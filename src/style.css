@@ -1,4 +1,4 @@
-@import url('/workstr-reference.css');
+@import './workstr-reference.css';
 
 button { font: inherit; border: 0; }
 .hero-card {
