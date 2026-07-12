@@ -1,0 +1,30 @@
+{
+  "name": "workstr-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Static local-first Nostr workout tracker PWA.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.0.1",
+    "idb": "^8.0.3",
+    "nostr-tools": "^2.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.1.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vitest": "^4.0.16"
+  }
+}
