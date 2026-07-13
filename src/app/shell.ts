@@ -6,7 +6,7 @@ import { CANONICAL_REGIONS } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft } from '../db/store';
 import starterExercises from '../data/starter-exercises.json';
 import type { Exercise } from '../core/types';
-import { fetchPowrExercises, fetchPowrPrograms, POWR_RELAY, type RelayProgram } from '../nostr/powrLibrary';
+import { fetchRelayExercises, fetchRelayPrograms, WORKSTR_LIBRARY_RELAY, type RelayProgram } from '../nostr/powrLibrary';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
@@ -28,7 +28,8 @@ interface AppState {
   editingId: number | null;
   filter: string;
   programFilter: string;
-  relayStatus: string;
+  exerciseStatus: string;
+  programStatus: string;
   signInStatus: string | null;
 }
 
@@ -150,10 +151,10 @@ function exercisesView(state: AppState): string {
     ${authNotice(state)}
     <div class="sub-panel ${active === 'library' ? 'active' : ''}" id="sub-exercises-library">
       <div class="panel">
-        <div class="panel-head"><span>Exercise library</span><span class="head-actions"><span class="status-pill">${POWR_RELAY}</span><button class="button ghost small" id="refresh-library">Refresh</button></span></div>
-        <p class="section-help">This is the main Workstr Web library: public Workstr/NIP-101e exercise templates fetched from the POWR relay.</p>
+        <div class="panel-head"><span>Exercise library</span><span class="head-actions"><span class="status-pill">${WORKSTR_LIBRARY_RELAY}</span><button class="button ghost small" id="refresh-exercises">Refresh</button></span></div>
+        <p class="section-help">This is the main Workstr Web library: public Workstr/NIP-101e exercise templates fetched from the relay.</p>
         <div class="filter-bar"><input class="grow" id="exercise-filter" placeholder="Search exercises..." autocomplete="off" value="${html(state.filter)}" /><select><option>All categories</option></select><select><option>All muscles</option></select><select><option>All levels</option></select></div>
-        <div class="discover-status">${html(state.relayStatus || `${exercises.length} Workstr exercises from ${POWR_RELAY}`)}</div>
+        <div class="discover-status">${html(state.exerciseStatus || `${exercises.length} exercises from ${WORKSTR_LIBRARY_RELAY}`)}</div>
         <div class="ex-grid">${exercises.map(exerciseCard).join('') || '<div class="empty">No Workstr exercises loaded yet. Use Refresh to query the relay.</div>'}</div>
       </div>
       ${state.pubkey ? `<div class="panel"><div class="panel-head"><span>${editing ? 'Edit exercise' : 'New exercise'}</span></div>${exerciseForm(editing)}</div>` : ''}
@@ -203,10 +204,10 @@ function workoutsView(state: AppState): string {
     <div class="page-title">Workouts</div>
     ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
     <div class="sub-panel ${active === 'programs' ? 'active' : ''}" id="sub-workouts-programs">
-      <div class="panel"><div class="panel-head"><span>Programs</span><span class="head-actions"><span class="status-pill">${POWR_RELAY}</span><button class="button ghost small" id="refresh-library">Refresh</button></span></div><p class="section-help">This is the main Workstr Web program library: public Workstr/NIP-101e workout templates fetched from the POWR relay.</p><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="discover-status">${html(state.relayStatus || `${programs.length} Workstr programs from ${POWR_RELAY}`)}</div><div class="program-list">${programs.map(programCard).join('') || '<div class="empty">No Workstr programs loaded yet. Use Refresh to query the relay.</div>'}</div></div>
+      <div class="panel"><div class="panel-head"><span>Programs</span><span class="head-actions"><span class="status-pill">${WORKSTR_LIBRARY_RELAY}</span><button class="button ghost small" id="refresh-programs">Refresh</button></span></div><p class="section-help">This is the main Workstr Web program library: public Workstr/NIP-101e workout templates fetched from the relay.</p><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="discover-status">${html(state.programStatus || `${programs.length} workouts from ${WORKSTR_LIBRARY_RELAY}`)}</div><div class="program-list">${programs.map(programCard).join('') || '<div class="empty">No workouts loaded yet. Use Refresh to query the relay.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
-      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost" id="refresh-library">Search relays</button></div><p class="section-help">Programs from ${POWR_RELAY} are already the main Programs library for Workstr Web.</p><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="discover-status">${html(state.relayStatus)}</div><div class="program-list">${state.programs.map(programCard).join('')}</div></div>
+      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost" id="refresh-programs">Search relays</button></div><p class="section-help">Workouts from ${WORKSTR_LIBRARY_RELAY} are already the main Programs library for Workstr Web.</p><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="discover-status">${html(state.programStatus)}</div><div class="program-list">${state.programs.map(programCard).join('')}</div></div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p><div class="list empty">No completed sessions yet.</div></div>
@@ -250,12 +251,12 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], editingId: null, filter: '', programFilter: '', relayStatus: `loading Workstr library from ${POWR_RELAY}...`, signInStatus: null };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], editingId: null, filter: '', programFilter: '', exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
     render();
-    await refreshLibrary();
+    await refreshExercises();
   }
 
   async function openIdentity(pubkey: string, persist = true, signerType: AppState['signerType'] = state.signerType): Promise<void> {
@@ -278,7 +279,13 @@ export function renderShell(root: HTMLElement): void {
   }
 
   function bind(): void {
-    root.querySelectorAll<HTMLElement>('[data-view]').forEach((button) => button.addEventListener('click', () => { state.view = button.dataset.view as View; state.editingId = null; render(); }));
+    root.querySelectorAll<HTMLElement>('[data-view]').forEach((button) => button.addEventListener('click', () => {
+      state.view = button.dataset.view as View;
+      state.editingId = null;
+      render();
+      if (state.view === 'exercises' && !state.exercises.length) void refreshExercises();
+      if (state.view === 'workouts' && !state.programs.length) void refreshPrograms();
+    }));
     root.querySelectorAll<HTMLElement>('[data-subtab]').forEach((button) => button.addEventListener('click', () => {
       const parent = button.dataset.parent as keyof AppState['subState'];
       if (parent && parent in state.subState) {
@@ -286,6 +293,8 @@ export function renderShell(root: HTMLElement): void {
         state.view = parent as View;
         state.editingId = null;
         render();
+        if (parent === 'exercises' && !state.exercises.length) void refreshExercises();
+        if (parent === 'workouts' && !state.programs.length) void refreshPrograms();
       }
     }));
     root.querySelector('#sign-in')?.addEventListener('click', startRemoteSignerRequest);
@@ -293,7 +302,8 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#sign-out')?.addEventListener('click', signOut);
     root.querySelector('#sign-out-settings')?.addEventListener('click', signOut);
     root.querySelector('#open-demo')?.addEventListener('click', () => openAndRender('demo-local-pubkey'));
-    root.querySelectorAll('#refresh-library').forEach((button) => button.addEventListener('click', () => { void refreshLibrary(); }));
+    root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void refreshExercises(); }));
+    root.querySelectorAll('#refresh-programs').forEach((button) => button.addEventListener('click', () => { void refreshPrograms(); }));
     root.querySelector('#new-exercise')?.addEventListener('click', () => { state.editingId = null; render(); });
     root.querySelector('#cancel-edit')?.addEventListener('click', () => { state.editingId = null; render(); });
     root.querySelector('#exercise-filter')?.addEventListener('input', (event) => { state.filter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#exercise-filter'); input?.focus(); input?.setSelectionRange(state.filter.length, state.filter.length); });
@@ -303,16 +313,28 @@ export function renderShell(root: HTMLElement): void {
     root.querySelectorAll<HTMLElement>('[data-delete]').forEach((button) => button.addEventListener('click', () => deleteExercise(Number(button.dataset.delete))));
   }
 
-  async function refreshLibrary(): Promise<void> {
-    state.relayStatus = `loading Workstr exercises and programs from ${POWR_RELAY}...`;
+  async function refreshExercises(): Promise<void> {
+    state.exerciseStatus = `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`;
     render();
     try {
-      const [exercises, programs] = await Promise.all([fetchPowrExercises(), fetchPowrPrograms()]);
+      const exercises = await fetchRelayExercises();
       state.exercises = exercises;
-      state.programs = programs;
-      state.relayStatus = `loaded ${exercises.length} exercises and ${programs.length} programs from ${POWR_RELAY}`;
+      state.exerciseStatus = `loaded ${exercises.length} exercises from ${WORKSTR_LIBRARY_RELAY}`;
     } catch (error) {
-      state.relayStatus = `relay error: ${(error as Error).message}`;
+      state.exerciseStatus = `exercise relay error: ${(error as Error).message}`;
+    }
+    render();
+  }
+
+  async function refreshPrograms(): Promise<void> {
+    state.programStatus = `loading workouts from ${WORKSTR_LIBRARY_RELAY}...`;
+    render();
+    try {
+      const programs = await fetchRelayPrograms();
+      state.programs = programs;
+      state.programStatus = `loaded ${programs.length} workouts from ${WORKSTR_LIBRARY_RELAY}`;
+    } catch (error) {
+      state.programStatus = `workout relay error: ${(error as Error).message}`;
     }
     render();
   }

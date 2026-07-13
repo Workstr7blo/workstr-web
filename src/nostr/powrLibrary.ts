@@ -4,8 +4,8 @@ import { canonMuscle } from '../core/muscles';
 import { slugify } from '../core/ids';
 import type { Exercise } from '../core/types';
 
-export const POWR_RELAY = 'wss://relay.powr.build';
-export const WORKSTR_LIBRARY_RELAYS = [POWR_RELAY];
+export const WORKSTR_LIBRARY_RELAY = 'wss://relay.damus.io';
+export const WORKSTR_LIBRARY_RELAYS = [WORKSTR_LIBRARY_RELAY];
 
 export interface RelayProgramExercise {
   address: string;
@@ -219,7 +219,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = QUERY_TIMEOUT_MS): Prom
   });
 }
 
-export async function fetchPowrExercises(): Promise<Exercise[]> {
+export async function fetchRelayExercises(): Promise<Exercise[]> {
   const events = await withTimeout(queryKind(33401));
   const byAddress = new Map<string, Exercise>();
   for (const event of events) {
@@ -229,7 +229,7 @@ export async function fetchPowrExercises(): Promise<Exercise[]> {
   return [...byAddress.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function fetchPowrPrograms(): Promise<RelayProgram[]> {
+export async function fetchRelayPrograms(): Promise<RelayProgram[]> {
   const events = await withTimeout(queryKind(33402));
   const byAddress = new Map<string, RelayProgram>();
   for (const event of events) {
