@@ -244,11 +244,19 @@ function resolveProgramExercise(member: RelayProgram['exercises'][number], exerc
   return null;
 }
 
+function programMuscleLabel(raw?: string): string {
+  const value = String(raw || '').trim();
+  const key = value.toLowerCase();
+  if (['biceps', 'triceps', 'brachialis', 'brachioradialis', 'forearms', 'forearm'].includes(key)) return 'Arms';
+  if (['shoulder', 'shoulders', 'deltoid', 'deltoids', 'lateral deltoid', 'anterior deltoid', 'posterior deltoid', 'supraspinatus'].includes(key)) return 'Shoulders';
+  return value;
+}
+
 function programGroups(program: RelayProgram, exercises: Exercise[]): string[] {
   const groups = new Set<string>();
   for (const member of program.exercises) {
     const full = resolveProgramExercise(member, exercises);
-    const primary = member.muscleGroup || full?.muscle_group;
+    const primary = programMuscleLabel(member.muscleGroup || full?.muscle_group);
     if (primary) groups.add(primary);
   }
   return [...groups];
@@ -290,14 +298,14 @@ function programBody(program: RelayProgram, exercises: Exercise[]): string {
   const exHtml = program.exercises.length ? program.exercises.map((member, index) => {
     const full = resolveProgramExercise(member, exercises);
     const name = programExerciseName(member, full);
-    const muscle = member.muscleGroup || full?.muscle_group || '';
+    const muscle = programMuscleLabel(member.muscleGroup || full?.muscle_group);
     const image = exerciseImage(member.imageUrl || full?.image_url);
     const sets = Number(member.sets) || 3;
     const reps = member.reps || String(full?.default_reps || '8-12');
     const weight = member.weight != null && member.weight !== '' ? ` @ ${html(member.weight)}` : '';
     const rest = Number(member.restSec || member.rest || full?.default_rest) || 90;
-    return `<div class="wk-ex-item open" data-exitem="${html(program.address)}-${index}">
-      <div class="wk-ex-header">
+    return `<div class="wk-ex-item" data-exitem="${html(program.address)}-${index}">
+      <div class="wk-ex-header" data-toggle-exitem="${html(program.address)}-${index}">
         ${image}
         <div class="wk-ex-info">
           <div class="wk-ex-name">${html(name)}</div>
@@ -404,6 +412,12 @@ export function renderShell(root: HTMLElement): void {
       const address = header.dataset.toggleProgram || null;
       state.expandedProgramAddress = state.expandedProgramAddress === address ? null : address;
       render();
+    }));
+    root.querySelectorAll<HTMLElement>('[data-toggle-exitem]').forEach((header) => header.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const key = header.dataset.toggleExitem;
+      const item = key ? root.querySelector<HTMLElement>(`[data-exitem="${CSS.escape(key)}"]`) : null;
+      item?.classList.toggle('open');
     }));
     root.querySelector('#exercise-form')?.addEventListener('submit', saveExercise);
     root.querySelectorAll<HTMLElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => { state.editingId = Number(button.dataset.edit); render(); }));
