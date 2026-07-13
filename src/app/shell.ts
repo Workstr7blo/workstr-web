@@ -1,4 +1,5 @@
 import { nip19, SimplePool } from 'nostr-tools';
+import { renderSVG } from 'uqr';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
 import { createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
 import { slugify } from '../core/ids';
@@ -658,7 +659,7 @@ function statisticsView(state: AppState): string {
 
 function settingsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
-  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr signer</span><span class="status-pill ${state.pubkey ? 'ok' : 'bad'}">${state.pubkey ? 'connected' : 'not signed in'}</span></div><p class="section-help">Workstr Web replaces self-hosted Idenstr with a user-owned NIP-46 signer. Press Sign in in the top-right; the app launches the signer request directly.</p><div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'not signed in')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div><div class="web-empty-actions">${state.pubkey ? '<button id="sign-out-settings" class="button ghost">Switch signer</button>' : '<button id="sign-in-settings" class="button primary">Sign in</button>'}<button id="open-demo" class="button ghost">Open local demo</button></div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select" ${state.store ? '' : 'disabled'}><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label>${state.store ? '' : '<p class="section-help">Open a signer or local demo first so preferences can be saved in the per-identity IndexedDB database.</p>'}</div></div>`;
+  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr signer</span><span class="status-pill ${state.pubkey ? 'ok' : 'bad'}">${state.pubkey ? 'connected' : 'not signed in'}</span></div><p class="section-help">Workstr Web replaces self-hosted Idenstr with a user-owned NIP-46 signer. Press Sign in in the top-right; scan the QR code with your signer app, or let it open directly on mobile.</p><div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'not signed in')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div><div class="web-empty-actions">${state.pubkey ? '<button id="sign-out-settings" class="button ghost">Switch signer</button>' : '<button id="sign-in-settings" class="button primary">Sign in</button>'}<button id="open-demo" class="button ghost">Open local demo</button></div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select" ${state.store ? '' : 'disabled'}><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label>${state.store ? '' : '<p class="section-help">Open a signer or local demo first so preferences can be saved in the per-identity IndexedDB database.</p>'}</div></div>`;
 }
 
 export function renderShell(root: HTMLElement): void {
@@ -693,6 +694,7 @@ export function renderShell(root: HTMLElement): void {
     root.innerHTML = shellMarkup(state);
     bind();
     if (state.activeSession) void openSessionOverlay(state.activeSession);
+    if (pendingConnect) renderConnectModal();
   }
 
   function bind(): void {
@@ -853,6 +855,7 @@ export function renderShell(root: HTMLElement): void {
 
   let sessionExerciseIndex = 0;
   let sessionSetCounts: Record<string, number> = {};
+  let pendingConnect: { uri: string; mobile: boolean } | null = null;
   let sessionRestTimer = 0;
   let sessionRestTotal = 0;
   let sessionRestRemaining = 0;
@@ -1228,7 +1231,7 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#modal-close')?.addEventListener('click', closeModal);
   }
 
-  function closeModal(): void { root.querySelector('#modal')?.classList.remove('open'); }
+  function closeModal(): void { pendingConnect = null; root.querySelector('#modal')?.classList.remove('open'); }
 
   function bindSessionControls(): void {
     root.querySelector('#session-close')?.addEventListener('click', () => { void cancelActiveSession(); });
@@ -1265,16 +1268,45 @@ export function renderShell(root: HTMLElement): void {
 
   async function startRemoteSignerRequest(): Promise<void> {
     try {
-      state.signInStatus = 'creating open signer request...'; render();
+      state.signInStatus = 'creating signer connect request...'; render();
       const request = createNostrConnectSignerRequest(defaultBunkerRelays(), { onAuthUrl: launchSignerRequest });
-      state.signInStatus = `launching signer request; approve it, then return to this tab; waiting on ${request.relays.join(', ')}`;
-      launchSignerRequest(request.uri); render();
+      const mobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+      state.signInStatus = `waiting for signer approval on ${request.relays.join(', ')}`;
+      render();
+      showSignerConnectModal(request.uri, mobile);
+      if (mobile) launchSignerRequest(request.uri);
       const connected = await request.signer;
+      closeModal();
       await openAndRender(connected.pubkey, 'nip46');
     } catch (error) {
+      closeModal();
       state.signInStatus = `signer error ${(error as Error).message}`;
       render();
     }
+  }
+
+  function showSignerConnectModal(uri: string, mobile: boolean): void {
+    pendingConnect = { uri, mobile };
+    renderConnectModal();
+  }
+
+  function renderConnectModal(): void {
+    if (!pendingConnect) return;
+    const { uri, mobile } = pendingConnect;
+    openModal(`<div class="page-title">Connect signer</div>
+      <p class="section-help">${mobile
+        ? 'Approve the request in your signer app, then return to this tab. You can also scan the QR code from another device.'
+        : 'Scan the QR code with your NIP-46 signer app (Clave, Amber, ...). Once you approve, this tab signs in automatically.'}</p>
+      <div class="signer-qr">${renderSVG(uri, { border: 2 })}</div>
+      <div class="web-empty-actions">
+        <button id="connect-copy" class="button ghost" type="button">Copy connect link</button>
+        <button id="connect-open" class="button ghost" type="button">Open signer app</button>
+      </div>`);
+    root.querySelector('#connect-copy')?.addEventListener('click', (event) => {
+      void navigator.clipboard.writeText(uri);
+      (event.currentTarget as HTMLButtonElement).textContent = 'Copied';
+    });
+    root.querySelector('#connect-open')?.addEventListener('click', () => launchSignerRequest(uri));
   }
 
   function launchSignerRequest(uri: string): void {
