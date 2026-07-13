@@ -301,23 +301,22 @@ export function renderShell(root: HTMLElement): void {
           return;
         }
         panel!.textContent += '$ bunker connecting over the URI relays; keep the signer app online and approve there...\n';
-        signerPromise = createBunkerSigner(input, { onAuthUrl: showAuthUrl });
+        signerPromise = createBunkerSigner(input, { onAuthUrl: showAuthUrl }).then(async (signer) => ({ signer, pubkey: await signer.getPublicKey() }));
       } else {
         const request = createNostrConnectSignerRequest(relays, { onAuthUrl: showAuthUrl });
         signerPromise = request.signer;
-        panel!.textContent += `$ signer request created on ${request.relays.join(', ')}\n$ open this request in Amber/your NIP-46 signer and approve it; waiting up to 5 minutes...\n`;
+        panel!.textContent += `$ signer request created on ${request.relays.join(', ')}\n$ open this request in Amber/your NIP-46 signer, approve it, then return to this tab; waiting up to 5 minutes...\n`;
         if (linkPanel) {
-          linkPanel.innerHTML = `<a class="button primary" href="${html(request.uri)}">Open signer request</a><button id="copy-bunker-request" class="button ghost" type="button">Copy request URI</button>`;
+          linkPanel.innerHTML = `<a class="button primary" href="${html(request.uri)}" target="_blank" rel="noreferrer">Open signer request</a><button id="copy-bunker-request" class="button ghost" type="button">Copy request URI</button>`;
           linkPanel.querySelector('#copy-bunker-request')?.addEventListener('click', async () => {
             await navigator.clipboard.writeText(request.uri);
             panel!.textContent += '$ signer request copied\n';
           });
         }
       }
-      const signer = await signerPromise;
-      const pubkey = await signer.getPublicKey();
-      panel!.textContent += `$ bunker connected ${shortNpub(pubkey)}\n`;
-      await openAndRender(pubkey, 'nip46');
+      const connected = await signerPromise;
+      panel!.textContent += `$ bunker connected ${shortNpub(connected.pubkey)}\n`;
+      await openAndRender(connected.pubkey, 'nip46');
     } catch (error) {
       panel!.textContent += `$ bunker error ${(error as Error).message}\n`;
     }

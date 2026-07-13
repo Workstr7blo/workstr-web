@@ -11,10 +11,15 @@ interface BunkerOptions {
   onAuthUrl?: (url: string) => void;
 }
 
+interface ConnectedBunkerSigner {
+  pubkey: string;
+  signer: Signer;
+}
+
 interface NostrConnectRequest {
   uri: string;
   relays: string[];
-  signer: Promise<Signer>;
+  signer: Promise<ConnectedBunkerSigner>;
 }
 
 function clientSecretKey(): Uint8Array {
@@ -72,7 +77,10 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
   return {
     uri,
     relays: cleanRelays,
-    signer: BunkerSigner.fromURI(secret, uri, { pool, onauth: options.onAuthUrl }, 300000).then(wrapBunkerSigner)
+    signer: BunkerSigner.fromURI(secret, uri, { pool, onauth: options.onAuthUrl }, 300000).then((signer) => ({
+      pubkey: signer.bp.pubkey,
+      signer: wrapBunkerSigner(signer)
+    }))
   };
 }
 
