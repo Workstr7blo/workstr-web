@@ -7,7 +7,7 @@ import { CANONICAL_REGIONS, canonMuscle } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft } from '../db/store';
 import starterExercises from '../data/starter-exercises.json';
 import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
-import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
+import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput, type WeightUnit } from '../core/units';
 import { fetchRelayExercises, fetchRelayPrograms, WORKSTR_LIBRARY_RELAY, type RelayProgram } from '../nostr/powrLibrary';
 
 const SESSION_KEY = 'workstr.currentPubkey';
@@ -163,6 +163,7 @@ interface AppState {
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
   exercises: Exercise[];
   programs: RelayProgram[];
+  expandedSessionId: number | null;
   activeSession: ActiveSession | null;
   finishedSessions: ActiveSession[];
   editingId: number | null;
@@ -368,31 +369,107 @@ function exerciseForm(exercise?: Exercise): string {
   </form>`;
 }
 
-function historyDuration(session: ActiveSession): string {
-  if (!session.startedAt || !session.finishedAt) return 'in progress';
-  const sec = Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(session.startedAt).getTime()) / 1000));
-  const m = Math.floor(sec / 60), s = sec % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
-
 function sessionExercises(session: ActiveSession): SessionExercise[] { return session.exercises || []; }
 
 function workoutVolume(session: ActiveSession): number {
   return session.sets.filter((set) => set.done).reduce((total, set) => total + (Number(set.reps) || 0) * (Number(set.weight) || 0), 0);
 }
 
+function formatSessionDate(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? (iso || '') : date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function sessionDuration(session: ActiveSession): string {
+  if (!session.startedAt || !session.finishedAt) return '';
+  const min = Math.round((new Date(session.finishedAt).getTime() - new Date(session.startedAt).getTime()) / 60000);
+  if (!Number.isFinite(min) || min <= 0) return '';
+  return min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`;
+}
+
+function muscleSetsForSlugs(slugs: string[], fallbackGroups: string[], exercises: Exercise[]): { primary: Set<string>; secondary: Set<string> } {
+  const primary = new Set<string>();
+  const secondary = new Set<string>();
+  for (const group of fallbackGroups) { const canonical = canonMuscle(group); if (canonical) primary.add(canonical); }
+  for (const slug of slugs) {
+    const full = exercises.find((exercise) => exercise.slug === slug);
+    const canonicalPrimary = canonMuscle(full?.muscle_group || '');
+    if (canonicalPrimary) primary.add(canonicalPrimary);
+    for (const raw of full?.muscles || []) { const canonical = canonMuscle(raw); if (canonical) secondary.add(canonical); }
+  }
+  primary.forEach((muscle) => secondary.delete(muscle));
+  return { primary, secondary };
+}
+
+function sessionMuscleSets(session: ActiveSession, exercises: Exercise[]): { primary: Set<string>; secondary: Set<string> } {
+  const slugs = [...new Set(sessionExercises(session).map((member) => member.exerciseSlug))];
+  const fallbackGroups = sessionExercises(session).map((member) => member.muscleGroup || '').filter(Boolean);
+  return muscleSetsForSlugs(slugs, fallbackGroups, exercises);
+}
+
+function sessionMuscleGroupNames(session: ActiveSession, exercises: Exercise[]): string[] {
+  const names = new Set<string>();
+  for (const member of sessionExercises(session)) {
+    if (member.muscleGroup) names.add(member.muscleGroup);
+    const full = exercises.find((exercise) => exercise.slug === member.exerciseSlug);
+    if (full?.muscle_group) names.add(full.muscle_group);
+  }
+  return [...names].filter(Boolean);
+}
+
+function sessionDetail(session: ActiveSession, unit: WeightUnit): string {
+  const byEx = new Map<string, SessionSetLog[]>();
+  for (const set of session.sets.filter((item) => item.done)) {
+    if (!byEx.has(set.exerciseSlug)) byEx.set(set.exerciseSlug, []);
+    byEx.get(set.exerciseSlug)!.push(set);
+  }
+  const exName = (slug: string) => sessionExercises(session).find((member) => member.exerciseSlug === slug)?.exerciseName || slug;
+  const rows = [...byEx.entries()].map(([slug, sets]) => {
+    const pills = [...sets].sort((a, b) => a.setNumber - b.setNumber).map((set) =>
+      `<span class="set-pill">${set.reps ?? '?'}${set.weight != null ? ` × ${html(formatWeightKg(set.weight, unit))}` : ''}</span>`
+    ).join('');
+    return `<div class="session-detail-ex">
+      <div class="session-detail-ex-name">${html(exName(slug))}</div>
+      <div class="session-detail-sets">${pills}</div>
+    </div>`;
+  }).join('');
+  return `<div class="session-detail">
+    ${rows || '<p class="empty" style="padding:6px 0 12px">No sets were logged in this session.</p>'}
+    <div class="workout-card-actions">
+      <button class="button primary small" disabled title="Publishing summaries arrives with the Nostr share block">Publish summary</button>
+      <button class="button danger small" data-delete-session="${session.id}">Delete session</button>
+    </div>
+  </div>`;
+}
+
 function workoutHistory(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
-  if (!state.finishedSessions.length) return '<div class="list empty">No completed sessions yet.</div>';
-  return `<div class="history-list">${state.finishedSessions.map((session) => {
+  if (!state.finishedSessions.length) return '<div class="list empty">No completed sessions yet. Finish a workout to see it here.</div>';
+  return `<div class="program-list" id="history-list">${state.finishedSessions.map((session) => {
     const doneSets = session.sets.filter((set) => set.done);
     const volume = workoutVolume(session);
-    const grouped = sessionExercises(session).map((exercise) => {
-      const sets = doneSets.filter((set) => set.exerciseSlug === exercise.exerciseSlug);
-      if (!sets.length) return '';
-      return `<div class="session-detail-ex"><div class="session-detail-ex-name">${html(exercise.exerciseName || exercise.exerciseSlug)}</div><div class="session-detail-sets">${sets.map((set) => `<span class="set-pill">${set.reps ?? '—'}${set.weight == null ? '' : ` × ${html(formatWeightKg(set.weight, unit))}`}</span>`).join('')}</div></div>`;
-    }).filter(Boolean).join('');
-    return `<details class="history-session"><summary><div><strong>${html(session.sheetName || 'Workout')}</strong><small>${new Date(session.startedAt).toLocaleString()} · ${historyDuration(session)}</small></div><span>${doneSets.length} sets · ${volume ? html(formatWeightKg(volume, unit)) : '—'}</span></summary><div class="history-session-body session-detail">${grouped || '<div class="empty">No sets logged.</div>'}<div class="workout-card-actions"><button class="button danger small" type="button" data-delete-session="${session.id}">Delete session</button></div></div></details>`;
+    const meta = [
+      formatSessionDate(session.finishedAt || session.startedAt),
+      sessionDuration(session),
+      `${doneSets.length} set${doneSets.length === 1 ? '' : 's'}`,
+      volume > 0 ? `${Math.round(displayWeightKg(volume, unit) || 0)} ${unit} volume` : ''
+    ].filter(Boolean).join(' · ');
+    const groups = sessionMuscleGroupNames(session, state.exercises);
+    const { primary, secondary } = sessionMuscleSets(session, state.exercises);
+    const map = paintBodyMapSvg(primary, secondary);
+    const expanded = state.expandedSessionId === session.id;
+    return `<div class="workout-card ${expanded ? 'expanded' : ''}" data-session="${session.id}">
+      <div class="workout-card-header" data-toggle-session="${session.id}">
+        <div class="workout-card-map ${map ? 'has-map' : ''}" data-session-map="${session.id}">${map || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'}</div>
+        <div class="workout-card-info">
+          <div class="workout-card-name">${html(session.sheetName || 'Freestyle')}</div>
+          <div class="workout-card-meta">${meta}</div>
+          ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(', '))}</div>` : ''}
+        </div>
+        <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="workout-card-body" data-session-body="${session.id}">${expanded ? sessionDetail(session, unit) : ''}</div>
+    </div>`;
   }).join('')}</div>`;
 }
 
@@ -536,8 +613,7 @@ function programMuscleSets(program: RelayProgram, exercises: Exercise[]): { prim
   return { primary, secondary };
 }
 
-function programMuscleMap(program: RelayProgram, exercises: Exercise[]): string {
-  const { primary, secondary } = programMuscleSets(program, exercises);
+function paintBodyMapSvg(primary: Set<string>, secondary: Set<string>): string {
   if (!primary.size && !secondary.size) return '';
   return RECOVERY_BODY_SVG.replace(/<polygon([^>]*data-muscle="([^"]+)"[^>]*)>/g, (_match, attrs: string, muscle: string) => {
     const cleanAttrs = attrs.replace(/\s*\/$/, '');
@@ -548,6 +624,11 @@ function programMuscleMap(program: RelayProgram, exercises: Exercise[]): string 
     const cleanAttrs = attrs.replace(/\s*\/$/, '');
     return `<polygon${cleanAttrs} style="fill:#1a1228"/>`;
   });
+}
+
+function programMuscleMap(program: RelayProgram, exercises: Exercise[]): string {
+  const { primary, secondary } = programMuscleSets(program, exercises);
+  return paintBodyMapSvg(primary, secondary);
 }
 
 function exerciseImage(src?: string): string {
@@ -663,7 +744,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null, expandedSessionId: null };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
@@ -749,12 +830,18 @@ export function renderShell(root: HTMLElement): void {
     root.querySelectorAll<HTMLElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => { state.editingId = Number(button.dataset.edit); render(); }));
     root.querySelectorAll<HTMLElement>('[data-delete]').forEach((button) => button.addEventListener('click', () => deleteExercise(Number(button.dataset.delete))));
     root.querySelectorAll<HTMLElement>('[data-delete-session]').forEach((button) => button.addEventListener('click', () => { void deleteSession(Number(button.dataset.deleteSession)); }));
+    root.querySelectorAll<HTMLElement>('[data-toggle-session]').forEach((head) => head.addEventListener('click', () => {
+      const id = Number(head.dataset.toggleSession) || 0;
+      state.expandedSessionId = state.expandedSessionId === id ? null : id;
+      render();
+    }));
   }
 
   async function deleteSession(id: number): Promise<void> {
     if (!state.store || !id) return;
-    if (!window.confirm('Delete this completed session? This removes it from history, stats, and recovery.')) return;
+    if (!window.confirm('Delete this session? All logged sets will be permanently removed from your history and stats.')) return;
     await state.store.deleteSession(id);
+    if (state.expandedSessionId === id) state.expandedSessionId = null;
     state.finishedSessions = await loadFinishedSessions();
     render();
   }
