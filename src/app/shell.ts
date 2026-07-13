@@ -397,12 +397,12 @@ function programMuscleMap(program: RelayProgram, exercises: Exercise[]): string 
   if (!primary.size && !secondary.size) return '';
   return RECOVERY_BODY_SVG.replace(/<polygon([^>]*data-muscle="([^"]+)"[^>]*)>/g, (_match, attrs: string, muscle: string) => {
     const cleanAttrs = attrs.replace(/\s*\/$/, '');
-    if (primary.has(muscle)) return `<polygon${cleanAttrs} style="fill:#d7c2ff;opacity:1;stroke:#ffffff;stroke-width:1.15"/>`;
-    if (secondary.has(muscle)) return `<polygon${cleanAttrs} style="fill:#9f6bff;opacity:.9;stroke:#eadfff;stroke-width:.9"/>`;
-    return `<polygon${cleanAttrs} style="fill:#725e92;opacity:.6;stroke:#c5b2df;stroke-width:.6"/>`;
+    if (primary.has(muscle)) return `<polygon${cleanAttrs} style="fill:var(--sovereign-purple);opacity:.95"/>`;
+    if (secondary.has(muscle)) return `<polygon${cleanAttrs} style="fill:var(--purple-2);opacity:.5"/>`;
+    return `<polygon${cleanAttrs} style="fill:#2a1d40"/>`;
   }).replace(/<polygon((?:(?!data-muscle)[^>])*)>/g, (_match, attrs: string) => {
     const cleanAttrs = attrs.replace(/\s*\/$/, '');
-    return `<polygon${cleanAttrs} style="fill:#40314f;opacity:.75;stroke:#8b7aa1;stroke-width:.45"/>`;
+    return `<polygon${cleanAttrs} style="fill:#1a1228"/>`;
   });
 }
 
