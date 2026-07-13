@@ -1,4 +1,4 @@
-import { nip19 } from 'nostr-tools';
+import { nip19, SimplePool } from 'nostr-tools';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
 import { createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
 import { slugify } from '../core/ids';
@@ -9,12 +9,14 @@ import type { Exercise } from '../core/types';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
+const PROFILE_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
 
 type View = 'home' | 'library' | 'train' | 'progress';
 
 interface AppState {
   pubkey: string | null;
   npub: string | null;
+  profileName: string | null;
   store: WorkstrStore | null;
   signerType: 'nip07' | 'nip46' | 'demo' | null;
   view: View;
@@ -33,6 +35,27 @@ function shortNpub(pubkey: string): string {
 function displayNpub(pubkey: string): string {
   if (pubkey === 'demo-local-pubkey') return 'demo local identity';
   return shortNpub(pubkey);
+}
+
+function displayIdentity(state: AppState): string {
+  if (!state.pubkey) return '';
+  if (state.profileName) return state.profileName;
+  return displayNpub(state.pubkey);
+}
+
+async function fetchProfileName(pubkey: string): Promise<string | null> {
+  if (pubkey === 'demo-local-pubkey') return 'demo local identity';
+  const pool = new SimplePool();
+  try {
+    const event = await pool.get(PROFILE_RELAYS, { kinds: [0], authors: [pubkey] });
+    if (!event) return null;
+    const profile = JSON.parse(event.content) as { display_name?: string; name?: string; nip05?: string };
+    return profile.display_name?.trim() || profile.name?.trim() || profile.nip05?.trim() || null;
+  } catch {
+    return null;
+  } finally {
+    pool.close(PROFILE_RELAYS);
+  }
 }
 
 function html(value: unknown): string {
@@ -65,7 +88,7 @@ function shellMarkup(state: AppState): string {
       </div>
       <div class="topbar-actions">
         ${state.pubkey
-          ? `<span id="live-status">${html(displayNpub(state.pubkey))}</span><button id="sign-out" class="button small ghost">Switch</button>`
+          ? `<span id="live-status">${html(displayIdentity(state))}</span><button id="sign-out" class="button small ghost">Switch</button>`
           : '<button id="sign-in" class="button small primary">Sign in</button>'}
       </div>
     </header>
@@ -101,7 +124,7 @@ function loginView(state: AppState): string {
         <button id="open-demo" class="button ghost">Open local demo</button>
       </div>
       <div class="signer-request-panel">
-        ${state.signerRequestUri ? `<a class="button primary" href="${html(state.signerRequestUri)}" target="_blank" rel="noreferrer">Open signer request</a><button id="copy-signer-request" class="button ghost" type="button">Copy signer request</button>` : ''}
+        ${state.signerRequestUri ? `<a id="open-signer-request" class="button primary" href="${html(state.signerRequestUri)}" target="_blank" rel="noreferrer">Open signer request</a><button id="copy-signer-request" class="button ghost" type="button">Copy signer request</button>` : ''}
       </div>
       <pre id="status-panel" class="terminal-mini">$ workstr-web boot\nsecure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\n${state.signInStatus ? `$ ${html(state.signInStatus)}\n` : ''}</pre>
     </div>
@@ -116,7 +139,7 @@ function appView(state: AppState): string {
     <div class="hero-card">
       <p class="eyebrow">Signed in</p>
       <h1>Your local-first training workspace is open.</h1>
-      <p class="lede">Identity: <strong>${html(state.npub ?? '')}</strong></p>
+      <p class="lede">Signed in as <strong>${html(displayIdentity(state))}</strong></p>
       <div class="metric-grid mini">
         <div class="metric"><span class="metric-label">Library</span><strong>${state.exercises.length}</strong><p>active exercises in your local IndexedDB namespace</p></div>
         <div class="metric"><span class="metric-label">Signer</span><strong>${state.signerType === 'nip46' ? 'NIP-46' : state.pubkey === 'demo-local-pubkey' ? 'Demo' : 'NIP-07'}</strong><p>keys stay outside the app</p></div>
@@ -204,7 +227,7 @@ function exerciseCard(exercise: Exercise): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'home', exercises: [], editingId: null, filter: '', signerRequestUri: null, signInStatus: null };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'home', exercises: [], editingId: null, filter: '', signerRequestUri: null, signInStatus: null };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
@@ -215,6 +238,9 @@ export function renderShell(root: HTMLElement): void {
     state.pubkey = pubkey;
     state.signerType = signerType;
     state.npub = pubkey === 'demo-local-pubkey' ? 'demo-local-pubkey' : nip19.npubEncode(pubkey);
+    state.profileName = await fetchProfileName(pubkey);
+    state.signerRequestUri = null;
+    state.signInStatus = null;
     state.store = await WorkstrStore.open(pubkey);
     await state.store.seedExercises(starterExercises as ExerciseDraft[]);
     state.exercises = await state.store.listExercises();
@@ -242,6 +268,7 @@ export function renderShell(root: HTMLElement): void {
       localStorage.removeItem(SIGNER_TYPE_KEY);
       state.pubkey = null;
       state.npub = null;
+      state.profileName = null;
       state.store = null;
       state.signerType = null;
       state.exercises = [];
@@ -287,8 +314,9 @@ export function renderShell(root: HTMLElement): void {
       render();
       const request = createNostrConnectSignerRequest(defaultBunkerRelays(), { onAuthUrl: showAuthUrl });
       state.signerRequestUri = request.uri;
-      state.signInStatus = `open the signer request, approve it, then return to this tab; waiting on ${request.relays.join(', ')}`;
+      state.signInStatus = `launching signer request; approve it, then return to this tab; waiting on ${request.relays.join(', ')}`;
       render();
+      launchSignerRequest(request.uri);
       const connected = await request.signer;
       state.signInStatus = `signer connected ${shortNpub(connected.pubkey)}`;
       await openAndRender(connected.pubkey, 'nip46');
@@ -302,6 +330,16 @@ export function renderShell(root: HTMLElement): void {
       state.signInStatus = 'signer returned an approval URL; open it to approve the request';
       render();
     }
+  }
+
+  function launchSignerRequest(uri: string): void {
+    const iframe = document.createElement('iframe');
+    iframe.title = 'Nostr signer request launcher';
+    iframe.hidden = true;
+    iframe.style.display = 'none';
+    iframe.src = uri;
+    document.body.appendChild(iframe);
+    window.setTimeout(() => iframe.remove(), 5000);
   }
 
   async function copySignerRequest(): Promise<void> {
