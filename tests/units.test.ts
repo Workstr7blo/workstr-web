@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { exerciseAddress, slugify } from '../src/core/ids';
-import { epleyOneRepMax, kgToLb, lbToKg } from '../src/core/units';
+import { displayWeightKg, epleyOneRepMax, formatWeightKg, kgToLb, lbToKg, normalizeWeightUnit, storeWeightInput } from '../src/core/units';
 import { canonMuscle } from '../src/core/muscles';
 
 describe('core ids', () => {
@@ -16,6 +16,15 @@ describe('core ids', () => {
 describe('core units', () => {
   it('round-trips kg and lb', () => {
     expect(lbToKg(kgToLb(100))).toBeCloseTo(100, 8);
+  });
+
+  it('uses self-hosted unit names and canonical kg storage', () => {
+    expect(normalizeWeightUnit('lb')).toBe('lbs');
+    expect(normalizeWeightUnit('lbs')).toBe('lbs');
+    expect(displayWeightKg(6.8, 'lbs')).toBe(15);
+    expect(storeWeightInput(15, 'lbs')).toBe(6.8);
+    expect(formatWeightKg(6.8, 'lbs')).toBe('15lbs');
+    expect(formatWeightKg(6.8, 'kg')).toBe('6.8kg');
   });
 
   it('calculates epley estimated one-rep max', () => {
