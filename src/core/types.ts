@@ -47,12 +47,17 @@ export interface Sheet {
 export interface SheetExercise {
   id?: number;
   sheet_id: number;
-  exercise_id: number;
+  exercise_id?: number;
+  exercise_slug?: string;
+  exercise_name?: string;
+  muscle_group?: string;
+  image_url?: string;
   position: number;
   sets?: number;
-  reps?: number;
+  reps?: number | string;
   rest?: number;
-  weight?: number;
+  weight?: number | null;
+  notes?: string;
 }
 
 export interface StoredSessionExercise {

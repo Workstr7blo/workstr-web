@@ -4,7 +4,7 @@ import { hasNip07, createNip07Signer } from '../signer/nip07';
 import { createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
 import { slugify } from '../core/ids';
 import { CANONICAL_REGIONS, canonMuscle } from '../core/muscles';
-import { WorkstrStore, type ExerciseDraft } from '../db/store';
+import { WorkstrStore, type ExerciseDraft, type SheetWithExercises } from '../db/store';
 import starterExercises from '../data/starter-exercises.json';
 import type { BodyWeightEntry, Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput, type WeightUnit } from '../core/units';
@@ -166,6 +166,7 @@ interface AppState {
   expandedSessionId: number | null;
   qw: { duration: number; exercises: QwExercise[]; pool: Record<string, QwExercise[]>; meta: string; visible: boolean };
   bodyEntries: BodyWeightEntry[];
+  sheets: SheetWithExercises[];
   activeSession: ActiveSession | null;
   finishedSessions: ActiveSession[];
   editingId: number | null;
@@ -742,6 +743,10 @@ function recoveryView(state: AppState): string {
 
 interface QwExercise { slug: string; name: string; muscleGroup: string; sets: number; reps: string; restSec: number; score?: number }
 
+interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string }
+
+interface BuilderState { sheetId?: number; name: string; desc: string; rows: BuilderRow[]; library: Exercise[] }
+
 interface QuickWorkoutData { exercises: QwExercise[]; pool: Record<string, QwExercise[]>; targetMuscleGroups: string[]; estimatedDurationMin: number }
 
 // Canonicalize a raw muscle group, folding granular names (e.g. "Lateral
@@ -831,12 +836,14 @@ function quickWorkoutPanel(state: AppState): string {
 function workoutsView(state: AppState): string {
   const active = state.subState.workouts;
   const query = state.programFilter.toLowerCase();
+  const locals = state.sheets.map(sheetToProgram).filter((program) => [program.name, program.description].join(' ').toLowerCase().includes(query));
   const programs = state.programs.filter((program) => [program.name, program.description, ...program.tags].join(' ').toLowerCase().includes(query));
+  const cards = [...locals, ...programs];
   return `<div class="page active" id="page-workouts">
     <div class="page-title">Workouts</div>
     ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
     <div class="sub-panel ${active === 'programs' ? 'active' : ''}" id="sub-workouts-programs">
-      <div class="panel"><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="program-list">${programs.map((program) => programCard(program, state)).join('') || '<div class="empty">No workouts match.</div>'}</div></div>
+      <div class="panel"><div class="panel-head"><span>Programs</span><button class="button primary small" id="new-program">+ New program</button></div><p class="section-help">A program is the routine you take to the gym. Expand one to review its exercises, then hit Start to open the live logger.</p><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="program-list">${cards.map((program) => programCard(program, state)).join('') || '<div class="empty">No programs yet. Build your first routine.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
       <div class="panel"><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="program-list">${state.programs.map((program) => programCard(program, state)).join('')}</div></div>
@@ -967,6 +974,39 @@ function programAuthor(program: RelayProgram, state: AppState): string {
   return state.profileNames[program.pubkey] || displayPubkey(program.pubkey);
 }
 
+function isLocalProgram(program: RelayProgram): boolean {
+  return program.address.startsWith('local:');
+}
+
+function localSheetId(program: RelayProgram): number {
+  return Number(program.address.slice('local:'.length)) || 0;
+}
+
+function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
+  return {
+    slug: sheet.slug,
+    name: sheet.name,
+    description: sheet.notes || '',
+    tags: [],
+    sourceLabel: 'local only',
+    eventId: sheet.nostr_event_id || '',
+    pubkey: '',
+    address: `local:${sheet.id}`,
+    createdAt: Math.floor(new Date(sheet.created_at).getTime() / 1000) || 0,
+    exercises: sheet.exercises.map((row) => ({
+      address: '',
+      name: row.exercise_name || row.exercise_slug || 'Exercise',
+      muscleGroup: row.muscle_group,
+      imageUrl: row.image_url,
+      notes: row.notes,
+      sets: Number(row.sets) || undefined,
+      reps: row.reps != null ? String(row.reps) : undefined,
+      weight: row.weight != null ? String(row.weight) : undefined,
+      restSec: Number(row.rest) || undefined
+    }))
+  };
+}
+
 function programCard(program: RelayProgram, state: AppState): string {
   const exerciseCount = program.exercises.length;
   const time = formatMinutes(estimateProgramMin(program.exercises));
@@ -974,13 +1014,14 @@ function programCard(program: RelayProgram, state: AppState): string {
   const map = programMuscleMap(program, state.exercises);
   const meta = [`${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
   const isExpanded = state.expandedProgramAddress === program.address;
+  const statusCls = isLocalProgram(program) ? 'local' : 'published';
   return `<div class="workout-card ${isExpanded ? 'expanded' : ''}" data-program-address="${html(program.address)}">
     <div class="workout-card-header" data-toggle-program="${html(program.address)}">
       <div class="workout-card-map ${map ? 'has-map' : ''}">${map || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg>'}</div>
       <div class="workout-card-info">
-        <div class="workout-card-name">${html(program.name)}<span class="program-status published">${html(program.sourceLabel || 'Workstr')}</span></div>
+        <div class="workout-card-name">${html(program.name)}<span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span></div>
         <div class="workout-card-meta">${meta}</div>
-        <div class="workout-card-author">${html(programAuthor(program, state))}</div>
+        ${program.pubkey ? `<div class="workout-card-author">${html(programAuthor(program, state))}</div>` : ''}
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(', '))}</div>` : ''}
       </div>
       <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1022,9 +1063,15 @@ function programBody(program: RelayProgram, state: AppState): string {
       </div>
     </div>`;
   }).join('') : '<p class="empty" style="padding:10px 0">No exercises yet.</p>';
+  const localActions = isLocalProgram(program)
+    ? `<button class="button ghost small" type="button" data-edit-sheet="${localSheetId(program)}">Edit</button>
+      <button class="button ghost small" type="button" disabled title="Publishing arrives with the Nostr share block">Publish</button>
+      <button class="button danger small" type="button" data-del-sheet="${localSheetId(program)}">Delete</button>`
+    : '';
   return `<div class="wk-ex-list">${exHtml}</div>
     <div class="workout-card-actions">
       <button class="button gold small" type="button" data-start-program="${html(program.address)}">Start workout</button>
+      ${localActions}
     </div>`;
 }
 
@@ -1164,7 +1211,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [] };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [] };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
@@ -1184,6 +1231,7 @@ export function renderShell(root: HTMLElement): void {
     state.settings = await state.store.getSettings();
     state.finishedSessions = await loadFinishedSessions();
     state.bodyEntries = await state.store.listBody();
+    state.sheets = await state.store.listSheets();
     state.activeSession = await loadUnfinishedSession();
     if (state.activeSession) sessionSetCounts = setCountsFromSession(state.activeSession);
     if (persist) {
@@ -1197,6 +1245,7 @@ export function renderShell(root: HTMLElement): void {
     bind();
     if (state.activeSession) void openSessionOverlay(state.activeSession);
     if (pendingConnect) renderConnectModal();
+    if (builder) renderBuilderModal();
   }
 
   function bind(): void {
@@ -1243,8 +1292,24 @@ export function renderShell(root: HTMLElement): void {
     }));
     root.querySelectorAll<HTMLElement>('[data-start-program]').forEach((button) => button.addEventListener('click', (event) => {
       event.stopPropagation();
-      const program = state.programs.find((item) => item.address === button.dataset.startProgram);
+      const address = button.dataset.startProgram;
+      const program = state.programs.find((item) => item.address === address)
+        || state.sheets.map(sheetToProgram).find((item) => item.address === address);
       if (program) startTrainingSession(program);
+    }));
+    root.querySelector('#new-program')?.addEventListener('click', () => { void openSheetBuilder(); });
+    root.querySelectorAll<HTMLElement>('[data-edit-sheet]').forEach((button) => button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const sheet = state.sheets.find((item) => item.id === Number(button.dataset.editSheet));
+      if (sheet) void openSheetBuilder(sheet);
+    }));
+    root.querySelectorAll<HTMLElement>('[data-del-sheet]').forEach((button) => button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      if (!state.store || !window.confirm('Delete this program?')) return;
+      await state.store.deleteSheet(Number(button.dataset.delSheet) || 0);
+      state.sheets = await state.store.listSheets();
+      render();
+      toast('Program deleted');
     }));
     bindSessionControls();
     root.querySelector('#exercise-form')?.addEventListener('submit', saveExercise);
@@ -1258,6 +1323,170 @@ export function renderShell(root: HTMLElement): void {
     }));
     bindRecoveryControls();
     bindBodyControls();
+  }
+
+  async function openSheetBuilder(sheet: SheetWithExercises | null = null): Promise<void> {
+    if (!state.store) { toast('Sign in or open the local demo to create programs.', 'bad'); return; }
+    const library = await quickWorkoutLibrary();
+    builder = {
+      sheetId: sheet?.id,
+      name: sheet?.name || '',
+      desc: sheet?.notes || '',
+      library,
+      rows: sheet
+        ? sheet.exercises.map((row) => ({
+            exerciseSlug: row.exercise_slug || '',
+            exerciseName: row.exercise_name || row.exercise_slug || 'Exercise',
+            muscleGroup: row.muscle_group,
+            imageUrl: row.image_url,
+            sets: Number(row.sets) || 3,
+            reps: String(row.reps ?? '8-12'),
+            restSec: Number(row.rest) || 90,
+            weight: row.weight ?? null,
+            notes: row.notes || ''
+          }))
+        : []
+    };
+    renderBuilderModal();
+  }
+
+  function renderBuilderModal(): void {
+    const current = builder;
+    if (!current) return;
+    openModal(`
+      <h3>${current.sheetId ? 'Edit program' : 'New program'}</h3>
+      <div class="form-grid">
+        <label class="span-2">Name<input id="sheet-name" value="${html(current.name)}" placeholder="Push Day" /></label>
+        <label class="span-2">Description<input id="sheet-desc" value="${html(current.desc)}" placeholder="optional" /></label>
+      </div>
+      <div class="subsection-head"><span>Exercises</span></div>
+      <div class="builder-search-wrap">
+        <input id="builder-search" class="builder-search" placeholder="Search exercises to add..." autocomplete="off" />
+        <div id="builder-results" class="builder-results" style="display:none"></div>
+      </div>
+      <div id="builder-rows" class="builder-rows"></div>
+      <div class="form-actions"><button class="button primary" id="sheet-save" type="button">${current.sheetId ? 'Save program' : 'Create program'}</button></div>`);
+    renderBuilderRows();
+    root.querySelector('#sheet-name')?.addEventListener('input', (event) => { current.name = (event.target as HTMLInputElement).value; });
+    root.querySelector('#sheet-desc')?.addEventListener('input', (event) => { current.desc = (event.target as HTMLInputElement).value; });
+    const search = root.querySelector<HTMLInputElement>('#builder-search');
+    const results = root.querySelector<HTMLElement>('#builder-results');
+    search?.addEventListener('input', () => {
+      if (!results) return;
+      const query = search.value.trim().toLowerCase();
+      if (!query) { results.style.display = 'none'; results.innerHTML = ''; return; }
+      const matches = current.library
+        .filter((exercise) => exercise.name.toLowerCase().includes(query) || (exercise.muscle_group || '').toLowerCase().includes(query))
+        .slice(0, 8);
+      if (!matches.length) { results.innerHTML = '<div class="ex-search-empty">No exercises match.</div>'; results.style.display = 'block'; return; }
+      results.style.display = 'block';
+      results.innerHTML = matches.map((exercise) => {
+        const added = current.rows.some((row) => row.exerciseSlug === exercise.slug);
+        return `<div class="ex-search-result-item${added ? ' added' : ''}" data-add-slug="${html(exercise.slug)}"><span>${html(exercise.name)}</span><span class="muscle">${added ? 'added' : html(exercise.muscle_group || '')}</span></div>`;
+      }).join('');
+    });
+    results?.addEventListener('click', (event) => {
+      const item = (event.target as Element).closest<HTMLElement>('[data-add-slug]');
+      if (!item || !search || !results) return;
+      const exercise = current.library.find((entry) => entry.slug === item.dataset.addSlug);
+      if (exercise && !current.rows.some((row) => row.exerciseSlug === exercise.slug)) {
+        current.rows.push({
+          exerciseSlug: exercise.slug,
+          exerciseName: exercise.name,
+          muscleGroup: exercise.muscle_group,
+          imageUrl: exercise.image_url,
+          sets: Number(exercise.default_sets) || 3,
+          reps: String(exercise.default_reps || '8-12'),
+          restSec: Number(exercise.default_rest) || 90,
+          weight: null,
+          notes: ''
+        });
+        renderBuilderRows();
+      }
+      search.value = ''; results.style.display = 'none'; results.innerHTML = '';
+      search.focus();
+    });
+    const rowsHost = root.querySelector<HTMLElement>('#builder-rows');
+    rowsHost?.addEventListener('input', (event) => {
+      const target = event.target as HTMLInputElement;
+      const row = target.closest<HTMLElement>('[data-i]');
+      const entry = row ? current.rows[Number(row.dataset.i)] : undefined;
+      const field = target.dataset.f;
+      if (!entry || !field) return;
+      if (field === 'sets') entry.sets = Number(target.value) || 0;
+      else if (field === 'restSec') entry.restSec = Number(target.value) || 0;
+      else if (field === 'weight') entry.weight = storeWeightInput(target.value, normalizeWeightUnit(state.settings.unit));
+      else if (field === 'reps') entry.reps = target.value;
+    });
+    rowsHost?.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      if (target.dataset.rm != null) { current.rows.splice(Number(target.dataset.rm), 1); renderBuilderRows(); return; }
+      if (target.dataset.move != null) {
+        const index = Number(target.dataset.move);
+        const next = index + Number(target.dataset.dir);
+        if (next >= 0 && next < current.rows.length) {
+          [current.rows[index], current.rows[next]] = [current.rows[next], current.rows[index]];
+          renderBuilderRows();
+        }
+      }
+    });
+    root.querySelector('#sheet-save')?.addEventListener('click', async () => {
+      if (!state.store || !builder) return;
+      const name = builder.name.trim();
+      if (!name) { toast('name is required', 'bad'); return; }
+      await state.store.saveSheet({
+        name,
+        notes: builder.desc.trim(),
+        exercises: builder.rows.map((row, index) => ({
+          exercise_slug: row.exerciseSlug,
+          exercise_name: row.exerciseName,
+          muscle_group: row.muscleGroup,
+          image_url: row.imageUrl,
+          sets: row.sets,
+          reps: row.reps,
+          rest: row.restSec,
+          weight: row.weight,
+          notes: row.notes,
+          position: index
+        }))
+      }, builder.sheetId);
+      builder = null;
+      state.sheets = await state.store.listSheets();
+      closeModal();
+      render();
+      toast('Program saved');
+    });
+  }
+
+  function renderBuilderRows(): void {
+    const host = root.querySelector<HTMLElement>('#builder-rows');
+    const current = builder;
+    if (!host || !current) return;
+    const unit = normalizeWeightUnit(state.settings.unit);
+    if (!current.rows.length) { host.innerHTML = '<div class="empty" style="padding:8px 0">No exercises yet. Search above to add.</div>'; return; }
+    host.innerHTML = current.rows.map((row, index) => {
+      const src = row.imageUrl || current.library.find((exercise) => exercise.slug === row.exerciseSlug)?.image_url;
+      const img = src
+        ? `<img class="wex-img" src="${html(src)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'wex-img placeholder'}))">`
+        : `<div class="wex-img placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>`;
+      return `<div class="wex-row" data-i="${index}">
+        <div class="wex-move-btns">
+          <button class="wex-move-btn" type="button" data-move="${index}" data-dir="-1" title="Move up">↑</button>
+          <button class="wex-move-btn" type="button" data-move="${index}" data-dir="1" title="Move down">↓</button>
+        </div>
+        ${img}
+        <div class="wex-info">
+          <div class="wex-name">${html(row.exerciseName)}${row.muscleGroup ? `<span class="wex-muscle">${html(row.muscleGroup)}</span>` : ''}</div>
+          <div class="wex-params">
+            <div class="wex-param-group"><div class="wex-param-label">Sets</div><input class="wex-param-input" type="number" min="1" max="20" data-f="sets" value="${row.sets}"></div>
+            <div class="wex-param-group"><div class="wex-param-label">Reps</div><input class="wex-param-input reps" data-f="reps" value="${html(row.reps)}"></div>
+            <div class="wex-param-group"><div class="wex-param-label">${unit}</div><input class="wex-param-input" type="number" min="0" step="0.5" data-f="weight" placeholder="—" value="${row.weight != null ? displayWeightKg(row.weight, unit) : ''}"></div>
+            <div class="wex-param-group"><div class="wex-param-label">Rest</div><input class="wex-param-input" type="number" min="0" step="5" data-f="restSec" value="${row.restSec}"></div>
+          </div>
+        </div>
+        <button class="wex-remove" type="button" data-rm="${index}" title="Remove">✕</button>
+      </div>`;
+    }).join('');
   }
 
   function bindBodyControls(): void {
@@ -1477,7 +1706,7 @@ export function renderShell(root: HTMLElement): void {
   function signOut(): void {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SIGNER_TYPE_KEY);
-    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.settings = { ...DEFAULT_SETTINGS }; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null; state.bodyEntries = [];
+    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.settings = { ...DEFAULT_SETTINGS }; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null; state.bodyEntries = []; state.sheets = [];
     render();
   }
 
@@ -1486,6 +1715,7 @@ export function renderShell(root: HTMLElement): void {
   let sessionSetCounts: Record<string, number> = {};
   let pendingConnect: { uri: string; mobile: boolean } | null = null;
   let toastTimer: number | undefined;
+  let builder: BuilderState | null = null;
   let sessionRestTimer = 0;
   let sessionRestTotal = 0;
   let sessionRestRemaining = 0;
@@ -1861,7 +2091,7 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#modal-close')?.addEventListener('click', closeModal);
   }
 
-  function closeModal(): void { pendingConnect = null; root.querySelector('#modal')?.classList.remove('open'); }
+  function closeModal(): void { pendingConnect = null; builder = null; root.querySelector('#modal')?.classList.remove('open'); }
 
   function bindSessionControls(): void {
     root.querySelector('#session-close')?.addEventListener('click', () => { void cancelActiveSession(); });

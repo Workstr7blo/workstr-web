@@ -1,10 +1,20 @@
 import type { IDBPDatabase } from 'idb';
 import { openWorkstrDB, type WorkstrDB } from './schema';
-import type { BodyWeightEntry, Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
+import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, WorkstrSettings } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
+import { slugify } from '../core/ids';
 
 export type ExerciseDraft = Omit<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'> &
   Partial<Pick<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'>>;
+
+export interface SheetWithExercises extends Sheet { exercises: SheetExercise[] }
+
+export interface SheetDraft {
+  name: string;
+  notes?: string;
+  is_temporary?: boolean;
+  exercises: Omit<SheetExercise, 'id' | 'sheet_id'>[];
+}
 
 export class WorkstrStore {
   private constructor(private readonly db: IDBPDatabase<WorkstrDB>) {}
@@ -69,6 +79,61 @@ export class WorkstrStore {
     }
     await this.saveSettings({ ...settings, starterExercisesSeeded: true });
     return exercises.length;
+  }
+
+  async listSheets(): Promise<SheetWithExercises[]> {
+    const sheets = (await this.db.getAll('sheets'))
+      .filter((sheet) => !sheet.is_temporary)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const result: SheetWithExercises[] = [];
+    for (const sheet of sheets) {
+      const exercises = (await this.db.getAllFromIndex('sheet_exercises', 'sheet_id', sheet.id!))
+        .sort((a, b) => Number(a.position) - Number(b.position));
+      result.push({ ...sheet, exercises });
+    }
+    return result;
+  }
+
+  // Create or replace a sheet and its exercise rows. The slug is minted once
+  // on create and stays stable across edits, like self-hosted Workstr.
+  async saveSheet(draft: SheetDraft, id?: number): Promise<number> {
+    const now = new Date().toISOString();
+    const tx = this.db.transaction(['sheets', 'sheet_exercises'], 'readwrite');
+    const sheets = tx.objectStore('sheets');
+    const existing = id ? await sheets.get(id) : undefined;
+    let slug = existing?.slug;
+    if (!slug) {
+      const base = slugify(draft.name) || 'program';
+      let candidate = base;
+      let suffix = 2;
+      while (await sheets.index('slug').get(candidate)) candidate = `${base}-${suffix++}`;
+      slug = candidate;
+    }
+    const value: Sheet = {
+      ...existing,
+      slug,
+      name: draft.name,
+      notes: draft.notes || '',
+      is_temporary: draft.is_temporary ?? existing?.is_temporary ?? false,
+      created_at: existing?.created_at ?? now,
+      updated_at: now
+    };
+    if (existing?.id) value.id = existing.id;
+    const sheetId = Number(value.id ? await sheets.put(value) : await sheets.add(value));
+    const rows = tx.objectStore('sheet_exercises');
+    for await (const cursor of rows.index('sheet_id').iterate(sheetId)) await cursor.delete();
+    for (const [index, row] of draft.exercises.entries()) {
+      await rows.add({ ...row, sheet_id: sheetId, position: row.position ?? index });
+    }
+    await tx.done;
+    return sheetId;
+  }
+
+  async deleteSheet(id: number): Promise<void> {
+    const tx = this.db.transaction(['sheets', 'sheet_exercises'], 'readwrite');
+    await tx.objectStore('sheets').delete(id);
+    for await (const cursor of tx.objectStore('sheet_exercises').index('sheet_id').iterate(id)) await cursor.delete();
+    await tx.done;
   }
 
   async createSession(session: Omit<Session, 'id'>): Promise<number> {
