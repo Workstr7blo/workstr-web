@@ -4,7 +4,7 @@ import { canonMuscle } from '../core/muscles';
 import { slugify } from '../core/ids';
 import type { Exercise } from '../core/types';
 
-export const WORKSTR_LIBRARY_RELAY = 'wss://relay.damus.io';
+export const WORKSTR_LIBRARY_RELAY = 'wss://nos.lol';
 export const WORKSTR_LIBRARY_RELAYS = [WORKSTR_LIBRARY_RELAY];
 
 export interface RelayProgramExercise {
