@@ -634,21 +634,28 @@ interface QwExercise { slug: string; name: string; muscleGroup: string; sets: nu
 
 interface QuickWorkoutData { exercises: QwExercise[]; pool: Record<string, QwExercise[]>; targetMuscleGroups: string[]; estimatedDurationMin: number }
 
+// Canonicalize a raw muscle group, folding granular names (e.g. "Lateral
+// Deltoid") into their canonical group the same way the program cards do.
+function qwCanonMuscle(raw: string | undefined): string {
+  return canonMuscle(raw || '') || canonMuscle(programMuscleLabel(raw || '')) || '';
+}
+
 // Ported verbatim from self-hosted Workstr src/app/store.js getQuickWorkout().
-function getQuickWorkout(state: AppState, durationMinutes = 45, minRecovery = 80): QuickWorkoutData {
-  const recovery = getRecovery(state.finishedSessions, state.exercises);
+// Untrained muscle groups report 100% recovery, so they are always in readySet.
+export function getQuickWorkout(sessions: ActiveSession[], exercises: Exercise[], durationMinutes = 45, minRecovery = 80): QuickWorkoutData {
+  const recovery = getRecovery(sessions, exercises);
   const readySet = new Set(recovery.muscleGroups.filter((group) => group.percent >= minRecovery).map((group) => group.name));
   if (!readySet.size) return { exercises: [], pool: {}, targetMuscleGroups: [], estimatedDurationMin: 0 };
 
-  const rows = [...state.exercises]
-    .filter((exercise) => exercise.muscle_group && readySet.has(canonMuscle(exercise.muscle_group) || ''))
+  const rows = [...exercises]
+    .filter((exercise) => exercise.muscle_group && readySet.has(qwCanonMuscle(exercise.muscle_group)))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-  const loggedSlugs = new Set(completedSets(state.finishedSessions).map((set) => set.exerciseSlug));
+  const loggedSlugs = new Set(completedSets(sessions).map((set) => set.exerciseSlug));
 
   // Score (logged-before + compound) and bucket exercises by canonical muscle group.
   const byMuscle: Record<string, QwExercise[]> = {};
   for (const row of rows) {
-    const mg = canonMuscle(row.muscle_group) || '';
+    const mg = qwCanonMuscle(row.muscle_group);
     const score = (loggedSlugs.has(row.slug) ? 1 : 0) + ((row.tags || []).map((tag) => String(tag).toLowerCase()).includes('compound') ? 1 : 0);
     (byMuscle[mg] ||= []).push({ slug: row.slug, name: row.name, muscleGroup: mg, sets: 3, reps: '8-12', restSec: 90, score });
   }
@@ -1035,6 +1042,14 @@ export function renderShell(root: HTMLElement): void {
     toastTimer = window.setTimeout(() => { el.className = ''; }, 2600);
   }
 
+  // Quick workout draws from the full library like self-hosted: local store
+  // exercises (starter pack + user-created) plus the relay library, deduped by slug.
+  async function quickWorkoutLibrary(): Promise<Exercise[]> {
+    const local = state.store ? await state.store.listExercises() : [];
+    const seen = new Set(local.map((exercise) => exercise.slug));
+    return [...local, ...state.exercises.filter((exercise) => !seen.has(exercise.slug))];
+  }
+
   function bindRecoveryControls(): void {
     const body = root.querySelector<SVGSVGElement>('#recovery-body');
     if (body) {
@@ -1063,8 +1078,8 @@ export function renderShell(root: HTMLElement): void {
       state.qw.duration = Number(button.dataset.qwDur) || 45;
       root.querySelectorAll<HTMLElement>('#qw-duration .qw-dur-btn').forEach((el) => el.classList.toggle('active', el === button));
     }));
-    root.querySelector('#qw-generate')?.addEventListener('click', () => {
-      const data = getQuickWorkout(state, state.qw.duration, 80);
+    root.querySelector('#qw-generate')?.addEventListener('click', async () => {
+      const data = getQuickWorkout(state.finishedSessions, await quickWorkoutLibrary(), state.qw.duration, 80);
       if (!data.exercises.length) {
         state.qw.visible = false; state.qw.exercises = []; state.qw.pool = {};
         render();
