@@ -6,6 +6,7 @@ import { CANONICAL_REGIONS } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft } from '../db/store';
 import starterExercises from '../data/starter-exercises.json';
 import type { Exercise } from '../core/types';
+import { fetchPowrExercises, fetchPowrPrograms, POWR_RELAY, type RelayProgram } from '../nostr/powrLibrary';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
@@ -23,8 +24,11 @@ interface AppState {
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
   exercises: Exercise[];
+  programs: RelayProgram[];
   editingId: number | null;
   filter: string;
+  programFilter: string;
+  relayStatus: string;
   signInStatus: string | null;
 }
 
@@ -77,6 +81,11 @@ function html(value: unknown): string {
 
 function splitList(value: FormDataEntryValue | null): string[] {
   return String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function sourceBadge(exercise: Exercise): string {
+  if (exercise.nostr_address) return 'workstr';
+  return exercise.source_type;
 }
 
 function shellMarkup(state: AppState): string {
@@ -141,9 +150,11 @@ function exercisesView(state: AppState): string {
     ${authNotice(state)}
     <div class="sub-panel ${active === 'library' ? 'active' : ''}" id="sub-exercises-library">
       <div class="panel">
-        <div class="panel-head"><span>Exercise library</span><span class="head-actions"><button class="button ghost small">Select</button><button class="button primary small" id="new-exercise">+ New exercise</button></span></div>
+        <div class="panel-head"><span>Exercise library</span><span class="head-actions"><span class="status-pill">${POWR_RELAY}</span><button class="button ghost small" id="refresh-library">Refresh</button></span></div>
+        <p class="section-help">This is the main Workstr Web library: public Workstr/NIP-101e exercise templates fetched from the POWR relay.</p>
         <div class="filter-bar"><input class="grow" id="exercise-filter" placeholder="Search exercises..." autocomplete="off" value="${html(state.filter)}" /><select><option>All categories</option></select><select><option>All muscles</option></select><select><option>All levels</option></select></div>
-        <div class="ex-grid">${exercises.map(exerciseCard).join('') || '<div class="empty">No exercises match.</div>'}</div>
+        <div class="discover-status">${html(state.relayStatus || `${exercises.length} Workstr exercises from ${POWR_RELAY}`)}</div>
+        <div class="ex-grid">${exercises.map(exerciseCard).join('') || '<div class="empty">No Workstr exercises loaded yet. Use Refresh to query the relay.</div>'}</div>
       </div>
       ${state.pubkey ? `<div class="panel"><div class="panel-head"><span>${editing ? 'Edit exercise' : 'New exercise'}</span></div>${exerciseForm(editing)}</div>` : ''}
     </div>
@@ -160,9 +171,9 @@ function exercisesView(state: AppState): string {
 }
 
 function exerciseCard(exercise: Exercise): string {
-  return `<div class="ex-card" data-id="${exercise.id}">
-    <div class="card-img"><div class="card-placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div><span class="source-badge badge-${exercise.source_type === 'imported' ? 'nostr' : 'manual'}">${html(exercise.source_type)}</span>${exercise.difficulty ? `<span class="diff-badge diff-${html(exercise.difficulty)}">${html(exercise.difficulty)}</span>` : ''}</div>
-    <div class="card-body"><div class="card-name">${html(exercise.name)}<button class="fav ${exercise.favourite ? 'on' : ''}" title="Favourite">${exercise.favourite ? '★' : '☆'}</button></div><div class="card-meta"><span class="muscle">${html(exercise.muscle_group || exercise.muscles[0] || 'Muscle')}</span>${exercise.category ? `<span class="card-tag">${html(exercise.category)}</span>` : ''}</div><div class="row-actions"><button class="button small ghost" data-edit="${exercise.id}">Edit</button><button class="button small danger" data-delete="${exercise.id}">Delete</button></div></div>
+  return `<div class="ex-card" data-id="${exercise.id ?? exercise.nostr_event_id ?? exercise.slug}">
+    <div class="card-img">${exercise.image_url ? `<img src="${html(exercise.image_url)}" alt="${html(exercise.name)}" loading="lazy" />` : '<div class="card-placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>'}<span class="source-badge badge-nostr">${html(sourceBadge(exercise))}</span>${exercise.difficulty ? `<span class="diff-badge diff-${html(exercise.difficulty)}">${html(exercise.difficulty)}</span>` : ''}</div>
+    <div class="card-body"><div class="card-name">${html(exercise.name)}<button class="fav ${exercise.favourite ? 'on' : ''}" title="Favourite">${exercise.favourite ? '★' : '☆'}</button></div><div class="card-meta"><span class="muscle">${html(exercise.muscle_group || exercise.muscles[0] || 'Muscle')}</span>${exercise.category ? `<span class="card-tag">${html(exercise.category)}</span>` : ''}</div><div class="detail-nostr"><code>${html(exercise.nostr_address || '')}</code></div></div>
   </div>`;
 }
 
@@ -186,14 +197,16 @@ function exerciseForm(exercise?: Exercise): string {
 
 function workoutsView(state: AppState): string {
   const active = state.subState.workouts;
+  const query = state.programFilter.toLowerCase();
+  const programs = state.programs.filter((program) => [program.name, program.description, ...program.tags].join(' ').toLowerCase().includes(query));
   return `<div class="page active" id="page-workouts">
     <div class="page-title">Workouts</div>
     ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
     <div class="sub-panel ${active === 'programs' ? 'active' : ''}" id="sub-workouts-programs">
-      <div class="panel"><div class="panel-head"><span>Programs</span><button class="button primary small">+ New program</button></div><p class="section-help">A program is the routine you take to the gym. Expand one to review its exercises, then hit Start to open the live logger. Publish a program as a public NIP-101e workout template (kind 33402) on your relays.</p><div class="list empty">No programs yet.</div></div>
+      <div class="panel"><div class="panel-head"><span>Programs</span><span class="head-actions"><span class="status-pill">${POWR_RELAY}</span><button class="button ghost small" id="refresh-library">Refresh</button></span></div><p class="section-help">This is the main Workstr Web program library: public Workstr/NIP-101e workout templates fetched from the POWR relay.</p><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="discover-status">${html(state.relayStatus || `${programs.length} Workstr programs from ${POWR_RELAY}`)}</div><div class="program-list">${programs.map(programCard).join('') || '<div class="empty">No Workstr programs loaded yet. Use Refresh to query the relay.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
-      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost">Search relays</button></div><p class="section-help">Browse workout programs shared on your relays. Importing a program saves it into your library, fetching and importing any of its exercises you don't have yet.</p><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="discover-status">Relay discovery will use NIP-101e workout templates in the next data-module port.</div><div class="program-list"></div></div>
+      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost" id="refresh-library">Search relays</button></div><p class="section-help">Programs from ${POWR_RELAY} are already the main Programs library for Workstr Web.</p><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="discover-status">${html(state.relayStatus)}</div><div class="program-list">${state.programs.map(programCard).join('')}</div></div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p><div class="list empty">No completed sessions yet.</div></div>
@@ -201,6 +214,18 @@ function workoutsView(state: AppState): string {
     <div class="sub-panel ${active === 'recovery' ? 'active' : ''}" id="sub-workouts-recovery">
       <div class="panel"><div class="panel-head"><span>Muscle recovery</span><strong>—</strong></div><p class="section-help">Estimated readiness per muscle group from your completed sessions over the last 10 days. Bigger groups recover slower; higher training volume extends recovery.</p><div class="recovery empty">No completed sessions yet — train to see recovery.</div></div>
       <div class="panel"><div class="panel-head"><span>Quick workout</span><div class="qw-duration"><button class="qw-dur-btn">20</button><button class="qw-dur-btn">30</button><button class="qw-dur-btn active">45</button><button class="qw-dur-btn">60</button><span class="qw-dur-unit">min</span></div></div><p class="section-help">Generates a balanced session from exercises whose muscle groups are recovered. Pick a duration, then swap or drop any exercise before you start.</p><button class="button primary" style="width:100%">Generate from recovered muscles</button></div>
+    </div>
+  </div>`;
+}
+
+function programCard(program: RelayProgram): string {
+  const exerciseCount = program.exercises.length;
+  const tagLine = program.tags.slice(0, 4).join(' · ');
+  return `<div class="workout-card">
+    <div class="workout-card-header">
+      <div class="workout-card-map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></div>
+      <div class="workout-card-info"><div class="workout-card-name">${html(program.name)}<span class="program-status published">Workstr</span></div><div class="workout-card-meta">${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'} · ${html(program.address)}</div>${tagLine ? `<div class="workout-card-muscles">${html(tagLine)}</div>` : ''}${program.description ? `<div class="section-help">${html(program.description)}</div>` : ''}</div>
+      <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 9l6 6 6-6"/></svg>
     </div>
   </div>`;
 }
@@ -225,11 +250,12 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], editingId: null, filter: '', signInStatus: null };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], editingId: null, filter: '', programFilter: '', relayStatus: `loading Workstr library from ${POWR_RELAY}...`, signInStatus: null };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
     render();
+    await refreshLibrary();
   }
 
   async function openIdentity(pubkey: string, persist = true, signerType: AppState['signerType'] = state.signerType): Promise<void> {
@@ -240,7 +266,6 @@ export function renderShell(root: HTMLElement): void {
     state.signInStatus = null;
     state.store = await WorkstrStore.open(pubkey);
     await state.store.seedExercises(starterExercises as ExerciseDraft[]);
-    state.exercises = await state.store.listExercises();
     if (persist) {
       localStorage.setItem(SESSION_KEY, pubkey);
       if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
@@ -268,18 +293,34 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#sign-out')?.addEventListener('click', signOut);
     root.querySelector('#sign-out-settings')?.addEventListener('click', signOut);
     root.querySelector('#open-demo')?.addEventListener('click', () => openAndRender('demo-local-pubkey'));
+    root.querySelectorAll('#refresh-library').forEach((button) => button.addEventListener('click', () => { void refreshLibrary(); }));
     root.querySelector('#new-exercise')?.addEventListener('click', () => { state.editingId = null; render(); });
     root.querySelector('#cancel-edit')?.addEventListener('click', () => { state.editingId = null; render(); });
     root.querySelector('#exercise-filter')?.addEventListener('input', (event) => { state.filter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#exercise-filter'); input?.focus(); input?.setSelectionRange(state.filter.length, state.filter.length); });
+    root.querySelector('#program-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#program-filter'); input?.focus(); input?.setSelectionRange(state.programFilter.length, state.programFilter.length); });
     root.querySelector('#exercise-form')?.addEventListener('submit', saveExercise);
     root.querySelectorAll<HTMLElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => { state.editingId = Number(button.dataset.edit); render(); }));
     root.querySelectorAll<HTMLElement>('[data-delete]').forEach((button) => button.addEventListener('click', () => deleteExercise(Number(button.dataset.delete))));
   }
 
+  async function refreshLibrary(): Promise<void> {
+    state.relayStatus = `loading Workstr exercises and programs from ${POWR_RELAY}...`;
+    render();
+    try {
+      const [exercises, programs] = await Promise.all([fetchPowrExercises(), fetchPowrPrograms()]);
+      state.exercises = exercises;
+      state.programs = programs;
+      state.relayStatus = `loaded ${exercises.length} exercises and ${programs.length} programs from ${POWR_RELAY}`;
+    } catch (error) {
+      state.relayStatus = `relay error: ${(error as Error).message}`;
+    }
+    render();
+  }
+
   function signOut(): void {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SIGNER_TYPE_KEY);
-    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.signerType = null; state.exercises = []; state.editingId = null; state.signInStatus = null;
+    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.signerType = null; state.editingId = null; state.signInStatus = null;
     render();
   }
 
