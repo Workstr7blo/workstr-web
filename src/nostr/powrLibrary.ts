@@ -9,10 +9,15 @@ export const WORKSTR_LIBRARY_RELAYS = [WORKSTR_LIBRARY_RELAY];
 
 export interface RelayProgramExercise {
   address: string;
+  name?: string;
+  muscleGroup?: string;
+  imageUrl?: string;
+  notes?: string;
   sets?: number;
   reps?: string;
   weight?: string;
   rest?: number;
+  restSec?: number;
   setType?: string;
 }
 
@@ -176,17 +181,25 @@ export function programFromEvent(event: Event): RelayProgram | null {
   const exerciseRows = tagRows(tags, 'exercise');
   const exercises = metaExercises.length
     ? metaExercises.map((item) => ({
-      address: String(item.address || ''),
+      address: String(item.address || item.nostrAddress || ''),
+      name: item.exerciseName == null && item.name == null ? undefined : String(item.exerciseName || item.name),
+      muscleGroup: item.muscleGroup == null ? undefined : String(item.muscleGroup),
+      imageUrl: item.imageUrl == null ? undefined : String(item.imageUrl),
+      notes: item.notes == null ? undefined : String(item.notes),
       sets: Number(item.sets) || undefined,
       reps: item.reps == null ? undefined : String(item.reps),
       weight: item.weight == null ? undefined : String(item.weight),
-      rest: Number(item.restSec) || undefined,
+      rest: Number(item.restSec || item.rest) || undefined,
+      restSec: Number(item.restSec || item.rest) || undefined,
       setType: 'normal'
     })).filter((item) => item.address)
     : exerciseRows.map((row) => ({
       address: row[1] || '',
+      name: row[2] || undefined,
       weight: row[3] || undefined,
       reps: row[4] || row[3] || undefined,
+      rest: Number(row[5]) || undefined,
+      restSec: Number(row[5]) || undefined,
       setType: row[row.length - 1] || undefined
     })).filter((item) => item.address);
 
