@@ -11,7 +11,8 @@ const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
 const PROFILE_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
 
-type View = 'exercises' | 'programs' | 'train' | 'plan' | 'progress' | 'recovery' | 'discover' | 'settings';
+type View = 'exercises' | 'workouts' | 'statistics' | 'settings';
+type SubView = 'library' | 'discover' | 'programs' | 'history' | 'recovery' | 'training' | 'body';
 
 interface AppState {
   pubkey: string | null;
@@ -20,6 +21,7 @@ interface AppState {
   store: WorkstrStore | null;
   signerType: 'nip07' | 'nip46' | 'demo' | null;
   view: View;
+  subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
   exercises: Exercise[];
   editingId: number | null;
   filter: string;
@@ -28,13 +30,9 @@ interface AppState {
 
 const navItems: Array<{ view: View; label: string; icon: string }> = [
   { view: 'exercises', label: 'Exercises', icon: '<path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/>' },
-  { view: 'programs', label: 'Programs', icon: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/>' },
-  { view: 'train', label: 'Train', icon: '<path d="M8 5v14M16 5v14M8 12h8M4 9h4M16 9h4M4 15h4M16 15h4"/>' },
-  { view: 'plan', label: 'Plan', icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>' },
-  { view: 'progress', label: 'Progress', icon: '<path d="M18 20V10M12 20V4M6 20v-6"/>' },
-  { view: 'recovery', label: 'Recovery', icon: '<path d="M12 21s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.6-7 10-7 10z"/>' },
-  { view: 'discover', label: 'Discover', icon: '<circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/>' },
-  { view: 'settings', label: 'Settings', icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06A1.65 1.65 0 0015 19.4a1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06A2 2 0 017.04 4.3l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09A1.65 1.65 0 0015 4.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.36.5.57 1.1.6 1.7H21a2 2 0 010 4h-.09c-.61.03-1.2.24-1.51.3z"/>' }
+  { view: 'workouts', label: 'Workouts', icon: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/>' },
+  { view: 'statistics', label: 'Statistics', icon: '<path d="M18 20V10M12 20V4M6 20v-6"/>' },
+  { view: 'settings', label: 'Settings', icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>' }
 ];
 
 function shortNpub(pubkey: string): string {
@@ -111,12 +109,8 @@ function shellMarkup(state: AppState): string {
 }
 
 function appView(state: AppState): string {
-  if (state.view === 'programs') return programsView();
-  if (state.view === 'train') return trainView();
-  if (state.view === 'plan') return planView();
-  if (state.view === 'progress') return progressView();
-  if (state.view === 'recovery') return recoveryView();
-  if (state.view === 'discover') return discoverView();
+  if (state.view === 'workouts') return workoutsView(state);
+  if (state.view === 'statistics') return statisticsView(state);
   if (state.view === 'settings') return settingsView(state);
   return exercisesView(state);
 }
@@ -126,6 +120,13 @@ function authNotice(state: AppState): string {
   return `<div class="panel web-status-note"><div class="panel-head"><span>Signer required</span><span class="status-pill bad">not signed in</span></div><p class="section-help">Sign in with your Nostr signer to open the local IndexedDB namespace for your training data. Keys stay in your signer.</p>${state.signInStatus ? `<div class="terminal-mini">${html(state.signInStatus)}</div>` : ''}</div>`;
 }
 
+function subTabs(parent: View, active: string, tabs: string[]): string {
+  return `<div class="sub-tabs">${tabs.map((tab) => {
+    const value = tab.toLowerCase();
+    return `<div class="sub-tab ${active === value ? 'active' : ''}" data-parent="${parent}" data-subtab="${value}">${html(tab)}</div>`;
+  }).join('')}</div>`;
+}
+
 function exercisesView(state: AppState): string {
   const query = state.filter.toLowerCase();
   const exercises = state.exercises.filter((exercise) => {
@@ -133,17 +134,27 @@ function exercisesView(state: AppState): string {
     return haystack.includes(query);
   });
   const editing = state.editingId ? state.exercises.find((exercise) => exercise.id === state.editingId) : undefined;
+  const active = state.subState.exercises;
   return `<div class="page active" id="page-exercises">
     <div class="page-title">Exercises</div>
-    <div class="sub-tabs"><div class="sub-tab active">Library</div><div class="sub-tab">Discover</div></div>
+    ${subTabs('exercises', active, ['Library', 'Discover'])}
     ${authNotice(state)}
-    <div class="sub-panel active">
+    <div class="sub-panel ${active === 'library' ? 'active' : ''}" id="sub-exercises-library">
       <div class="panel">
         <div class="panel-head"><span>Exercise library</span><span class="head-actions"><button class="button ghost small">Select</button><button class="button primary small" id="new-exercise">+ New exercise</button></span></div>
         <div class="filter-bar"><input class="grow" id="exercise-filter" placeholder="Search exercises..." autocomplete="off" value="${html(state.filter)}" /><select><option>All categories</option></select><select><option>All muscles</option></select><select><option>All levels</option></select></div>
         <div class="ex-grid">${exercises.map(exerciseCard).join('') || '<div class="empty">No exercises match.</div>'}</div>
       </div>
       ${state.pubkey ? `<div class="panel"><div class="panel-head"><span>${editing ? 'Edit exercise' : 'New exercise'}</span></div>${exerciseForm(editing)}</div>` : ''}
+    </div>
+    <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-exercises-discover">
+      <div class="panel">
+        <div class="panel-head"><span>Discover exercises</span><button class="button ghost">Search relays</button></div>
+        <p class="section-help">Browse exercises shared on your relays. Importing an exercise saves it into your local library so it can be used in programs and workouts.</p>
+        <div class="filter-bar"><input class="grow" placeholder="Search exercises..." autocomplete="off" /><select><option>All categories</option></select><select><option>All muscles</option></select><select><option>All levels</option></select></div>
+        <div class="discover-status">Relay discovery will use NIP-101e exercise templates in the next data-module port.</div>
+        <div class="ex-grid"></div>
+      </div>
     </div>
   </div>`;
 }
@@ -173,17 +184,40 @@ function exerciseForm(exercise?: Exercise): string {
   </form>`;
 }
 
-function programsView(): string {
-  return featurePage('Programs', ['Programs', 'Discover', 'History'], 'Programs', 'A program is the routine you take to the gym. Build ordered exercises with set, rep, rest, and weight targets. Public programs become NIP-101e kind 33402 templates.');
+function workoutsView(state: AppState): string {
+  const active = state.subState.workouts;
+  return `<div class="page active" id="page-workouts">
+    <div class="page-title">Workouts</div>
+    ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
+    <div class="sub-panel ${active === 'programs' ? 'active' : ''}" id="sub-workouts-programs">
+      <div class="panel"><div class="panel-head"><span>Programs</span><button class="button primary small">+ New program</button></div><p class="section-help">A program is the routine you take to the gym. Expand one to review its exercises, then hit Start to open the live logger. Publish a program as a public NIP-101e workout template (kind 33402) on your relays.</p><div class="list empty">No programs yet.</div></div>
+    </div>
+    <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
+      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost">Search relays</button></div><p class="section-help">Browse workout programs shared on your relays. Importing a program saves it into your library, fetching and importing any of its exercises you don't have yet.</p><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="discover-status">Relay discovery will use NIP-101e workout templates in the next data-module port.</div><div class="program-list"></div></div>
+    </div>
+    <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
+      <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p><div class="list empty">No completed sessions yet.</div></div>
+    </div>
+    <div class="sub-panel ${active === 'recovery' ? 'active' : ''}" id="sub-workouts-recovery">
+      <div class="panel"><div class="panel-head"><span>Muscle recovery</span><strong>—</strong></div><p class="section-help">Estimated readiness per muscle group from your completed sessions over the last 10 days. Bigger groups recover slower; higher training volume extends recovery.</p><div class="recovery empty">No completed sessions yet — train to see recovery.</div></div>
+      <div class="panel"><div class="panel-head"><span>Quick workout</span><div class="qw-duration"><button class="qw-dur-btn">20</button><button class="qw-dur-btn">30</button><button class="qw-dur-btn active">45</button><button class="qw-dur-btn">60</button><span class="qw-dur-unit">min</span></div></div><p class="section-help">Generates a balanced session from exercises whose muscle groups are recovered. Pick a duration, then swap or drop any exercise before you start.</p><button class="button primary" style="width:100%">Generate from recovered muscles</button></div>
+    </div>
+  </div>`;
 }
-function trainView(): string { return featurePage('Train', ['Session runner'], 'Live session', 'Start from a program, log sets, run rest timers, keep the screen awake, then finish and review.'); }
-function planView(): string { return featurePage('Plan', ['Weekly grid', 'Mesocycle'], 'Training plan', 'Plan the week and organize mesocycle blocks. This mirrors the self-hosted Workstr planning surface.'); }
-function progressView(): string { return featurePage('Progress', ['Training', 'Body'], 'Training statistics', 'Weekly volume, muscle distribution, estimated 1RM records, streaks, and body-weight logs.'); }
-function recoveryView(): string { return featurePage('Recovery', ['Muscle map', 'Quick workout'], 'Muscle recovery', 'Readiness by muscle group from recent session history, with quick workout generation from recovered muscles.'); }
-function discoverView(): string { return featurePage('Discover', ['Exercises', 'Programs'], 'Discover on relays', 'Browse/import NIP-101e exercises and programs from public relays with author profile display and spam filtering.'); }
 
-function featurePage(title: string, tabs: string[], panelTitle: string, help: string): string {
-  return `<div class="page active"><div class="page-title">${html(title)}</div><div class="sub-tabs">${tabs.map((tab, index) => `<div class="sub-tab ${index === 0 ? 'active' : ''}">${html(tab)}</div>`).join('')}</div><div class="panel"><div class="panel-head"><span>${html(panelTitle)}</span><span class="status-pill">phase 1</span></div><p class="section-help">${html(help)}</p><div class="list empty">This surface is wired into the Workstr Web menu and ready for the next data-module port.</div></div></div>`;
+function statisticsView(state: AppState): string {
+  const active = state.subState.statistics;
+  return `<div class="page active" id="page-statistics">
+    <div class="page-title">Statistics</div>
+    ${subTabs('statistics', active, ['Training', 'Body'])}
+    <div class="sub-panel ${active === 'training' ? 'active' : ''}" id="sub-statistics-training">
+      <div class="stats-hero"><div class="summary-stat"><div class="ss-val">0</div><div class="ss-label">Day streak</div></div><div class="summary-stat"><div class="ss-val">0</div><div class="ss-label">Total sessions</div></div><div class="summary-stat"><div class="ss-val">0<small class="ss-unit">kg</small></div><div class="ss-label">Total volume</div></div></div>
+      <div class="panel"><div class="panel-head"><span>Weekly volume</span></div><div class="bars"></div><div class="subsection-head"><span>Muscle distribution</span><small>by working sets</small></div><div class="dist empty">No logged sets yet.</div><div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley)</small></div><div class="list empty">No records yet.</div></div>
+    </div>
+    <div class="sub-panel ${active === 'body' ? 'active' : ''}" id="sub-statistics-body">
+      <div class="panel"><div class="panel-head"><span>Body weight</span><span class="section-label">kg</span></div><div class="empty">No entries yet. Log your weight below to start tracking.</div><div class="subsection-head"><span>Log weight</span></div><form class="form-grid"><label>Date<input type="date" /></label><label>Weight (kg)<input type="number" step="0.1" placeholder="e.g. 80" /></label><div class="form-actions span-2"><button class="button primary" type="button">Log weight</button></div></form><div class="subsection-head"><span>Profile</span><small>for BMI &amp; goal</small></div><form class="form-grid"><label>Height (cm)<input type="number" step="1" min="100" max="250" placeholder="e.g. 175" /></label><label>Target weight (kg)<input type="number" step="0.1" min="0" placeholder="e.g. 75" /></label><div class="form-actions span-2"><button class="button" type="button">Save profile</button></div></form></div>
+    </div>
+  </div>`;
 }
 
 function settingsView(state: AppState): string {
@@ -191,7 +225,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', exercises: [], editingId: null, filter: '', signInStatus: null };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], editingId: null, filter: '', signInStatus: null };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
@@ -220,6 +254,15 @@ export function renderShell(root: HTMLElement): void {
 
   function bind(): void {
     root.querySelectorAll<HTMLElement>('[data-view]').forEach((button) => button.addEventListener('click', () => { state.view = button.dataset.view as View; state.editingId = null; render(); }));
+    root.querySelectorAll<HTMLElement>('[data-subtab]').forEach((button) => button.addEventListener('click', () => {
+      const parent = button.dataset.parent as keyof AppState['subState'];
+      if (parent && parent in state.subState) {
+        (state.subState[parent] as SubView) = button.dataset.subtab as SubView;
+        state.view = parent as View;
+        state.editingId = null;
+        render();
+      }
+    }));
     root.querySelector('#sign-in')?.addEventListener('click', startRemoteSignerRequest);
     root.querySelector('#sign-in-settings')?.addEventListener('click', startRemoteSignerRequest);
     root.querySelector('#sign-out')?.addEventListener('click', signOut);
