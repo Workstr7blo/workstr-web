@@ -1,6 +1,6 @@
 import { nip19 } from 'nostr-tools';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
-import { createBunkerSigner, createNostrConnectSignerRequest, defaultBunkerRelays, isLikelyBunkerInput } from '../signer/nip46';
+import { createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
 import { slugify } from '../core/ids';
 import { CANONICAL_REGIONS } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft } from '../db/store';
@@ -21,6 +21,8 @@ interface AppState {
   exercises: Exercise[];
   editingId: number | null;
   filter: string;
+  signerRequestUri: string | null;
+  signInStatus: string | null;
 }
 
 function shortNpub(pubkey: string): string {
@@ -50,7 +52,6 @@ function splitList(value: FormDataEntryValue | null): string[] {
 }
 
 function shellMarkup(state: AppState): string {
-  const status = state.pubkey ? displayNpub(state.pubkey) : 'not connected';
   return `
     <div class="noise"></div>
     <div class="cyber-grid"></div>
@@ -63,8 +64,9 @@ function shellMarkup(state: AppState): string {
         </div>
       </div>
       <div class="topbar-actions">
-        <span id="live-status">${html(status)}</span>
-        ${state.pubkey ? '<button id="sign-out" class="button small ghost">Switch</button>' : ''}
+        ${state.pubkey
+          ? `<span id="live-status">${html(displayNpub(state.pubkey))}</span><button id="sign-out" class="button small ghost">Switch</button>`
+          : '<button id="sign-in" class="button small primary">Sign in</button>'}
       </div>
     </header>
     <aside class="sidebar">
@@ -76,7 +78,7 @@ function shellMarkup(state: AppState): string {
       </nav>
     </aside>
     <main class="content">
-      ${state.pubkey ? appView(state) : loginView()}
+      ${state.pubkey ? appView(state) : loginView(state)}
     </main>`;
 }
 
@@ -84,35 +86,24 @@ function navButton(view: View, label: string, active: View): string {
   return `<button class="nav-item ${active === view ? 'active' : ''}" data-view="${view}"><span>${label}</span></button>`;
 }
 
-function loginView(): string {
+function loginView(state: AppState): string {
   return `<section class="page active">
     <div class="hero-card">
-      <p class="eyebrow">Phase 0 identity</p>
-      <h1>Connect your signer to open Workstr.</h1>
-      <p class="lede">Workstr stores your data in a browser database namespaced by your Nostr pubkey. Signing stays delegated to your signer; there is no nsec paste flow.</p>
-      <div class="signer-grid">
-        <section class="signer-card">
-          <span class="section-label">Browser extension</span>
-          <h2>NIP-07 extension</h2>
-          <p>Use Alby, nos2x, Flamingo, or another extension that exposes <code>window.nostr</code>.</p>
-          <button id="connect-nip07" class="button primary">Use Extension</button>
-        </section>
-        <section class="signer-card">
-          <span class="section-label">Remote signer</span>
-          <h2>Bunker URL</h2>
-          <p>For Amber/remote signers, create a request and open it in your signer. If you already have a <code>bunker://</code> URI or NIP-05 signer address, paste it below.</p>
-          <form id="bunker-form" class="bunker-form">
-            <input name="bunker" placeholder="bunker://... or name@domain.com" autocomplete="off" />
-            <input name="relays" placeholder="relays for new request" value="${html(defaultBunkerRelays().join(', '))}" autocomplete="off" />
-            <button class="button primary" type="submit">Connect / Create Request</button>
-          </form>
-          <div id="bunker-link-panel" class="bunker-link-panel"></div>
-        </section>
+      <p class="eyebrow">Workstr app</p>
+      <h1>Your training workspace is ready.</h1>
+      <p class="lede">Sign in from the top-right corner with a Nostr signer. Workstr will create an open signer request, then use your pubkey to open your local workout library.</p>
+      <div class="metric-grid mini">
+        <div class="metric"><span class="metric-label">Library</span><strong>Exercises</strong><p>Create and manage movements, muscles, equipment, cues, and defaults.</p></div>
+        <div class="metric"><span class="metric-label">Keys</span><strong>Signer only</strong><p>No nsec paste flow. Approve with your signer.</p></div>
       </div>
       <div class="action-row">
+        <button id="sign-in-main" class="button primary">Sign in</button>
         <button id="open-demo" class="button ghost">Open local demo</button>
       </div>
-      <pre id="status-panel" class="terminal-mini">$ workstr-web boot\nsecure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\n</pre>
+      <div class="signer-request-panel">
+        ${state.signerRequestUri ? `<a class="button primary" href="${html(state.signerRequestUri)}" target="_blank" rel="noreferrer">Open signer request</a><button id="copy-signer-request" class="button ghost" type="button">Copy signer request</button>` : ''}
+      </div>
+      <pre id="status-panel" class="terminal-mini">$ workstr-web boot\nsecure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\n${state.signInStatus ? `$ ${html(state.signInStatus)}\n` : ''}</pre>
     </div>
   </section>`;
 }
@@ -213,7 +204,7 @@ function exerciseCard(exercise: Exercise): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'home', exercises: [], editingId: null, filter: '' };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'home', exercises: [], editingId: null, filter: '', signerRequestUri: null, signInStatus: null };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
@@ -255,10 +246,14 @@ export function renderShell(root: HTMLElement): void {
       state.signerType = null;
       state.exercises = [];
       state.view = 'home';
+      state.signerRequestUri = null;
+      state.signInStatus = null;
       render();
     });
+    root.querySelector('#sign-in')?.addEventListener('click', startRemoteSignerRequest);
+    root.querySelector('#sign-in-main')?.addEventListener('click', startRemoteSignerRequest);
     root.querySelector('#connect-nip07')?.addEventListener('click', connectNip07);
-    root.querySelector('#bunker-form')?.addEventListener('submit', connectBunker);
+    root.querySelector('#copy-signer-request')?.addEventListener('click', copySignerRequest);
     root.querySelector('#open-demo')?.addEventListener('click', () => openAndRender('demo-local-pubkey'));
     root.querySelector('#new-exercise')?.addEventListener('click', () => { state.editingId = null; render(); });
     root.querySelector('#cancel-edit')?.addEventListener('click', () => { state.editingId = null; render(); });
@@ -286,47 +281,34 @@ export function renderShell(root: HTMLElement): void {
     }
   }
 
-  async function connectBunker(event: Event): Promise<void> {
-    event.preventDefault();
-    const panel = root.querySelector('#status-panel');
-    const linkPanel = root.querySelector<HTMLElement>('#bunker-link-panel');
-    const form = event.target as HTMLFormElement;
-    const input = String(new FormData(form).get('bunker') || '').trim();
-    const relays = String(new FormData(form).get('relays') || '').split(',').map((relay) => relay.trim()).filter(Boolean);
+  async function startRemoteSignerRequest(): Promise<void> {
     try {
-      let signerPromise;
-      if (input) {
-        if (!isLikelyBunkerInput(input)) {
-          panel!.textContent += '$ bunker error paste a bunker:// URL or NIP-05 identifier, or leave it empty to create a new signer request\n';
-          return;
-        }
-        panel!.textContent += '$ bunker connecting over the URI relays; keep the signer app online and approve there...\n';
-        signerPromise = createBunkerSigner(input, { onAuthUrl: showAuthUrl }).then(async (signer) => ({ signer, pubkey: await signer.getPublicKey() }));
-      } else {
-        const request = createNostrConnectSignerRequest(relays, { onAuthUrl: showAuthUrl });
-        signerPromise = request.signer;
-        panel!.textContent += `$ signer request created on ${request.relays.join(', ')}\n$ open this request in Amber/your NIP-46 signer, approve it, then return to this tab; waiting up to 5 minutes...\n`;
-        if (linkPanel) {
-          linkPanel.innerHTML = `<a class="button primary" href="${html(request.uri)}" target="_blank" rel="noreferrer">Open signer request</a><button id="copy-bunker-request" class="button ghost" type="button">Copy request URI</button>`;
-          linkPanel.querySelector('#copy-bunker-request')?.addEventListener('click', async () => {
-            await navigator.clipboard.writeText(request.uri);
-            panel!.textContent += '$ signer request copied\n';
-          });
-        }
-      }
-      const connected = await signerPromise;
-      panel!.textContent += `$ bunker connected ${shortNpub(connected.pubkey)}\n`;
+      state.signInStatus = 'creating open signer request...';
+      render();
+      const request = createNostrConnectSignerRequest(defaultBunkerRelays(), { onAuthUrl: showAuthUrl });
+      state.signerRequestUri = request.uri;
+      state.signInStatus = `open the signer request, approve it, then return to this tab; waiting on ${request.relays.join(', ')}`;
+      render();
+      const connected = await request.signer;
+      state.signInStatus = `signer connected ${shortNpub(connected.pubkey)}`;
       await openAndRender(connected.pubkey, 'nip46');
     } catch (error) {
-      panel!.textContent += `$ bunker error ${(error as Error).message}\n`;
+      state.signInStatus = `signer error ${(error as Error).message}`;
+      render();
     }
 
     function showAuthUrl(url: string): void {
-      panel!.textContent += '$ signer returned an auth URL; open it to approve the request\n';
-      if (linkPanel) {
-        linkPanel.innerHTML = `<a class="button primary" href="${html(url)}" target="_blank" rel="noreferrer">Open signer approval</a>`;
-      }
+      state.signerRequestUri = url;
+      state.signInStatus = 'signer returned an approval URL; open it to approve the request';
+      render();
     }
+  }
+
+  async function copySignerRequest(): Promise<void> {
+    if (!state.signerRequestUri) return;
+    await navigator.clipboard.writeText(state.signerRequestUri);
+    state.signInStatus = 'signer request copied';
+    render();
   }
 
   async function openAndRender(pubkey: string, signerType: AppState['signerType'] = pubkey === 'demo-local-pubkey' ? 'demo' : state.signerType): Promise<void> {
