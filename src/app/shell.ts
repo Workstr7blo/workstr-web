@@ -143,7 +143,6 @@ function exercisesView(state: AppState): string {
     const haystack = [exercise.name, exercise.description, exercise.muscle_group, exercise.difficulty, ...exercise.muscles, ...exercise.equipment, ...exercise.tags].join(' ').toLowerCase();
     return haystack.includes(query);
   });
-  const editing = state.editingId ? state.exercises.find((exercise) => exercise.id === state.editingId) : undefined;
   const active = state.subState.exercises;
   return `<div class="page active" id="page-exercises">
     <div class="page-title">Exercises</div>
@@ -151,20 +150,13 @@ function exercisesView(state: AppState): string {
     ${authNotice(state)}
     <div class="sub-panel ${active === 'library' ? 'active' : ''}" id="sub-exercises-library">
       <div class="panel">
-        <div class="panel-head"><span>Exercise library</span><span class="head-actions"><span class="status-pill">${WORKSTR_LIBRARY_RELAY}</span><button class="button ghost small" id="refresh-exercises">Refresh</button></span></div>
-        <p class="section-help">This is the main Workstr Web library: public Workstr/NIP-101e exercise templates fetched from the relay.</p>
         <div class="filter-bar"><input class="grow" id="exercise-filter" placeholder="Search exercises..." autocomplete="off" value="${html(state.filter)}" /><select><option>All categories</option></select><select><option>All muscles</option></select><select><option>All levels</option></select></div>
-        <div class="discover-status">${html(state.exerciseStatus || `${exercises.length} exercises from ${WORKSTR_LIBRARY_RELAY}`)}</div>
-        <div class="ex-grid">${exercises.map(exerciseCard).join('') || '<div class="empty">No Workstr exercises loaded yet. Use Refresh to query the relay.</div>'}</div>
+        <div class="ex-grid">${exercises.map(exerciseCard).join('') || '<div class="empty">No exercises match.</div>'}</div>
       </div>
-      ${state.pubkey ? `<div class="panel"><div class="panel-head"><span>${editing ? 'Edit exercise' : 'New exercise'}</span></div>${exerciseForm(editing)}</div>` : ''}
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-exercises-discover">
       <div class="panel">
-        <div class="panel-head"><span>Discover exercises</span><button class="button ghost">Search relays</button></div>
-        <p class="section-help">Browse exercises shared on your relays. Importing an exercise saves it into your local library so it can be used in programs and workouts.</p>
         <div class="filter-bar"><input class="grow" placeholder="Search exercises..." autocomplete="off" /><select><option>All categories</option></select><select><option>All muscles</option></select><select><option>All levels</option></select></div>
-        <div class="discover-status">Relay discovery will use NIP-101e exercise templates in the next data-module port.</div>
         <div class="ex-grid"></div>
       </div>
     </div>
@@ -204,10 +196,10 @@ function workoutsView(state: AppState): string {
     <div class="page-title">Workouts</div>
     ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
     <div class="sub-panel ${active === 'programs' ? 'active' : ''}" id="sub-workouts-programs">
-      <div class="panel"><div class="panel-head"><span>Programs</span><span class="head-actions"><span class="status-pill">${WORKSTR_LIBRARY_RELAY}</span><button class="button ghost small" id="refresh-programs">Refresh</button></span></div><p class="section-help">This is the main Workstr Web program library: public Workstr/NIP-101e workout templates fetched from the relay.</p><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="discover-status">${html(state.programStatus || `${programs.length} workouts from ${WORKSTR_LIBRARY_RELAY}`)}</div><div class="program-list">${programs.map(programCard).join('') || '<div class="empty">No workouts loaded yet. Use Refresh to query the relay.</div>'}</div></div>
+      <div class="panel"><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="program-list">${programs.map(programCard).join('') || '<div class="empty">No workouts match.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
-      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost" id="refresh-programs">Search relays</button></div><p class="section-help">Workouts from ${WORKSTR_LIBRARY_RELAY} are already the main Programs library for Workstr Web.</p><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="discover-status">${html(state.programStatus)}</div><div class="program-list">${state.programs.map(programCard).join('')}</div></div>
+      <div class="panel"><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="program-list">${state.programs.map(programCard).join('')}</div></div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p><div class="list empty">No completed sessions yet.</div></div>
