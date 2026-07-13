@@ -6,7 +6,7 @@ import { slugify } from '../core/ids';
 import { CANONICAL_REGIONS, canonMuscle } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft } from '../db/store';
 import starterExercises from '../data/starter-exercises.json';
-import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
+import type { BodyWeightEntry, Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput, type WeightUnit } from '../core/units';
 import { fetchRelayExercises, fetchRelayPrograms, WORKSTR_LIBRARY_RELAY, type RelayProgram } from '../nostr/powrLibrary';
 
@@ -165,6 +165,7 @@ interface AppState {
   programs: RelayProgram[];
   expandedSessionId: number | null;
   qw: { duration: number; exercises: QwExercise[]; pool: Record<string, QwExercise[]>; meta: string; visible: boolean };
+  bodyEntries: BodyWeightEntry[];
   activeSession: ActiveSession | null;
   finishedSessions: ActiveSession[];
   editingId: number | null;
@@ -475,32 +476,141 @@ function workoutHistory(state: AppState): string {
   }).join('')}</div>`;
 }
 
-function sessionMuscleMap(session: ActiveSession): Record<string, string> {
-  const map: Record<string, string> = {};
-  for (const exercise of sessionExercises(session)) map[exercise.exerciseSlug] = canonMuscle(exercise.muscleGroup || '') || programMuscleLabel(exercise.muscleGroup) || 'Other';
-  return map;
-}
-
 function completedSets(sessions: ActiveSession[]): SessionSetLog[] {
   return sessions.flatMap((session) => session.sets.filter((set) => set.done));
 }
 
-function statisticsSummary(state: AppState): string {
-  const unit = normalizeWeightUnit(state.settings.unit);
-  const sessions = state.finishedSessions;
-  const sets = completedSets(sessions);
-  const volume = sessions.reduce((total, session) => total + workoutVolume(session), 0);
-  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const weeklyVolume = sessions.filter((session) => new Date(session.finishedAt || session.startedAt).getTime() >= weekAgo).reduce((total, session) => total + workoutVolume(session), 0);
-  const muscles: Record<string, number> = {};
-  for (const session of sessions) {
-    const map = sessionMuscleMap(session);
-    for (const set of session.sets.filter((item) => item.done)) muscles[map[set.exerciseSlug] || 'Other'] = (muscles[map[set.exerciseSlug] || 'Other'] || 0) + 1;
+// SQLite strftime('%Y-%W') equivalent: week of year 00-53, Monday-based,
+// computed on the UTC date like self-hosted datetime strings.
+function sqliteWeek(iso: string): string {
+  const date = new Date(iso);
+  const year = date.getUTCFullYear();
+  const yday = Math.floor((Date.UTC(year, date.getUTCMonth(), date.getUTCDate()) - Date.UTC(year, 0, 1)) / 86400000) + 1;
+  const wdayMon = (date.getUTCDay() + 6) % 7;
+  const week = Math.floor((yday + 6 - wdayMon) / 7);
+  return `${year}-${String(week).padStart(2, '0')}`;
+}
+
+// Ported verbatim from self-hosted Workstr src/app/store.js computeStreak().
+function computeStreak(sessions: ActiveSession[]): number {
+  const dates = [...new Set(sessions.filter((session) => session.finishedAt).map((session) => new Date(session.startedAt).toISOString().slice(0, 10)))].sort().reverse();
+  if (!dates.length) return 0;
+  const dayMs = 86400000;
+  const stripTime = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  // allow today or yesterday to start the streak
+  if (Math.round((stripTime(new Date()) - stripTime(new Date(dates[0]))) / dayMs) > 1) return 0;
+  let expect = stripTime(new Date(dates[0]));
+  let streak = 0;
+  for (const value of dates) {
+    const day = stripTime(new Date(value));
+    if (day === expect) { streak += 1; expect -= dayMs; }
+    else if (day < expect) break;
   }
-  const dist = Object.entries(muscles).sort((a, b) => b[1] - a[1]);
-  const distHtml = dist.length ? `<div class="dist">${dist.map(([name, count]) => `<div class="compare-row"><div class="cr-name">${html(name)}</div><div class="cr-delta flat">${count} sets</div></div>`).join('')}</div>` : '<div class="dist empty">No logged sets yet.</div>';
-  return `<div class="stats-hero"><div class="summary-stat"><div class="ss-val">0</div><div class="ss-label">Day streak</div></div><div class="summary-stat"><div class="ss-val">${sessions.length}</div><div class="ss-label">Total sessions</div></div><div class="summary-stat"><div class="ss-val">${Math.round(displayWeightKg(volume, unit) || 0)}<small class="ss-unit">${unit}</small></div><div class="ss-label">Total volume</div></div></div>
-    <div class="panel"><div class="panel-head"><span>Weekly volume</span><strong>${Math.round(displayWeightKg(weeklyVolume, unit) || 0)} ${unit}</strong></div><div class="subsection-head"><span>Muscle distribution</span><small>by working sets</small></div>${distHtml}<div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley)</small></div><div class="list empty">PRs appear after repeated persisted sessions.</div></div>`;
+  return streak;
+}
+
+interface WorkstrStats {
+  totalSessions: number;
+  totalSets: number;
+  totalVolume: number;
+  weekly: { week: string; volume: number }[];
+  muscle: { muscle: string; sets: number }[];
+  prs: { slug: string; name: string; e1rm: number; topWeight: number }[];
+  streak: number;
+}
+
+// Ported verbatim from self-hosted Workstr src/app/store.js getStats().
+export function getStats(sessions: ActiveSession[], exercises: Exercise[]): WorkstrStats {
+  const sets = completedSets(sessions);
+  const totalSessions = sessions.length;
+  const totalSets = sets.length;
+  const totalVolume = Math.round(sets.reduce((total, set) => total + (Number(set.reps) || 0) * (Number(set.weight) || 0), 0));
+
+  // Weekly volume (last 8 weeks)
+  const weekTotals: Record<string, number> = {};
+  for (const session of sessions) {
+    const week = sqliteWeek(session.startedAt);
+    for (const set of session.sets) {
+      if (set.done) weekTotals[week] = (weekTotals[week] || 0) + (Number(set.reps) || 0) * (Number(set.weight) || 0);
+    }
+  }
+  const weekly = Object.entries(weekTotals).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 8).reverse()
+    .map(([week, volume]) => ({ week, volume: Math.round(volume) }));
+
+  // Muscle distribution by sets
+  const lookup = (session: ActiveSession, slug: string) =>
+    exercises.find((exercise) => exercise.slug === slug)?.muscle_group
+    || sessionExercises(session).find((member) => member.exerciseSlug === slug)?.muscleGroup
+    || 'Other';
+  const muscleTotals: Record<string, number> = {};
+  for (const session of sessions) {
+    for (const set of session.sets.filter((item) => item.done)) {
+      const muscle = lookup(session, set.exerciseSlug) || 'Other';
+      muscleTotals[muscle] = (muscleTotals[muscle] || 0) + 1;
+    }
+  }
+  const muscle = Object.entries(muscleTotals).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ muscle: name, sets: count }));
+
+  // Personal records: best estimated 1RM (Epley) per exercise
+  const prMap = new Map<string, { name: string; e1rm: number; topWeight: number }>();
+  for (const session of sessions) {
+    for (const set of session.sets.filter((item) => item.done && item.weight != null && item.reps != null && Number(item.weight) > 0)) {
+      const e1rm = Number(set.weight) * (1 + Number(set.reps) / 30);
+      const name = exercises.find((exercise) => exercise.slug === set.exerciseSlug)?.name
+        || sessionExercises(session).find((member) => member.exerciseSlug === set.exerciseSlug)?.exerciseName
+        || set.exerciseSlug;
+      const existing = prMap.get(set.exerciseSlug);
+      if (!existing) prMap.set(set.exerciseSlug, { name, e1rm, topWeight: Number(set.weight) });
+      else {
+        existing.e1rm = Math.max(existing.e1rm, e1rm);
+        existing.topWeight = Math.max(existing.topWeight, Number(set.weight));
+      }
+    }
+  }
+  const prs = [...prMap.entries()]
+    .map(([slug, record]) => ({ slug, name: record.name, e1rm: Math.round(record.e1rm * 10) / 10, topWeight: record.topWeight }))
+    .sort((a, b) => b.e1rm - a.e1rm)
+    .slice(0, 12);
+
+  return { totalSessions, totalSets, totalVolume, weekly, muscle, prs, streak: computeStreak(sessions) };
+}
+
+function trainingStatsView(state: AppState): string {
+  const unit = normalizeWeightUnit(state.settings.unit);
+  const stats = getStats(state.finishedSessions, state.exercises);
+  const max = Math.max(1, ...stats.weekly.map((week) => week.volume));
+  const bars = stats.weekly.length
+    ? stats.weekly.map((week) => `<div class="bar"><div class="fill" style="height:${Math.round((week.volume / max) * 100)}%"></div><span class="blabel">${html(week.week.split('-')[1])}</span></div>`).join('')
+    : '<div class="empty">No volume logged yet.</div>';
+  const distMax = Math.max(1, ...stats.muscle.map((entry) => entry.sets));
+  const dist = stats.muscle.length
+    ? `<div id="prog-dist" class="dist">${stats.muscle.map((entry) => `<div class="dist-row"><small>${html(entry.muscle)}</small><div class="track"><div class="fill" style="width:${Math.round((entry.sets / distMax) * 100)}%"></div></div><small>${entry.sets}</small></div>`).join('')}</div>`
+    : '<div id="prog-dist" class="dist empty">No logged sets yet.</div>';
+  const prs = stats.prs.length
+    ? `<div id="prog-prs" class="list">${stats.prs.map((record) => `<div class="row"><div><strong>${html(record.name)}</strong><small>top ${displayWeightKg(record.topWeight, unit)} ${unit}</small></div><span class="badge muscle">${displayWeightKg(record.e1rm, unit)} ${unit} 1RM</span></div>`).join('')}</div>`
+    : '<div id="prog-prs" class="list empty">No records yet.</div>';
+  return `<div class="stats-hero">
+    <div class="summary-stat">
+      <div class="ss-val"><svg id="stat-streak-flame" class="flame ${stats.streak > 0 ? 'active' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c-4-2.5-7-6.5-7-11 0-3 2-5.5 4-7 .5 2.5 2 4 4 5 0-3 1.5-6 3-8 1.5 2 3 5 3 8 2-1 3.5-2.5 4-5 1.5 2.5 1 6-1 9s-5.5 5.5-10 9z"/></svg><span id="stat-streak">${stats.streak}</span></div>
+      <div class="ss-label">Day streak</div>
+    </div>
+    <div class="summary-stat">
+      <div class="ss-val"><span id="stat-sessions">${stats.totalSessions}</span></div>
+      <div class="ss-label">Total sessions</div>
+    </div>
+    <div class="summary-stat">
+      <div class="ss-val"><span id="stat-volume">${Math.round(displayWeightKg(stats.totalVolume, unit) || 0).toLocaleString()}</span><small id="stat-volume-unit" class="ss-unit">${unit}</small></div>
+      <div class="ss-label">Total volume</div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><span>Weekly volume</span></div>
+    <div id="prog-bars" class="bars">${bars}</div>
+    <div class="subsection-head"><span>Muscle distribution</span><small>by working sets</small></div>
+    ${dist}
+    <div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley)</small></div>
+    ${prs}
+  </div>`;
 }
 
 // Base recovery hours per canonical muscle group (larger groups recover slower).
@@ -918,17 +1028,132 @@ function programBody(program: RelayProgram, state: AppState): string {
     </div>`;
 }
 
+function bmiMarkup(bmi: number): string {
+  const barMin = 15, barMax = 40, range = barMax - barMin;
+  const zones = [
+    { name: 'Under', cls: 'under', min: barMin, max: 18.5 },
+    { name: 'Normal', cls: 'normal', min: 18.5, max: 25 },
+    { name: 'Over', cls: 'over', min: 25, max: 30 },
+    { name: 'Obese', cls: 'obese', min: 30, max: barMax }
+  ];
+  const pct = ((Math.max(barMin, Math.min(barMax, bmi)) - barMin) / range) * 100;
+  const label = bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Overweight' : 'Obese';
+  return `<div class="subsection-head"><span>BMI</span><small>${bmi.toFixed(1)} · ${label}</small></div>
+    <div class="bmi-bar">
+      ${zones.map((zone) => `<div class="bmi-zone ${zone.cls}" style="flex:0 0 ${(((zone.max - zone.min) / range) * 100).toFixed(1)}%">${zone.name}</div>`).join('')}
+      <div class="bmi-marker" style="left:${pct.toFixed(1)}%"></div>
+    </div>
+    <div class="bmi-scale"><span>15</span><span>18.5</span><span>25</span><span>30</span><span>40+</span></div>`;
+}
+
+function bodyChartMarkup(sorted: BodyWeightEntry[], unit: WeightUnit): string {
+  if (sorted.length < 2) return '';
+  const wd = (kg: number) => displayWeightKg(kg, unit) || 0;
+  const W = 400, H = 120, pad = 30, n = sorted.length;
+  const vals = sorted.map((entry) => entry.weight_kg);
+  const min = Math.min(...vals) * 0.995, max = Math.max(...vals) * 1.005, range = (max - min) || 1;
+  const pts = vals.map((value, index) => {
+    const x = pad + (index / (n - 1)) * (W - pad * 2);
+    const y = pad / 2 + (1 - (value - min) / range) * (H - pad);
+    return [x.toFixed(1), y.toFixed(1)];
+  });
+  const polyline = pts.map((point) => point.join(',')).join(' ');
+  const areaPath = `M${pts[0].join(',')} ${pts.slice(1).map((point) => 'L' + point.join(',')).join(' ')} L${pts[n - 1][0]},${H - pad / 2} L${pts[0][0]},${H - pad / 2} Z`;
+  const dots = pts.map(([x, y], index) => {
+    const label = new Date(sorted[index].date + 'T00:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    return `<circle cx="${x}" cy="${y}" r="3" fill="var(--purple-2)" stroke="var(--void)" stroke-width="1.5"><title>${label}: ${wd(sorted[index].weight_kg).toFixed(1)} ${unit}</title></circle>`;
+  }).join('');
+  let yLabels = '';
+  const ySteps = 4;
+  for (let i = 0; i <= ySteps; i++) {
+    const value = min + (range * i / ySteps);
+    const y = pad / 2 + (1 - i / ySteps) * (H - pad);
+    yLabels += `<text x="${pad - 6}" y="${y}" text-anchor="end" font-size="9" fill="var(--dim)" dominant-baseline="middle">${wd(value).toFixed(0)}</text>`;
+    yLabels += `<line x1="${pad}" y1="${y}" x2="${W - pad}" y2="${y}" stroke="rgba(255,255,255,.06)" stroke-width="0.5"/>`;
+  }
+  const firstDate = new Date(sorted[0].date + 'T00:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric' });
+  const lastDate = new Date(sorted[n - 1].date + 'T00:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric' });
+  return `<div class="subsection-head"><span>Weight trend</span><small>${n} entr${n === 1 ? 'y' : 'ies'}</small></div>
+    <div class="body-chart">
+      <svg viewBox="0 0 ${W} ${H + 16}">
+        ${yLabels}
+        <path d="${areaPath}" fill="var(--sovereign-purple)" opacity=".12"/>
+        <polyline points="${polyline}" fill="none" stroke="var(--purple-2)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        ${dots}
+        <text x="${pad}" y="${H + 10}" font-size="9" fill="var(--dim)">${firstDate}</text>
+        <text x="${W - pad}" y="${H + 10}" font-size="9" fill="var(--dim)" text-anchor="end">${lastDate}</text>
+      </svg>
+    </div>`;
+}
+
+function bodyView(state: AppState): string {
+  const unit = normalizeWeightUnit(state.settings.unit);
+  const wd = (kg: number) => displayWeightKg(kg, unit) || 0;
+  const entries = state.bodyEntries;
+  let cards = '', bmi = '', chart = '', goal = '';
+  let listHtml = '<div id="body-list" class="list empty">No entries yet.</div>';
+  if (entries.length) {
+    // Entries are newest-first; sort oldest-first for trend/average maths.
+    const sorted = entries.slice().sort((a, b) => a.date.localeCompare(b.date));
+    const first = sorted[0], latest = sorted[sorted.length - 1];
+    const latestW = latest.weight_kg;
+    const last7 = sorted.slice(-7);
+    const avg7 = last7.reduce((sum, entry) => sum + entry.weight_kg, 0) / last7.length;
+    const totalChange = latestW - first.weight_kg;
+    const changeColor = totalChange > 0 ? 'var(--danger-red)' : totalChange < 0 ? 'var(--success-green)' : 'var(--muted)';
+    cards = `<div class="body-cards">
+      <div class="body-card"><div class="body-card-val">${wd(latestW).toFixed(1)}</div><div class="body-card-lbl">Current (${unit})</div></div>
+      <div class="body-card"><div class="body-card-val">${wd(avg7).toFixed(1)}</div><div class="body-card-lbl">7-day avg</div></div>
+      <div class="body-card"><div class="body-card-val" style="color:${changeColor}">${totalChange > 0 ? '+' : ''}${wd(totalChange).toFixed(1)}</div><div class="body-card-lbl">Total change</div></div>
+    </div>`;
+    const heightCm = state.settings.heightCm || 0;
+    if (heightCm > 0) { const meters = heightCm / 100; bmi = bmiMarkup(latestW / (meters * meters)); }
+    chart = bodyChartMarkup(sorted, unit);
+    const targetKg = state.settings.targetWeightKg || 0;
+    if (targetKg > 0) {
+      const startW = first.weight_kg;
+      const totalNeeded = targetKg - startW;
+      const pct = totalNeeded !== 0 ? Math.min(100, Math.max(0, ((latestW - startW) / totalNeeded) * 100)) : 100;
+      const remaining = targetKg - latestW;
+      goal = `<div class="subsection-head"><span>Goal progress</span></div>
+        <div class="body-goal-bar"><div class="body-goal-fill" style="width:${pct.toFixed(0)}%"></div></div>
+        <div class="body-goal-labels"><span>${wd(startW).toFixed(1)} ${unit}</span><span>${remaining > 0 ? '+' : ''}${wd(remaining).toFixed(1)} ${unit} to go</span><span>${wd(targetKg).toFixed(1)} ${unit}</span></div>`;
+    }
+    listHtml = `<div id="body-list" class="list">${entries.map((entry) => `<div class="row"><div><strong>${wd(entry.weight_kg)} ${unit}</strong><small>${html(entry.date)}${entry.notes ? ' · ' + html(entry.notes) : ''}</small></div><button class="button danger small" data-del-body="${entry.id}">×</button></div>`).join('')}</div>`;
+  }
+  return `<div class="panel">
+    <div class="panel-head"><span>Body weight</span><span class="section-label" id="body-unit">${unit}</span></div>
+    <div id="body-empty" class="empty" style="display:${entries.length ? 'none' : ''}">No entries yet. Log your weight below to start tracking.</div>
+    <div id="body-cards">${cards}</div>
+    <div id="body-bmi">${bmi}</div>
+    <div id="body-chart">${chart}</div>
+    <div id="body-goal">${goal}</div>
+    <div class="subsection-head"><span>Log weight</span></div>
+    <form id="body-form" class="form-grid">
+      <label>Date<input type="date" name="date" /></label>
+      <label><span>Weight (<span class="body-unit-lbl">${unit}</span>)</span><input type="number" name="weightKg" step="0.1" placeholder="e.g. 80" /></label>
+      <div class="form-actions span-2"><button class="button primary" type="submit">Log weight</button></div>
+    </form>
+    ${listHtml}
+    <div class="subsection-head"><span>Profile</span><small>for BMI &amp; goal</small></div>
+    <form id="body-profile-form" class="form-grid">
+      <label>Height (cm)<input type="number" name="heightCm" step="1" min="100" max="250" placeholder="e.g. 175" value="${state.settings.heightCm || ''}" /></label>
+      <label><span>Target weight (<span class="body-unit-lbl">${unit}</span>)</span><input type="number" name="targetWeightKg" step="0.1" min="0" placeholder="e.g. 75" value="${state.settings.targetWeightKg ? wd(state.settings.targetWeightKg) : ''}" /></label>
+      <div class="form-actions span-2"><button class="button" type="submit">Save profile</button></div>
+    </form>
+  </div>`;
+}
+
 function statisticsView(state: AppState): string {
   const active = state.subState.statistics;
-  const unit = normalizeWeightUnit(state.settings.unit);
   return `<div class="page active" id="page-statistics">
     <div class="page-title">Statistics</div>
     ${subTabs('statistics', active, ['Training', 'Body'])}
     <div class="sub-panel ${active === 'training' ? 'active' : ''}" id="sub-statistics-training">
-      ${statisticsSummary(state)}
+      ${trainingStatsView(state)}
     </div>
     <div class="sub-panel ${active === 'body' ? 'active' : ''}" id="sub-statistics-body">
-      <div class="panel"><div class="panel-head"><span>Body weight</span><span class="section-label">${unit}</span></div><div class="empty">No entries yet. Log your weight below to start tracking.</div><div class="subsection-head"><span>Log weight</span></div><form class="form-grid"><label>Date<input type="date" /></label><label>Weight (${unit})<input type="number" step="0.1" placeholder="e.g. ${unit === 'lbs' ? '176' : '80'}" /></label><div class="form-actions span-2"><button class="button primary" type="button">Log weight</button></div></form><div class="subsection-head"><span>Profile</span><small>for BMI &amp; goal</small></div><form class="form-grid"><label>Height (cm)<input type="number" step="1" min="100" max="250" placeholder="e.g. 175" /></label><label>Target weight (${unit})<input type="number" step="0.1" min="0" placeholder="e.g. ${unit === 'lbs' ? '165' : '75'}" /></label><div class="form-actions span-2"><button class="button" type="button">Save profile</button></div></form></div>
+      ${bodyView(state)}
     </div>
   </div>`;
 }
@@ -939,7 +1164,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [] };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
@@ -958,6 +1183,7 @@ export function renderShell(root: HTMLElement): void {
     await state.store.seedExercises(starterExercises as ExerciseDraft[]);
     state.settings = await state.store.getSettings();
     state.finishedSessions = await loadFinishedSessions();
+    state.bodyEntries = await state.store.listBody();
     state.activeSession = await loadUnfinishedSession();
     if (state.activeSession) sessionSetCounts = setCountsFromSession(state.activeSession);
     if (persist) {
@@ -1031,6 +1257,38 @@ export function renderShell(root: HTMLElement): void {
       render();
     }));
     bindRecoveryControls();
+    bindBodyControls();
+  }
+
+  function bindBodyControls(): void {
+    root.querySelector('#body-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!state.store) { toast('Sign in or open the local demo to log weight.', 'bad'); return; }
+      const form = event.target as HTMLFormElement;
+      const weightKg = storeWeightInput((form.elements.namedItem('weightKg') as HTMLInputElement).value, normalizeWeightUnit(state.settings.unit));
+      if (weightKg == null) return;
+      await state.store.logBody({ date: (form.elements.namedItem('date') as HTMLInputElement).value || undefined, weight_kg: weightKg, notes: '' });
+      state.bodyEntries = await state.store.listBody();
+      render();
+      toast('Weight logged');
+    });
+    root.querySelectorAll<HTMLElement>('[data-del-body]').forEach((button) => button.addEventListener('click', async () => {
+      if (!state.store) return;
+      await state.store.deleteBody(Number(button.dataset.delBody) || 0);
+      state.bodyEntries = await state.store.listBody();
+      render();
+    }));
+    root.querySelector('#body-profile-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!state.store) { toast('Sign in or open the local demo to save your profile.', 'bad'); return; }
+      const form = event.target as HTMLFormElement;
+      const heightCm = Number((form.elements.namedItem('heightCm') as HTMLInputElement).value) || 0;
+      const targetWeightKg = storeWeightInput((form.elements.namedItem('targetWeightKg') as HTMLInputElement).value, normalizeWeightUnit(state.settings.unit)) || 0;
+      state.settings = { ...state.settings, heightCm, targetWeightKg };
+      await state.store.saveSettings(state.settings);
+      render();
+      toast('Profile saved');
+    });
   }
 
   function toast(message: string, kind: 'ok' | 'bad' = 'ok'): void {
@@ -1219,7 +1477,7 @@ export function renderShell(root: HTMLElement): void {
   function signOut(): void {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SIGNER_TYPE_KEY);
-    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.settings = { ...DEFAULT_SETTINGS }; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null;
+    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.settings = { ...DEFAULT_SETTINGS }; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null; state.bodyEntries = [];
     render();
   }
 

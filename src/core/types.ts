@@ -97,6 +97,7 @@ export interface BodyWeightEntry {
   id?: number;
   date: string;
   weight_kg: number;
+  notes?: string;
 }
 
 export interface WorkstrSettings {
@@ -106,4 +107,6 @@ export interface WorkstrSettings {
   signerType?: 'nip07' | 'nip46' | 'idenstr';
   syncCursor?: number;
   starterExercisesSeeded?: boolean;
+  heightCm?: number;
+  targetWeightKg?: number;
 }

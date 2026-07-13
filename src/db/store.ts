@@ -1,6 +1,6 @@
 import type { IDBPDatabase } from 'idb';
 import { openWorkstrDB, type WorkstrDB } from './schema';
-import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
+import type { BodyWeightEntry, Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 
 export type ExerciseDraft = Omit<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'> &
@@ -102,6 +102,26 @@ export class WorkstrStore {
       const ex = String(a.exercise_slug || '').localeCompare(String(b.exercise_slug || ''));
       return ex || Number(a.set_number) - Number(b.set_number);
     });
+  }
+
+  async listBody(limit = 120): Promise<BodyWeightEntry[]> {
+    return (await this.db.getAll('bodyweight'))
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      .slice(0, limit);
+  }
+
+  // Upsert by date, mirroring self-hosted body_log's UNIQUE(date) ON CONFLICT UPDATE.
+  async logBody(entry: { date?: string; weight_kg: number; notes?: string }): Promise<void> {
+    if (!Number.isFinite(entry.weight_kg)) throw new Error('weight_kg must be a number');
+    const date = String(entry.date || new Date().toISOString().slice(0, 10));
+    const tx = this.db.transaction('bodyweight', 'readwrite');
+    const existing = await tx.store.index('date').get(date);
+    await tx.store.put({ ...existing, date, weight_kg: entry.weight_kg, notes: entry.notes || '' });
+    await tx.done;
+  }
+
+  async deleteBody(id: number): Promise<void> {
+    await this.db.delete('bodyweight', id);
   }
 
   async getSettings(): Promise<WorkstrSettings> {
