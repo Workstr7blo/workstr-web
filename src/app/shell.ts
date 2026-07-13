@@ -374,15 +374,75 @@ function historyDuration(session: ActiveSession): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+function sessionExercises(session: ActiveSession): SessionExercise[] { return session.exercises || []; }
+
+function workoutVolume(session: ActiveSession): number {
+  return session.sets.filter((set) => set.done).reduce((total, set) => total + (Number(set.reps) || 0) * (Number(set.weight) || 0), 0);
+}
+
 function workoutHistory(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   if (!state.finishedSessions.length) return '<div class="list empty">No completed sessions yet.</div>';
   return `<div class="history-list">${state.finishedSessions.map((session) => {
     const doneSets = session.sets.filter((set) => set.done);
-    const volume = doneSets.reduce((total, set) => total + (Number(set.reps) || 0) * (Number(set.weight) || 0), 0);
-    const rows = doneSets.map((set) => `<div class="history-set-row"><span>${html(set.exerciseName || set.exerciseSlug)} · set ${set.setNumber}</span><strong>${set.reps ?? '—'} reps${set.weight == null ? '' : ` @ ${html(formatWeightKg(set.weight, unit))}`}</strong></div>`).join('');
-    return `<details class="history-session"><summary><div><strong>${html(session.sheetName || 'Workout')}</strong><small>${new Date(session.startedAt).toLocaleString()} · ${historyDuration(session)}</small></div><span>${doneSets.length} sets · ${volume ? html(formatWeightKg(volume, unit)) : '—'}</span></summary><div class="history-session-body">${rows || '<div class="empty">No sets logged.</div>'}</div></details>`;
+    const volume = workoutVolume(session);
+    const grouped = sessionExercises(session).map((exercise) => {
+      const sets = doneSets.filter((set) => set.exerciseSlug === exercise.exerciseSlug);
+      if (!sets.length) return '';
+      return `<div class="session-detail-ex"><div class="session-detail-ex-name">${html(exercise.exerciseName || exercise.exerciseSlug)}</div><div class="session-detail-sets">${sets.map((set) => `<span class="set-pill">${set.reps ?? '—'}${set.weight == null ? '' : ` × ${html(formatWeightKg(set.weight, unit))}`}</span>`).join('')}</div></div>`;
+    }).filter(Boolean).join('');
+    return `<details class="history-session"><summary><div><strong>${html(session.sheetName || 'Workout')}</strong><small>${new Date(session.startedAt).toLocaleString()} · ${historyDuration(session)}</small></div><span>${doneSets.length} sets · ${volume ? html(formatWeightKg(volume, unit)) : '—'}</span></summary><div class="history-session-body session-detail">${grouped || '<div class="empty">No sets logged.</div>'}<div class="workout-card-actions"><button class="button danger small" type="button" data-delete-session="${session.id}">Delete session</button></div></div></details>`;
   }).join('')}</div>`;
+}
+
+function sessionMuscleMap(session: ActiveSession): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const exercise of sessionExercises(session)) map[exercise.exerciseSlug] = canonMuscle(exercise.muscleGroup || '') || programMuscleLabel(exercise.muscleGroup) || 'Other';
+  return map;
+}
+
+function completedSets(sessions: ActiveSession[]): SessionSetLog[] {
+  return sessions.flatMap((session) => session.sets.filter((set) => set.done));
+}
+
+function statisticsSummary(state: AppState): string {
+  const unit = normalizeWeightUnit(state.settings.unit);
+  const sessions = state.finishedSessions;
+  const sets = completedSets(sessions);
+  const volume = sessions.reduce((total, session) => total + workoutVolume(session), 0);
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const weeklyVolume = sessions.filter((session) => new Date(session.finishedAt || session.startedAt).getTime() >= weekAgo).reduce((total, session) => total + workoutVolume(session), 0);
+  const muscles: Record<string, number> = {};
+  for (const session of sessions) {
+    const map = sessionMuscleMap(session);
+    for (const set of session.sets.filter((item) => item.done)) muscles[map[set.exerciseSlug] || 'Other'] = (muscles[map[set.exerciseSlug] || 'Other'] || 0) + 1;
+  }
+  const dist = Object.entries(muscles).sort((a, b) => b[1] - a[1]);
+  const distHtml = dist.length ? `<div class="dist">${dist.map(([name, count]) => `<div class="compare-row"><div class="cr-name">${html(name)}</div><div class="cr-delta flat">${count} sets</div></div>`).join('')}</div>` : '<div class="dist empty">No logged sets yet.</div>';
+  return `<div class="stats-hero"><div class="summary-stat"><div class="ss-val">0</div><div class="ss-label">Day streak</div></div><div class="summary-stat"><div class="ss-val">${sessions.length}</div><div class="ss-label">Total sessions</div></div><div class="summary-stat"><div class="ss-val">${Math.round(displayWeightKg(volume, unit) || 0)}<small class="ss-unit">${unit}</small></div><div class="ss-label">Total volume</div></div></div>
+    <div class="panel"><div class="panel-head"><span>Weekly volume</span><strong>${Math.round(displayWeightKg(weeklyVolume, unit) || 0)} ${unit}</strong></div><div class="subsection-head"><span>Muscle distribution</span><small>by working sets</small></div>${distHtml}<div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley)</small></div><div class="list empty">PRs appear after repeated persisted sessions.</div></div>`;
+}
+
+function recoveryView(state: AppState): string {
+  const now = Date.now();
+  const fatigue: Record<string, number> = {};
+  for (const session of state.finishedSessions) {
+    const ageHours = Math.max(0, (now - new Date(session.finishedAt || session.startedAt).getTime()) / 36e5);
+    if (ageHours > 240) continue;
+    const map = sessionMuscleMap(session);
+    for (const set of session.sets.filter((item) => item.done)) {
+      const muscle = map[set.exerciseSlug] || 'Other';
+      fatigue[muscle] = (fatigue[muscle] || 0) + Math.max(0, 72 - ageHours) / 72;
+    }
+  }
+  const rows = Object.entries(fatigue).sort((a, b) => b[1] - a[1]);
+  if (!rows.length) return '<div class="panel"><div class="panel-head"><span>Muscle recovery</span><strong>—</strong></div><p class="section-help">Estimated readiness per muscle group from your completed sessions over the last 10 days. Bigger groups recover slower; higher training volume extends recovery.</p><div class="recovery empty">No completed sessions yet — train to see recovery.</div></div>';
+  const ready = rows.filter(([, score]) => score < 0.75).length;
+  return `<div class="panel"><div class="panel-head"><span>Muscle recovery</span><strong>${ready}/${rows.length} ready</strong></div><p class="section-help">Estimated readiness per muscle group from your completed sessions over the last 10 days.</p><div class="recovery">${rows.map(([muscle, score]) => {
+    const percent = Math.max(0, Math.min(100, Math.round(100 - score * 35)));
+    const status = percent >= 80 ? 'ready' : percent >= 55 ? 'partial' : 'recovering';
+    return `<div class="recovery-row ${status}"><div class="rname">${html(muscle)}</div><div class="rtrack"><div class="rfill" style="width:${percent}%"></div></div><div class="rmeta"><strong>${percent}%</strong><small>${status}</small></div></div>`;
+  }).join('')}</div></div>`;
 }
 
 function workoutsView(state: AppState): string {
@@ -402,7 +462,7 @@ function workoutsView(state: AppState): string {
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p>${workoutHistory(state)}</div>
     </div>
     <div class="sub-panel ${active === 'recovery' ? 'active' : ''}" id="sub-workouts-recovery">
-      <div class="panel"><div class="panel-head"><span>Muscle recovery</span><strong>—</strong></div><p class="section-help">Estimated readiness per muscle group from your completed sessions over the last 10 days. Bigger groups recover slower; higher training volume extends recovery.</p><div class="recovery empty">No completed sessions yet — train to see recovery.</div></div>
+      ${recoveryView(state)}
       <div class="panel"><div class="panel-head"><span>Quick workout</span><div class="qw-duration"><button class="qw-dur-btn">20</button><button class="qw-dur-btn">30</button><button class="qw-dur-btn active">45</button><button class="qw-dur-btn">60</button><span class="qw-dur-unit">min</span></div></div><p class="section-help">Generates a balanced session from exercises whose muscle groups are recovered. Pick a duration, then swap or drop any exercise before you start.</p><button class="button primary" style="width:100%">Generate from recovered muscles</button></div>
     </div>
   </div>`;
@@ -588,8 +648,7 @@ function statisticsView(state: AppState): string {
     <div class="page-title">Statistics</div>
     ${subTabs('statistics', active, ['Training', 'Body'])}
     <div class="sub-panel ${active === 'training' ? 'active' : ''}" id="sub-statistics-training">
-      <div class="stats-hero"><div class="summary-stat"><div class="ss-val">0</div><div class="ss-label">Day streak</div></div><div class="summary-stat"><div class="ss-val">0</div><div class="ss-label">Total sessions</div></div><div class="summary-stat"><div class="ss-val">0<small class="ss-unit">${unit}</small></div><div class="ss-label">Total volume</div></div></div>
-      <div class="panel"><div class="panel-head"><span>Weekly volume</span></div><div class="bars"></div><div class="subsection-head"><span>Muscle distribution</span><small>by working sets</small></div><div class="dist empty">No logged sets yet.</div><div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley)</small></div><div class="list empty">No records yet.</div></div>
+      ${statisticsSummary(state)}
     </div>
     <div class="sub-panel ${active === 'body' ? 'active' : ''}" id="sub-statistics-body">
       <div class="panel"><div class="panel-head"><span>Body weight</span><span class="section-label">${unit}</span></div><div class="empty">No entries yet. Log your weight below to start tracking.</div><div class="subsection-head"><span>Log weight</span></div><form class="form-grid"><label>Date<input type="date" /></label><label>Weight (${unit})<input type="number" step="0.1" placeholder="e.g. ${unit === 'lbs' ? '176' : '80'}" /></label><div class="form-actions span-2"><button class="button primary" type="button">Log weight</button></div></form><div class="subsection-head"><span>Profile</span><small>for BMI &amp; goal</small></div><form class="form-grid"><label>Height (cm)<input type="number" step="1" min="100" max="250" placeholder="e.g. 175" /></label><label>Target weight (${unit})<input type="number" step="0.1" min="0" placeholder="e.g. ${unit === 'lbs' ? '165' : '75'}" /></label><div class="form-actions span-2"><button class="button" type="button">Save profile</button></div></form></div>
@@ -622,6 +681,8 @@ export function renderShell(root: HTMLElement): void {
     await state.store.seedExercises(starterExercises as ExerciseDraft[]);
     state.settings = await state.store.getSettings();
     state.finishedSessions = await loadFinishedSessions();
+    state.activeSession = await loadUnfinishedSession();
+    if (state.activeSession) sessionSetCounts = setCountsFromSession(state.activeSession);
     if (persist) {
       localStorage.setItem(SESSION_KEY, pubkey);
       if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
@@ -685,6 +746,15 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#exercise-form')?.addEventListener('submit', saveExercise);
     root.querySelectorAll<HTMLElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => { state.editingId = Number(button.dataset.edit); render(); }));
     root.querySelectorAll<HTMLElement>('[data-delete]').forEach((button) => button.addEventListener('click', () => deleteExercise(Number(button.dataset.delete))));
+    root.querySelectorAll<HTMLElement>('[data-delete-session]').forEach((button) => button.addEventListener('click', () => { void deleteSession(Number(button.dataset.deleteSession)); }));
+  }
+
+  async function deleteSession(id: number): Promise<void> {
+    if (!state.store || !id) return;
+    if (!window.confirm('Delete this completed session? This removes it from history, stats, and recovery.')) return;
+    await state.store.deleteSession(id);
+    state.finishedSessions = await loadFinishedSessions();
+    render();
   }
 
   async function saveUnitPreference(value: string): Promise<void> {
@@ -703,6 +773,13 @@ export function renderShell(root: HTMLElement): void {
       result.push(activeSessionFromStored(session, sets));
     }
     return result;
+  }
+
+  async function loadUnfinishedSession(): Promise<ActiveSession | null> {
+    if (!state.store) return null;
+    const session = (await state.store.listSessions()).find((item) => !item.finished_at);
+    if (!session?.id) return null;
+    return activeSessionFromStored(session, await state.store.listSessionSets(session.id));
   }
 
   function activeSessionFromStored(session: Session, sets: SessionSet[]): ActiveSession {
