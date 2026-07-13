@@ -128,6 +128,7 @@ export function exerciseFromEvent(event: Event): Exercise | null {
   const dTag = tagValue(tags, 'd');
   const name = tagValue(tags, 'title');
   if (!dTag || !name) return null;
+  if (!dTag.startsWith(EXERCISE_D_PREFIX)) return null;
 
   const meta = parseWorkstrMeta(tags);
   const exact = workstrMuscles(tags);
@@ -169,6 +170,7 @@ export function programFromEvent(event: Event): RelayProgram | null {
   const dTag = tagValue(tags, 'd');
   const name = tagValue(tags, 'title');
   if (!dTag || !name) return null;
+  if (!dTag.startsWith(PROGRAM_D_PREFIX)) return null;
   const meta = parseWorkstrMeta(tags);
   const metaExercises = Array.isArray(meta.exercises) ? meta.exercises as Array<Record<string, unknown>> : [];
   const exerciseRows = tagRows(tags, 'exercise');
