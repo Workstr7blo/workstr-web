@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getRecovery } from '../src/app/shell';
+import { getQuickWorkout, getRecovery } from '../src/app/shell';
 import type { Exercise } from '../src/core/types';
+
+const libraryExercise = (slug: string, muscleGroup: string) =>
+  ({ slug, name: slug, muscle_group: muscleGroup, muscles: [muscleGroup], tags: [] } as unknown as Exercise);
 
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3600000).toISOString();
 
@@ -49,5 +52,38 @@ describe('getRecovery', () => {
     const data = getRecovery([makeSession(hoursAgo(11 * 24), 'squat', 'Quadriceps')], []);
     const quads = data.muscleGroups.find((group) => group.name === 'Quadriceps')!;
     expect(quads.status).toBe('untrained');
+  });
+});
+
+describe('getQuickWorkout', () => {
+  const library = [
+    libraryExercise('bench-press', 'Chest'),
+    libraryExercise('squat', 'Quadriceps'),
+    libraryExercise('deadlift', 'Hamstrings'),
+    libraryExercise('lateral-raise', 'Lateral Deltoid')
+  ];
+
+  it('includes untrained muscle groups with no history at all', () => {
+    const data = getQuickWorkout([], library, 45, 80);
+    const groups = new Set(data.exercises.map((exercise) => exercise.muscleGroup));
+    expect(groups).toContain('Chest');
+    expect(groups).toContain('Quadriceps');
+    expect(groups).toContain('Hamstrings');
+  });
+
+  it('folds granular muscle names into their canonical group', () => {
+    const data = getQuickWorkout([], library, 60, 80);
+    expect(data.exercises.find((exercise) => exercise.slug === 'lateral-raise')?.muscleGroup).toBe('Shoulders');
+  });
+
+  it('excludes a freshly trained group but keeps untrained ones', () => {
+    // 12 sets of chest 1h ago -> recovering; untrained groups stay eligible
+    const session = makeSession(hoursAgo(1), 'bench-press', 'Chest', 12);
+    const data = getQuickWorkout([session], library, 60, 80);
+    const groups = new Set(data.exercises.map((exercise) => exercise.muscleGroup));
+    expect(groups).not.toContain('Chest');
+    expect(groups).toContain('Quadriceps');
+    expect(groups).toContain('Hamstrings');
+    expect(groups).toContain('Shoulders');
   });
 });
