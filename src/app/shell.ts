@@ -1,5 +1,6 @@
 import { nip19 } from 'nostr-tools';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
+import { createBunkerSigner, isLikelyBunkerInput } from '../signer/nip46';
 import { slugify } from '../core/ids';
 import { CANONICAL_REGIONS } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft } from '../db/store';
@@ -7,6 +8,7 @@ import starterExercises from '../data/starter-exercises.json';
 import type { Exercise } from '../core/types';
 
 const SESSION_KEY = 'workstr.currentPubkey';
+const SIGNER_TYPE_KEY = 'workstr.signerType';
 
 type View = 'home' | 'library' | 'train' | 'progress';
 
@@ -14,6 +16,7 @@ interface AppState {
   pubkey: string | null;
   npub: string | null;
   store: WorkstrStore | null;
+  signerType: 'nip07' | 'nip46' | 'demo' | null;
   view: View;
   exercises: Exercise[];
   editingId: number | null;
@@ -87,8 +90,24 @@ function loginView(): string {
       <p class="eyebrow">Phase 0 identity</p>
       <h1>Connect your signer to open Workstr.</h1>
       <p class="lede">Workstr stores your data in a browser database namespaced by your Nostr pubkey. Signing stays delegated to your signer; there is no nsec paste flow.</p>
+      <div class="signer-grid">
+        <section class="signer-card">
+          <span class="section-label">Browser extension</span>
+          <h2>NIP-07 extension</h2>
+          <p>Use Alby, nos2x, Flamingo, or another extension that exposes <code>window.nostr</code>.</p>
+          <button id="connect-nip07" class="button primary">Use Extension</button>
+        </section>
+        <section class="signer-card">
+          <span class="section-label">Remote signer</span>
+          <h2>Bunker URL</h2>
+          <p>Paste a <code>bunker://</code> URI or NIP-05 identifier from a NIP-46 signer such as Amber.</p>
+          <form id="bunker-form" class="bunker-form">
+            <input name="bunker" placeholder="bunker://... or name@domain.com" autocomplete="off" />
+            <button class="button primary" type="submit">Connect Bunker</button>
+          </form>
+        </section>
+      </div>
       <div class="action-row">
-        <button id="connect-nip07" class="button primary">Connect NIP-07 signer</button>
         <button id="open-demo" class="button ghost">Open local demo</button>
       </div>
       <pre id="status-panel" class="terminal-mini">$ workstr-web boot\nsecure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\n</pre>
@@ -107,7 +126,7 @@ function appView(state: AppState): string {
       <p class="lede">Identity: <strong>${html(state.npub ?? '')}</strong></p>
       <div class="metric-grid mini">
         <div class="metric"><span class="metric-label">Library</span><strong>${state.exercises.length}</strong><p>active exercises in your local IndexedDB namespace</p></div>
-        <div class="metric"><span class="metric-label">Signer</span><strong>${state.pubkey === 'demo-local-pubkey' ? 'Demo' : 'NIP-07'}</strong><p>keys stay outside the app</p></div>
+        <div class="metric"><span class="metric-label">Signer</span><strong>${state.signerType === 'nip46' ? 'NIP-46' : state.pubkey === 'demo-local-pubkey' ? 'Demo' : 'NIP-07'}</strong><p>keys stay outside the app</p></div>
       </div>
       <div class="action-row">
         <button class="button primary" data-view="library">Open Library</button>
@@ -192,20 +211,24 @@ function exerciseCard(exercise: Exercise): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, store: null, view: 'home', exercises: [], editingId: null, filter: '' };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'home', exercises: [], editingId: null, filter: '' };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
     render();
   }
 
-  async function openIdentity(pubkey: string, persist = true): Promise<void> {
+  async function openIdentity(pubkey: string, persist = true, signerType: AppState['signerType'] = state.signerType): Promise<void> {
     state.pubkey = pubkey;
+    state.signerType = signerType;
     state.npub = pubkey === 'demo-local-pubkey' ? 'demo-local-pubkey' : nip19.npubEncode(pubkey);
     state.store = await WorkstrStore.open(pubkey);
     await state.store.seedExercises(starterExercises as ExerciseDraft[]);
     state.exercises = await state.store.listExercises();
-    if (persist) localStorage.setItem(SESSION_KEY, pubkey);
+    if (persist) {
+      localStorage.setItem(SESSION_KEY, pubkey);
+      if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
+    }
   }
 
   function render(): void {
@@ -223,14 +246,17 @@ export function renderShell(root: HTMLElement): void {
     });
     root.querySelector('#sign-out')?.addEventListener('click', () => {
       localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(SIGNER_TYPE_KEY);
       state.pubkey = null;
       state.npub = null;
       state.store = null;
+      state.signerType = null;
       state.exercises = [];
       state.view = 'home';
       render();
     });
     root.querySelector('#connect-nip07')?.addEventListener('click', connectNip07);
+    root.querySelector('#bunker-form')?.addEventListener('submit', connectBunker);
     root.querySelector('#open-demo')?.addEventListener('click', () => openAndRender('demo-local-pubkey'));
     root.querySelector('#new-exercise')?.addEventListener('click', () => { state.editingId = null; render(); });
     root.querySelector('#cancel-edit')?.addEventListener('click', () => { state.editingId = null; render(); });
@@ -252,14 +278,34 @@ export function renderShell(root: HTMLElement): void {
       const signer = createNip07Signer();
       const pubkey = await signer.getPublicKey();
       panel!.textContent += `$ signer connected ${shortNpub(pubkey)}\n`;
-      await openAndRender(pubkey);
+      await openAndRender(pubkey, 'nip07');
     } catch (error) {
-      panel!.textContent += `$ signer error ${(error as Error).message}\n`;
+      panel!.textContent += `$ extension signer error ${(error as Error).message}\n`;
     }
   }
 
-  async function openAndRender(pubkey: string): Promise<void> {
-    await openIdentity(pubkey);
+  async function connectBunker(event: Event): Promise<void> {
+    event.preventDefault();
+    const panel = root.querySelector('#status-panel');
+    const form = event.target as HTMLFormElement;
+    const input = String(new FormData(form).get('bunker') || '').trim();
+    if (!isLikelyBunkerInput(input)) {
+      panel!.textContent += '$ bunker error paste a bunker:// URL or NIP-05 identifier\n';
+      return;
+    }
+    try {
+      panel!.textContent += '$ bunker connecting; approve the request in your signer...\n';
+      const signer = await createBunkerSigner(input);
+      const pubkey = await signer.getPublicKey();
+      panel!.textContent += `$ bunker connected ${shortNpub(pubkey)}\n`;
+      await openAndRender(pubkey, 'nip46');
+    } catch (error) {
+      panel!.textContent += `$ bunker error ${(error as Error).message}\n`;
+    }
+  }
+
+  async function openAndRender(pubkey: string, signerType: AppState['signerType'] = pubkey === 'demo-local-pubkey' ? 'demo' : state.signerType): Promise<void> {
+    await openIdentity(pubkey, true, signerType);
     render();
   }
 
