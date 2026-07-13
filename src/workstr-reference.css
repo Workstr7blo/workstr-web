@@ -547,7 +547,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 
 /* Rest countdown */
 .session-rest-overlay { display: none; position: fixed; inset: 0; z-index: 310; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(circle at 50% 38%, rgba(124,60,255,.26), transparent 20rem), rgba(4,2,8,.95); backdrop-filter: blur(12px); }
-.session-rest-overlay.show { display: flex; }
+.session-rest-overlay.show { display: flex !important; }
 .rest-label { color: var(--purple-2); font: 900 12px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .22em; }
 .rest-timer-wrap { position: relative; width: 184px; height: 184px; display: grid; place-items: center; }
 .rest-ring { position: absolute; inset: 0; transform: rotate(-90deg); width: 184px; height: 184px; }

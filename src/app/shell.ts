@@ -273,11 +273,11 @@ function sessionOverlayMarkup(state: AppState): string {
     <div class="session-bg"></div>
     <div class="session-header">
       <div class="session-head-main">
-        <div class="session-eyebrow">Training live</div>
+        <div class="session-eyebrow">Live session</div>
         <div id="session-title" class="session-title">Workout</div>
         <div class="session-meta-line"><span id="session-meta" class="session-meta">Exercise 1 of 1</span><span class="session-elapsed-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span id="session-elapsed" class="session-elapsed">00:00</span></span></div>
       </div>
-      <button id="session-close" class="session-close-btn" type="button">Discard</button>
+      <button id="session-close" class="session-close-btn" type="button">End</button>
     </div>
     <div class="session-progress"><div id="session-progress-fill" class="session-progress-fill"></div></div>
     <div id="session-ex-nav" class="session-ex-nav"></div>
@@ -288,7 +288,7 @@ function sessionOverlayMarkup(state: AppState): string {
       <div class="rest-label">Rest</div>
       <div class="rest-timer-wrap"><svg class="rest-ring" viewBox="0 0 120 120"><circle class="rest-ring-bg" cx="60" cy="60" r="54" stroke-width="8"/><circle id="rest-ring-fg" class="rest-ring-fg" cx="60" cy="60" r="54" stroke-width="8" stroke-dasharray="339.3" stroke-dashoffset="0"/></svg><div id="session-rest-val" class="rest-timer-val">90</div></div>
       <div id="rest-nextup" class="rest-nextup"></div>
-      <div class="rest-adjust-btns"><button class="rest-adjust-btn" data-rest-adjust="-15" type="button">-15s</button><button class="rest-skip-btn" id="rest-skip" type="button">Skip</button><button class="rest-adjust-btn" data-rest-adjust="15" type="button">+15s</button></div>
+      <div class="rest-adjust-btns"><button class="rest-adjust-btn" data-rest-adjust="-15" type="button">-15s</button><button class="rest-skip-btn" id="rest-skip" type="button">Skip Rest</button><button class="rest-adjust-btn" data-rest-adjust="15" type="button">+15s</button></div>
     </div>
   </div>`;
 }
@@ -721,6 +721,13 @@ export function renderShell(root: HTMLElement): void {
 
   function wFmt(weight: number | null | undefined): string { return weight == null ? '—' : `${wDisplay(weight)}${unitLabel()}`; }
 
+  function sessionWeightDisplay(weight: number | string | null | undefined): string {
+    if (weight == null || weight === '') return '';
+    const value = Number(weight);
+    if (!Number.isFinite(value)) return String(weight);
+    return String(Math.round(value * 2.20462));
+  }
+
   function programSessionExercises(program: RelayProgram): SessionExercise[] {
     return program.exercises.map((member) => {
       const full = resolveProgramExercise(member, state.exercises);
@@ -868,11 +875,13 @@ export function renderShell(root: HTMLElement): void {
       const locked = !done && i > 0 && !logged.find((set) => Number(set.setNumber) === i);
       const prevHint = prev ? `<div class="session-set-hint prev">prev: ${html(formatSetHint(prev))}</div>` : '';
       const suggestHint = prev ? `<div class="session-set-hint suggest">${suggestedSetHint(prev, targetReps)}</div>` : '';
+      const defaultReps = String(done?.reps ?? (targetReps || prev?.reps || ''));
+      const defaultWeight = done?.weight != null ? String(done.weight) : (prev?.weight != null ? String(prev.weight) : sessionWeightDisplay(ex.weight));
       return `<div class="session-set-block ${locked ? 'locked' : ''}" data-set-block="${i}">
         <div class="session-set-row">
           <div class="session-set-num ${done ? 'done' : ''}" data-set-num="${i}">${i + 1}</div>
-          <input class="session-set-input" data-session-reps="${i}" type="number" inputmode="numeric" placeholder="${html(targetReps || prev?.reps || 'reps')}" value="${done?.reps ?? ''}" ${done || locked ? 'disabled' : ''}>
-          <input class="session-set-input" data-session-weight="${i}" type="number" inputmode="decimal" step="0.5" placeholder="${prev?.weight != null ? wDisplay(prev.weight) : (ex.weight != null ? html(String(ex.weight)) : unitLabel())}" value="${done?.weight != null ? wDisplay(done.weight) : ''}" ${done || locked ? 'disabled' : ''}>
+          <input class="session-set-input" data-session-reps="${i}" type="number" inputmode="numeric" placeholder="${html(targetReps || prev?.reps || 'reps')}" value="${html(defaultReps)}" ${done || locked ? 'disabled' : ''}>
+          <input class="session-set-input" data-session-weight="${i}" type="number" inputmode="decimal" step="0.5" placeholder="${html(defaultWeight || unitLabel())}" value="${html(defaultWeight)}" ${done || locked ? 'disabled' : ''}>
           ${done ? `<button class="session-log-btn done" data-set-log-btn="${i}" disabled type="button">Done</button>` : `<button class="session-log-btn" data-session-log="${html(slug)}" data-set-index="${i}" data-set-log-btn="${i}" data-rest="${restSec}" ${locked ? 'disabled' : ''} type="button">Log</button>`}
         </div>
         ${prevHint}${suggestHint}
