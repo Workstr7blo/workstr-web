@@ -1,6 +1,6 @@
 import { nip19 } from 'nostr-tools';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
-import { createBunkerSigner, isLikelyBunkerInput } from '../signer/nip46';
+import { createBunkerSigner, createNostrConnectSignerRequest, defaultBunkerRelays, isLikelyBunkerInput } from '../signer/nip46';
 import { slugify } from '../core/ids';
 import { CANONICAL_REGIONS } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft } from '../db/store';
@@ -100,11 +100,13 @@ function loginView(): string {
         <section class="signer-card">
           <span class="section-label">Remote signer</span>
           <h2>Bunker URL</h2>
-          <p>Paste a <code>bunker://</code> URI or NIP-05 identifier from a NIP-46 signer such as Amber.</p>
+          <p>For Amber/remote signers, create a request and open it in your signer. If you already have a <code>bunker://</code> URI or NIP-05 signer address, paste it below.</p>
           <form id="bunker-form" class="bunker-form">
             <input name="bunker" placeholder="bunker://... or name@domain.com" autocomplete="off" />
-            <button class="button primary" type="submit">Connect Bunker</button>
+            <input name="relays" placeholder="relays for new request" value="${html(defaultBunkerRelays().join(', '))}" autocomplete="off" />
+            <button class="button primary" type="submit">Connect / Create Request</button>
           </form>
+          <div id="bunker-link-panel" class="bunker-link-panel"></div>
         </section>
       </div>
       <div class="action-row">
@@ -287,20 +289,44 @@ export function renderShell(root: HTMLElement): void {
   async function connectBunker(event: Event): Promise<void> {
     event.preventDefault();
     const panel = root.querySelector('#status-panel');
+    const linkPanel = root.querySelector<HTMLElement>('#bunker-link-panel');
     const form = event.target as HTMLFormElement;
     const input = String(new FormData(form).get('bunker') || '').trim();
-    if (!isLikelyBunkerInput(input)) {
-      panel!.textContent += '$ bunker error paste a bunker:// URL or NIP-05 identifier\n';
-      return;
-    }
+    const relays = String(new FormData(form).get('relays') || '').split(',').map((relay) => relay.trim()).filter(Boolean);
     try {
-      panel!.textContent += '$ bunker connecting; approve the request in your signer...\n';
-      const signer = await createBunkerSigner(input);
+      let signerPromise;
+      if (input) {
+        if (!isLikelyBunkerInput(input)) {
+          panel!.textContent += '$ bunker error paste a bunker:// URL or NIP-05 identifier, or leave it empty to create a new signer request\n';
+          return;
+        }
+        panel!.textContent += '$ bunker connecting over the URI relays; keep the signer app online and approve there...\n';
+        signerPromise = createBunkerSigner(input, { onAuthUrl: showAuthUrl });
+      } else {
+        const request = createNostrConnectSignerRequest(relays, { onAuthUrl: showAuthUrl });
+        signerPromise = request.signer;
+        panel!.textContent += `$ signer request created on ${request.relays.join(', ')}\n$ open this request in Amber/your NIP-46 signer and approve it; waiting up to 5 minutes...\n`;
+        if (linkPanel) {
+          linkPanel.innerHTML = `<a class="button primary" href="${html(request.uri)}">Open signer request</a><button id="copy-bunker-request" class="button ghost" type="button">Copy request URI</button>`;
+          linkPanel.querySelector('#copy-bunker-request')?.addEventListener('click', async () => {
+            await navigator.clipboard.writeText(request.uri);
+            panel!.textContent += '$ signer request copied\n';
+          });
+        }
+      }
+      const signer = await signerPromise;
       const pubkey = await signer.getPublicKey();
       panel!.textContent += `$ bunker connected ${shortNpub(pubkey)}\n`;
       await openAndRender(pubkey, 'nip46');
     } catch (error) {
       panel!.textContent += `$ bunker error ${(error as Error).message}\n`;
+    }
+
+    function showAuthUrl(url: string): void {
+      panel!.textContent += '$ signer returned an auth URL; open it to approve the request\n';
+      if (linkPanel) {
+        linkPanel.innerHTML = `<a class="button primary" href="${html(url)}" target="_blank" rel="noreferrer">Open signer approval</a>`;
+      }
     }
   }
 
