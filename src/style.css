@@ -4,6 +4,8 @@
 .topbar-actions #live-status { text-transform: none; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .web-empty-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .web-status-note { margin-top: 12px; }
+.signer-qr { width: 240px; max-width: 100%; margin: 16px auto 0; padding: 12px; background: #fff; border-radius: 12px; }
+.signer-qr svg { display: block; width: 100%; height: auto; }
 .metric-grid.mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .workout-card-map.has-map {
   width: 148px;
