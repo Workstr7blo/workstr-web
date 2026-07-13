@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
+import starterExercises from '../src/data/starter-exercises.json';
+import type { ExerciseDraft } from '../src/db/store';
 
 describe('WorkstrStore', () => {
   it('opens a pubkey-scoped database and stores exercises', async () => {
@@ -20,5 +22,19 @@ describe('WorkstrStore', () => {
     const exercises = await store.listExercises();
     expect(exercises).toHaveLength(1);
     expect(exercises[0].slug).toBe('push-up');
+  });
+
+  it('seeds bundled exercises once and soft-deletes exercises', async () => {
+    const store = await WorkstrStore.open('seed-test-pubkey');
+    const seeded = await store.seedExercises(starterExercises as ExerciseDraft[]);
+    const seededAgain = await store.seedExercises(starterExercises as ExerciseDraft[]);
+    expect(seeded).toBe(starterExercises.length);
+    expect(seededAgain).toBe(0);
+
+    const exercises = await store.listExercises();
+    expect(exercises.length).toBe(starterExercises.length);
+    await store.deleteExercise(exercises[0].id!);
+    expect(await store.getExercise(exercises[0].id!)).toBeUndefined();
+    expect(await store.listExercises()).toHaveLength(starterExercises.length - 1);
   });
 });
