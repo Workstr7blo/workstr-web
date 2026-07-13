@@ -906,7 +906,6 @@ export function renderShell(root: HTMLElement): void {
       ${ex.imageUrl ? `<img class="session-ex-image" src="${html(ex.imageUrl)}" alt="${html(name)}" loading="eager" onerror="this.classList.add('placeholder');this.removeAttribute('src');this.textContent='No exercise image'">` : '<div class="session-ex-image placeholder">No exercise image</div>'}
       <div class="session-ex-name">${html(name)}</div>
       <div class="session-ex-target"><b>${targetSets}</b> sets <span class="dot"></span> <b>${html(targetReps || 'free')}</b> reps <span class="dot"></span> <b>${restSec}s</b> rest</div>
-      ${ex.notes ? `<div class="session-note">${html(ex.notes)}</div>` : ''}
       <div class="session-sets">${rows}</div>
       <button class="session-add-set" data-add-session-set="${html(slug)}" type="button">+ Add set</button>
       ${instructionsHtml}`;
