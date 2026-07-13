@@ -37,4 +37,13 @@ describe('WorkstrStore', () => {
     expect(await store.getExercise(exercises[0].id!)).toBeUndefined();
     expect(await store.listExercises()).toHaveLength(starterExercises.length - 1);
   });
+
+  it('persists settings in IndexedDB using self-hosted lbs naming', async () => {
+    const store = await WorkstrStore.open('settings-test-pubkey');
+    const defaults = await store.getSettings();
+    expect(defaults.unit).toBe('kg');
+
+    await store.saveSettings({ ...defaults, unit: 'lbs' });
+    expect((await store.getSettings()).unit).toBe('lbs');
+  });
 });

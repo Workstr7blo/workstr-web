@@ -1,3 +1,5 @@
+import type { WeightUnit } from './units';
+
 export type ISODateTime = string;
 export type Slug = string;
 
@@ -81,7 +83,7 @@ export interface BodyWeightEntry {
 }
 
 export interface WorkstrSettings {
-  unit: 'kg' | 'lb';
+  unit: WeightUnit;
   publicRelays: string[];
   paidRelay?: string;
   signerType?: 'nip07' | 'nip46' | 'idenstr';

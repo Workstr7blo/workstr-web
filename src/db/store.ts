@@ -1,6 +1,7 @@
 import type { IDBPDatabase } from 'idb';
 import { openWorkstrDB, type WorkstrDB } from './schema';
 import type { Exercise, WorkstrSettings } from '../core/types';
+import { normalizeWeightUnit } from '../core/units';
 
 export type ExerciseDraft = Omit<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'> &
   Partial<Pick<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'>>;
@@ -71,15 +72,15 @@ export class WorkstrStore {
   }
 
   async getSettings(): Promise<WorkstrSettings> {
-    const stored = await this.db.get('settings', 'settings');
+    const stored = (await this.db.get('settings', 'settings')) as Partial<WorkstrSettings> | undefined;
     return {
-      unit: 'kg',
       publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'],
-      ...(stored as Partial<WorkstrSettings> | undefined)
+      ...stored,
+      unit: normalizeWeightUnit(stored?.unit)
     };
   }
 
   async saveSettings(settings: WorkstrSettings): Promise<void> {
-    await this.db.put('settings', settings, 'settings');
+    await this.db.put('settings', { ...settings, unit: normalizeWeightUnit(settings.unit) }, 'settings');
   }
 }

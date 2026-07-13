@@ -5,12 +5,14 @@ import { slugify } from '../core/ids';
 import { CANONICAL_REGIONS, canonMuscle } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft } from '../db/store';
 import starterExercises from '../data/starter-exercises.json';
-import type { Exercise } from '../core/types';
+import type { Exercise, WorkstrSettings } from '../core/types';
+import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { fetchRelayExercises, fetchRelayPrograms, WORKSTR_LIBRARY_RELAY, type RelayProgram } from '../nostr/powrLibrary';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
 const PROFILE_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://purplepag.es', 'wss://user.kindpag.es', 'wss://relay.nostr.band'];
+const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
 
 const RECOVERY_BODY_SVG = `<svg viewBox="0 0 230 230" xmlns="http://www.w3.org/2000/svg">
               <!-- FRONT (anterior) -->
@@ -153,6 +155,7 @@ interface AppState {
   profileName: string | null;
   profileNames: Record<string, string>;
   store: WorkstrStore | null;
+  settings: WorkstrSettings;
   signerType: 'nip07' | 'nip46' | 'demo' | null;
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
@@ -516,19 +519,21 @@ function programCard(program: RelayProgram, state: AppState): string {
       </div>
       <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
     </div>
-    <div class="workout-card-body">${isExpanded ? programBody(program, state.exercises) : ''}</div>
+    <div class="workout-card-body">${isExpanded ? programBody(program, state) : ''}</div>
   </div>`;
 }
 
-function programBody(program: RelayProgram, exercises: Exercise[]): string {
+function programBody(program: RelayProgram, state: AppState): string {
+  const unit = normalizeWeightUnit(state.settings.unit);
   const exHtml = program.exercises.length ? program.exercises.map((member, index) => {
-    const full = resolveProgramExercise(member, exercises);
+    const full = resolveProgramExercise(member, state.exercises);
     const name = programExerciseName(member, full);
     const muscle = programMuscleLabel(member.muscleGroup || full?.muscle_group || inferProgramMuscle(name));
     const image = exerciseImage(member.imageUrl || full?.image_url);
     const sets = Number(member.sets) || 3;
     const reps = member.reps || String(full?.default_reps || '8-12');
-    const weight = member.weight != null && member.weight !== '' ? ` @ ${html(member.weight)}` : '';
+    const weightValue = displayWeightKg(member.weight, unit);
+    const weight = weightValue != null ? ` @ ${html(String(weightValue))}` : '';
     const rest = Number(member.restSec || member.rest || full?.default_rest) || 90;
     return `<div class="wk-ex-item" data-exitem="${html(program.address)}-${index}">
       <div class="wk-ex-header" data-toggle-exitem="${html(program.address)}-${index}">
@@ -544,7 +549,7 @@ function programBody(program: RelayProgram, exercises: Exercise[]): string {
         <div class="wk-ex-detail-grid">
           <div class="wk-ex-detail-cell"><div class="val">${sets}</div><div class="lbl">Sets</div></div>
           <div class="wk-ex-detail-cell"><div class="val">${html(reps)}</div><div class="lbl">Reps</div></div>
-          <div class="wk-ex-detail-cell"><div class="val">${member.weight != null && member.weight !== '' ? html(member.weight) : '—'}</div><div class="lbl">Weight</div></div>
+          <div class="wk-ex-detail-cell"><div class="val">${weightValue != null ? html(String(weightValue)) : '—'}</div><div class="lbl">${unit}</div></div>
           <div class="wk-ex-detail-cell"><div class="val">${rest}s</div><div class="lbl">Rest</div></div>
         </div>
         ${member.notes ? `<div class="wk-ex-detail-note">${html(member.notes)}</div>` : ''}
@@ -559,25 +564,27 @@ function programBody(program: RelayProgram, exercises: Exercise[]): string {
 
 function statisticsView(state: AppState): string {
   const active = state.subState.statistics;
+  const unit = normalizeWeightUnit(state.settings.unit);
   return `<div class="page active" id="page-statistics">
     <div class="page-title">Statistics</div>
     ${subTabs('statistics', active, ['Training', 'Body'])}
     <div class="sub-panel ${active === 'training' ? 'active' : ''}" id="sub-statistics-training">
-      <div class="stats-hero"><div class="summary-stat"><div class="ss-val">0</div><div class="ss-label">Day streak</div></div><div class="summary-stat"><div class="ss-val">0</div><div class="ss-label">Total sessions</div></div><div class="summary-stat"><div class="ss-val">0<small class="ss-unit">kg</small></div><div class="ss-label">Total volume</div></div></div>
+      <div class="stats-hero"><div class="summary-stat"><div class="ss-val">0</div><div class="ss-label">Day streak</div></div><div class="summary-stat"><div class="ss-val">0</div><div class="ss-label">Total sessions</div></div><div class="summary-stat"><div class="ss-val">0<small class="ss-unit">${unit}</small></div><div class="ss-label">Total volume</div></div></div>
       <div class="panel"><div class="panel-head"><span>Weekly volume</span></div><div class="bars"></div><div class="subsection-head"><span>Muscle distribution</span><small>by working sets</small></div><div class="dist empty">No logged sets yet.</div><div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley)</small></div><div class="list empty">No records yet.</div></div>
     </div>
     <div class="sub-panel ${active === 'body' ? 'active' : ''}" id="sub-statistics-body">
-      <div class="panel"><div class="panel-head"><span>Body weight</span><span class="section-label">kg</span></div><div class="empty">No entries yet. Log your weight below to start tracking.</div><div class="subsection-head"><span>Log weight</span></div><form class="form-grid"><label>Date<input type="date" /></label><label>Weight (kg)<input type="number" step="0.1" placeholder="e.g. 80" /></label><div class="form-actions span-2"><button class="button primary" type="button">Log weight</button></div></form><div class="subsection-head"><span>Profile</span><small>for BMI &amp; goal</small></div><form class="form-grid"><label>Height (cm)<input type="number" step="1" min="100" max="250" placeholder="e.g. 175" /></label><label>Target weight (kg)<input type="number" step="0.1" min="0" placeholder="e.g. 75" /></label><div class="form-actions span-2"><button class="button" type="button">Save profile</button></div></form></div>
+      <div class="panel"><div class="panel-head"><span>Body weight</span><span class="section-label">${unit}</span></div><div class="empty">No entries yet. Log your weight below to start tracking.</div><div class="subsection-head"><span>Log weight</span></div><form class="form-grid"><label>Date<input type="date" /></label><label>Weight (${unit})<input type="number" step="0.1" placeholder="e.g. ${unit === 'lbs' ? '176' : '80'}" /></label><div class="form-actions span-2"><button class="button primary" type="button">Log weight</button></div></form><div class="subsection-head"><span>Profile</span><small>for BMI &amp; goal</small></div><form class="form-grid"><label>Height (cm)<input type="number" step="1" min="100" max="250" placeholder="e.g. 175" /></label><label>Target weight (${unit})<input type="number" step="0.1" min="0" placeholder="e.g. ${unit === 'lbs' ? '165' : '75'}" /></label><div class="form-actions span-2"><button class="button" type="button">Save profile</button></div></form></div>
     </div>
   </div>`;
 }
 
 function settingsView(state: AppState): string {
-  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr signer</span><span class="status-pill ${state.pubkey ? 'ok' : 'bad'}">${state.pubkey ? 'connected' : 'not signed in'}</span></div><p class="section-help">Workstr Web replaces self-hosted Idenstr with a user-owned NIP-46 signer. Press Sign in in the top-right; the app launches the signer request directly.</p><div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'not signed in')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div><div class="web-empty-actions">${state.pubkey ? '<button id="sign-out-settings" class="button ghost">Switch signer</button>' : '<button id="sign-in-settings" class="button primary">Sign in</button>'}<button id="open-demo" class="button ghost">Open local demo</button></div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select><option>Kilograms (kg)</option><option>Pounds (lbs)</option></select></label></div></div>`;
+  const unit = normalizeWeightUnit(state.settings.unit);
+  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr signer</span><span class="status-pill ${state.pubkey ? 'ok' : 'bad'}">${state.pubkey ? 'connected' : 'not signed in'}</span></div><p class="section-help">Workstr Web replaces self-hosted Idenstr with a user-owned NIP-46 signer. Press Sign in in the top-right; the app launches the signer request directly.</p><div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'not signed in')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div><div class="web-empty-actions">${state.pubkey ? '<button id="sign-out-settings" class="button ghost">Switch signer</button>' : '<button id="sign-in-settings" class="button primary">Sign in</button>'}<button id="open-demo" class="button ghost">Open local demo</button></div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select" ${state.store ? '' : 'disabled'}><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label>${state.store ? '' : '<p class="section-help">Open a signer or local demo first so preferences can be saved in the per-identity IndexedDB database.</p>'}</div></div>`;
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
@@ -592,7 +599,9 @@ export function renderShell(root: HTMLElement): void {
     state.profileName = await fetchProfileName(pubkey);
     state.signInStatus = null;
     state.store = await WorkstrStore.open(pubkey);
+    state.settings = await state.store.getSettings();
     await state.store.seedExercises(starterExercises as ExerciseDraft[]);
+    state.settings = await state.store.getSettings();
     if (persist) {
       localStorage.setItem(SESSION_KEY, pubkey);
       if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
@@ -629,6 +638,7 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#sign-out')?.addEventListener('click', signOut);
     root.querySelector('#sign-out-settings')?.addEventListener('click', signOut);
     root.querySelector('#open-demo')?.addEventListener('click', () => openAndRender('demo-local-pubkey'));
+    root.querySelector('#unit-select')?.addEventListener('change', (event) => { void saveUnitPreference((event.target as HTMLSelectElement).value); });
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void refreshExercises(); }));
     root.querySelectorAll('#refresh-programs').forEach((button) => button.addEventListener('click', () => { void refreshPrograms(); }));
     root.querySelector('#new-exercise')?.addEventListener('click', () => { state.editingId = null; render(); });
@@ -655,6 +665,13 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#exercise-form')?.addEventListener('submit', saveExercise);
     root.querySelectorAll<HTMLElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => { state.editingId = Number(button.dataset.edit); render(); }));
     root.querySelectorAll<HTMLElement>('[data-delete]').forEach((button) => button.addEventListener('click', () => deleteExercise(Number(button.dataset.delete))));
+  }
+
+  async function saveUnitPreference(value: string): Promise<void> {
+    if (!state.store) return;
+    state.settings = { ...state.settings, unit: normalizeWeightUnit(value) };
+    await state.store.saveSettings(state.settings);
+    render();
   }
 
   async function refreshExercises(): Promise<void> {
@@ -701,7 +718,7 @@ export function renderShell(root: HTMLElement): void {
   function signOut(): void {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SIGNER_TYPE_KEY);
-    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null;
+    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.settings = { ...DEFAULT_SETTINGS }; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null;
     render();
   }
 
@@ -715,17 +732,15 @@ export function renderShell(root: HTMLElement): void {
   let sessionWakeLock: WakeLockSentinel | null = null;
   const sessionPreviousSets = new Map<string, SessionSetLog[]>();
 
-  function unitLabel(): string { return 'kg'; }
+  function unitLabel(): string { return normalizeWeightUnit(state.settings.unit); }
 
-  function wDisplay(weight: number | null | undefined): number { return Number(weight || 0); }
+  function wDisplay(weight: number | null | undefined): number | null { return displayWeightKg(weight, normalizeWeightUnit(state.settings.unit)); }
 
-  function wFmt(weight: number | null | undefined): string { return weight == null ? '—' : `${wDisplay(weight)}${unitLabel()}`; }
+  function wFmt(weight: number | null | undefined): string { return weight == null ? '—' : formatWeightKg(weight, normalizeWeightUnit(state.settings.unit)); }
 
   function sessionWeightDisplay(weight: number | string | null | undefined): string {
-    if (weight == null || weight === '') return '';
-    const value = Number(weight);
-    if (!Number.isFinite(value)) return String(weight);
-    return String(Math.round(value * 2.20462));
+    const value = displayWeightKg(weight, normalizeWeightUnit(state.settings.unit));
+    return value == null ? '' : String(value);
   }
 
   function programSessionExercises(program: RelayProgram): SessionExercise[] {
@@ -876,7 +891,7 @@ export function renderShell(root: HTMLElement): void {
       const prevHint = prev ? `<div class="session-set-hint prev">prev: ${html(formatSetHint(prev))}</div>` : '';
       const suggestHint = prev ? `<div class="session-set-hint suggest">${suggestedSetHint(prev, targetReps)}</div>` : '';
       const defaultReps = String(done?.reps ?? (targetReps || prev?.reps || ''));
-      const defaultWeight = done?.weight != null ? String(done.weight) : (prev?.weight != null ? String(prev.weight) : sessionWeightDisplay(ex.weight));
+      const defaultWeight = done?.weight != null ? sessionWeightDisplay(done.weight) : (prev?.weight != null ? sessionWeightDisplay(prev.weight) : sessionWeightDisplay(ex.weight));
       return `<div class="session-set-block ${locked ? 'locked' : ''}" data-set-block="${i}">
         <div class="session-set-row">
           <div class="session-set-num ${done ? 'done' : ''}" data-set-num="${i}">${i + 1}</div>
@@ -926,7 +941,7 @@ export function renderShell(root: HTMLElement): void {
       repsEl?.focus(); repsEl?.classList.add('shake'); window.setTimeout(() => repsEl?.classList.remove('shake'), 420); return;
     }
     const repsNum = reps === '' ? null : Number(reps);
-    const weightNum = weight === '' ? null : Number(weight);
+    const weightNum = weight === '' ? null : storeWeightInput(weight, normalizeWeightUnit(state.settings.unit));
     if (logBtn) { logBtn.disabled = true; logBtn.textContent = '···'; }
     state.activeSession.sets.push({ exerciseSlug: slug, setNumber: setIndex + 1, reps: repsNum, weight: weightNum, done: true, completedAt: new Date().toISOString() });
     if (repsEl) repsEl.disabled = true;
@@ -1044,7 +1059,7 @@ export function renderShell(root: HTMLElement): void {
     const stats = [
       { val: sessionDurationLabel(session), label: 'Duration' },
       { val: doneSets.length, label: 'Sets' },
-      { val: volume > 0 ? `${Math.round(wDisplay(volume))} ${unitLabel()}` : '—', label: 'Volume' },
+      { val: volume > 0 ? `${Math.round(wDisplay(volume) ?? 0)} ${unitLabel()}` : '—', label: 'Volume' },
       { val: exerciseCount, label: 'Exercises' }
     ];
     openModal(`
