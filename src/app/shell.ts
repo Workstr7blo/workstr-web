@@ -28,6 +28,7 @@ interface AppState {
   editingId: number | null;
   filter: string;
   programFilter: string;
+  expandedProgramAddress: string | null;
   exerciseStatus: string;
   programStatus: string;
   signInStatus: string | null;
@@ -196,10 +197,10 @@ function workoutsView(state: AppState): string {
     <div class="page-title">Workouts</div>
     ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
     <div class="sub-panel ${active === 'programs' ? 'active' : ''}" id="sub-workouts-programs">
-      <div class="panel"><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="program-list">${programs.map(programCard).join('') || '<div class="empty">No workouts match.</div>'}</div></div>
+      <div class="panel"><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="program-list">${programs.map((program) => programCard(program, state)).join('') || '<div class="empty">No workouts match.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
-      <div class="panel"><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="program-list">${state.programs.map(programCard).join('')}</div></div>
+      <div class="panel"><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="program-list">${state.programs.map((program) => programCard(program, state)).join('')}</div></div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p><div class="list empty">No completed sessions yet.</div></div>
@@ -211,16 +212,115 @@ function workoutsView(state: AppState): string {
   </div>`;
 }
 
-function programCard(program: RelayProgram): string {
+function estimateProgramMin(exercises: RelayProgram['exercises']): number {
+  return exercises.reduce((total, exercise) => {
+    const sets = Number(exercise.sets) || 3;
+    const rest = Number(exercise.restSec || exercise.rest) || 90;
+    return total + sets * 45 + Math.max(0, sets - 1) * rest;
+  }, 0);
+}
+
+function formatMinutes(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  if (!minutes) return '';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+function resolveProgramExercise(member: RelayProgram['exercises'][number], exercises: Exercise[]): Exercise | null {
+  if (member.address) {
+    const byAddress = exercises.find((exercise) => exercise.nostr_address === member.address);
+    if (byAddress) return byAddress;
+    const slug = member.address.split(':').pop();
+    const bySlug = exercises.find((exercise) => exercise.slug === slug || `workstr:exercise:${exercise.slug}` === slug);
+    if (bySlug) return bySlug;
+  }
+  if (member.name) {
+    const name = member.name.toLowerCase();
+    return exercises.find((exercise) => exercise.name.toLowerCase() === name) || null;
+  }
+  return null;
+}
+
+function programGroups(program: RelayProgram, exercises: Exercise[]): string[] {
+  const groups = new Set<string>();
+  for (const member of program.exercises) {
+    const full = resolveProgramExercise(member, exercises);
+    const primary = member.muscleGroup || full?.muscle_group;
+    if (primary) groups.add(primary);
+  }
+  return [...groups];
+}
+
+function exerciseImage(src?: string): string {
+  return src
+    ? `<img class="wk-ex-img" src="${html(src)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'wk-ex-img placeholder'}))">`
+    : `<div class="wk-ex-img placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>`;
+}
+
+function programExerciseName(member: RelayProgram['exercises'][number], full: Exercise | null): string {
+  const slugName = member.address ? member.address.split(':').pop()?.replace(/^workstr:exercise:/, '').replace(/[-_]+/g, ' ') : '';
+  return member.name || full?.name || slugName || 'Exercise';
+}
+
+function programCard(program: RelayProgram, state: AppState): string {
   const exerciseCount = program.exercises.length;
-  const tagLine = program.tags.slice(0, 4).join(' · ');
-  return `<div class="workout-card">
-    <div class="workout-card-header">
-      <div class="workout-card-map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></div>
-      <div class="workout-card-info"><div class="workout-card-name">${html(program.name)}<span class="program-status published">Workstr</span></div><div class="workout-card-meta">${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'} · ${html(program.address)}</div>${tagLine ? `<div class="workout-card-muscles">${html(tagLine)}</div>` : ''}${program.description ? `<div class="section-help">${html(program.description)}</div>` : ''}</div>
-      <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 9l6 6 6-6"/></svg>
+  const time = formatMinutes(estimateProgramMin(program.exercises));
+  const groups = programGroups(program, state.exercises);
+  const meta = [`${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
+  const isExpanded = state.expandedProgramAddress === program.address;
+  return `<div class="workout-card ${isExpanded ? 'expanded' : ''}" data-program-address="${html(program.address)}">
+    <div class="workout-card-header" data-toggle-program="${html(program.address)}">
+      <div class="workout-card-map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>
+      <div class="workout-card-info">
+        <div class="workout-card-name">${html(program.name)}<span class="program-status published">${html(program.sourceLabel || 'Workstr')}</span></div>
+        <div class="workout-card-meta">${meta}</div>
+        <div class="workout-card-author">${html(program.pubkey ? `${program.pubkey.slice(0, 8)}…` : 'unknown')}</div>
+        ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(', '))}</div>` : ''}
+      </div>
+      <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
     </div>
+    <div class="workout-card-body">${isExpanded ? programBody(program, state.exercises) : ''}</div>
   </div>`;
+}
+
+function programBody(program: RelayProgram, exercises: Exercise[]): string {
+  const exHtml = program.exercises.length ? program.exercises.map((member, index) => {
+    const full = resolveProgramExercise(member, exercises);
+    const name = programExerciseName(member, full);
+    const muscle = member.muscleGroup || full?.muscle_group || '';
+    const image = exerciseImage(member.imageUrl || full?.image_url);
+    const sets = Number(member.sets) || 3;
+    const reps = member.reps || String(full?.default_reps || '8-12');
+    const weight = member.weight != null && member.weight !== '' ? ` @ ${html(member.weight)}` : '';
+    const rest = Number(member.restSec || member.rest || full?.default_rest) || 90;
+    return `<div class="wk-ex-item open" data-exitem="${html(program.address)}-${index}">
+      <div class="wk-ex-header">
+        ${image}
+        <div class="wk-ex-info">
+          <div class="wk-ex-name">${html(name)}</div>
+          <div class="wk-ex-short">${sets} × ${html(reps)}${weight}</div>
+        </div>
+        ${muscle ? `<span class="wk-ex-muscle-pill">${html(muscle)}</span>` : ''}
+        <svg class="wk-ex-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="wk-ex-detail">
+        <div class="wk-ex-detail-grid">
+          <div class="wk-ex-detail-cell"><div class="val">${sets}</div><div class="lbl">Sets</div></div>
+          <div class="wk-ex-detail-cell"><div class="val">${html(reps)}</div><div class="lbl">Reps</div></div>
+          <div class="wk-ex-detail-cell"><div class="val">${member.weight != null && member.weight !== '' ? html(member.weight) : '—'}</div><div class="lbl">Weight</div></div>
+          <div class="wk-ex-detail-cell"><div class="val">${rest}s</div><div class="lbl">Rest</div></div>
+        </div>
+        ${member.notes ? `<div class="wk-ex-detail-note">${html(member.notes)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('') : '<p class="empty" style="padding:10px 0">No exercises yet.</p>';
+  return `<div class="wk-ex-list">${exHtml}</div>
+    <div class="workout-card-actions">
+      <button class="button gold small" type="button">Start workout</button>
+    </div>`;
 }
 
 function statisticsView(state: AppState): string {
@@ -243,7 +343,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], editingId: null, filter: '', programFilter: '', exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
@@ -300,6 +400,11 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#cancel-edit')?.addEventListener('click', () => { state.editingId = null; render(); });
     root.querySelector('#exercise-filter')?.addEventListener('input', (event) => { state.filter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#exercise-filter'); input?.focus(); input?.setSelectionRange(state.filter.length, state.filter.length); });
     root.querySelector('#program-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#program-filter'); input?.focus(); input?.setSelectionRange(state.programFilter.length, state.programFilter.length); });
+    root.querySelectorAll<HTMLElement>('[data-toggle-program]').forEach((header) => header.addEventListener('click', () => {
+      const address = header.dataset.toggleProgram || null;
+      state.expandedProgramAddress = state.expandedProgramAddress === address ? null : address;
+      render();
+    }));
     root.querySelector('#exercise-form')?.addEventListener('submit', saveExercise);
     root.querySelectorAll<HTMLElement>('[data-edit]').forEach((button) => button.addEventListener('click', () => { state.editingId = Number(button.dataset.edit); render(); }));
     root.querySelectorAll<HTMLElement>('[data-delete]').forEach((button) => button.addEventListener('click', () => deleteExercise(Number(button.dataset.delete))));
