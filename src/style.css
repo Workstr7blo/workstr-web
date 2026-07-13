@@ -79,16 +79,17 @@
   color: #fff0f4 !important;
   font: 900 12px/1 ui-monospace, SFMono-Regular, monospace !important;
 }
-.session-progress { height: 4px !important; background: rgba(255,255,255,.035) !important; }
+.session-progress { height: 5px !important; background: rgba(255,255,255,.055) !important; box-shadow: inset 0 1px 0 rgba(188,151,255,.10) !important; }
+.session-progress-fill { min-width: 36px !important; background: linear-gradient(90deg, #00d084, #7c3cff) !important; box-shadow: 0 0 14px rgba(0,208,132,.45) !important; }
 .session-ex-nav {
-  padding: 24px 28px 18px !important;
-  gap: 13px !important;
+  padding: 20px 28px 16px !important;
+  gap: 11px !important;
   border-bottom: 1px solid rgba(188,151,255,.10) !important;
   background: rgba(35,12,70,.28) !important;
 }
 .session-ex-dot {
-  width: 64px !important;
-  height: 64px !important;
+  width: 58px !important;
+  height: 58px !important;
   border-radius: 16px !important;
   border-color: rgba(188,151,255,.22) !important;
   background: rgba(255,255,255,.03) !important;
@@ -130,12 +131,12 @@
 .session-sets { gap: 16px !important; }
 .session-set-block.locked { opacity: .22 !important; filter: saturate(.65); }
 .session-set-row {
-  grid-template-columns: 48px minmax(0,1fr) minmax(0,1fr) 72px !important;
-  gap: 12px !important;
+  grid-template-columns: 46px minmax(0,1fr) minmax(0,1fr) 70px !important;
+  gap: 10px !important;
 }
 .session-set-num {
-  width: 48px !important;
-  height: 48px !important;
+  width: 46px !important;
+  height: 46px !important;
   border-radius: 14px !important;
   background: rgba(3,2,8,.52) !important;
   border-color: rgba(188,151,255,.20) !important;
@@ -143,7 +144,7 @@
   font: 900 19px/1 ui-monospace, SFMono-Regular, monospace !important;
 }
 .session-set-input {
-  height: 64px !important;
+  height: 58px !important;
   border-radius: 16px !important;
   background: rgba(3,2,8,.54) !important;
   border-color: rgba(188,151,255,.18) !important;
@@ -152,15 +153,49 @@
 }
 .session-set-input:disabled { opacity: .82 !important; color: #7d708f !important; }
 .session-log-btn {
-  height: 64px !important;
-  min-width: 72px !important;
+  height: 58px !important;
+  min-width: 70px !important;
   border-radius: 16px !important;
   color: #1d1202 !important;
   background: linear-gradient(135deg, #ff9d26, #ffbd49) !important;
   box-shadow: 0 0 26px rgba(247,147,26,.32) !important;
   font: 900 14px/1 ui-monospace, SFMono-Regular, monospace !important;
 }
-.session-add-set, .session-note, .session-instructions { display: none !important; }
+.session-add-set {
+  display: inline-flex !important;
+  align-items: center !important;
+  width: auto !important;
+  margin-top: 18px !important;
+  padding: 13px 18px !important;
+  border: 1px dashed rgba(188,151,255,.28) !important;
+  border-radius: 14px !important;
+  color: #c49cff !important;
+  background: rgba(0,0,0,.10) !important;
+}
+.session-note { display: none !important; }
+.session-instructions {
+  display: block !important;
+  margin-top: 28px !important;
+  border: 1px solid rgba(188,151,255,.24) !important;
+  border-radius: 17px !important;
+  background: rgba(0,0,0,.14) !important;
+  max-height: 320px !important;
+  overflow: hidden !important;
+}
+.session-instructions.open { overflow: auto !important; }
+.session-instructions-toggle {
+  padding: 16px 20px !important;
+  color: #c49cff !important;
+  font: 900 13px/1 ui-monospace, SFMono-Regular, monospace !important;
+  letter-spacing: .20em !important;
+}
+.session-instructions-body { padding: 0 22px 20px !important; }
+.session-instructions-step {
+  color: #cfc4df !important;
+  font: 700 16px/1.55 Inter, ui-sans-serif, sans-serif !important;
+  padding: 8px 0 !important;
+}
+.session-instructions-step b { color: #c49cff !important; margin-right: 10px !important; }
 .session-footer {
   position: fixed !important;
   left: 0 !important;
@@ -173,7 +208,7 @@
   backdrop-filter: blur(10px) !important;
 }
 .session-next-btn, .session-finish-btn, .session-prev-btn {
-  min-height: 80px !important;
+  min-height: 70px !important;
   border-radius: 18px !important;
   font: 900 15px/1 ui-monospace, SFMono-Regular, monospace !important;
   letter-spacing: .12em !important;
@@ -187,7 +222,9 @@
 .session-rest-overlay {
   position: fixed !important;
   inset: 0 !important;
-  z-index: 310 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  z-index: 9999 !important;
   display: none !important;
   flex-direction: column !important;
   align-items: center !important;
