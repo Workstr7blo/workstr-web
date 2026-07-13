@@ -1,4 +1,4 @@
-const CACHE = 'workstr-web-v1';
+const CACHE = 'workstr-web-v2';
 const CORE = ['./', './index.html', './manifest.webmanifest', './favicon.svg'];
 
 self.addEventListener('install', (event) => {
