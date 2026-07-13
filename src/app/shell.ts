@@ -369,7 +369,7 @@ function programGroups(program: RelayProgram, exercises: Exercise[]): string[] {
   const groups = new Set<string>();
   for (const member of program.exercises) {
     const full = resolveProgramExercise(member, exercises);
-    const primary = programMuscleLabel(member.muscleGroup || full?.muscle_group);
+    const primary = programMuscleLabel(member.muscleGroup || full?.muscle_group || inferProgramMuscle(programExerciseName(member, full)));
     if (primary) groups.add(primary);
   }
   return [...groups];
@@ -380,7 +380,7 @@ function programMuscleSets(program: RelayProgram, exercises: Exercise[]): { prim
   const secondary = new Set<string>();
   for (const member of program.exercises) {
     const full = resolveProgramExercise(member, exercises);
-    const rawPrimary = member.muscleGroup || full?.muscle_group;
+    const rawPrimary = member.muscleGroup || full?.muscle_group || inferProgramMuscle(programExerciseName(member, full));
     const canonicalPrimary = canonMuscle(rawPrimary) || canonMuscle(programMuscleLabel(rawPrimary));
     if (canonicalPrimary) primary.add(canonicalPrimary);
     for (const raw of full?.muscles || []) {
@@ -417,6 +417,21 @@ function programExerciseName(member: RelayProgram['exercises'][number], full: Ex
   return member.name || full?.name || slugName || 'Exercise';
 }
 
+function inferProgramMuscle(name: string): string {
+  const value = name.toLowerCase();
+  if (/squat|lunge|quad|leg press|step[- ]?up/.test(value)) return 'Quadriceps';
+  if (/lateral raise|front raise|shoulder|deltoid|press/.test(value)) return 'Shoulders';
+  if (/curl|bicep|hammer|arm/.test(value)) return 'Biceps';
+  if (/tricep|extension|dip/.test(value)) return 'Triceps';
+  if (/row|pull|lat|back|shrug/.test(value)) return 'Back';
+  if (/deadlift|hinge|hamstring|romanian/.test(value)) return 'Hamstrings';
+  if (/glute|hip thrust|bridge/.test(value)) return 'Glutes';
+  if (/calf/.test(value)) return 'Calves';
+  if (/crunch|plank|core|abs|sit[- ]?up/.test(value)) return 'Core';
+  if (/bench|push[- ]?up|chest|pec/.test(value)) return 'Chest';
+  return '';
+}
+
 function programAuthor(program: RelayProgram, state: AppState): string {
   if (!program.pubkey) return 'unknown';
   return state.profileNames[program.pubkey] || displayPubkey(program.pubkey);
@@ -448,7 +463,7 @@ function programBody(program: RelayProgram, exercises: Exercise[]): string {
   const exHtml = program.exercises.length ? program.exercises.map((member, index) => {
     const full = resolveProgramExercise(member, exercises);
     const name = programExerciseName(member, full);
-    const muscle = programMuscleLabel(member.muscleGroup || full?.muscle_group);
+    const muscle = programMuscleLabel(member.muscleGroup || full?.muscle_group || inferProgramMuscle(name));
     const image = exerciseImage(member.imageUrl || full?.image_url);
     const sets = Number(member.sets) || 3;
     const reps = member.reps || String(full?.default_reps || '8-12');
@@ -591,6 +606,9 @@ export function renderShell(root: HTMLElement): void {
     state.programStatus = `loading workouts from ${WORKSTR_LIBRARY_RELAY}...`;
     render();
     try {
+      if (!state.exercises.length) {
+        try { state.exercises = await fetchRelayExercises(); } catch { /* Program cards can still infer fallback muscles. */ }
+      }
       const programs = await fetchRelayPrograms();
       state.programs = programs;
       state.programStatus = `loaded ${programs.length} workouts from ${WORKSTR_LIBRARY_RELAY}`;
