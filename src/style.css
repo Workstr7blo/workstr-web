@@ -1,10 +1,24 @@
 @import './workstr-reference.css';
 
 .topbar-actions .button.small { padding: 8px 11px; font-size: 12px; }
+.topbar-actions #live-status { text-transform: none; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .web-empty-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .web-status-note { margin-top: 12px; }
 .metric-grid.mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.workout-card-map.has-map {
+  width: 70px;
+  height: 70px;
+  padding: 3px;
+  border-color: rgba(188,151,255,.36);
+  background: radial-gradient(circle at 50% 28%, rgba(188,151,255,.16), rgba(0,0,0,.34) 68%);
+  color: inherit;
+}
+.workout-card-map.has-map svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 7px rgba(177,122,255,.35)); }
+.workout-card-map.has-map polygon { stroke: rgba(215,194,255,.2); stroke-width: .45; }
+.workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 70px minmax(0,1fr) 22px; }
 
 @media (max-width: 700px) {
   input, textarea, select, button { font-size: 16px; }
+  .workout-card-map.has-map { width: 72px; height: 72px; }
+  .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 72px minmax(0,1fr) 22px; }
 }

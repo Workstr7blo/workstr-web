@@ -10,7 +10,7 @@ import { fetchRelayExercises, fetchRelayPrograms, WORKSTR_LIBRARY_RELAY, type Re
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
-const PROFILE_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
+const PROFILE_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://purplepag.es', 'wss://user.kindpag.es', 'wss://relay.nostr.band'];
 
 const RECOVERY_BODY_SVG = `<svg viewBox="0 0 230 230" xmlns="http://www.w3.org/2000/svg">
               <!-- FRONT (anterior) -->
@@ -120,6 +120,7 @@ interface AppState {
   pubkey: string | null;
   npub: string | null;
   profileName: string | null;
+  profileNames: Record<string, string>;
   store: WorkstrStore | null;
   signerType: 'nip07' | 'nip46' | 'demo' | null;
   view: View;
@@ -162,14 +163,25 @@ async function fetchProfileName(pubkey: string): Promise<string | null> {
   if (pubkey === 'demo-local-pubkey') return 'demo local identity';
   const pool = new SimplePool();
   try {
-    const event = await pool.get(PROFILE_RELAYS, { kinds: [0], authors: [pubkey] });
+    const event = await Promise.race([
+      pool.get(PROFILE_RELAYS, { kinds: [0], authors: [pubkey] }),
+      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 5000))
+    ]);
     if (!event) return null;
-    const profile = JSON.parse(event.content) as { display_name?: string; name?: string; nip05?: string };
-    return profile.display_name?.trim() || profile.name?.trim() || profile.nip05?.trim() || null;
+    const profile = JSON.parse(event.content) as { display_name?: string; displayName?: string; name?: string; username?: string; nip05?: string };
+    return profile.display_name?.trim() || profile.displayName?.trim() || profile.name?.trim() || profile.username?.trim() || profile.nip05?.trim() || null;
   } catch {
     return null;
   } finally {
     pool.close(PROFILE_RELAYS);
+  }
+}
+
+function displayPubkey(pubkey: string): string {
+  try {
+    return nip19.npubEncode(pubkey).slice(0, 12) + '…' + nip19.npubEncode(pubkey).slice(-8);
+  } catch {
+    return pubkey.slice(0, 8) + '…';
   }
 }
 
@@ -401,6 +413,11 @@ function programExerciseName(member: RelayProgram['exercises'][number], full: Ex
   return member.name || full?.name || slugName || 'Exercise';
 }
 
+function programAuthor(program: RelayProgram, state: AppState): string {
+  if (!program.pubkey) return 'unknown';
+  return state.profileNames[program.pubkey] || displayPubkey(program.pubkey);
+}
+
 function programCard(program: RelayProgram, state: AppState): string {
   const exerciseCount = program.exercises.length;
   const time = formatMinutes(estimateProgramMin(program.exercises));
@@ -414,7 +431,7 @@ function programCard(program: RelayProgram, state: AppState): string {
       <div class="workout-card-info">
         <div class="workout-card-name">${html(program.name)}<span class="program-status published">${html(program.sourceLabel || 'Workstr')}</span></div>
         <div class="workout-card-meta">${meta}</div>
-        <div class="workout-card-author">${html(program.pubkey ? `${program.pubkey.slice(0, 8)}…` : 'unknown')}</div>
+        <div class="workout-card-author">${html(programAuthor(program, state))}</div>
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(', '))}</div>` : ''}
       </div>
       <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -480,7 +497,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
@@ -573,10 +590,22 @@ export function renderShell(root: HTMLElement): void {
       const programs = await fetchRelayPrograms();
       state.programs = programs;
       state.programStatus = `loaded ${programs.length} workouts from ${WORKSTR_LIBRARY_RELAY}`;
+      void refreshProgramProfiles(programs);
     } catch (error) {
       state.programStatus = `workout relay error: ${(error as Error).message}`;
     }
     render();
+  }
+
+  async function refreshProgramProfiles(programs: RelayProgram[]): Promise<void> {
+    const pubkeys = [...new Set(programs.map((program) => program.pubkey).filter(Boolean))].filter((pubkey) => !state.profileNames[pubkey]);
+    if (!pubkeys.length) return;
+    const entries = await Promise.all(pubkeys.map(async (pubkey) => [pubkey, await fetchProfileName(pubkey)] as const));
+    let changed = false;
+    for (const [pubkey, name] of entries) {
+      if (name) { state.profileNames[pubkey] = name; changed = true; }
+    }
+    if (changed) render();
   }
 
   function signOut(): void {
