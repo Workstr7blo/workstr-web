@@ -1,6 +1,6 @@
 import type { IDBPDatabase } from 'idb';
 import { openWorkstrDB, type WorkstrDB } from './schema';
-import type { Exercise, WorkstrSettings } from '../core/types';
+import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 
 export type ExerciseDraft = Omit<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'> &
@@ -69,6 +69,39 @@ export class WorkstrStore {
     }
     await this.saveSettings({ ...settings, starterExercisesSeeded: true });
     return exercises.length;
+  }
+
+  async createSession(session: Omit<Session, 'id'>): Promise<number> {
+    return Number(await this.db.add('sessions', session));
+  }
+
+  async finishSession(id: number, finishedAt = new Date().toISOString()): Promise<void> {
+    const session = await this.db.get('sessions', id);
+    if (!session) return;
+    await this.db.put('sessions', { ...session, finished_at: finishedAt });
+  }
+
+  async deleteSession(id: number): Promise<void> {
+    const tx = this.db.transaction(['sessions', 'session_sets'], 'readwrite');
+    await tx.objectStore('sessions').delete(id);
+    const index = tx.objectStore('session_sets').index('session_id');
+    for await (const cursor of index.iterate(id)) await cursor.delete();
+    await tx.done;
+  }
+
+  async addSessionSet(set: Omit<SessionSet, 'id'>): Promise<number> {
+    return Number(await this.db.add('session_sets', set));
+  }
+
+  async listSessions(): Promise<Session[]> {
+    return (await this.db.getAll('sessions')).sort((a, b) => String(b.started_at).localeCompare(String(a.started_at)));
+  }
+
+  async listSessionSets(sessionId: number): Promise<SessionSet[]> {
+    return (await this.db.getAllFromIndex('session_sets', 'session_id', sessionId)).sort((a, b) => {
+      const ex = String(a.exercise_slug || '').localeCompare(String(b.exercise_slug || ''));
+      return ex || Number(a.set_number) - Number(b.set_number);
+    });
   }
 
   async getSettings(): Promise<WorkstrSettings> {

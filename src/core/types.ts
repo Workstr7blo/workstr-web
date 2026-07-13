@@ -55,23 +55,40 @@ export interface SheetExercise {
   weight?: number;
 }
 
+export interface StoredSessionExercise {
+  exerciseSlug: string;
+  exerciseName: string;
+  muscleGroup?: string;
+  imageUrl?: string;
+  sets: number;
+  reps: string;
+  restSec: number;
+  weight?: number | string | null;
+  notes?: string;
+  instructions?: string[];
+}
+
 export interface Session {
   id?: number;
   sheet_id?: number;
+  sheet_name?: string;
   started_at: ISODateTime;
   finished_at?: ISODateTime;
   notes?: string;
   summary_image_url?: string;
   nostr_event_id?: string;
+  exercises?: StoredSessionExercise[];
 }
 
 export interface SessionSet {
   id?: number;
   session_id: number;
-  exercise_id: number;
+  exercise_id?: number;
+  exercise_slug?: string;
+  exercise_name?: string;
   set_number: number;
-  reps: number;
-  weight_kg?: number;
+  reps: number | null;
+  weight_kg?: number | null;
   rpe?: number;
   completed_at: ISODateTime;
 }

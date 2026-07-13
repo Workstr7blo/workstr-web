@@ -46,4 +46,29 @@ describe('WorkstrStore', () => {
     await store.saveSettings({ ...defaults, unit: 'lbs' });
     expect((await store.getSettings()).unit).toBe('lbs');
   });
+
+  it('registers completed workouts and their sets in IndexedDB', async () => {
+    const store = await WorkstrStore.open('session-test-pubkey');
+    const sessionId = await store.createSession({
+      sheet_name: 'Full Body',
+      started_at: '2026-07-13T14:00:00.000Z',
+      exercises: [{ exerciseSlug: 'dumbbell-squat', exerciseName: 'Dumbbell Squat', sets: 1, reps: '8', restSec: 90, weight: 6.8 }]
+    });
+    await store.addSessionSet({
+      session_id: sessionId,
+      exercise_slug: 'dumbbell-squat',
+      exercise_name: 'Dumbbell Squat',
+      set_number: 1,
+      reps: 8,
+      weight_kg: 6.8,
+      completed_at: '2026-07-13T14:01:00.000Z'
+    });
+    await store.finishSession(sessionId, '2026-07-13T14:02:00.000Z');
+
+    const sessions = await store.listSessions();
+    const saved = sessions.find((session) => session.id === sessionId);
+    expect(saved?.sheet_name).toBe('Full Body');
+    expect(saved?.finished_at).toBe('2026-07-13T14:02:00.000Z');
+    expect(await store.listSessionSets(sessionId)).toMatchObject([{ exercise_slug: 'dumbbell-squat', reps: 8, weight_kg: 6.8 }]);
+  });
 });

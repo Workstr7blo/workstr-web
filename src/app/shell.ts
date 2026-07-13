@@ -5,7 +5,7 @@ import { slugify } from '../core/ids';
 import { CANONICAL_REGIONS, canonMuscle } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft } from '../db/store';
 import starterExercises from '../data/starter-exercises.json';
-import type { Exercise, WorkstrSettings } from '../core/types';
+import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { fetchRelayExercises, fetchRelayPrograms, WORKSTR_LIBRARY_RELAY, type RelayProgram } from '../nostr/powrLibrary';
 
@@ -133,6 +133,7 @@ interface SessionExercise {
 
 interface SessionSetLog {
   exerciseSlug: string;
+  exerciseName?: string;
   setNumber: number;
   reps: number | null;
   weight: number | null;
@@ -366,6 +367,24 @@ function exerciseForm(exercise?: Exercise): string {
   </form>`;
 }
 
+function historyDuration(session: ActiveSession): string {
+  if (!session.startedAt || !session.finishedAt) return 'in progress';
+  const sec = Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(session.startedAt).getTime()) / 1000));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function workoutHistory(state: AppState): string {
+  const unit = normalizeWeightUnit(state.settings.unit);
+  if (!state.finishedSessions.length) return '<div class="list empty">No completed sessions yet.</div>';
+  return `<div class="history-list">${state.finishedSessions.map((session) => {
+    const doneSets = session.sets.filter((set) => set.done);
+    const volume = doneSets.reduce((total, set) => total + (Number(set.reps) || 0) * (Number(set.weight) || 0), 0);
+    const rows = doneSets.map((set) => `<div class="history-set-row"><span>${html(set.exerciseName || set.exerciseSlug)} · set ${set.setNumber}</span><strong>${set.reps ?? '—'} reps${set.weight == null ? '' : ` @ ${html(formatWeightKg(set.weight, unit))}`}</strong></div>`).join('');
+    return `<details class="history-session"><summary><div><strong>${html(session.sheetName || 'Workout')}</strong><small>${new Date(session.startedAt).toLocaleString()} · ${historyDuration(session)}</small></div><span>${doneSets.length} sets · ${volume ? html(formatWeightKg(volume, unit)) : '—'}</span></summary><div class="history-session-body">${rows || '<div class="empty">No sets logged.</div>'}</div></details>`;
+  }).join('')}</div>`;
+}
+
 function workoutsView(state: AppState): string {
   const active = state.subState.workouts;
   const query = state.programFilter.toLowerCase();
@@ -380,7 +399,7 @@ function workoutsView(state: AppState): string {
       <div class="panel"><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="program-list">${state.programs.map((program) => programCard(program, state)).join('')}</div></div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
-      <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p><div class="list empty">No completed sessions yet.</div></div>
+      <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p>${workoutHistory(state)}</div>
     </div>
     <div class="sub-panel ${active === 'recovery' ? 'active' : ''}" id="sub-workouts-recovery">
       <div class="panel"><div class="panel-head"><span>Muscle recovery</span><strong>—</strong></div><p class="section-help">Estimated readiness per muscle group from your completed sessions over the last 10 days. Bigger groups recover slower; higher training volume extends recovery.</p><div class="recovery empty">No completed sessions yet — train to see recovery.</div></div>
@@ -602,6 +621,7 @@ export function renderShell(root: HTMLElement): void {
     state.settings = await state.store.getSettings();
     await state.store.seedExercises(starterExercises as ExerciseDraft[]);
     state.settings = await state.store.getSettings();
+    state.finishedSessions = await loadFinishedSessions();
     if (persist) {
       localStorage.setItem(SESSION_KEY, pubkey);
       if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
@@ -672,6 +692,37 @@ export function renderShell(root: HTMLElement): void {
     state.settings = { ...state.settings, unit: normalizeWeightUnit(value) };
     await state.store.saveSettings(state.settings);
     render();
+  }
+
+  async function loadFinishedSessions(): Promise<ActiveSession[]> {
+    if (!state.store) return [];
+    const sessions = (await state.store.listSessions()).filter((session) => session.finished_at);
+    const result: ActiveSession[] = [];
+    for (const session of sessions) {
+      const sets = session.id ? await state.store.listSessionSets(session.id) : [];
+      result.push(activeSessionFromStored(session, sets));
+    }
+    return result;
+  }
+
+  function activeSessionFromStored(session: Session, sets: SessionSet[]): ActiveSession {
+    const exercises = (session.exercises || []) as SessionExercise[];
+    return {
+      id: Number(session.id),
+      sheetName: session.sheet_name || 'Workout',
+      startedAt: session.started_at,
+      finishedAt: session.finished_at,
+      exercises,
+      sets: sets.map((set) => ({
+        exerciseSlug: set.exercise_slug || String(set.exercise_id || ''),
+        exerciseName: set.exercise_name,
+        setNumber: Number(set.set_number),
+        reps: set.reps ?? null,
+        weight: set.weight_kg ?? null,
+        done: true,
+        completedAt: set.completed_at
+      }))
+    };
   }
 
   async function refreshExercises(): Promise<void> {
@@ -774,7 +825,10 @@ export function renderShell(root: HTMLElement): void {
   }
 
   async function startTrainingSession(program: RelayProgram): Promise<void> {
-    state.activeSession = { id: Date.now(), sheetName: program.name || 'Freestyle', startedAt: new Date().toISOString(), exercises: programSessionExercises(program), sets: [] };
+    const exercises = programSessionExercises(program);
+    const startedAt = new Date().toISOString();
+    const sessionId = state.store ? await state.store.createSession({ sheet_name: program.name || 'Freestyle', started_at: startedAt, exercises }) : Date.now();
+    state.activeSession = { id: sessionId, sheetName: program.name || 'Freestyle', startedAt, exercises, sets: [] };
     sessionExerciseIndex = 0;
     sessionSetCounts = setCountsFromSession(state.activeSession);
     await openSessionOverlay(state.activeSession);
@@ -943,7 +997,20 @@ export function renderShell(root: HTMLElement): void {
     const repsNum = reps === '' ? null : Number(reps);
     const weightNum = weight === '' ? null : storeWeightInput(weight, normalizeWeightUnit(state.settings.unit));
     if (logBtn) { logBtn.disabled = true; logBtn.textContent = '···'; }
-    state.activeSession.sets.push({ exerciseSlug: slug, setNumber: setIndex + 1, reps: repsNum, weight: weightNum, done: true, completedAt: new Date().toISOString() });
+    const currentExercise = getSessionExercises(state.activeSession).find((exercise) => exercise.exerciseSlug === slug);
+    const loggedSet: SessionSetLog = { exerciseSlug: slug, exerciseName: currentExercise?.exerciseName, setNumber: setIndex + 1, reps: repsNum, weight: weightNum, done: true, completedAt: new Date().toISOString() };
+    if (state.store) {
+      await state.store.addSessionSet({
+        session_id: state.activeSession.id,
+        exercise_slug: slug,
+        exercise_name: currentExercise?.exerciseName || slug,
+        set_number: setIndex + 1,
+        reps: repsNum,
+        weight_kg: weightNum,
+        completed_at: loggedSet.completedAt
+      });
+    }
+    state.activeSession.sets.push(loggedSet);
     if (repsEl) repsEl.disabled = true;
     if (weightEl) weightEl.disabled = true;
     root.querySelector(`[data-set-num="${setIndex}"]`)?.classList.add('done');
@@ -1013,19 +1080,21 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#session-rest-overlay')?.classList.remove('show');
   }
 
-  function finishActiveSession(): void {
+  async function finishActiveSession(): Promise<void> {
     if (!state.activeSession) return;
     state.activeSession.finishedAt = new Date().toISOString();
+    if (state.store) await state.store.finishSession(state.activeSession.id, state.activeSession.finishedAt);
     const finished = state.activeSession;
-    state.finishedSessions.unshift(finished);
+    state.finishedSessions = state.store ? await loadFinishedSessions() : [finished, ...state.finishedSessions];
     closeSessionOverlay();
     state.activeSession = null;
     renderFinished(finished);
   }
 
-  function cancelActiveSession(): void {
+  async function cancelActiveSession(): Promise<void> {
     if (!state.activeSession) return closeSessionOverlay();
     if (!window.confirm('End and discard this session? Logged sets will be deleted.')) return;
+    if (state.store) await state.store.deleteSession(state.activeSession.id);
     state.activeSession = null;
     closeSessionOverlay();
   }
@@ -1085,7 +1154,7 @@ export function renderShell(root: HTMLElement): void {
   function closeModal(): void { root.querySelector('#modal')?.classList.remove('open'); }
 
   function bindSessionControls(): void {
-    root.querySelector('#session-close')?.addEventListener('click', cancelActiveSession);
+    root.querySelector('#session-close')?.addEventListener('click', () => { void cancelActiveSession(); });
     root.querySelector('#rest-skip')?.addEventListener('click', skipSessionRest);
     root.querySelectorAll<HTMLElement>('[data-rest-adjust]').forEach((button) => button.addEventListener('click', () => adjustRest(Number(button.dataset.restAdjust) || 0)));
     root.querySelectorAll<HTMLElement>('[data-jump-ex]').forEach((button) => button.addEventListener('click', () => {
@@ -1102,7 +1171,7 @@ export function renderShell(root: HTMLElement): void {
       sessionSetCounts[slug] = (sessionSetCounts[slug] || 0) + 1;
       void renderSessionExercise(state.activeSession);
     }));
-    root.querySelector('#finish-session')?.addEventListener('click', finishActiveSession);
+    root.querySelector('#finish-session')?.addEventListener('click', () => { void finishActiveSession(); });
     root.querySelector('[data-toggle-instructions]')?.addEventListener('click', () => root.querySelector('#session-instructions')?.classList.toggle('open'));
   }
 
