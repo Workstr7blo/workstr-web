@@ -164,6 +164,7 @@ interface AppState {
   exercises: Exercise[];
   programs: RelayProgram[];
   expandedSessionId: number | null;
+  qw: { duration: number; exercises: QwExercise[]; pool: Record<string, QwExercise[]>; meta: string; visible: boolean };
   activeSession: ActiveSession | null;
   finishedSessions: ActiveSession[];
   editingId: number | null;
@@ -270,6 +271,7 @@ function shellMarkup(state: AppState): string {
     </main>
     ${sessionOverlayMarkup(state)}
     <div id="modal" class="modal"><div class="modal-card"><button id="modal-close" class="modal-close" type="button">×</button><div id="modal-content"></div></div></div>
+    <div id="toast"></div>
     <div id="toast"></div>`;
 }
 
@@ -501,26 +503,212 @@ function statisticsSummary(state: AppState): string {
     <div class="panel"><div class="panel-head"><span>Weekly volume</span><strong>${Math.round(displayWeightKg(weeklyVolume, unit) || 0)} ${unit}</strong></div><div class="subsection-head"><span>Muscle distribution</span><small>by working sets</small></div>${distHtml}<div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley)</small></div><div class="list empty">PRs appear after repeated persisted sessions.</div></div>`;
 }
 
-function recoveryView(state: AppState): string {
+// Base recovery hours per canonical muscle group (larger groups recover slower).
+// Ported verbatim from self-hosted Workstr src/app/store.js getRecovery().
+const RECOVERY_CONFIG: Record<string, number> = {
+  Chest: 72, Back: 72, Shoulders: 48, Biceps: 36, Triceps: 36,
+  Core: 48, Quadriceps: 72, Hamstrings: 72, Glutes: 48, Calves: 36
+};
+const RECOVERY_COLORS: Record<RecoveryGroup['status'], string> = { ready: '#00d084', partial: '#f7931a', recovering: '#ff3864', untrained: '#3a3052' };
+
+interface RecoveryGroup {
+  name: string;
+  percent: number;
+  status: 'ready' | 'partial' | 'recovering' | 'untrained';
+  lastTrained: string | null;
+  hoursRemaining: number;
+  totalSets: number;
+}
+
+interface RecoveryData { muscleGroups: RecoveryGroup[]; overallReadiness: number; readyCount: number; totalCount: number }
+
+// Muscles that only appear as a secondary mover in one compound shouldn't read
+// as heavily fatigued as a directly-trained primary.
+function volumeMultiplier(sets: number): number {
+  if (sets < 2) return 0.4;
+  if (sets < 6) return 0.7;
+  if (sets <= 12) return 1.0;
+  return 1.2;
+}
+
+export function getRecovery(sessions: ActiveSession[], exercises: Exercise[]): RecoveryData {
   const now = Date.now();
-  const fatigue: Record<string, number> = {};
-  for (const session of state.finishedSessions) {
-    const ageHours = Math.max(0, (now - new Date(session.finishedAt || session.startedAt).getTime()) / 36e5);
-    if (ageHours > 240) continue;
-    const map = sessionMuscleMap(session);
+  const cutoff = now - 10 * 24 * 3600000;
+  // finishedAt -> { canonicalMuscle -> setCount (primary=1, secondary=0.5) }
+  const sessionVolumes = new Map<string, Record<string, number>>();
+  for (const session of sessions) {
+    const finishedAt = session.finishedAt;
+    if (!finishedAt || new Date(finishedAt).getTime() < cutoff) continue;
+    if (!sessionVolumes.has(finishedAt)) sessionVolumes.set(finishedAt, {});
+    const sv = sessionVolumes.get(finishedAt)!;
     for (const set of session.sets.filter((item) => item.done)) {
-      const muscle = map[set.exerciseSlug] || 'Other';
-      fatigue[muscle] = (fatigue[muscle] || 0) + Math.max(0, 72 - ageHours) / 72;
+      const full = exercises.find((exercise) => exercise.slug === set.exerciseSlug);
+      const member = sessionExercises(session).find((item) => item.exerciseSlug === set.exerciseSlug);
+      const primary = canonMuscle(full?.muscle_group || member?.muscleGroup || '');
+      if (primary) sv[primary] = (sv[primary] || 0) + 1;
+      for (const raw of full?.muscles || []) {
+        const canonical = canonMuscle(raw);
+        if (canonical && canonical !== primary) sv[canonical] = (sv[canonical] || 0) + 0.5;
+      }
     }
   }
-  const rows = Object.entries(fatigue).sort((a, b) => b[1] - a[1]);
-  if (!rows.length) return '<div class="panel"><div class="panel-head"><span>Muscle recovery</span><strong>—</strong></div><p class="section-help">Estimated readiness per muscle group from your completed sessions over the last 10 days. Bigger groups recover slower; higher training volume extends recovery.</p><div class="recovery empty">No completed sessions yet — train to see recovery.</div></div>';
-  const ready = rows.filter(([, score]) => score < 0.75).length;
-  return `<div class="panel"><div class="panel-head"><span>Muscle recovery</span><strong>${ready}/${rows.length} ready</strong></div><p class="section-help">Estimated readiness per muscle group from your completed sessions over the last 10 days.</p><div class="recovery">${rows.map(([muscle, score]) => {
-    const percent = Math.max(0, Math.min(100, Math.round(100 - score * 35)));
-    const status = percent >= 80 ? 'ready' : percent >= 55 ? 'partial' : 'recovering';
-    return `<div class="recovery-row ${status}"><div class="rname">${html(muscle)}</div><div class="rtrack"><div class="rfill" style="width:${percent}%"></div></div><div class="rmeta"><strong>${percent}%</strong><small>${status}</small></div></div>`;
-  }).join('')}</div></div>`;
+  const sortedSessions = [...sessionVolumes.keys()].sort().reverse();
+  const ms = (value: string) => new Date(value).getTime();
+
+  const groups: RecoveryGroup[] = [];
+  for (const [muscle, baseHours] of Object.entries(RECOVERY_CONFIG)) {
+    let lastTrained: string | null = null;
+    let totalSets = 0;
+    for (const finishedAt of sortedSessions) {
+      const sv = sessionVolumes.get(finishedAt)!;
+      if (!(muscle in sv)) continue;
+      if (lastTrained === null) { lastTrained = finishedAt; totalSets = sv[muscle]; }
+      else if ((ms(lastTrained) - ms(finishedAt)) / 3600000 <= baseHours) totalSets += sv[muscle];
+    }
+    if (lastTrained === null) {
+      groups.push({ name: muscle, percent: 100, status: 'untrained', lastTrained: null, hoursRemaining: 0, totalSets: 0 });
+      continue;
+    }
+    const hoursElapsed = (now - ms(lastTrained)) / 3600000;
+    const adjustedHours = baseHours * volumeMultiplier(totalSets);
+    const percent = Math.min(100, Math.round((hoursElapsed / adjustedHours) * 100));
+    const hoursRemaining = Math.max(0, Math.round((adjustedHours - hoursElapsed) * 10) / 10);
+    const status = percent >= 80 ? 'ready' : percent >= 50 ? 'partial' : 'recovering';
+    groups.push({ name: muscle, percent, status, lastTrained, hoursRemaining, totalSets: Math.round(totalSets) });
+  }
+
+  const trained = groups.filter((group) => group.status !== 'untrained');
+  const overallReadiness = trained.length ? Math.round(trained.reduce((total, group) => total + group.percent, 0) / trained.length) : 100;
+  const readyCount = groups.filter((group) => group.status === 'ready' || group.status === 'untrained').length;
+  return { muscleGroups: groups, overallReadiness, readyCount, totalCount: groups.length };
+}
+
+function recoveryNote(group: RecoveryGroup): string {
+  return group.status === 'untrained' ? 'not trained recently' : group.percent >= 100 ? 'fully recovered' : `${group.hoursRemaining}h to full`;
+}
+
+const RECOVERY_LABEL_TEXT = (x: number, label: string) => `<text x="${x}" y="225" text-anchor="middle" font-size="6" font-family="Jost,sans-serif" fill="#c0a880" letter-spacing="1.5" font-weight="600">${label}</text>`;
+
+function recoveryBodySvg(byMuscle: Record<string, RecoveryGroup>): string {
+  return RECOVERY_BODY_SVG.replace(/<polygon([^>]*data-muscle="([^"]+)"[^>]*)>/g, (_match, attrs: string, muscle: string) => {
+    const cleanAttrs = attrs.replace(/\s*\/$/, '');
+    const status = byMuscle[muscle]?.status || 'untrained';
+    return `<polygon${cleanAttrs} style="fill:${RECOVERY_COLORS[status]}"/>`;
+  })
+    .replace('<svg ', '<svg id="recovery-body" ')
+    .replace('<!-- FRONT (anterior) -->', `<!-- FRONT (anterior) -->\n${RECOVERY_LABEL_TEXT(50, 'FRONT')}`)
+    .replace('<!-- BACK (posterior) -->', `<!-- BACK (posterior) -->\n${RECOVERY_LABEL_TEXT(180, 'BACK')}`);
+}
+
+function recoveryView(state: AppState): string {
+  const data = getRecovery(state.finishedSessions, state.exercises);
+  const byMuscle: Record<string, RecoveryGroup> = {};
+  for (const group of data.muscleGroups) byMuscle[group.name] = group;
+  const order: Record<RecoveryGroup['status'], number> = { recovering: 0, partial: 1, ready: 2, untrained: 3 };
+  const sorted = [...data.muscleGroups].sort((a, b) => (order[a.status] - order[b.status]) || a.percent - b.percent);
+  return `<div class="panel">
+    <div class="panel-head"><span>Muscle recovery</span><strong id="recovery-overall">${data.overallReadiness}%</strong></div>
+    <p class="section-help">Estimated readiness per muscle group from your completed sessions over the last 10 days. Bigger groups recover slower; higher training volume extends recovery. <span id="recovery-ready" class="section-label">${data.readyCount}/${data.totalCount} ready</span></p>
+    <div class="recovery-layout">
+      <div class="recovery-map">
+        ${recoveryBodySvg(byMuscle)}
+        <div class="recovery-legend">
+          <span class="rl ready">Ready</span>
+          <span class="rl partial">Partial</span>
+          <span class="rl recovering">Recovering</span>
+          <span class="rl untrained">Untrained</span>
+        </div>
+        <div id="recovery-tip" class="recovery-tip" hidden></div>
+      </div>
+      <div id="recovery-list" class="recovery">${sorted.map((group) => `
+        <div class="recovery-row ${group.status}">
+          <div class="rname">${html(group.name)}</div>
+          <div class="rtrack"><div class="rfill" style="width:${group.percent}%"></div></div>
+          <div class="rmeta"><strong>${group.percent}%</strong><small>${recoveryNote(group)}</small></div>
+        </div>`).join('')}</div>
+    </div>
+  </div>`;
+}
+
+interface QwExercise { slug: string; name: string; muscleGroup: string; sets: number; reps: string; restSec: number; score?: number }
+
+interface QuickWorkoutData { exercises: QwExercise[]; pool: Record<string, QwExercise[]>; targetMuscleGroups: string[]; estimatedDurationMin: number }
+
+// Ported verbatim from self-hosted Workstr src/app/store.js getQuickWorkout().
+function getQuickWorkout(state: AppState, durationMinutes = 45, minRecovery = 80): QuickWorkoutData {
+  const recovery = getRecovery(state.finishedSessions, state.exercises);
+  const readySet = new Set(recovery.muscleGroups.filter((group) => group.percent >= minRecovery).map((group) => group.name));
+  if (!readySet.size) return { exercises: [], pool: {}, targetMuscleGroups: [], estimatedDurationMin: 0 };
+
+  const rows = [...state.exercises]
+    .filter((exercise) => exercise.muscle_group && readySet.has(canonMuscle(exercise.muscle_group) || ''))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  const loggedSlugs = new Set(completedSets(state.finishedSessions).map((set) => set.exerciseSlug));
+
+  // Score (logged-before + compound) and bucket exercises by canonical muscle group.
+  const byMuscle: Record<string, QwExercise[]> = {};
+  for (const row of rows) {
+    const mg = canonMuscle(row.muscle_group) || '';
+    const score = (loggedSlugs.has(row.slug) ? 1 : 0) + ((row.tags || []).map((tag) => String(tag).toLowerCase()).includes('compound') ? 1 : 0);
+    (byMuscle[mg] ||= []).push({ slug: row.slug, name: row.name, muscleGroup: mg, sets: 3, reps: '8-12', restSec: 90, score });
+  }
+  for (const mg of Object.keys(byMuscle)) byMuscle[mg].sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  // Round-robin across muscle groups so the workout is balanced, up to the time budget.
+  const minPerExercise = 9; // ~3 sets x 3 min
+  const maxExercises = Math.max(1, Math.floor(durationMinutes / minPerExercise));
+  const pools: Record<string, QwExercise[]> = {};
+  for (const mg of Object.keys(byMuscle)) pools[mg] = [...byMuscle[mg]];
+  const keys = Object.keys(pools);
+  const selected: QwExercise[] = [];
+  let idx = 0;
+  while (selected.length < maxExercises) {
+    if (!keys.some((key) => pools[key].length)) break;
+    const mg = keys[idx % keys.length];
+    if (pools[mg]?.length) selected.push(pools[mg].shift()!);
+    idx++;
+  }
+  const poolOut: Record<string, QwExercise[]> = {};
+  for (const mg of keys) if (pools[mg].length) poolOut[mg] = pools[mg];
+  return {
+    exercises: selected,
+    pool: poolOut,
+    targetMuscleGroups: [...new Set(selected.map((exercise) => exercise.muscleGroup))],
+    estimatedDurationMin: selected.length * minPerExercise
+  };
+}
+
+function quickWorkoutPanel(state: AppState): string {
+  const qw = state.qw;
+  return `<div class="panel" id="quick-workout-panel">
+    <div class="panel-head"><span>Quick workout</span>
+      <div class="qw-duration" id="qw-duration">
+        ${[20, 30, 45, 60].map((minutes) => `<button class="qw-dur-btn ${qw.duration === minutes ? 'active' : ''}" data-qw-dur="${minutes}">${minutes}</button>`).join('')}
+        <span class="qw-dur-unit">min</span>
+      </div>
+    </div>
+    <p class="section-help">Generates a balanced session from exercises whose muscle groups are recovered (ready, ≥80%). Pick a duration, then swap or drop any exercise before you start.</p>
+    <button class="button primary" id="qw-generate" style="width:100%">Generate from recovered muscles</button>
+    <div id="qw-result" class="qw-result" ${qw.visible && qw.exercises.length ? '' : 'hidden'}>
+      <div class="qw-meta" id="qw-meta">${html(qw.meta)}</div>
+      <div class="qw-list" id="qw-list">${qw.exercises.map((exercise, index) => {
+        const hasSwap = (qw.pool[exercise.muscleGroup] || []).length > 0;
+        return `<div class="qw-item">
+          <div class="qw-item-info">
+            <div class="qw-item-name">${html(exercise.name)}</div>
+            <div class="qw-item-meta">${html(exercise.muscleGroup)} · ${exercise.sets} × ${html(exercise.reps)}</div>
+          </div>
+          <div class="qw-item-actions">
+            ${hasSwap ? `<button class="button ghost small" data-qw-swap="${index}">Swap</button>` : ''}
+            <button class="button ghost small" data-qw-remove="${index}" title="Remove">✕</button>
+          </div>
+        </div>`;
+      }).join('')}</div>
+      <div class="qw-actions">
+        <button class="button gold" id="qw-start">Start workout</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 function workoutsView(state: AppState): string {
@@ -541,7 +729,7 @@ function workoutsView(state: AppState): string {
     </div>
     <div class="sub-panel ${active === 'recovery' ? 'active' : ''}" id="sub-workouts-recovery">
       ${recoveryView(state)}
-      <div class="panel"><div class="panel-head"><span>Quick workout</span><div class="qw-duration"><button class="qw-dur-btn">20</button><button class="qw-dur-btn">30</button><button class="qw-dur-btn active">45</button><button class="qw-dur-btn">60</button><span class="qw-dur-unit">min</span></div></div><p class="section-help">Generates a balanced session from exercises whose muscle groups are recovered. Pick a duration, then swap or drop any exercise before you start.</p><button class="button primary" style="width:100%">Generate from recovered muscles</button></div>
+      ${quickWorkoutPanel(state)}
     </div>
   </div>`;
 }
@@ -744,7 +932,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null, expandedSessionId: null };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false } };
 
   async function boot(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
@@ -835,6 +1023,87 @@ export function renderShell(root: HTMLElement): void {
       state.expandedSessionId = state.expandedSessionId === id ? null : id;
       render();
     }));
+    bindRecoveryControls();
+  }
+
+  function toast(message: string, kind: 'ok' | 'bad' = 'ok'): void {
+    const el = root.querySelector<HTMLElement>('#toast');
+    if (!el) return;
+    el.textContent = message;
+    el.className = `show ${kind}`;
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => { el.className = ''; }, 2600);
+  }
+
+  function bindRecoveryControls(): void {
+    const body = root.querySelector<SVGSVGElement>('#recovery-body');
+    if (body) {
+      const tip = root.querySelector<HTMLElement>('#recovery-tip');
+      const byMuscle: Record<string, RecoveryGroup> = {};
+      for (const group of getRecovery(state.finishedSessions, state.exercises).muscleGroups) byMuscle[group.name] = group;
+      const highlight = (name: string | null) => body.querySelectorAll<SVGElement>('[data-muscle]').forEach((el) => el.classList.toggle('hl', name != null && el.getAttribute('data-muscle') === name));
+      body.addEventListener('mousemove', (event) => {
+        if (!tip) return;
+        const poly = (event.target as Element).closest('[data-muscle]');
+        if (!poly) { tip.hidden = true; highlight(null); return; }
+        const name = poly.getAttribute('data-muscle') || '';
+        const group = byMuscle[name];
+        highlight(name);
+        const rect = (body.parentElement as HTMLElement).getBoundingClientRect();
+        tip.hidden = false;
+        tip.style.left = `${event.clientX - rect.left}px`;
+        tip.style.top = `${event.clientY - rect.top}px`;
+        tip.innerHTML = group
+          ? `<strong>${html(name)}</strong><small>${group.percent}% · ${group.status}${group.status !== 'untrained' && group.percent < 100 ? ` · ${group.hoursRemaining}h left` : ''}</small>`
+          : `<strong>${html(name)}</strong><small>no data</small>`;
+      });
+      body.addEventListener('mouseleave', () => { if (tip) tip.hidden = true; highlight(null); });
+    }
+    root.querySelectorAll<HTMLElement>('[data-qw-dur]').forEach((button) => button.addEventListener('click', () => {
+      state.qw.duration = Number(button.dataset.qwDur) || 45;
+      root.querySelectorAll<HTMLElement>('#qw-duration .qw-dur-btn').forEach((el) => el.classList.toggle('active', el === button));
+    }));
+    root.querySelector('#qw-generate')?.addEventListener('click', () => {
+      const data = getQuickWorkout(state, state.qw.duration, 80);
+      if (!data.exercises.length) {
+        state.qw.visible = false; state.qw.exercises = []; state.qw.pool = {};
+        render();
+        toast('No recovered muscle groups with exercises yet — train or add exercises first.', 'bad');
+        return;
+      }
+      state.qw.exercises = data.exercises;
+      state.qw.pool = data.pool;
+      state.qw.meta = `${data.exercises.length} exercises · ~${data.estimatedDurationMin} min · ${data.targetMuscleGroups.join(', ')}`;
+      state.qw.visible = true;
+      render();
+    });
+    root.querySelectorAll<HTMLElement>('[data-qw-swap]').forEach((button) => button.addEventListener('click', () => {
+      const index = Number(button.dataset.qwSwap) || 0;
+      const exercise = state.qw.exercises[index];
+      const pool = state.qw.pool[exercise?.muscleGroup || ''] || [];
+      if (!exercise || !pool.length) return;
+      const replacement = pool.shift()!;
+      pool.push(exercise); // cycle the swapped-out exercise back in
+      state.qw.pool[exercise.muscleGroup] = pool;
+      state.qw.exercises[index] = replacement;
+      render();
+    }));
+    root.querySelectorAll<HTMLElement>('[data-qw-remove]').forEach((button) => button.addEventListener('click', () => {
+      state.qw.exercises.splice(Number(button.dataset.qwRemove) || 0, 1);
+      if (!state.qw.exercises.length) state.qw.visible = false;
+      render();
+    }));
+    root.querySelector('#qw-start')?.addEventListener('click', () => {
+      if (!state.qw.exercises.length) return;
+      const groups = [...new Set(state.qw.exercises.map((exercise) => exercise.muscleGroup).filter(Boolean))];
+      const name = 'Quick — ' + (groups.length ? groups.join(', ') : 'Mixed');
+      const program: RelayProgram = {
+        slug: 'quick-workout', name, description: '', tags: [], sourceLabel: '', eventId: '', pubkey: '', address: '', createdAt: Date.now(),
+        exercises: state.qw.exercises.map((exercise) => ({ address: '', name: exercise.name, muscleGroup: exercise.muscleGroup, sets: exercise.sets, reps: exercise.reps, restSec: exercise.restSec }))
+      };
+      state.qw.visible = false;
+      void startTrainingSession(program);
+    });
   }
 
   async function deleteSession(id: number): Promise<void> {
@@ -943,6 +1212,7 @@ export function renderShell(root: HTMLElement): void {
   let sessionExerciseIndex = 0;
   let sessionSetCounts: Record<string, number> = {};
   let pendingConnect: { uri: string; mobile: boolean } | null = null;
+  let toastTimer: number | undefined;
   let sessionRestTimer = 0;
   let sessionRestTotal = 0;
   let sessionRestRemaining = 0;
