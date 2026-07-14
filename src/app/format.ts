@@ -18,7 +18,6 @@ export function shortNpub(pubkey: string): string {
 }
 
 export function displayNpub(pubkey: string): string {
-  if (pubkey === 'demo-local-pubkey') return 'demo local identity';
   return shortNpub(pubkey);
 }
 

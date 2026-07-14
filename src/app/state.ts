@@ -46,7 +46,7 @@ export interface AppState {
   profileNames: Record<string, string>;
   store: WorkstrStore | null;
   settings: WorkstrSettings;
-  signerType: 'nip07' | 'nip46' | 'demo' | null;
+  signerType: 'nip07' | 'nip46' | null;
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
   exercises: Exercise[];

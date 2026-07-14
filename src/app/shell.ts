@@ -34,7 +34,6 @@ const navItems: Array<{ view: View; label: string; icon: string }> = [
 ];
 
 async function fetchProfileName(pubkey: string): Promise<string | null> {
-  if (pubkey === 'demo-local-pubkey') return 'demo local identity';
   const pool = new SimplePool();
   try {
     const event = await Promise.race([
@@ -184,13 +183,20 @@ function statisticsView(state: AppState): string {
 
 function settingsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
-  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr signer</span><span class="status-pill ${state.pubkey ? 'ok' : 'bad'}">${state.pubkey ? 'connected' : 'not signed in'}</span></div><p class="section-help">Workstr Web replaces self-hosted Idenstr with a user-owned NIP-46 signer. Press Sign in in the top-right; scan the QR code with your signer app, or let it open directly on mobile.</p><div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'not signed in')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div><div class="web-empty-actions">${state.pubkey ? '<button id="sign-out-settings" class="button ghost">Switch signer</button>' : '<button id="sign-in-settings" class="button primary">Sign in</button>'}<button id="open-demo" class="button ghost">Open local demo</button></div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select" ${state.store ? '' : 'disabled'}><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label>${state.store ? '' : '<p class="section-help">Open a signer or local demo first so preferences can be saved in the per-identity IndexedDB database.</p>'}</div></div>`;
+  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr signer</span><span class="status-pill ${state.pubkey ? 'ok' : 'bad'}">${state.pubkey ? 'connected' : 'not signed in'}</span></div><p class="section-help">Workstr Web replaces self-hosted Idenstr with a user-owned NIP-46 signer. Press Sign in in the top-right; scan the QR code with your signer app, or let it open directly on mobile.</p><div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'not signed in')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div><div class="web-empty-actions">${state.pubkey ? '<button id="sign-out-settings" class="button ghost">Switch signer</button>' : '<button id="sign-in-settings" class="button primary">Sign in</button>'}</div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select" ${state.store ? '' : 'disabled'}><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label>${state.store ? '' : '<p class="section-help">Sign in first so preferences can be saved in the per-identity IndexedDB database.</p>'}</div></div>`;
 }
 
 export function renderShell(root: HTMLElement): void {
   const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
 
   async function boot(): Promise<void> {
+    // Installs from before demo mode was removed may still have the fake
+    // demo pubkey persisted; it is not valid hex and would crash npubEncode.
+    if (state.pubkey === 'demo-local-pubkey') {
+      state.pubkey = null;
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(SIGNER_TYPE_KEY);
+    }
     if (state.pubkey) await openIdentity(state.pubkey, false);
     render();
     await refreshExercises();
@@ -199,7 +205,7 @@ export function renderShell(root: HTMLElement): void {
   async function openIdentity(pubkey: string, persist = true, signerType: AppState['signerType'] = state.signerType): Promise<void> {
     state.pubkey = pubkey;
     state.signerType = signerType;
-    state.npub = pubkey === 'demo-local-pubkey' ? 'demo-local-pubkey' : nip19.npubEncode(pubkey);
+    state.npub = nip19.npubEncode(pubkey);
     state.profileName = await fetchProfileName(pubkey);
     state.signInStatus = null;
     state.store = await WorkstrStore.open(pubkey);
@@ -249,7 +255,6 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#sign-in-settings')?.addEventListener('click', startRemoteSignerRequest);
     root.querySelector('#sign-out')?.addEventListener('click', signOut);
     root.querySelector('#sign-out-settings')?.addEventListener('click', signOut);
-    root.querySelector('#open-demo')?.addEventListener('click', () => openAndRender('demo-local-pubkey'));
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void saveUnitPreference((event.target as HTMLSelectElement).value); });
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void refreshExercises(); }));
     root.querySelectorAll('#refresh-programs').forEach((button) => button.addEventListener('click', () => { void refreshPrograms(); }));
@@ -327,7 +332,7 @@ export function renderShell(root: HTMLElement): void {
   }
 
   async function openSheetBuilder(sheet: SheetWithExercises | null = null): Promise<void> {
-    if (!state.store) { toast('Sign in or open the local demo to create programs.', 'bad'); return; }
+    if (!state.store) { toast('Sign in to create programs.', 'bad'); return; }
     const library = await quickWorkoutLibrary();
     builder = {
       sheetId: sheet?.id,
@@ -493,7 +498,7 @@ export function renderShell(root: HTMLElement): void {
   function bindBodyControls(): void {
     root.querySelector('#body-form')?.addEventListener('submit', async (event) => {
       event.preventDefault();
-      if (!state.store) { toast('Sign in or open the local demo to log weight.', 'bad'); return; }
+      if (!state.store) { toast('Sign in to log weight.', 'bad'); return; }
       const form = event.target as HTMLFormElement;
       const weightKg = storeWeightInput((form.elements.namedItem('weightKg') as HTMLInputElement).value, normalizeWeightUnit(state.settings.unit));
       if (weightKg == null) return;
@@ -510,7 +515,7 @@ export function renderShell(root: HTMLElement): void {
     }));
     root.querySelector('#body-profile-form')?.addEventListener('submit', async (event) => {
       event.preventDefault();
-      if (!state.store) { toast('Sign in or open the local demo to save your profile.', 'bad'); return; }
+      if (!state.store) { toast('Sign in to save your profile.', 'bad'); return; }
       const form = event.target as HTMLFormElement;
       const heightCm = Number((form.elements.namedItem('heightCm') as HTMLInputElement).value) || 0;
       const targetWeightKg = storeWeightInput((form.elements.namedItem('targetWeightKg') as HTMLInputElement).value, normalizeWeightUnit(state.settings.unit)) || 0;
@@ -1189,7 +1194,7 @@ export function renderShell(root: HTMLElement): void {
     document.body.appendChild(link); link.click(); link.remove();
   }
 
-  async function openAndRender(pubkey: string, signerType: AppState['signerType'] = pubkey === 'demo-local-pubkey' ? 'demo' : state.signerType): Promise<void> {
+  async function openAndRender(pubkey: string, signerType: AppState['signerType'] = state.signerType): Promise<void> {
     await openIdentity(pubkey, true, signerType);
     render();
   }
@@ -1223,7 +1228,7 @@ export function renderShell(root: HTMLElement): void {
   }
 
   function openExerciseModal(existing: Exercise | null = null): void {
-    if (!state.store) { toast('Sign in or open the local demo to edit your library.', 'bad'); return; }
+    if (!state.store) { toast('Sign in to edit your library.', 'bad'); return; }
     openModal(`
       <h3>${existing ? 'Edit exercise' : 'New exercise'}</h3>
       <form id="ex-form" class="form-grid">
@@ -1363,7 +1368,7 @@ export function renderShell(root: HTMLElement): void {
   }
 
   async function importDiscovered(exercise: Exercise, button: HTMLButtonElement | null): Promise<void> {
-    if (!state.store) { toast('Sign in or open the local demo to import exercises.', 'bad'); return; }
+    if (!state.store) { toast('Sign in to import exercises.', 'bad'); return; }
     if (button) { button.disabled = true; button.textContent = 'Importing...'; }
     const duplicate = state.library.some((entry) => entry.slug === exercise.slug || (entry.nostr_address && entry.nostr_address === exercise.nostr_address));
     if (!duplicate) {
