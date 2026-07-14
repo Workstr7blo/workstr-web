@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getQuickWorkout, getRecovery } from '../src/app/shell';
+import { getRecovery } from '../src/features/recovery/recovery';
+import { getQuickWorkout } from '../src/features/recovery/quickWorkout';
 import type { Exercise } from '../src/core/types';
 
 const libraryExercise = (slug: string, muscleGroup: string) =>

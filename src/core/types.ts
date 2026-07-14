@@ -18,9 +18,9 @@ export interface Exercise {
   image_url?: string;
   favourite: boolean;
   default_sets?: number;
-  default_reps?: number;
+  default_reps?: number | string;
   default_rest?: number;
-  source_type: 'manual' | 'imported' | 'premium' | 'bundle';
+  source_type: 'manual' | 'imported' | 'premium' | 'bundle' | 'nostr' | 'ai';
   status: 'active' | 'deleted';
   nostr_event_id?: string;
   nostr_pubkey?: string;
