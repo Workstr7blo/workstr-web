@@ -1,6 +1,6 @@
 import type { WorkstrStore, SheetWithExercises } from '../db/store';
 import type { BodyWeightEntry, Exercise, WorkstrSettings } from '../core/types';
-import type { RelayProgram } from '../nostr/powrLibrary';
+import type { RelayProgram } from '../nostr/canon';
 
 export type View = 'exercises' | 'workouts' | 'statistics' | 'settings';
 export type SubView = 'library' | 'discover' | 'programs' | 'history' | 'recovery' | 'training' | 'body';

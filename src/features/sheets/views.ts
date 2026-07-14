@@ -2,7 +2,7 @@ import { canonMuscle } from '../../core/muscles';
 import type { Exercise } from '../../core/types';
 import { displayWeightKg, normalizeWeightUnit } from '../../core/units';
 import type { SheetWithExercises } from '../../db/store';
-import type { RelayProgram } from '../../nostr/powrLibrary';
+import type { RelayProgram } from '../../nostr/canon';
 import type { AppState } from '../../app/state';
 import { displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';

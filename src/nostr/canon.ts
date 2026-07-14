@@ -1,11 +1,15 @@
 import type { Event } from 'nostr-tools';
-import { SimplePool } from 'nostr-tools';
+import { SimplePool, verifyEvent } from 'nostr-tools';
 import { canonMuscle } from '../core/muscles';
 import { slugify } from '../core/ids';
-import type { Exercise } from '../core/types';
+import type { CanonCache, Exercise } from '../core/types';
+import { DEFAULT_PUBLIC_RELAYS } from './pool';
 
-export const WORKSTR_LIBRARY_RELAY = 'wss://nos.lol';
-export const WORKSTR_LIBRARY_RELAYS = [WORKSTR_LIBRARY_RELAY];
+// The canon is everything signed by the operator key. The d-tag convention
+// gives cohesion; the author filter gives control — anyone can copy a d-tag,
+// nobody can forge the signature.
+export const OPERATOR_PUBKEY = '20e17dd0ec1bb0832688e739ad89709d047deb23ed5146822efdd2d22ae504d7';
+export const CANON_RELAYS = DEFAULT_PUBLIC_RELAYS;
 
 export interface RelayProgramExercise {
   address: string;
@@ -34,10 +38,11 @@ export interface RelayProgram {
   createdAt: number;
 }
 
-const EXERCISE_D_PREFIX = 'workstr:exercise:';
-const PROGRAM_D_PREFIX = 'workstr:program:';
+export const EXERCISE_D_PREFIX = 'workstr:exercise:';
+export const PROGRAM_D_PREFIX = 'workstr:program:';
 const QUERY_TIMEOUT_MS = 7000;
-const LIBRARY_LIMIT = 200;
+const EXERCISE_LIMIT = 500;
+const PROGRAM_LIMIT = 200;
 
 function tagValue(tags: string[][], key: string): string {
   return (tags.find((tag) => tag[0] === key) || [])[1] || '';
@@ -217,39 +222,90 @@ export function programFromEvent(event: Event): RelayProgram | null {
   };
 }
 
-async function queryKind(kind: 33401 | 33402): Promise<Event[]> {
-  const pool = new SimplePool();
-  try {
-    const events = await pool.querySync(WORKSTR_LIBRARY_RELAYS, { kinds: [kind], limit: LIBRARY_LIMIT });
-    return events.sort((a, b) => b.created_at - a.created_at);
-  } finally {
-    pool.close(WORKSTR_LIBRARY_RELAYS);
-  }
-}
-
 function withTimeout<T>(promise: Promise<T>, timeoutMs = QUERY_TIMEOUT_MS): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error(`relay query timed out after ${timeoutMs / 1000}s`)), timeoutMs);
-    promise.then((value) => { window.clearTimeout(timer); resolve(value); }, (error) => { window.clearTimeout(timer); reject(error); });
+    const timer = setTimeout(() => reject(new Error(`relay query timed out after ${timeoutMs / 1000}s`)), timeoutMs);
+    promise.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
   });
 }
 
-export async function fetchRelayExercises(): Promise<Exercise[]> {
-  const events = await withTimeout(queryKind(33401));
-  const byAddress = new Map<string, Exercise>();
+// Keep only trusted canon events: operator-authored, valid signature, one
+// event per full address (kind:pubkey:d) with the newest created_at winning —
+// republishing the same d replaces the previous version.
+export function selectCanonEvents(events: Event[], operator = OPERATOR_PUBKEY): Event[] {
+  const byAddress = new Map<string, Event>();
   for (const event of events) {
-    const exercise = exerciseFromEvent(event);
-    if (exercise?.nostr_address && !byAddress.has(exercise.nostr_address)) byAddress.set(exercise.nostr_address, exercise);
+    if (event.pubkey !== operator) continue;
+    const dTag = tagValue(event.tags as string[][], 'd');
+    if (!dTag) continue;
+    const existing = byAddress.get(`${event.kind}:${event.pubkey}:${dTag}`);
+    if (existing && existing.created_at >= event.created_at) continue;
+    if (!verifyEvent(event)) continue;
+    byAddress.set(`${event.kind}:${event.pubkey}:${dTag}`, event);
   }
-  return [...byAddress.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...byAddress.values()];
 }
 
-export async function fetchRelayPrograms(): Promise<RelayProgram[]> {
-  const events = await withTimeout(queryKind(33402));
-  const byAddress = new Map<string, RelayProgram>();
-  for (const event of events) {
-    const program = programFromEvent(event);
-    if (program && !byAddress.has(program.address)) byAddress.set(program.address, program);
+// Every canon relay is queried in parallel with its own timeout; partial
+// failure is tolerated, but if no relay answered at all we throw so the UI
+// can distinguish "offline" from "canon is empty".
+async function queryCanon(kind: 33401 | 33402, limit: number): Promise<Event[]> {
+  const pool = new SimplePool();
+  try {
+    const filter = { kinds: [kind], authors: [OPERATOR_PUBKEY], limit };
+    const results = await Promise.allSettled(
+      CANON_RELAYS.map((relay) => withTimeout(pool.querySync([relay], filter)))
+    );
+    if (results.every((result) => result.status === 'rejected')) {
+      throw new Error('no canon relay reachable');
+    }
+    const merged = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+    return selectCanonEvents(merged);
+  } finally {
+    pool.close(CANON_RELAYS);
   }
-  return [...byAddress.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function exercisesFrom(events: Event[]): Exercise[] {
+  return events.map(exerciseFromEvent).filter((item): item is Exercise => item !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function programsFrom(events: Event[]): RelayProgram[] {
+  return events.map(programFromEvent).filter((item): item is RelayProgram => item !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// In-memory copy of the verified canon events, refreshed per kind on each
+// successful fetch. Snapshots of it are persisted in settings.canonCache so
+// Discover opens instantly and works offline with the last known catalog.
+let memory: { fetchedAt: number; events: Event[] } | null = null;
+
+function rememberKind(kind: number, events: Event[]): void {
+  const others = memory ? memory.events.filter((event) => event.kind !== kind) : [];
+  memory = { fetchedAt: Date.now(), events: [...others, ...events] };
+}
+
+// Hydrate the in-memory canon from a persisted snapshot. Cached events were
+// verified when fetched, so they are not re-verified here.
+export function primeCanonCache(cache?: CanonCache): { exercises: Exercise[]; programs: RelayProgram[]; fetchedAt: number } | null {
+  if (!cache?.events?.length) return null;
+  if (!memory || cache.fetchedAt > memory.fetchedAt) memory = { fetchedAt: cache.fetchedAt, events: cache.events as Event[] };
+  return { exercises: exercisesFrom(memory.events), programs: programsFrom(memory.events), fetchedAt: memory.fetchedAt };
+}
+
+export function canonCacheSnapshot(): CanonCache | null {
+  return memory ? { fetchedAt: memory.fetchedAt, events: memory.events } : null;
+}
+
+export async function fetchCanonExercises(): Promise<Exercise[]> {
+  const events = await queryCanon(33401, EXERCISE_LIMIT);
+  rememberKind(33401, events);
+  return exercisesFrom(events);
+}
+
+export async function fetchCanonPrograms(): Promise<RelayProgram[]> {
+  const events = await queryCanon(33402, PROGRAM_LIMIT);
+  rememberKind(33402, events);
+  return programsFrom(events);
 }

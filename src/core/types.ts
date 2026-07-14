@@ -105,6 +105,23 @@ export interface BodyWeightEntry {
   notes?: string;
 }
 
+// Raw nostr event snapshot persisted for offline Discover (structurally the
+// same shape as nostr-tools Event; kept local so core/ stays dependency-free).
+export interface CanonCachedEvent {
+  id: string;
+  pubkey: string;
+  created_at: number;
+  kind: number;
+  tags: string[][];
+  content: string;
+  sig: string;
+}
+
+export interface CanonCache {
+  fetchedAt: number;
+  events: CanonCachedEvent[];
+}
+
 export interface WorkstrSettings {
   unit: WeightUnit;
   publicRelays: string[];
@@ -114,4 +131,5 @@ export interface WorkstrSettings {
   starterExercisesSeeded?: boolean;
   heightCm?: number;
   targetWeightKg?: number;
+  canonCache?: CanonCache;
 }

@@ -8,7 +8,7 @@ import { WorkstrStore, type ExerciseDraft, type SheetWithExercises } from '../db
 import starterExercises from '../data/starter-exercises.json';
 import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
-import { fetchRelayExercises, fetchRelayPrograms, WORKSTR_LIBRARY_RELAY, type RelayProgram } from '../nostr/powrLibrary';
+import { canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import type { ActiveSession, AppState, SessionExercise, SessionSetLog, SubView, View } from './state';
 import { displayIdentity, EX_PLACEHOLDER, exerciseSourceLabel, html, programMuscleLabel } from './format';
 import { paintBodyMapSvg } from './bodymap';
@@ -187,7 +187,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`, programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the canon from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -215,6 +215,15 @@ export function renderShell(root: HTMLElement): void {
     state.finishedSessions = await loadFinishedSessions();
     state.bodyEntries = await state.store.listBody();
     state.sheets = await state.store.listSheets();
+    // Open Discover instantly from the persisted canon snapshot; the network
+    // refresh replaces it in the background when relays answer.
+    const cached = primeCanonCache(state.settings.canonCache);
+    if (cached) {
+      state.discoverExercises = cached.exercises;
+      state.programs = cached.programs;
+      state.exerciseStatus = `showing ${cached.exercises.length} cached canon exercises`;
+      state.programStatus = `showing ${cached.programs.length} cached canon programs`;
+    }
     await reloadLibrary();
     state.activeSession = await loadUnfinishedSession();
     if (state.activeSession) sessionSetCounts = setCountsFromSession(state.activeSession);
@@ -680,33 +689,51 @@ export function renderShell(root: HTMLElement): void {
     refreshMergedExercises();
   }
 
+  // Persist the verified canon snapshot in settings so Discover opens
+  // instantly and works offline on the next launch.
+  async function persistCanonCache(): Promise<void> {
+    if (!state.store) return;
+    const snapshot = canonCacheSnapshot();
+    if (!snapshot) return;
+    state.settings = { ...state.settings, canonCache: snapshot };
+    await state.store.saveSettings(state.settings);
+  }
+
   async function refreshExercises(): Promise<void> {
-    state.exerciseStatus = `loading exercises from ${WORKSTR_LIBRARY_RELAY}...`;
+    state.exerciseStatus = 'loading canon exercises from relays...';
     render();
     try {
-      const exercises = await fetchRelayExercises();
+      const exercises = await fetchCanonExercises();
       state.discoverExercises = exercises;
-      state.exerciseStatus = `loaded ${exercises.length} exercises from ${WORKSTR_LIBRARY_RELAY}`;
+      state.exerciseStatus = `loaded ${exercises.length} canon exercises`;
+      await persistCanonCache();
     } catch (error) {
-      state.exerciseStatus = `exercise relay error: ${(error as Error).message}`;
+      const cached = state.discoverExercises.length;
+      state.exerciseStatus = cached
+        ? `offline — showing ${cached} cached canon exercises`
+        : `canon relay error: ${(error as Error).message}`;
     }
     refreshMergedExercises();
     render();
   }
 
   async function refreshPrograms(): Promise<void> {
-    state.programStatus = `loading workouts from ${WORKSTR_LIBRARY_RELAY}...`;
+    state.programStatus = 'loading canon programs from relays...';
     render();
     try {
       if (!state.exercises.length) {
-        try { state.exercises = await fetchRelayExercises(); } catch { /* Program cards can still infer fallback muscles. */ }
+        try { state.exercises = await fetchCanonExercises(); } catch { /* Program cards can still infer fallback muscles. */ }
       }
-      const programs = await fetchRelayPrograms();
+      const programs = await fetchCanonPrograms();
       state.programs = programs;
-      state.programStatus = `loaded ${programs.length} workouts from ${WORKSTR_LIBRARY_RELAY}`;
+      state.programStatus = `loaded ${programs.length} canon programs`;
+      await persistCanonCache();
       void refreshProgramProfiles(programs);
     } catch (error) {
-      state.programStatus = `workout relay error: ${(error as Error).message}`;
+      const cached = state.programs.length;
+      state.programStatus = cached
+        ? `offline — showing ${cached} cached canon programs`
+        : `program relay error: ${(error as Error).message}`;
     }
     render();
   }
