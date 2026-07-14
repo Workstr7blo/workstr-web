@@ -13,7 +13,7 @@ import type { ActiveSession, AppState, SessionExercise, SessionSetLog, SubView, 
 import { displayIdentity, EX_PLACEHOLDER, exerciseSourceLabel, html, programMuscleLabel } from './format';
 import { paintBodyMapSvg } from './bodymap';
 import { libraryPanel } from '../features/library/views';
-import { discoverPanel } from '../features/discover/views';
+import { discoverImportState, discoverPanel } from '../features/discover/views';
 import { workoutHistory } from '../features/train/views';
 import { bodyView, trainingStatsView } from '../features/progress/views';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
@@ -187,7 +187,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the canon from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -221,8 +221,8 @@ export function renderShell(root: HTMLElement): void {
     if (cached) {
       state.discoverExercises = cached.exercises;
       state.programs = cached.programs;
-      state.exerciseStatus = `showing ${cached.exercises.length} cached canon exercises`;
-      state.programStatus = `showing ${cached.programs.length} cached canon programs`;
+      state.exerciseStatus = `showing ${cached.exercises.length} Workstr exercises from the last sync`;
+      state.programStatus = `showing ${cached.programs.length} Workstr programs from the last sync`;
     }
     await reloadLibrary();
     state.activeSession = await loadUnfinishedSession();
@@ -700,25 +700,25 @@ export function renderShell(root: HTMLElement): void {
   }
 
   async function refreshExercises(): Promise<void> {
-    state.exerciseStatus = 'loading canon exercises from relays...';
+    state.exerciseStatus = 'loading Workstr exercises from relays...';
     render();
     try {
       const exercises = await fetchCanonExercises();
       state.discoverExercises = exercises;
-      state.exerciseStatus = `loaded ${exercises.length} canon exercises`;
+      state.exerciseStatus = `loaded ${exercises.length} Workstr exercises`;
       await persistCanonCache();
     } catch (error) {
       const cached = state.discoverExercises.length;
       state.exerciseStatus = cached
-        ? `offline — showing ${cached} cached canon exercises`
-        : `canon relay error: ${(error as Error).message}`;
+        ? `offline — showing ${cached} Workstr exercises from the last sync`
+        : `catalog relay error: ${(error as Error).message}`;
     }
     refreshMergedExercises();
     render();
   }
 
   async function refreshPrograms(): Promise<void> {
-    state.programStatus = 'loading canon programs from relays...';
+    state.programStatus = 'loading Workstr programs from relays...';
     render();
     try {
       if (!state.exercises.length) {
@@ -726,13 +726,13 @@ export function renderShell(root: HTMLElement): void {
       }
       const programs = await fetchCanonPrograms();
       state.programs = programs;
-      state.programStatus = `loaded ${programs.length} canon programs`;
+      state.programStatus = `loaded ${programs.length} Workstr programs`;
       await persistCanonCache();
       void refreshProgramProfiles(programs);
     } catch (error) {
       const cached = state.programs.length;
       state.programStatus = cached
-        ? `offline — showing ${cached} cached canon programs`
+        ? `offline — showing ${cached} Workstr programs from the last sync`
         : `program relay error: ${(error as Error).message}`;
     }
     render();
@@ -1329,7 +1329,11 @@ export function renderShell(root: HTMLElement): void {
         default_sets: Number(value('defaultSets')) || 3,
         default_reps: value('defaultReps') || '8-12',
         default_rest: Number(value('defaultRest')) || 90,
-        source_type: existing?.source_type || 'manual',
+        // Import = snapshot: editing an imported row forks it. The nostr
+        // fields are cleared so canon updates never clobber local edits.
+        ...(existing?.nostr_address
+          ? { source_type: 'manual' as const, nostr_address: undefined, nostr_event_id: undefined, nostr_pubkey: undefined, nostr_published_at: undefined, origin_created_at: undefined }
+          : { source_type: existing?.source_type || 'manual' }),
         status: 'active'
       });
       await reloadLibrary();
@@ -1355,11 +1359,13 @@ export function renderShell(root: HTMLElement): void {
     const pills = (list: string[]) => list.map((item) => `<span class="tag-pill">${html(item)}</span>`).join('');
     const muscleList = muscles.length ? muscles : (exercise.muscle_group ? [exercise.muscle_group] : []);
     const sourceLabel = exerciseSourceLabel(exercise);
-    const imported = state.library.some((entry) => entry.slug === exercise.slug || (entry.nostr_address && entry.nostr_address === exercise.nostr_address));
+    const importState = discoverImportState(exercise, state.library);
+    const importLabel = importState === 'update' ? 'Update' : importState === 'in-library' ? 'In library' : 'Import';
+    const importCls = importState === 'update' ? 'gold' : importState === 'in-library' ? 'ghost' : 'primary';
     const actions = source === 'library'
       ? `<button class="button primary" id="ex-edit">Edit</button>
         <button class="button ghost" disabled title="Publishing arrives with the Nostr share block">Publish to relays</button>`
-      : `<button class="button ${imported ? 'ghost' : 'primary'}" id="ex-import"${imported ? ' disabled' : ''}>${imported ? 'In library' : 'Import'}</button>`;
+      : `<button class="button ${importCls}" id="ex-import"${importState === 'in-library' ? ' disabled' : ''}>${importLabel}</button>`;
     openModal(`
       <div class="detail-img${src ? '' : ' placeholder'}">${src ? `<img src="${html(src)}" alt="" loading="lazy" onerror="this.parentElement.classList.add('placeholder');this.remove()">` : EX_PLACEHOLDER}</div>
       <h3 class="detail-title">${html(exercise.name)}</h3>
@@ -1396,15 +1402,15 @@ export function renderShell(root: HTMLElement): void {
 
   async function importDiscovered(exercise: Exercise, button: HTMLButtonElement | null): Promise<void> {
     if (!state.store) { toast('Sign in to import exercises.', 'bad'); return; }
-    if (button) { button.disabled = true; button.textContent = 'Importing...'; }
-    const duplicate = state.library.some((entry) => entry.slug === exercise.slug || (entry.nostr_address && entry.nostr_address === exercise.nostr_address));
-    if (!duplicate) {
-      const { id: _ignored, ...rest } = exercise;
-      await state.store.upsertExercise({ ...rest, favourite: rest.favourite ?? false, source_type: 'nostr', status: 'active' });
-    }
+    const importState = discoverImportState(exercise, state.library);
+    if (importState === 'in-library') { toast('Already in your library'); return; }
+    if (button) { button.disabled = true; button.textContent = importState === 'update' ? 'Updating...' : 'Importing...'; }
+    const local = exercise.nostr_address ? state.library.find((entry) => entry.nostr_address === exercise.nostr_address) : undefined;
+    const { id: _ignored, ...rest } = exercise;
+    await state.store.upsertExercise({ ...rest, favourite: local?.favourite ?? false, source_type: 'imported', status: 'active' });
     await reloadLibrary();
     render();
-    toast(duplicate ? 'Already in your library' : 'Imported to library');
+    toast(importState === 'update' ? 'Updated from the Workstr catalog' : 'Imported to library');
   }
 
   async function toggleFavourite(slug: string): Promise<void> {

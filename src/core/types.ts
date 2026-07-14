@@ -26,6 +26,9 @@ export interface Exercise {
   nostr_pubkey?: string;
   nostr_address?: string;
   nostr_published_at?: ISODateTime;
+  // created_at (unix seconds) of the origin canon event this row was imported
+  // from; newer remote created_at on the same address = update available.
+  origin_created_at?: number;
   created_at: ISODateTime;
   updated_at: ISODateTime;
 }
