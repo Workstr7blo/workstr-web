@@ -169,6 +169,7 @@ export function exerciseFromEvent(event: Event): Exercise | null {
     nostr_pubkey: event.pubkey,
     nostr_address: eventAddress(33401, event, dTag),
     nostr_published_at: now,
+    origin_created_at: event.created_at,
     created_at: now,
     updated_at: now
   };
