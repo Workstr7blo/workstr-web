@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getStats } from '../src/app/shell';
+import { getStats } from '../src/features/progress/stats';
 import { WorkstrStore } from '../src/db/store';
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86400000).toISOString();
