@@ -61,3 +61,4 @@
 .builder-pick-state { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--border); color: var(--dim); }
 .builder-pick-state svg { width: 14px; height: 14px; }
 .builder-pick-item.added .builder-pick-state { color: var(--success-green); border-color: var(--success-green); }
+.ex-grid.selecting .ex-card.unselectable { opacity: .45; }

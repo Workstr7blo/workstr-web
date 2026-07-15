@@ -14,7 +14,7 @@ import type { ActiveSession, AppState, SessionExercise, SessionSetLog, SubView, 
 import { displayIdentity, EX_PLACEHOLDER, exerciseImage, exerciseSourceLabel, filterExercises, html, programMuscleLabel } from './format';
 import { paintBodyMapSvg } from './bodymap';
 import { libraryPanel } from '../features/library/views';
-import { discoverImportState, discoverPanel } from '../features/discover/views';
+import { discoverImportable, discoverImportState, discoverPanel } from '../features/discover/views';
 import { workoutHistory } from '../features/train/views';
 import { bodyView, trainingStatsView } from '../features/progress/views';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
@@ -188,7 +188,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -309,10 +309,28 @@ export function renderShell(root: HTMLElement): void {
       if (!card) return;
       const exercise = state.discoverExercises.find((entry) => (entry.nostr_address || entry.slug) === card.dataset.address);
       if (!exercise) return;
+      if (state.discoverSelect.active) {
+        if (discoverImportState(exercise, state.library) === 'in-library') return;
+        const address = exercise.nostr_address || exercise.slug;
+        if (state.discoverSelect.addresses.has(address)) state.discoverSelect.addresses.delete(address);
+        else state.discoverSelect.addresses.add(address);
+        render();
+        return;
+      }
       const importButton = target.closest<HTMLButtonElement>('[data-import-address]');
       if (importButton) { void importDiscovered(exercise, importButton); return; }
       openExerciseDetail(exercise, 'discover');
     });
+    root.querySelector('#discover-select-toggle')?.addEventListener('click', () => { state.discoverSelect = { active: true, addresses: new Set() }; render(); });
+    root.querySelector('#discover-select-cancel')?.addEventListener('click', () => { state.discoverSelect = { active: false, addresses: new Set() }; render(); });
+    root.querySelector('#discover-select-all')?.addEventListener('click', () => {
+      const visible = filterExercises(state.discoverExercises, state.discoverFilter.q, state.discoverFilter.cat, state.discoverFilter.muscle, state.discoverFilter.diff);
+      const importable = discoverImportable(visible, state.library).map((exercise) => exercise.nostr_address || exercise.slug);
+      const allSelected = importable.length > 0 && importable.every((address) => state.discoverSelect.addresses.has(address));
+      state.discoverSelect.addresses = allSelected ? new Set() : new Set(importable);
+      render();
+    });
+    root.querySelector('#discover-import-selected')?.addEventListener('click', () => { void importSelectedDiscovered(); });
     root.querySelector('#program-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#program-filter'); input?.focus(); input?.setSelectionRange(state.programFilter.length, state.programFilter.length); });
     root.querySelectorAll<HTMLElement>('[data-toggle-program]').forEach((header) => header.addEventListener('click', () => {
       const address = header.dataset.toggleProgram || null;
@@ -784,7 +802,7 @@ export function renderShell(root: HTMLElement): void {
   function signOut(): void {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SIGNER_TYPE_KEY);
-    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.settings = { ...DEFAULT_SETTINGS }; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null; state.bodyEntries = []; state.sheets = []; state.library = []; state.librarySelect = { active: false, slugs: new Set() }; refreshMergedExercises();
+    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.settings = { ...DEFAULT_SETTINGS }; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null; state.bodyEntries = []; state.sheets = []; state.library = []; state.librarySelect = { active: false, slugs: new Set() }; state.discoverSelect = { active: false, addresses: new Set() }; refreshMergedExercises();
     render();
   }
 
@@ -1323,6 +1341,23 @@ export function renderShell(root: HTMLElement): void {
     await reloadLibrary();
     render();
     toast(importState === 'update' ? 'Updated from the Workstr catalog' : 'Imported to library');
+  }
+
+  async function importSelectedDiscovered(): Promise<void> {
+    if (!state.store) { toast('Sign in to import exercises.', 'bad'); return; }
+    const selected = state.discoverExercises.filter((exercise) => state.discoverSelect.addresses.has(exercise.nostr_address || exercise.slug));
+    let imported = 0;
+    for (const exercise of selected) {
+      if (discoverImportState(exercise, state.library) === 'in-library') continue;
+      const local = exercise.nostr_address ? state.library.find((entry) => entry.nostr_address === exercise.nostr_address) : undefined;
+      const { id: _ignored, ...rest } = exercise;
+      await state.store.upsertExercise({ ...rest, favourite: local?.favourite ?? false, source_type: 'imported', status: 'active' });
+      imported += 1;
+    }
+    state.discoverSelect = { active: false, addresses: new Set() };
+    await reloadLibrary();
+    render();
+    toast(imported ? `Imported ${imported} exercise${imported === 1 ? '' : 's'} to library` : 'Nothing new to import');
   }
 
   async function importProgram(program: RelayProgram, button: HTMLButtonElement | null): Promise<void> {

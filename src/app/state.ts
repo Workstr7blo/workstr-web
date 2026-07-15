@@ -57,6 +57,7 @@ export interface AppState {
   sheets: SheetWithExercises[];
   library: Exercise[];
   librarySelect: { active: boolean; slugs: Set<string> };
+  discoverSelect: { active: boolean; addresses: Set<string> };
   discoverExercises: Exercise[];
   exFilter: { cat: string; muscle: string; diff: string };
   discoverFilter: { q: string; cat: string; muscle: string; diff: string };
