@@ -9,6 +9,7 @@ import starterExercises from '../data/starter-exercises.json';
 import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
+import { planProgramImport, programImportState } from '../nostr/programImport';
 import type { ActiveSession, AppState, SessionExercise, SessionSetLog, SubView, View } from './state';
 import { displayIdentity, EX_PLACEHOLDER, exerciseSourceLabel, filterExercises, html, programMuscleLabel } from './format';
 import { paintBodyMapSvg } from './bodymap';
@@ -330,6 +331,11 @@ export function renderShell(root: HTMLElement): void {
       const program = state.programs.find((item) => item.address === address)
         || state.sheets.map(sheetToProgram).find((item) => item.address === address);
       if (program) startTrainingSession(program);
+    }));
+    root.querySelectorAll<HTMLElement>('[data-import-program]').forEach((button) => button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const program = state.programs.find((item) => item.address === button.dataset.importProgram);
+      if (program) await importProgram(program, button as HTMLButtonElement);
     }));
     root.querySelector('#new-program')?.addEventListener('click', () => { void openSheetBuilder(); });
     root.querySelectorAll<HTMLElement>('[data-edit-sheet]').forEach((button) => button.addEventListener('click', (event) => {
@@ -1307,6 +1313,31 @@ export function renderShell(root: HTMLElement): void {
     await reloadLibrary();
     render();
     toast(importState === 'update' ? 'Updated from the Workstr catalog' : 'Imported to library');
+  }
+
+  async function importProgram(program: RelayProgram, button: HTMLButtonElement | null): Promise<void> {
+    if (!state.store) { toast('Sign in to import programs.', 'bad'); return; }
+    const importState = programImportState(program, state.sheets);
+    if (importState === 'in-library') { toast('Already in your programs'); return; }
+    if (button) { button.disabled = true; button.textContent = importState === 'update' ? 'Updating...' : 'Importing...'; }
+    // The dependency walk resolves referenced exercises from the canon catalog;
+    // fetch it first on a fresh install where no snapshot is primed yet.
+    if (!state.discoverExercises.length) await refreshExercises();
+    const plan = planProgramImport(program, state.library, state.discoverExercises);
+    for (const exercise of plan.exercisesToImport) {
+      const { id: _ignored, ...rest } = exercise;
+      await state.store.upsertExercise({ ...rest, source_type: 'imported', status: 'active' });
+    }
+    const existing = state.sheets.find((sheet) => sheet.nostr_address === program.address);
+    await state.store.saveSheet(plan.sheet, existing?.id);
+    if (plan.exercisesToImport.length) await reloadLibrary();
+    state.sheets = await state.store.listSheets();
+    render();
+    const count = plan.exercisesToImport.length;
+    toast(importState === 'update'
+      ? 'Program updated from the Workstr catalog'
+      : `Program imported${count ? ` with ${count} exercise${count === 1 ? '' : 's'}` : ''}`);
+    if (plan.unresolved.length) toast(`${plan.unresolved.length} referenced exercise${plan.unresolved.length === 1 ? '' : 's'} not found in the catalog`, 'bad');
   }
 
   async function deleteExerciseFromLibrary(exercise: Exercise): Promise<boolean> {
