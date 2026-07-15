@@ -53,7 +53,7 @@ export async function createBunkerSigner(input: string, options: BunkerOptions =
   const pool = new SimplePool();
   const signer = BunkerSigner.fromBunker(clientSecretKey(), pointer, { pool, onauth: options.onAuthUrl });
   await signer.connect({
-    name: 'Workstr Web',
+    name: 'Workstr',
     url: window.location.origin
   });
 
@@ -69,7 +69,7 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
     clientPubkey,
     relays: cleanRelays,
     secret: connectionSecret,
-    name: 'Workstr Web',
+    name: 'Workstr',
     url: window.location.origin,
     perms: ['get_public_key', 'sign_event', 'nip44_encrypt', 'nip44_decrypt']
   });

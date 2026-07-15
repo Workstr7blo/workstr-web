@@ -62,3 +62,5 @@
 .builder-pick-state svg { width: 14px; height: 14px; }
 .builder-pick-item.added .builder-pick-state { color: var(--success-green); border-color: var(--success-green); }
 .ex-grid.selecting .ex-card.unselectable { opacity: .45; }
+.glyph { background: #0b0616; border: 1px solid var(--border-hot); }
+.glyph img { width: 19px; height: 19px; object-fit: contain; display: block; }
