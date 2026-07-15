@@ -57,7 +57,7 @@ function shellMarkup(state: AppState): string {
     <div class="cyber-grid"></div>
     <header class="topbar">
       <div class="logo-zone">
-        <div class="glyph">W</div>
+        <div class="glyph"><img src="./favicon.svg" alt="" /></div>
         <div class="logo-text">
           <div class="logo-mark">Work<span>str</span></div>
           <div class="logo-tagline">sovereign training</div>
@@ -184,7 +184,7 @@ function statisticsView(state: AppState): string {
 
 function settingsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
-  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr signer</span><span class="status-pill ${state.pubkey ? 'ok' : 'bad'}">${state.pubkey ? 'connected' : 'not signed in'}</span></div><p class="section-help">Workstr Web replaces self-hosted Idenstr with a user-owned NIP-46 signer. Press Sign in in the top-right; scan the QR code with your signer app, or let it open directly on mobile.</p><div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'not signed in')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div><div class="web-empty-actions">${state.pubkey ? '<button id="sign-out-settings" class="button ghost">Switch signer</button>' : '<button id="sign-in-settings" class="button primary">Sign in</button>'}</div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select" ${state.store ? '' : 'disabled'}><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label>${state.store ? '' : '<p class="section-help">Sign in first so preferences can be saved in the per-identity IndexedDB database.</p>'}</div></div>`;
+  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr signer</span><span class="status-pill ${state.pubkey ? 'ok' : 'bad'}">${state.pubkey ? 'connected' : 'not signed in'}</span></div><p class="section-help">Workstr replaces self-hosted Idenstr with a user-owned NIP-46 signer. Press Sign in in the top-right; scan the QR code with your signer app, or let it open directly on mobile.</p><div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'not signed in')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div><div class="web-empty-actions">${state.pubkey ? '<button id="sign-out-settings" class="button ghost">Switch signer</button>' : '<button id="sign-in-settings" class="button primary">Sign in</button>'}</div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select" ${state.store ? '' : 'disabled'}><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label>${state.store ? '' : '<p class="section-help">Sign in first so preferences can be saved in the per-identity IndexedDB database.</p>'}</div></div>`;
 }
 
 export function renderShell(root: HTMLElement): void {
