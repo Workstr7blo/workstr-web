@@ -13,6 +13,11 @@ export interface SheetDraft {
   name: string;
   notes?: string;
   is_temporary?: boolean;
+  nostr_pubkey?: string;
+  nostr_address?: string;
+  nostr_event_id?: string;
+  nostr_published_at?: string;
+  origin_created_at?: number;
   exercises: Omit<SheetExercise, 'id' | 'sheet_id'>[];
 }
 
@@ -115,6 +120,14 @@ export class WorkstrStore {
       name: draft.name,
       notes: draft.notes || '',
       is_temporary: draft.is_temporary ?? existing?.is_temporary ?? false,
+      // Import = snapshot: the nostr identity comes only from the draft, so a
+      // builder save (which carries none) forks an imported sheet and canon
+      // updates never clobber local edits.
+      nostr_pubkey: draft.nostr_pubkey,
+      nostr_address: draft.nostr_address,
+      nostr_event_id: draft.nostr_event_id,
+      nostr_published_at: draft.nostr_published_at,
+      origin_created_at: draft.origin_created_at,
       created_at: existing?.created_at ?? now,
       updated_at: now
     };

@@ -3,6 +3,7 @@ import type { Exercise } from '../../core/types';
 import { displayWeightKg, normalizeWeightUnit } from '../../core/units';
 import type { SheetWithExercises } from '../../db/store';
 import type { RelayProgram } from '../../nostr/canon';
+import { programImportState } from '../../nostr/programImport';
 import type { AppState } from '../../app/state';
 import { displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
@@ -180,14 +181,16 @@ export function programBody(program: RelayProgram, state: AppState): string {
       </div>
     </div>`;
   }).join('') : '<p class="empty" style="padding:10px 0">No exercises yet.</p>';
-  const localActions = isLocalProgram(program)
+  const importState = isLocalProgram(program) ? null : programImportState(program, state.sheets);
+  const actions = importState === null
     ? `<button class="button ghost small" type="button" data-edit-sheet="${localSheetId(program)}">Edit</button>
-      <button class="button ghost small" type="button" disabled title="Publishing arrives with the Nostr share block">Publish</button>
       <button class="button danger small" type="button" data-del-sheet="${localSheetId(program)}">Delete</button>`
-    : '';
+    : importState === 'in-library'
+      ? '<button class="button ghost small" type="button" disabled>In library</button>'
+      : `<button class="button ${importState === 'update' ? 'gold' : 'primary'} small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>`;
   return `<div class="wk-ex-list">${exHtml}</div>
     <div class="workout-card-actions">
       <button class="button gold small" type="button" data-start-program="${html(program.address)}">Start workout</button>
-      ${localActions}
+      ${actions}
     </div>`;
 }
