@@ -134,7 +134,6 @@ export interface WorkstrSettings {
   paidRelay?: string;
   signerType?: 'nip07' | 'nip46' | 'idenstr';
   syncCursor?: number;
-  starterExercisesSeeded?: boolean;
   heightCm?: number;
   targetWeightKg?: number;
   canonCache?: CanonCache;

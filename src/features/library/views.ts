@@ -7,7 +7,7 @@ export function libraryPanel(state: AppState): string {
   const list = filterExercises(state.library, state.filter, state.exFilter.cat, state.exFilter.muscle, state.exFilter.diff);
   const hasFilters = Boolean(state.filter || state.exFilter.cat || state.exFilter.muscle || state.exFilter.diff);
   const emptyText = state.library.length === 0 && !hasFilters
-    ? 'Your exercise library is empty. Import exercises from the Discover tab.'
+    ? '<p>Your library is empty. Add exercises from the Workstr catalog.</p><button class="button primary" data-parent="exercises" data-subtab="discover">Browse Discover</button>'
     : 'No exercises match.';
   const sel = state.librarySelect;
   const allVisibleSelected = list.length > 0 && list.every((exercise) => sel.slugs.has(exercise.slug));

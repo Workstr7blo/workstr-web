@@ -12,9 +12,12 @@ const draft = (slug: string): ExerciseDraft => ({
   instructions: []
 });
 
+// Simulates a legacy install that still has bundled starter rows.
 async function seededStore(namespace: string): Promise<WorkstrStore> {
   const store = await WorkstrStore.open(namespace);
-  await store.seedExercises([draft('bench-press'), draft('squat')]);
+  for (const slug of ['bench-press', 'squat']) {
+    await store.upsertExercise({ ...draft(slug), source_type: 'bundle' });
+  }
   return store;
 }
 

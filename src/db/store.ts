@@ -75,19 +75,14 @@ export class WorkstrStore {
     });
   }
 
-  async seedExercises(exercises: ExerciseDraft[]): Promise<number> {
-    const settings = await this.getSettings();
-    if (settings.starterExercisesSeeded) return 0;
-    for (const exercise of exercises) {
-      await this.upsertExercise({
-        ...exercise,
-        source_type: 'bundle',
-        status: 'active',
-        favourite: false
-      });
+  // One-time cleanup for installs created while the app still shipped a
+  // bundled starter library: drop untouched seed rows, keep favourited ones.
+  async removeStarterExercises(): Promise<void> {
+    const tx = this.db.transaction('exercises', 'readwrite');
+    for await (const cursor of tx.store.iterate()) {
+      if (cursor.value.source_type === 'bundle' && !cursor.value.favourite) await cursor.delete();
     }
-    await this.saveSettings({ ...settings, starterExercisesSeeded: true });
-    return exercises.length;
+    await tx.done;
   }
 
   async listSheets(): Promise<SheetWithExercises[]> {

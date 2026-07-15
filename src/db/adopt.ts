@@ -4,14 +4,14 @@ import { dbName, openWorkstrDB } from './schema';
 // adopts it into `workstr-<pubkey>` per plan decision 6 — never merged.
 export const LOCAL_NAMESPACE = 'local';
 
-// Stores whose records only exist through user action; the bundled seed
-// writes only exercises + settings.
+// Stores whose records only exist through user action; the legacy bundled
+// seed (removed 2026-07) wrote only exercises + settings.
 const USER_DATA_STORES = ['sessions', 'session_sets', 'sheets', 'sheet_exercises', 'bodyweight', 'plan', 'blobs'] as const;
 
 // True when the namespace holds anything a user made (logged sessions,
-// programs, body entries, or seed exercises they favourited/deleted/added
-// to). A freshly seeded namespace reports false, so sign-in right after a
-// clean boot never triggers the adoption prompt.
+// programs, body entries, imported exercises, or legacy seed rows they
+// favourited). A fresh or seed-only namespace reports false, so sign-in
+// right after a clean boot never triggers the adoption prompt.
 export async function namespaceHasUserData(namespace: string): Promise<boolean> {
   const db = await openWorkstrDB(namespace);
   try {

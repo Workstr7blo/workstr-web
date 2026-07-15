@@ -6,7 +6,6 @@ import { slugify } from '../core/ids';
 import { canonMuscle } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft, type SheetWithExercises } from '../db/store';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
-import starterExercises from '../data/starter-exercises.json';
 import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
@@ -240,8 +239,7 @@ export function renderShell(root: HTMLElement): void {
     state.store?.close();
     state.store = await WorkstrStore.open(namespace);
     state.settings = await state.store.getSettings();
-    await state.store.seedExercises(starterExercises as ExerciseDraft[]);
-    state.settings = await state.store.getSettings();
+    await state.store.removeStarterExercises();
     state.finishedSessions = await loadFinishedSessions();
     state.bodyEntries = await state.store.listBody();
     state.sheets = await state.store.listSheets();
@@ -627,7 +625,7 @@ export function renderShell(root: HTMLElement): void {
   }
 
   // Quick workout draws from the full library like self-hosted: local store
-  // exercises (starter pack + user-created) plus the relay library, deduped by slug.
+  // exercises plus the relay library, deduped by slug.
   function bindRecoveryControls(): void {
     const body = root.querySelector<SVGSVGElement>('#recovery-body');
     if (body) {

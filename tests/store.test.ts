@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
-import starterExercises from '../src/data/starter-exercises.json';
 import type { ExerciseDraft } from '../src/db/store';
+
+const bundleDraft = (slug: string): ExerciseDraft => ({
+  slug,
+  name: slug,
+  muscles: ['Chest'],
+  equipment: [],
+  tags: [],
+  instructions: [],
+  source_type: 'bundle'
+});
 
 describe('WorkstrStore', () => {
   it('opens a pubkey-scoped database and stores exercises', async () => {
@@ -24,18 +33,24 @@ describe('WorkstrStore', () => {
     expect(exercises[0].slug).toBe('push-up');
   });
 
-  it('seeds bundled exercises once and soft-deletes exercises', async () => {
-    const store = await WorkstrStore.open('seed-test-pubkey');
-    const seeded = await store.seedExercises(starterExercises as ExerciseDraft[]);
-    const seededAgain = await store.seedExercises(starterExercises as ExerciseDraft[]);
-    expect(seeded).toBe(starterExercises.length);
-    expect(seededAgain).toBe(0);
+  it('removes untouched legacy starter rows but keeps favourites and user exercises', async () => {
+    const store = await WorkstrStore.open('seed-cleanup-pubkey');
+    await store.upsertExercise(bundleDraft('old-seed'));
+    await store.upsertExercise({ ...bundleDraft('kept-seed'), favourite: true });
+    await store.upsertExercise({ ...bundleDraft('mine'), source_type: 'imported' });
+    await store.removeStarterExercises();
+    await store.removeStarterExercises();
+    const slugs = (await store.listExercises()).map((exercise) => exercise.slug).sort();
+    expect(slugs).toEqual(['kept-seed', 'mine']);
+  });
 
-    const exercises = await store.listExercises();
-    expect(exercises.length).toBe(starterExercises.length);
-    await store.deleteExercise(exercises[0].id!);
-    expect(await store.getExercise(exercises[0].id!)).toBeUndefined();
-    expect(await store.listExercises()).toHaveLength(starterExercises.length - 1);
+  it('soft-deletes exercises', async () => {
+    const store = await WorkstrStore.open('soft-delete-pubkey');
+    await store.upsertExercise({ ...bundleDraft('gone'), source_type: 'imported' });
+    const [exercise] = await store.listExercises();
+    await store.deleteExercise(exercise.id!);
+    expect(await store.getExercise(exercise.id!)).toBeUndefined();
+    expect(await store.listExercises()).toHaveLength(0);
   });
 
   it('persists settings in IndexedDB using self-hosted lbs naming', async () => {

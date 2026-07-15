@@ -41,7 +41,7 @@ export const difficultyBadgeClass = (difficulty?: string): string =>
   ({ beginner: 'diff-beginner', intermediate: 'diff-intermediate', advanced: 'diff-advanced' } as Record<string, string>)[String(difficulty || '').trim().toLowerCase()] || 'diff-unknown';
 
 // User-facing source badge: anything from the official catalog (imported,
-// bundled starter pack, premium) is labeled "Workstr"; "canon" stays code-only.
+// legacy bundle rows, premium) is labeled "Workstr"; "canon" stays code-only.
 export function exerciseSourceLabel(exercise: Exercise): string {
   const source = exercise.source_type;
   if (source === 'ai') return 'ai';
