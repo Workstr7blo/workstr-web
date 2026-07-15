@@ -364,7 +364,8 @@ export function renderShell(root: HTMLElement): void {
 
   async function openSheetBuilder(sheet: SheetWithExercises | null = null): Promise<void> {
     if (!state.store) { toast('Sign in to create programs.', 'bad'); return; }
-    const library = await quickWorkoutLibrary();
+    // Programs are built from the user's library only, never the relay catalog.
+    const library = await state.store.listExercises();
     builder = {
       sheetId: sheet?.id,
       name: sheet?.name || '',
