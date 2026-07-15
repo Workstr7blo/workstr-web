@@ -1,14 +1,6 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
-import { difficultyBadgeClass, displayPubkey, EX_PLACEHOLDER, exerciseFilterValues, fillSelectHtml, filterExercises, html } from '../../app/format';
-
-export function exerciseAuthorPill(exercise: Exercise, state: AppState): string {
-  const pubkey = exercise.nostr_pubkey || '';
-  if (!pubkey) return '';
-  const name = state.profileNames[pubkey] || displayPubkey(pubkey);
-  const initial = name.trim().slice(0, 1).toUpperCase() || '?';
-  return `<span class="author-pill compact" title="${html(name)}"><span class="author-avatar-fallback">${html(initial)}</span><span>${html(name)}</span></span>`;
-}
+import { difficultyBadgeClass, EX_PLACEHOLDER, exerciseFilterValues, fillSelectHtml, filterExercises, html } from '../../app/format';
 
 export type DiscoverImportState = 'new' | 'in-library' | 'update';
 
@@ -48,7 +40,6 @@ export function discoverCardHtml(exercise: Exercise, state: AppState): string {
         <div class="card-name">${html(exercise.name)}</div>
         <div class="card-meta">
           ${exercise.muscle_group ? `<span class="muscle">${html(exercise.muscle_group)}</span>` : ''}
-          ${exerciseAuthorPill(exercise, state)}
         </div>
         ${importButton(exercise, importState)}
       </div>

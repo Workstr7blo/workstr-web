@@ -150,7 +150,8 @@ export function exerciseFromEvent(event: Event): Exercise | null {
   return {
     slug: dTag.startsWith(EXERCISE_D_PREFIX) ? dTag.slice(EXERCISE_D_PREFIX.length) : slugify(name),
     name,
-    description: String(meta.description || event.content || ''),
+    // content is the NIP-101e instruction text (parsed below) — not a description
+    description: String(meta.description || ''),
     category: String(meta.category || tagValues(tags, 't').find((tag) => tag !== 'workstr') || 'strength'),
     muscle_group: primary,
     muscles: muscles.length ? muscles : [primary],

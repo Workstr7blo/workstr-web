@@ -40,9 +40,13 @@ export const EX_PLACEHOLDER = '<div class="card-placeholder"><svg width="40" hei
 export const difficultyBadgeClass = (difficulty?: string): string =>
   ({ beginner: 'diff-beginner', intermediate: 'diff-intermediate', advanced: 'diff-advanced' } as Record<string, string>)[String(difficulty || '').trim().toLowerCase()] || 'diff-unknown';
 
+// User-facing source badge: anything from the official catalog (imported,
+// bundled starter pack, premium) is labeled "Workstr"; "canon" stays code-only.
 export function exerciseSourceLabel(exercise: Exercise): string {
   const source = exercise.source_type;
-  return source === 'ai' ? 'ai' : source === 'nostr' || source === 'imported' ? 'nostr' : 'manual';
+  if (source === 'ai') return 'ai';
+  if (source === 'nostr' || source === 'imported' || source === 'bundle' || source === 'premium') return 'Workstr';
+  return 'manual';
 }
 
 // Every canonical recovery region an exercise touches (primary group + all listed

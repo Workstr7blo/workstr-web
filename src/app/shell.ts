@@ -10,7 +10,7 @@ import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/typ
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import type { ActiveSession, AppState, SessionExercise, SessionSetLog, SubView, View } from './state';
-import { displayIdentity, EX_PLACEHOLDER, exerciseSourceLabel, html, programMuscleLabel } from './format';
+import { displayIdentity, EX_PLACEHOLDER, exerciseSourceLabel, filterExercises, html, programMuscleLabel } from './format';
 import { paintBodyMapSvg } from './bodymap';
 import { libraryPanel } from '../features/library/views';
 import { discoverImportState, discoverPanel } from '../features/discover/views';
@@ -187,7 +187,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -267,20 +267,36 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void saveUnitPreference((event.target as HTMLSelectElement).value); });
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void refreshExercises(); }));
     root.querySelectorAll('#refresh-programs').forEach((button) => button.addEventListener('click', () => { void refreshPrograms(); }));
-    root.querySelector('#new-exercise')?.addEventListener('click', () => openExerciseModal());
     root.querySelector('#ex-search')?.addEventListener('input', (event) => { state.filter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#ex-search'); input?.focus(); input?.setSelectionRange(state.filter.length, state.filter.length); });
     root.querySelector('#ex-cat')?.addEventListener('change', (event) => { state.exFilter.cat = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#ex-muscle')?.addEventListener('change', (event) => { state.exFilter.muscle = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#ex-diff')?.addEventListener('change', (event) => { state.exFilter.diff = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#ex-grid')?.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
+      const card = target.closest<HTMLElement>('[data-slug]');
+      if (state.librarySelect.active) {
+        const slug = card?.dataset.slug;
+        if (!slug) return;
+        if (state.librarySelect.slugs.has(slug)) state.librarySelect.slugs.delete(slug);
+        else state.librarySelect.slugs.add(slug);
+        render();
+        return;
+      }
       const fav = target.closest<HTMLElement>('[data-fav]');
       if (fav) { void toggleFavourite(fav.dataset.fav || ''); return; }
-      const card = target.closest<HTMLElement>('[data-slug]');
       if (!card) return;
       const exercise = state.library.find((entry) => entry.slug === card.dataset.slug);
       if (exercise) openExerciseDetail(exercise, 'library');
     });
+    root.querySelector('#lib-select-toggle')?.addEventListener('click', () => { state.librarySelect = { active: true, slugs: new Set() }; render(); });
+    root.querySelector('#lib-select-cancel')?.addEventListener('click', () => { state.librarySelect = { active: false, slugs: new Set() }; render(); });
+    root.querySelector('#lib-select-all')?.addEventListener('click', () => {
+      const visible = filterExercises(state.library, state.filter, state.exFilter.cat, state.exFilter.muscle, state.exFilter.diff).map((exercise) => exercise.slug);
+      const allSelected = visible.length > 0 && visible.every((slug) => state.librarySelect.slugs.has(slug));
+      state.librarySelect.slugs = allSelected ? new Set() : new Set(visible);
+      render();
+    });
+    root.querySelector('#lib-delete-selected')?.addEventListener('click', () => { void deleteSelectedExercises(); });
     root.querySelector('#discover-refresh')?.addEventListener('click', () => { void refreshExercises(); });
     root.querySelector('#discover-search')?.addEventListener('input', (event) => { state.discoverFilter.q = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#discover-search'); input?.focus(); input?.setSelectionRange(state.discoverFilter.q.length, state.discoverFilter.q.length); });
     root.querySelector('#discover-cat')?.addEventListener('change', (event) => { state.discoverFilter.cat = (event.target as HTMLSelectElement).value; render(); });
@@ -752,7 +768,7 @@ export function renderShell(root: HTMLElement): void {
   function signOut(): void {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SIGNER_TYPE_KEY);
-    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.settings = { ...DEFAULT_SETTINGS }; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null; state.bodyEntries = []; state.sheets = []; state.library = []; refreshMergedExercises();
+    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.settings = { ...DEFAULT_SETTINGS }; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null; state.bodyEntries = []; state.sheets = []; state.library = []; state.librarySelect = { active: false, slugs: new Set() }; refreshMergedExercises();
     render();
   }
 
@@ -1226,131 +1242,6 @@ export function renderShell(root: HTMLElement): void {
     render();
   }
 
-  // Read an image file and downscale it to a compact JPEG data URL so the picture
-  // can live directly in the DB without bloating list payloads.
-  function fileToDataUrl(file: File, maxDim = 800, quality = 0.82): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('read failed'));
-      reader.onload = () => {
-        const img = new Image();
-        img.onerror = () => reject(new Error('decode failed'));
-        img.onload = () => {
-          let { width, height } = img;
-          if (width > maxDim || height > maxDim) {
-            const scale = maxDim / Math.max(width, height);
-            width = Math.round(width * scale);
-            height = Math.round(height * scale);
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', quality));
-        };
-        img.src = String(reader.result);
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function openExerciseModal(existing: Exercise | null = null): void {
-    if (!state.store) { toast('Sign in to edit your library.', 'bad'); return; }
-    openModal(`
-      <h3>${existing ? 'Edit exercise' : 'New exercise'}</h3>
-      <form id="ex-form" class="form-grid">
-        <label class="span-2">Name<input name="name" value="${html(existing?.name || '')}" required /></label>
-        <label>Category<input name="category" value="${html(existing?.category || '')}" placeholder="strength" /></label>
-        <label>Muscle group<input name="muscleGroup" value="${html(existing?.muscle_group || '')}" placeholder="Chest" /></label>
-        <label>Difficulty<input name="difficulty" value="${html(existing?.difficulty || '')}" placeholder="beginner" /></label>
-        <label>Equipment (comma)<input name="equipment" value="${html((existing?.equipment || []).join(', '))}" placeholder="Barbell" /></label>
-        <div class="span-2 image-field">
-          <span class="field-label">Image</span>
-          <div class="image-upload">
-            <div class="image-preview" id="ex-image-preview">${existing?.image_url ? `<img src="${html(existing.image_url)}" alt="">` : '<span>No image</span>'}</div>
-            <div class="image-actions">
-              <label class="button" for="ex-image-file">Upload picture</label>
-              <input type="file" id="ex-image-file" accept="image/*" hidden />
-              <button type="button" class="button ghost" id="ex-image-remove"${existing?.image_url ? '' : ' hidden'}>Remove</button>
-            </div>
-          </div>
-          <input type="hidden" name="imageUrl" value="${html(existing?.image_url || '')}" />
-        </div>
-        <label>Default sets<input name="defaultSets" type="number" value="${existing?.default_sets ?? 3}" /></label>
-        <label>Default reps<input name="defaultReps" value="${html(String(existing?.default_reps ?? '8-12'))}" /></label>
-        <label>Default rest (sec)<input name="defaultRest" type="number" value="${existing?.default_rest ?? 90}" /></label>
-        <label class="span-2">Instructions (one per line)<textarea name="instructions" rows="3">${html((existing?.instructions || []).join('\n'))}</textarea></label>
-        <div class="form-actions span-2">
-          <button class="button primary" type="submit">${existing ? 'Save' : 'Create'}</button>
-          ${existing ? '<button class="button danger" type="button" id="ex-delete">Delete</button>' : ''}
-        </div>
-      </form>`);
-    const form = root.querySelector<HTMLFormElement>('#ex-form')!;
-    const fileInput = root.querySelector<HTMLInputElement>('#ex-image-file')!;
-    const preview = root.querySelector<HTMLElement>('#ex-image-preview')!;
-    const removeBtn = root.querySelector<HTMLButtonElement>('#ex-image-remove');
-    const imageField = form.elements.namedItem('imageUrl') as HTMLInputElement;
-    fileInput.addEventListener('change', async () => {
-      const file = fileInput.files?.[0];
-      if (!file) return;
-      try {
-        const dataUrl = await fileToDataUrl(file);
-        imageField.value = dataUrl;
-        preview.innerHTML = `<img src="${dataUrl}" alt="">`;
-        if (removeBtn) removeBtn.hidden = false;
-      } catch { toast('Could not read that image', 'bad'); }
-    });
-    removeBtn?.addEventListener('click', () => {
-      imageField.value = '';
-      fileInput.value = '';
-      preview.innerHTML = '<span>No image</span>';
-      removeBtn.hidden = true;
-    });
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (!state.store) return;
-      const value = (field: string) => String((form.elements.namedItem(field) as HTMLInputElement | HTMLTextAreaElement | null)?.value || '');
-      const name = value('name').trim();
-      if (!name) return;
-      const muscleGroup = value('muscleGroup').trim();
-      await state.store.upsertExercise({
-        slug: existing?.slug || slugify(name),
-        name,
-        description: existing?.description || '',
-        category: value('category').trim(),
-        muscle_group: muscleGroup,
-        muscles: muscleGroup ? [muscleGroup] : [],
-        equipment: value('equipment').split(',').map((item) => item.trim()).filter(Boolean),
-        difficulty: value('difficulty').trim(),
-        tags: existing?.tags || [],
-        instructions: value('instructions').split('\n').map((line) => line.trim()).filter(Boolean),
-        image_url: imageField.value.trim() || undefined,
-        favourite: existing?.favourite ?? false,
-        default_sets: Number(value('defaultSets')) || 3,
-        default_reps: value('defaultReps') || '8-12',
-        default_rest: Number(value('defaultRest')) || 90,
-        // Import = snapshot: editing an imported row forks it. The nostr
-        // fields are cleared so canon updates never clobber local edits.
-        ...(existing?.nostr_address
-          ? { source_type: 'manual' as const, nostr_address: undefined, nostr_event_id: undefined, nostr_pubkey: undefined, nostr_published_at: undefined, origin_created_at: undefined }
-          : { source_type: existing?.source_type || 'manual' }),
-        status: 'active'
-      });
-      await reloadLibrary();
-      closeModal();
-      render();
-      toast('Exercise saved');
-    });
-    root.querySelector('#ex-delete')?.addEventListener('click', async () => {
-      if (!state.store || !existing?.id) return;
-      await state.store.deleteExercise(existing.id);
-      await reloadLibrary();
-      closeModal();
-      render();
-      toast('Exercise deleted');
-    });
-  }
-
   function openExerciseDetail(exercise: Exercise, source: 'library' | 'discover'): void {
     const src = exercise.image_url || '';
     const muscles = (exercise.muscles || []).filter(Boolean);
@@ -1359,12 +1250,17 @@ export function renderShell(root: HTMLElement): void {
     const pills = (list: string[]) => list.map((item) => `<span class="tag-pill">${html(item)}</span>`).join('');
     const muscleList = muscles.length ? muscles : (exercise.muscle_group ? [exercise.muscle_group] : []);
     const sourceLabel = exerciseSourceLabel(exercise);
+    const instructions = (exercise.instructions || []).map((line) => line.trim()).filter(Boolean);
+    const normalize = (text: string) => text.replace(/\s+/g, ' ').trim().toLowerCase();
+    // Canon events carry instructions in the event content; older imports have that
+    // same text copied into description — show it only when it adds something.
+    const description = (exercise.description || '').trim();
+    const showDescription = description && normalize(description) !== normalize(instructions.join(' '));
     const importState = discoverImportState(exercise, state.library);
     const importLabel = importState === 'update' ? 'Update' : importState === 'in-library' ? 'In library' : 'Import';
     const importCls = importState === 'update' ? 'gold' : importState === 'in-library' ? 'ghost' : 'primary';
     const actions = source === 'library'
-      ? `<button class="button primary" id="ex-edit">Edit</button>
-        <button class="button ghost" disabled title="Publishing arrives with the Nostr share block">Publish to relays</button>`
+      ? `<button class="button danger" id="ex-detail-delete">Delete</button>`
       : `<button class="button ${importCls}" id="ex-import"${importState === 'in-library' ? ' disabled' : ''}>${importLabel}</button>`;
     openModal(`
       <div class="detail-img${src ? '' : ' placeholder'}">${src ? `<img src="${html(src)}" alt="" loading="lazy" onerror="this.parentElement.classList.add('placeholder');this.remove()">` : EX_PLACEHOLDER}</div>
@@ -1373,10 +1269,8 @@ export function renderShell(root: HTMLElement): void {
         ${exercise.difficulty ? `<span class="badge diff">${html(exercise.difficulty)}</span>` : ''}
         ${exercise.category ? `<span class="badge cat">${html(exercise.category)}</span>` : ''}
         <span class="badge">${html(sourceLabel)}</span>
-        ${exercise.nostr_event_id ? '<span class="badge published">published</span>' : ''}
       </div>
-      ${exercise.nostr_address ? `<p class="detail-nostr" title="${html(exercise.nostr_address)}">Shared on relays · <code>${html(exercise.nostr_address)}</code></p>` : ''}
-      ${exercise.description ? `<p class="detail-desc">${html(exercise.description)}</p>` : ''}
+      ${showDescription ? `<p class="detail-desc">${html(description)}</p>` : ''}
       <div class="sets-info">
         <div class="sets-item"><div class="val">${exercise.default_sets ?? 3}</div><div class="lbl">Sets</div></div>
         <div class="sets-item"><div class="val">${html(String(exercise.default_reps || '8-12'))}</div><div class="lbl">Reps</div></div>
@@ -1385,7 +1279,7 @@ export function renderShell(root: HTMLElement): void {
       ${muscleList.length ? `<div class="subsection-head"><span>Target muscles</span></div><div class="tag-row">${pills(muscleList)}</div><div id="detail-muscle-map" class="detail-muscle-map"></div>` : ''}
       ${equipment.length ? `<div class="subsection-head"><span>Equipment</span></div><div class="tag-row">${pills(equipment)}</div>` : ''}
       ${tags.length ? `<div class="subsection-head"><span>Tags</span></div><div class="tag-row">${pills(tags)}</div>` : ''}
-      ${(exercise.instructions || []).length ? `<div class="subsection-head"><span>Instructions</span></div><ol class="instruction-list">${exercise.instructions.map((line) => `<li>${html(line)}</li>`).join('')}</ol>` : ''}
+      ${instructions.length ? `<div class="subsection-head"><span>Instructions</span></div><ol class="instruction-list">${instructions.map((line) => `<li>${html(line)}</li>`).join('')}</ol>` : ''}
       <div class="form-actions">${actions}</div>`);
     if (muscleList.length) {
       const primary = canonMuscle(exercise.muscle_group || '') || canonMuscle(muscleList[0]);
@@ -1394,7 +1288,9 @@ export function renderShell(root: HTMLElement): void {
       const mapHost = root.querySelector<HTMLElement>('#detail-muscle-map');
       if (mapHost) mapHost.innerHTML = paintBodyMapSvg(primarySet, secondarySet);
     }
-    root.querySelector('#ex-edit')?.addEventListener('click', () => openExerciseModal(exercise));
+    root.querySelector('#ex-detail-delete')?.addEventListener('click', async () => {
+      if (await deleteExerciseFromLibrary(exercise)) closeModal();
+    });
     root.querySelector('#ex-import')?.addEventListener('click', async (event) => {
       await importDiscovered(exercise, event.currentTarget as HTMLButtonElement);
     });
@@ -1411,6 +1307,31 @@ export function renderShell(root: HTMLElement): void {
     await reloadLibrary();
     render();
     toast(importState === 'update' ? 'Updated from the Workstr catalog' : 'Imported to library');
+  }
+
+  async function deleteExerciseFromLibrary(exercise: Exercise): Promise<boolean> {
+    if (!state.store || !exercise.id) return false;
+    if (!window.confirm(`Delete "${exercise.name}" from your library? Programs and logged sessions keep their own copies.`)) return false;
+    await state.store.deleteExercise(exercise.id);
+    await reloadLibrary();
+    render();
+    toast('Exercise deleted');
+    return true;
+  }
+
+  async function deleteSelectedExercises(): Promise<void> {
+    if (!state.store) return;
+    const slugs = [...state.librarySelect.slugs];
+    if (!slugs.length) return;
+    if (!window.confirm(`Delete ${slugs.length} exercise${slugs.length === 1 ? '' : 's'} from your library? Programs and logged sessions keep their own copies.`)) return;
+    for (const slug of slugs) {
+      const exercise = state.library.find((entry) => entry.slug === slug);
+      if (exercise?.id) await state.store.deleteExercise(exercise.id);
+    }
+    state.librarySelect = { active: false, slugs: new Set() };
+    await reloadLibrary();
+    render();
+    toast(`Deleted ${slugs.length} exercise${slugs.length === 1 ? '' : 's'}`);
   }
 
   async function toggleFavourite(slug: string): Promise<void> {
