@@ -11,7 +11,7 @@ import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput 
 import { canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import { planProgramImport, programImportState } from '../nostr/programImport';
 import type { ActiveSession, AppState, SessionExercise, SessionSetLog, SubView, View } from './state';
-import { displayIdentity, EX_PLACEHOLDER, exerciseSourceLabel, filterExercises, html, programMuscleLabel } from './format';
+import { displayIdentity, EX_PLACEHOLDER, exerciseImage, exerciseSourceLabel, filterExercises, html, programMuscleLabel } from './format';
 import { paintBodyMapSvg } from './bodymap';
 import { libraryPanel } from '../features/library/views';
 import { discoverImportState, discoverPanel } from '../features/discover/views';
@@ -397,37 +397,53 @@ export function renderShell(root: HTMLElement): void {
         <label class="span-2">Name<input id="sheet-name" value="${html(current.name)}" placeholder="Push Day" /></label>
         <label class="span-2">Description<input id="sheet-desc" value="${html(current.desc)}" placeholder="optional" /></label>
       </div>
-      <div class="subsection-head"><span>Exercises</span></div>
+      <div class="subsection-head"><span>Add from your library</span></div>
       <div class="builder-search-wrap">
-        <input id="builder-search" class="builder-search" placeholder="Search exercises to add..." autocomplete="off" />
-        <div id="builder-results" class="builder-results" style="display:none"></div>
+        <input id="builder-search" class="builder-search" placeholder="Filter your library..." autocomplete="off" />
       </div>
+      <div id="builder-picker" class="builder-picker"></div>
+      <div class="subsection-head"><span>Program exercises</span></div>
       <div id="builder-rows" class="builder-rows"></div>
       <div class="form-actions"><button class="button primary" id="sheet-save" type="button">${current.sheetId ? 'Save program' : 'Create program'}</button></div>`);
     renderBuilderRows();
     root.querySelector('#sheet-name')?.addEventListener('input', (event) => { current.name = (event.target as HTMLInputElement).value; });
     root.querySelector('#sheet-desc')?.addEventListener('input', (event) => { current.desc = (event.target as HTMLInputElement).value; });
     const search = root.querySelector<HTMLInputElement>('#builder-search');
-    const results = root.querySelector<HTMLElement>('#builder-results');
-    search?.addEventListener('input', () => {
-      if (!results) return;
-      const query = search.value.trim().toLowerCase();
-      if (!query) { results.style.display = 'none'; results.innerHTML = ''; return; }
-      const matches = current.library
-        .filter((exercise) => exercise.name.toLowerCase().includes(query) || (exercise.muscle_group || '').toLowerCase().includes(query))
-        .slice(0, 8);
-      if (!matches.length) { results.innerHTML = '<div class="ex-search-empty">No exercises match.</div>'; results.style.display = 'block'; return; }
-      results.style.display = 'block';
-      results.innerHTML = matches.map((exercise) => {
+    const picker = root.querySelector<HTMLElement>('#builder-picker');
+    const sorted = [...current.library].sort((a, b) => Number(b.favourite) - Number(a.favourite) || a.name.localeCompare(b.name));
+    const renderPicker = () => {
+      if (!picker) return;
+      if (!sorted.length) { picker.innerHTML = '<div class="ex-search-empty">Your library is empty. Import exercises from the Discover tab.</div>'; return; }
+      const query = (search?.value || '').trim().toLowerCase();
+      const matches = query
+        ? sorted.filter((exercise) => exercise.name.toLowerCase().includes(query) || (exercise.muscle_group || '').toLowerCase().includes(query))
+        : sorted;
+      if (!matches.length) { picker.innerHTML = '<div class="ex-search-empty">No exercises match.</div>'; return; }
+      picker.innerHTML = matches.map((exercise) => {
         const added = current.rows.some((row) => row.exerciseSlug === exercise.slug);
-        return `<div class="ex-search-result-item${added ? ' added' : ''}" data-add-slug="${html(exercise.slug)}"><span>${html(exercise.name)}</span><span class="muscle">${added ? 'added' : html(exercise.muscle_group || '')}</span></div>`;
+        return `<div class="builder-pick-item${added ? ' added' : ''}" data-pick-slug="${html(exercise.slug)}">
+          ${exerciseImage(exercise.image_url)}
+          <div class="builder-pick-info">
+            <div class="builder-pick-name">${html(exercise.name)}</div>
+            ${exercise.muscle_group ? `<div class="builder-pick-muscle">${html(exercise.muscle_group)}</div>` : ''}
+          </div>
+          <span class="builder-pick-state">${added
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'}</span>
+        </div>`;
       }).join('');
-    });
-    results?.addEventListener('click', (event) => {
-      const item = (event.target as Element).closest<HTMLElement>('[data-add-slug]');
-      if (!item || !search || !results) return;
-      const exercise = current.library.find((entry) => entry.slug === item.dataset.addSlug);
-      if (exercise && !current.rows.some((row) => row.exerciseSlug === exercise.slug)) {
+    };
+    renderPicker();
+    search?.addEventListener('input', renderPicker);
+    picker?.addEventListener('click', (event) => {
+      const item = (event.target as Element).closest<HTMLElement>('[data-pick-slug]');
+      if (!item) return;
+      const exercise = current.library.find((entry) => entry.slug === item.dataset.pickSlug);
+      if (!exercise) return;
+      const index = current.rows.findIndex((row) => row.exerciseSlug === exercise.slug);
+      if (index >= 0) {
+        current.rows.splice(index, 1);
+      } else {
         current.rows.push({
           exerciseSlug: exercise.slug,
           exerciseName: exercise.name,
@@ -439,10 +455,9 @@ export function renderShell(root: HTMLElement): void {
           weight: null,
           notes: ''
         });
-        renderBuilderRows();
       }
-      search.value = ''; results.style.display = 'none'; results.innerHTML = '';
-      search.focus();
+      renderBuilderRows();
+      renderPicker();
     });
     const rowsHost = root.querySelector<HTMLElement>('#builder-rows');
     rowsHost?.addEventListener('input', (event) => {
@@ -458,7 +473,7 @@ export function renderShell(root: HTMLElement): void {
     });
     rowsHost?.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
-      if (target.dataset.rm != null) { current.rows.splice(Number(target.dataset.rm), 1); renderBuilderRows(); return; }
+      if (target.dataset.rm != null) { current.rows.splice(Number(target.dataset.rm), 1); renderBuilderRows(); renderPicker(); return; }
       if (target.dataset.move != null) {
         const index = Number(target.dataset.move);
         const next = index + Number(target.dataset.dir);
