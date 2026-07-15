@@ -1,7 +1,31 @@
 @import './workstr-reference.css';
 
 .topbar-actions .button.small { padding: 8px 11px; font-size: 12px; }
-.topbar-actions #live-status { text-transform: none; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Stack-standard account chip: status light + chevron, opens Settings.
+   Same anatomy and class names as Feedstr's connection-chip. */
+.topbar-actions .connection-chip { max-width: 44vw; }
+.connection-chip {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 46px; padding: 6px 11px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03); color: var(--text);
+  font: inherit; text-align: left; cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.connection-chip:hover { border-color: var(--border-hot); background: rgba(124, 60, 255, 0.1); }
+.connection-chip-main { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; flex: 1; }
+.connection-chip-label { font-size: 12px; font-weight: 800; line-height: 1.1; }
+.connection-chip-status { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--dim); }
+.connection-chip-text { font-size: 11px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.connection-chip-chevron { width: 16px; height: 16px; flex: 0 0 auto; color: var(--dim); }
+.connection-chip:hover .connection-chip-chevron { color: var(--purple-2); }
+.connection-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--dim); box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04); }
+.connection-chip.ok .connection-dot { background: var(--success-green); box-shadow: 0 0 0 3px rgba(0, 208, 132, 0.16); }
+.connection-chip.warn .connection-dot { background: var(--bitcoin-gold); box-shadow: 0 0 0 3px rgba(247, 147, 26, 0.16); }
+.connection-chip.error .connection-dot { background: var(--danger-red); box-shadow: 0 0 0 3px rgba(255, 56, 100, 0.16); }
+.connection-chip.ok { border-color: rgba(0, 208, 132, 0.32); }
+.connection-chip.error { border-color: rgba(255, 56, 100, 0.32); }
 .web-empty-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .web-status-note { margin-top: 12px; }
 .signer-qr { width: 240px; max-width: 100%; margin: 16px auto 0; padding: 12px; background: #fff; border-radius: 12px; }
