@@ -5,6 +5,7 @@ import { createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/
 import { slugify } from '../core/ids';
 import { canonMuscle } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft, type SheetWithExercises } from '../db/store';
+import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import starterExercises from '../data/starter-exercises.json';
 import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
@@ -65,8 +66,8 @@ function shellMarkup(state: AppState): string {
       </div>
       <div class="topbar-actions">
         ${state.pubkey
-          ? `<small id="live-status">${html(displayIdentity(state))}</small><button id="sign-out" class="button small ghost">Switch</button>`
-          : '<button id="sign-in" class="button small primary">Sign in</button>'}
+          ? `<small id="live-status">${html(displayIdentity(state))}</small><button id="sign-out" class="button small ghost">Sign out</button>`
+          : '<button id="local-chip" class="button small ghost">Local data</button>'}
       </div>
     </header>
     <nav class="sidebar">
@@ -116,11 +117,6 @@ function appView(state: AppState): string {
   return exercisesView(state);
 }
 
-function authNotice(state: AppState): string {
-  if (state.pubkey) return '';
-  return `<div class="panel web-status-note"><div class="panel-head"><span>Signer required</span><span class="status-pill bad">not signed in</span></div><p class="section-help">Sign in with your Nostr signer to open the local IndexedDB namespace for your training data. Keys stay in your signer.</p>${state.signInStatus ? `<div class="terminal-mini">${html(state.signInStatus)}</div>` : ''}</div>`;
-}
-
 function subTabs(parent: View, active: string, tabs: string[]): string {
   return `<div class="sub-tabs">${tabs.map((tab) => {
     const value = tab.toLowerCase();
@@ -133,7 +129,6 @@ function exercisesView(state: AppState): string {
   return `<div class="page active" id="page-exercises">
     <div class="page-title">Exercises</div>
     ${subTabs('exercises', active, ['Library', 'Discover'])}
-    ${authNotice(state)}
     <div class="sub-panel ${active === 'library' ? 'active' : ''}" id="sub-exercises-library">
       ${libraryPanel(state)}
     </div>
@@ -184,7 +179,10 @@ function statisticsView(state: AppState): string {
 
 function settingsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
-  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr signer</span><span class="status-pill ${state.pubkey ? 'ok' : 'bad'}">${state.pubkey ? 'connected' : 'not signed in'}</span></div><p class="section-help">Workstr replaces self-hosted Idenstr with a user-owned NIP-46 signer. Press Sign in in the top-right; scan the QR code with your signer app, or let it open directly on mobile.</p><div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'not signed in')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div><div class="web-empty-actions">${state.pubkey ? '<button id="sign-out-settings" class="button ghost">Switch signer</button>' : '<button id="sign-in-settings" class="button primary">Sign in</button>'}</div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select" ${state.store ? '' : 'disabled'}><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label>${state.store ? '' : '<p class="section-help">Sign in first so preferences can be saved in the per-identity IndexedDB database.</p>'}</div></div>`;
+  const account = state.pubkey
+    ? `<p class="section-help">Signed in with your Nostr signer. Your training data lives in this identity's database on this device; keys stay in your signer.</p><div class="web-empty-actions"><button id="sign-out-settings" class="button ghost">Sign out</button><button id="remove-account-data" class="button ghost">Sign out and remove data from this device</button></div>`
+    : `<p class="section-help">Workstr works fully on this device without an account — everything is saved locally. Sign in with a Nostr signer to attach your training data to your identity; sync, backup and publishing build on it later. On first sign-in your local data moves under your identity — nothing is ever merged.</p><div class="web-empty-actions"><button id="sign-in-settings" class="button primary">Sign in with signer app</button>${hasNip07() ? '<button id="sign-in-nip07" class="button ghost">Use browser extension</button>' : ''}</div>`;
+  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr account</span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'connected' : 'local'}</span></div>${account}<div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label></div></div>`;
 }
 
 export function renderShell(root: HTMLElement): void {
@@ -198,7 +196,10 @@ export function renderShell(root: HTMLElement): void {
       localStorage.removeItem(SESSION_KEY);
       localStorage.removeItem(SIGNER_TYPE_KEY);
     }
+    // Paint the shell immediately; data lands on the next render.
+    render();
     if (state.pubkey) await openIdentity(state.pubkey, false);
+    else await openLocal();
     render();
     await refreshExercises();
   }
@@ -207,9 +208,30 @@ export function renderShell(root: HTMLElement): void {
     state.pubkey = pubkey;
     state.signerType = signerType;
     state.npub = nip19.npubEncode(pubkey);
-    state.profileName = await fetchProfileName(pubkey);
     state.signInStatus = null;
-    state.store = await WorkstrStore.open(pubkey);
+    // Persist before the slow steps: reloading mid-sign-in must not lose the
+    // session (the profile fetch alone can take its full 5s timeout).
+    if (persist) {
+      localStorage.setItem(SESSION_KEY, pubkey);
+      if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
+    }
+    await loadNamespace(pubkey);
+    state.profileName = await fetchProfileName(pubkey);
+  }
+
+  // Anonymous local account — the default; no signer involved.
+  async function openLocal(): Promise<void> {
+    state.pubkey = null;
+    state.npub = null;
+    state.profileName = null;
+    state.signerType = null;
+    state.signInStatus = null;
+    await loadNamespace(LOCAL_NAMESPACE);
+  }
+
+  async function loadNamespace(namespace: string): Promise<void> {
+    state.store?.close();
+    state.store = await WorkstrStore.open(namespace);
     state.settings = await state.store.getSettings();
     await state.store.seedExercises(starterExercises as ExerciseDraft[]);
     state.settings = await state.store.getSettings();
@@ -228,10 +250,6 @@ export function renderShell(root: HTMLElement): void {
     await reloadLibrary();
     state.activeSession = await loadUnfinishedSession();
     if (state.activeSession) sessionSetCounts = setCountsFromSession(state.activeSession);
-    if (persist) {
-      localStorage.setItem(SESSION_KEY, pubkey);
-      if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
-    }
   }
 
   function render(): void {
@@ -261,10 +279,12 @@ export function renderShell(root: HTMLElement): void {
         if (parent === 'workouts' && !state.programs.length) void refreshPrograms();
       }
     }));
-    root.querySelector('#sign-in')?.addEventListener('click', startRemoteSignerRequest);
+    root.querySelector('#local-chip')?.addEventListener('click', () => { state.view = 'settings'; render(); });
     root.querySelector('#sign-in-settings')?.addEventListener('click', startRemoteSignerRequest);
-    root.querySelector('#sign-out')?.addEventListener('click', signOut);
-    root.querySelector('#sign-out-settings')?.addEventListener('click', signOut);
+    root.querySelector('#sign-in-nip07')?.addEventListener('click', () => { void connectNip07(); });
+    root.querySelector('#sign-out')?.addEventListener('click', () => { void signOut(); });
+    root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void signOut(); });
+    root.querySelector('#remove-account-data')?.addEventListener('click', () => { void signOutAndRemoveData(); });
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void saveUnitPreference((event.target as HTMLSelectElement).value); });
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void refreshExercises(); }));
     root.querySelectorAll('#refresh-programs').forEach((button) => button.addEventListener('click', () => { void refreshPrograms(); }));
@@ -799,11 +819,62 @@ export function renderShell(root: HTMLElement): void {
     if (changed) render();
   }
 
-  function signOut(): void {
+  // Sign out returns to the anonymous local account; the identity's database
+  // stays on the device unless explicitly removed.
+  async function signOut(): Promise<void> {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SIGNER_TYPE_KEY);
-    state.pubkey = null; state.npub = null; state.profileName = null; state.store = null; state.settings = { ...DEFAULT_SETTINGS }; state.signerType = null; state.activeSession = null; state.editingId = null; state.signInStatus = null; state.bodyEntries = []; state.sheets = []; state.library = []; state.librarySelect = { active: false, slugs: new Set() }; state.discoverSelect = { active: false, addresses: new Set() }; refreshMergedExercises();
+    state.editingId = null;
+    state.librarySelect = { active: false, slugs: new Set() };
+    state.discoverSelect = { active: false, addresses: new Set() };
+    await openLocal();
     render();
+  }
+
+  async function signOutAndRemoveData(): Promise<void> {
+    const pubkey = state.pubkey;
+    if (!pubkey) return;
+    if (!window.confirm("Remove this identity's training data from this device and sign out? This cannot be undone.")) return;
+    state.store?.close();
+    state.store = null;
+    await deleteNamespace(pubkey);
+    await signOut();
+  }
+
+  // Sign-in always starts from the anonymous local account. Adoption policy
+  // (plan decision 6): a fresh identity adopts the local data wholesale; an
+  // identity that already has data on this device asks once — never merge.
+  // A purely seeded local account has nothing worth adopting, so it skips
+  // both the copy and the prompt.
+  async function completeSignIn(pubkey: string, signerType: AppState['signerType']): Promise<void> {
+    if (state.pubkey || !(await namespaceHasUserData(LOCAL_NAMESPACE))) {
+      await openAndRender(pubkey, signerType);
+      return;
+    }
+    if (await namespaceHasUserData(pubkey)) {
+      askAdoptChoice(pubkey, signerType);
+      return;
+    }
+    await adoptLocalAndOpen(pubkey, signerType);
+  }
+
+  async function adoptLocalAndOpen(pubkey: string, signerType: AppState['signerType']): Promise<void> {
+    state.store?.close();
+    state.store = null;
+    await copyNamespace(LOCAL_NAMESPACE, pubkey);
+    await deleteNamespace(LOCAL_NAMESPACE);
+    await openAndRender(pubkey, signerType);
+  }
+
+  function askAdoptChoice(pubkey: string, signerType: AppState['signerType']): void {
+    openModal(`<div class="page-title">Existing account data</div>
+      <p class="section-help">This identity already has Workstr data on this device. Pick the dataset to continue with — the two are never merged. Keeping this device's data replaces the identity's copy on this device.</p>
+      <div class="web-empty-actions">
+        <button id="adopt-keep-device" class="button primary">Keep this device's data</button>
+        <button id="adopt-use-account" class="button ghost">Use the account's data</button>
+      </div>`);
+    root.querySelector('#adopt-keep-device')?.addEventListener('click', () => { closeModal(); void adoptLocalAndOpen(pubkey, signerType); });
+    root.querySelector('#adopt-use-account')?.addEventListener('click', () => { closeModal(); void openAndRender(pubkey, signerType); });
   }
 
 
@@ -1215,7 +1286,7 @@ export function renderShell(root: HTMLElement): void {
     try {
       const signer = createNip07Signer();
       const pubkey = await signer.getPublicKey();
-      await openAndRender(pubkey, 'nip07');
+      await completeSignIn(pubkey, 'nip07');
     } catch (error) {
       state.signInStatus = `extension signer error ${(error as Error).message}`;
       render();
@@ -1233,7 +1304,7 @@ export function renderShell(root: HTMLElement): void {
       if (mobile) launchSignerRequest(request.uri);
       const connected = await request.signer;
       closeModal();
-      await openAndRender(connected.pubkey, 'nip46');
+      await completeSignIn(connected.pubkey, 'nip46');
     } catch (error) {
       closeModal();
       state.signInStatus = `signer error ${(error as Error).message}`;
@@ -1419,6 +1490,5 @@ export function renderShell(root: HTMLElement): void {
     render();
   }
 
-  void connectNip07;
   void boot();
 }

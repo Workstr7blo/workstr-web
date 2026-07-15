@@ -24,6 +24,7 @@
     "@types/node": "^25.0.3",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
+    "playwright": "^1.61.1",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
     "vitest": "^4.0.16"

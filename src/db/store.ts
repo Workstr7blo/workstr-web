@@ -28,6 +28,10 @@ export class WorkstrStore {
     return new WorkstrStore(await openWorkstrDB(pubkey));
   }
 
+  close(): void {
+    this.db.close();
+  }
+
   async upsertExercise(exercise: ExerciseDraft | Exercise): Promise<number> {
     const now = new Date().toISOString();
     const tx = this.db.transaction('exercises', 'readwrite');
