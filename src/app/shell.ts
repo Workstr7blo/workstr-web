@@ -65,9 +65,16 @@ function shellMarkup(state: AppState): string {
         </div>
       </div>
       <div class="topbar-actions">
-        ${state.pubkey
-          ? `<small id="live-status">${html(displayIdentity(state))}</small><button id="sign-out" class="button small ghost">Sign out</button>`
-          : '<button id="local-chip" class="button small ghost">Local data</button>'}
+        <button class="connection-chip ${state.pubkey ? 'ok' : ''}" id="account-chip" type="button" title="Open settings" aria-label="Open settings">
+          <span class="connection-chip-main">
+            <span class="connection-chip-label">Account</span>
+            <span class="connection-chip-status">
+              <span class="connection-dot"></span>
+              <span class="connection-chip-text">${state.pubkey ? html(displayIdentity(state)) : 'Local — this device'}</span>
+            </span>
+          </span>
+          <svg class="connection-chip-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
       </div>
     </header>
     <nav class="sidebar">
@@ -279,10 +286,9 @@ export function renderShell(root: HTMLElement): void {
         if (parent === 'workouts' && !state.programs.length) void refreshPrograms();
       }
     }));
-    root.querySelector('#local-chip')?.addEventListener('click', () => { state.view = 'settings'; render(); });
+    root.querySelector('#account-chip')?.addEventListener('click', () => { state.view = 'settings'; render(); });
     root.querySelector('#sign-in-settings')?.addEventListener('click', startRemoteSignerRequest);
     root.querySelector('#sign-in-nip07')?.addEventListener('click', () => { void connectNip07(); });
-    root.querySelector('#sign-out')?.addEventListener('click', () => { void signOut(); });
     root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void signOut(); });
     root.querySelector('#remove-account-data')?.addEventListener('click', () => { void signOutAndRemoveData(); });
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void saveUnitPreference((event.target as HTMLSelectElement).value); });
