@@ -569,12 +569,6 @@ export function renderShell(root: HTMLElement): void {
 
   // Quick workout draws from the full library like self-hosted: local store
   // exercises (starter pack + user-created) plus the relay library, deduped by slug.
-  async function quickWorkoutLibrary(): Promise<Exercise[]> {
-    const local = state.store ? await state.store.listExercises() : [];
-    const seen = new Set(local.map((exercise) => exercise.slug));
-    return [...local, ...state.exercises.filter((exercise) => !seen.has(exercise.slug))];
-  }
-
   function bindRecoveryControls(): void {
     const body = root.querySelector<SVGSVGElement>('#recovery-body');
     if (body) {
@@ -604,7 +598,7 @@ export function renderShell(root: HTMLElement): void {
       root.querySelectorAll<HTMLElement>('#qw-duration .qw-dur-btn').forEach((el) => el.classList.toggle('active', el === button));
     }));
     root.querySelector('#qw-generate')?.addEventListener('click', async () => {
-      const data = getQuickWorkout(state.finishedSessions, await quickWorkoutLibrary(), state.qw.duration, 80);
+      const data = getQuickWorkout(state.finishedSessions, state.store ? await state.store.listExercises() : [], state.qw.duration, 80);
       if (!data.exercises.length) {
         state.qw.visible = false; state.qw.exercises = []; state.qw.pool = {};
         render();
