@@ -158,6 +158,12 @@ export class WorkstrStore {
     await this.db.put('sessions', { ...session, finished_at: finishedAt });
   }
 
+  async markSessionPublished(id: number, eventId: string): Promise<void> {
+    const session = await this.db.get('sessions', id);
+    if (!session) return;
+    await this.db.put('sessions', { ...session, nostr_event_id: eventId });
+  }
+
   async deleteSession(id: number): Promise<void> {
     const tx = this.db.transaction(['sessions', 'session_sets'], 'readwrite');
     await tx.objectStore('sessions').delete(id);

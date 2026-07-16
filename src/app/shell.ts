@@ -10,6 +10,8 @@ import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/typ
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import { planProgramImport, programImportState } from '../nostr/programImport';
+import { publishWorkoutSummary } from '../nostr/share';
+import type { Signer } from '../signer/types';
 import type { ActiveSession, AppState, SessionExercise, SessionSetLog, SubView, View } from './state';
 import { displayIdentity, EX_PLACEHOLDER, exerciseImage, exerciseSourceLabel, filterExercises, html, programMuscleLabel } from './format';
 import { paintBodyMapSvg } from './bodymap';
@@ -86,7 +88,6 @@ function shellMarkup(state: AppState): string {
     </main>
     ${sessionOverlayMarkup(state)}
     <div id="modal" class="modal"><div class="modal-card"><button id="modal-close" class="modal-close" type="button">×</button><div id="modal-content"></div></div></div>
-    <div id="toast"></div>
     <div id="toast"></div>`;
 }
 
@@ -192,7 +193,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -395,6 +396,10 @@ export function renderShell(root: HTMLElement): void {
     }));
     bindSessionControls();
     root.querySelectorAll<HTMLElement>('[data-delete-session]').forEach((button) => button.addEventListener('click', () => { void deleteSession(Number(button.dataset.deleteSession)); }));
+    root.querySelectorAll<HTMLButtonElement>('[data-publish-session]').forEach((button) => button.addEventListener('click', () => {
+      const session = state.finishedSessions.find((item) => item.id === Number(button.dataset.publishSession));
+      if (session) void publishSessionSummary(session, button);
+    }));
     root.querySelectorAll<HTMLElement>('[data-toggle-session]').forEach((head) => head.addEventListener('click', () => {
       const id = Number(head.dataset.toggleSession) || 0;
       state.expandedSessionId = state.expandedSessionId === id ? null : id;
@@ -738,6 +743,7 @@ export function renderShell(root: HTMLElement): void {
       sheetName: session.sheet_name || 'Workout',
       startedAt: session.started_at,
       finishedAt: session.finished_at,
+      nostrEventId: session.nostr_event_id,
       exercises,
       sets: sets.map((set) => ({
         exerciseSlug: set.exercise_slug || String(set.exercise_id || ''),
@@ -826,6 +832,7 @@ export function renderShell(root: HTMLElement): void {
   // Sign out returns to the anonymous local account; the identity's database
   // stays on the device unless explicitly removed.
   async function signOut(): Promise<void> {
+    activeSigner = null;
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SIGNER_TYPE_KEY);
     state.editingId = null;
@@ -884,6 +891,7 @@ export function renderShell(root: HTMLElement): void {
 
   let sessionExerciseIndex = 0;
   let sessionSetCounts: Record<string, number> = {};
+  let activeSigner: Signer | null = null;
   let pendingConnect: { uri: string; mobile: boolean } | null = null;
   let toastTimer: number | undefined;
   let builder: BuilderState | null = null;
@@ -1202,6 +1210,47 @@ export function renderShell(root: HTMLElement): void {
     renderFinished(finished);
   }
 
+  // The live signer only survives the tab; a persisted NIP-07 session can
+  // recreate one from the extension, a persisted NIP-46 session cannot.
+  function getActiveSigner(): Signer | null {
+    if (activeSigner) return activeSigner;
+    if (state.signerType === 'nip07' && hasNip07()) {
+      activeSigner = createNip07Signer();
+      return activeSigner;
+    }
+    return null;
+  }
+
+  async function publishSessionSummary(session: ActiveSession, button: HTMLButtonElement | null): Promise<void> {
+    if (session.nostrEventId || state.publishingSessionId !== null) return;
+    const signer = getActiveSigner();
+    if (!signer) {
+      toast(state.pubkey ? 'Signer connection was lost — sign in again from Settings to publish' : 'Sign in with your Nostr signer in Settings to publish', 'bad');
+      return;
+    }
+    state.publishingSessionId = session.id;
+    if (button) { button.disabled = true; button.textContent = 'Publishing...'; }
+    let message: { text: string; kind: 'ok' | 'bad' };
+    try {
+      const result = await publishWorkoutSummary(signer, session, normalizeWeightUnit(state.settings.unit));
+      session.nostrEventId = result.event.id;
+      if (state.store) await state.store.markSessionPublished(session.id, result.event.id);
+      const inHistory = state.finishedSessions.find((item) => item.id === session.id);
+      if (inHistory) inHistory.nostrEventId = result.event.id;
+      if (button?.isConnected) { button.textContent = 'Published'; }
+      message = { text: `Summary published to ${result.okRelays.length} relay${result.okRelays.length === 1 ? '' : 's'}`, kind: 'ok' };
+    } catch (error) {
+      if (button?.isConnected) { button.disabled = false; button.textContent = 'Publish summary'; }
+      message = { text: `Publish failed: ${(error as Error).message}`, kind: 'bad' };
+    }
+    state.publishingSessionId = null;
+    // A background render (canon/profile fetch) may have replaced the button
+    // we were mutating — refresh from state, but never while a modal (workout
+    // recap) is open: render() would wipe it. Toast last: render rebuilds #toast.
+    if (!button?.isConnected && !root.querySelector('#modal.open')) render();
+    toast(message.text, message.kind);
+  }
+
   async function cancelActiveSession(): Promise<void> {
     if (!state.activeSession) return closeSessionOverlay();
     if (!window.confirm('End and discard this session? Logged sets will be deleted.')) return;
@@ -1250,7 +1299,13 @@ export function renderShell(root: HTMLElement): void {
       <div class="summary-stats">${stats.map((item) => `<div class="summary-stat"><div class="ss-val">${html(String(item.val))}</div><div class="ss-label">${item.label}</div></div>`).join('')}</div>
       <div class="subsection-head"><span>Vs last time</span><small>working-set volume per exercise</small></div>
       <div class="summary-compare"><div class="empty">First local web session — comparison appears after you repeat this workout.</div></div>
-      <div class="form-actions"><button class="button ghost" id="finish-done" type="button">Done</button></div>`);
+      <div class="form-actions">
+        ${state.pubkey
+          ? '<button class="button primary" id="finish-publish" type="button">Publish summary</button>'
+          : '<button class="button primary" id="finish-publish" type="button" disabled title="Sign in with your Nostr signer in Settings to publish">Publish summary</button>'}
+        <button class="button ghost" id="finish-done" type="button">Done</button>
+      </div>`);
+    root.querySelector('#finish-publish')?.addEventListener('click', (event) => { void publishSessionSummary(session, event.currentTarget as HTMLButtonElement); });
     root.querySelector('#finish-done')?.addEventListener('click', closeModal);
   }
 
@@ -1290,6 +1345,7 @@ export function renderShell(root: HTMLElement): void {
     try {
       const signer = createNip07Signer();
       const pubkey = await signer.getPublicKey();
+      activeSigner = signer;
       await completeSignIn(pubkey, 'nip07');
     } catch (error) {
       state.signInStatus = `extension signer error ${(error as Error).message}`;
@@ -1307,6 +1363,7 @@ export function renderShell(root: HTMLElement): void {
       showSignerConnectModal(request.uri, mobile);
       if (mobile) launchSignerRequest(request.uri);
       const connected = await request.signer;
+      activeSigner = connected.signer;
       closeModal();
       await completeSignIn(connected.pubkey, 'nip46');
     } catch (error) {
