@@ -212,18 +212,19 @@ async function muscleMapPng(session: ActiveSession, exercises: Exercise[]): Prom
   return svgToPngBlob(svg);
 }
 
-async function uploadToNostrBuild(file: Blob): Promise<string> {
-  const url = 'https://nostr.build/api/v2/nip96/upload';
+async function uploadSummaryImage(file: Blob): Promise<string> {
   const form = new FormData();
-  form.append('file', file, 'workstr-muscle-map.png');
-  const response = await fetch(url, {
+  form.append('reqtype', 'fileupload');
+  form.append('time', '72h');
+  form.append('fileToUpload', file, 'workstr-muscle-map.png');
+  const response = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
     method: 'POST',
     body: form
   });
-  if (!response.ok) throw new Error(`nostr.build upload failed (${response.status})`);
-  const json = await response.json();
-  const uploaded = extractUploadUrl(json);
-  if (!uploaded) throw new Error('nostr.build upload response did not include a URL');
+  if (!response.ok) throw new Error(`image upload failed (${response.status})`);
+  const text = await response.text();
+  const uploaded = extractUploadUrl(text);
+  if (!uploaded) throw new Error('image upload response did not include a URL');
   return uploaded;
 }
 
@@ -233,7 +234,7 @@ async function createSummaryImageUrl(session: ActiveSession, exercises: Exercise
     const image = await muscleMapPng(session, exercises);
     if (!image) return '';
     onStage?.('uploading-image');
-    return await uploadToNostrBuild(image);
+    return await uploadSummaryImage(image);
   } catch (error) {
     console.warn('Workstr summary image skipped:', error);
     return '';
