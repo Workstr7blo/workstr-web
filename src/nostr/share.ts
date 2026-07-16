@@ -41,9 +41,17 @@ export interface PublishSummaryResult {
   event: SignedNostrEvent;
   okRelays: string[];
   failedRelays: string[];
+  confirmed: boolean;
+}
+
+interface PublishRelayResult {
+  relay: string;
+  accepted: boolean;
+  reason: string;
 }
 
 const PUBLISH_TIMEOUT_MS = 8000;
+const CONFIRM_TIMEOUT_MS = 3500;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs = PUBLISH_TIMEOUT_MS): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -52,18 +60,50 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = PUBLISH_TIMEOUT_MS): Pr
   });
 }
 
+function publishResultReason(result: PromiseSettledResult<string>): string {
+  if (result.status === 'fulfilled') return result.value || 'accepted';
+  return result.reason instanceof Error ? result.reason.message : String(result.reason);
+}
+
+function isAcceptedPublishResult(result: PromiseSettledResult<string>): boolean {
+  // nostr-tools SimplePool.publish resolves connection failures as a string instead
+  // of rejecting them. Treat those as failures so the UI never marks a local
+  // summary as Published when no relay actually acknowledged the EVENT.
+  return result.status === 'fulfilled' && !result.value.toLowerCase().startsWith('connection failure:');
+}
+
+export function summarizePublishResults(relays: string[], results: PromiseSettledResult<string>[]): PublishRelayResult[] {
+  return relays.map((relay, index) => ({
+    relay,
+    accepted: isAcceptedPublishResult(results[index]),
+    reason: publishResultReason(results[index])
+  }));
+}
+
 export async function publishWorkoutSummary(signer: Signer, session: ActiveSession, unit: WeightUnit, relays: string[] = CANON_RELAYS): Promise<PublishSummaryResult> {
   const signed = await signer.signEvent(buildWorkoutSummaryEvent(session, unit));
   const pool = new SimplePool();
   try {
     const results = await Promise.allSettled(pool.publish(relays, signed as Parameters<typeof pool.publish>[1]).map((publish) => withTimeout(publish)));
-    const okRelays = relays.filter((_, index) => results[index].status === 'fulfilled');
-    const failedRelays = relays.filter((_, index) => results[index].status === 'rejected');
+    const relayResults = summarizePublishResults(relays, results);
+    const okRelays = relayResults.filter((result) => result.accepted).map((result) => result.relay);
+    const failedRelays = relayResults.filter((result) => !result.accepted).map((result) => result.relay);
     if (!okRelays.length) {
-      const first = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
-      throw new Error(`no relay accepted the note${first ? ` (${String(first.reason)})` : ''}`);
+      const firstFailure = relayResults.find((result) => !result.accepted);
+      throw new Error(`no relay accepted the note${firstFailure ? ` (${firstFailure.relay}: ${firstFailure.reason})` : ''}`);
     }
-    return { event: signed, okRelays, failedRelays };
+
+    const confirmed = Boolean(await pool.get(okRelays, {
+      ids: [signed.id],
+      authors: [signed.pubkey],
+      kinds: [1],
+      limit: 1
+    }, { maxWait: CONFIRM_TIMEOUT_MS }));
+    if (!confirmed) {
+      throw new Error(`relay OK received but the note was not readable back yet (${signed.id})`);
+    }
+
+    return { event: signed, okRelays, failedRelays, confirmed };
   } finally {
     pool.close(relays);
   }
