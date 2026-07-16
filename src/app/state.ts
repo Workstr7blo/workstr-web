@@ -65,6 +65,7 @@ export interface AppState {
   activeSession: ActiveSession | null;
   finishedSessions: ActiveSession[];
   publishingSessionId: number | null;
+  publishingStatus: string | null;
   editingId: number | null;
   filter: string;
   programFilter: string;

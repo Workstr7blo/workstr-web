@@ -46,14 +46,14 @@ export function sessionMuscleGroupNames(session: ActiveSession, exercises: Exerc
   return [...names].filter(Boolean);
 }
 
-export function publishSummaryButton(session: ActiveSession, canPublish: boolean, publishing = false, size = 'small'): string {
+export function publishSummaryButton(session: ActiveSession, canPublish: boolean, publishing = false, size = 'small', publishingLabel = 'Waiting for signer...'): string {
   if (session.nostrEventId) return `<button class="button ghost ${size}" disabled title="Summary already published to Nostr">Published</button>`;
-  if (publishing) return `<button class="button primary ${size}" disabled>Publishing...</button>`;
+  if (publishing) return `<button class="button primary ${size}" disabled>${html(publishingLabel)}</button>`;
   if (!canPublish) return `<button class="button primary ${size}" disabled title="Sign in with your Nostr signer in Settings to publish">Publish summary</button>`;
   return `<button class="button primary ${size}" data-publish-session="${session.id}">Publish summary</button>`;
 }
 
-export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPublish = false, publishing = false): string {
+export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPublish = false, publishing = false, publishingLabel = 'Waiting for signer...'): string {
   const byEx = new Map<string, SessionSetLog[]>();
   for (const set of session.sets.filter((item) => item.done)) {
     if (!byEx.has(set.exerciseSlug)) byEx.set(set.exerciseSlug, []);
@@ -72,7 +72,7 @@ export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPubli
   return `<div class="session-detail">
     ${rows || '<p class="empty" style="padding:6px 0 12px">No sets were logged in this session.</p>'}
     <div class="workout-card-actions">
-      ${publishSummaryButton(session, canPublish, publishing)}
+      ${publishSummaryButton(session, canPublish, publishing, 'small', publishingLabel)}
       <button class="button danger small" data-delete-session="${session.id}">Delete session</button>
     </div>
   </div>`;
@@ -104,7 +104,7 @@ export function workoutHistory(state: AppState): string {
         </div>
         <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="workout-card-body" data-session-body="${session.id}">${expanded ? sessionDetail(session, unit, Boolean(state.pubkey), state.publishingSessionId === session.id) : ''}</div>
+      <div class="workout-card-body" data-session-body="${session.id}">${expanded ? sessionDetail(session, unit, Boolean(state.pubkey), state.publishingSessionId === session.id, state.publishingStatus || 'Waiting for signer...') : ''}</div>
     </div>`;
   }).join('')}</div>`;
 }

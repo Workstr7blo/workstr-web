@@ -44,6 +44,12 @@ export interface PublishSummaryResult {
   confirmed: boolean;
 }
 
+export type PublishSummaryStage = 'waiting-for-signer' | 'publishing';
+
+interface PublishSummaryOptions {
+  onStage?: (stage: PublishSummaryStage) => void;
+}
+
 interface PublishRelayResult {
   relay: string;
   accepted: boolean;
@@ -81,8 +87,10 @@ export function summarizePublishResults(relays: string[], results: PromiseSettle
   }));
 }
 
-export async function publishWorkoutSummary(signer: Signer, session: ActiveSession, unit: WeightUnit, relays: string[] = CANON_RELAYS): Promise<PublishSummaryResult> {
+export async function publishWorkoutSummary(signer: Signer, session: ActiveSession, unit: WeightUnit, relays: string[] = CANON_RELAYS, options: PublishSummaryOptions = {}): Promise<PublishSummaryResult> {
+  options.onStage?.('waiting-for-signer');
   const signed = await withTimeout(signer.signEvent(buildWorkoutSummaryEvent(session, unit)), SIGN_TIMEOUT_MS, 'signer approval timed out');
+  options.onStage?.('publishing');
   const pool = new SimplePool();
   try {
     const results = await Promise.allSettled(pool.publish(relays, signed as Parameters<typeof pool.publish>[1]).map((publish) => withTimeout(publish, PUBLISH_TIMEOUT_MS, 'relay publish timed out')));

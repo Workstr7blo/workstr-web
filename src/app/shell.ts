@@ -193,7 +193,7 @@ function settingsView(state: AppState): string {
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -1229,10 +1229,17 @@ export function renderShell(root: HTMLElement): void {
       return;
     }
     state.publishingSessionId = session.id;
-    if (button) { button.disabled = true; button.textContent = 'Publishing...'; }
+    state.publishingStatus = 'Waiting for signer...';
+    if (button) { button.disabled = true; button.textContent = state.publishingStatus; }
     let message: { text: string; kind: 'ok' | 'bad' };
+    const setPublishStatus = (text: string): void => {
+      state.publishingStatus = text;
+      if (button?.isConnected) button.textContent = text;
+    };
     try {
-      const result = await publishWorkoutSummary(signer, session, normalizeWeightUnit(state.settings.unit));
+      const result = await publishWorkoutSummary(signer, session, normalizeWeightUnit(state.settings.unit), undefined, {
+        onStage: (stage) => setPublishStatus(stage === 'waiting-for-signer' ? 'Waiting for signer...' : 'Publishing...')
+      });
       session.nostrEventId = result.event.id;
       if (state.store) await state.store.markSessionPublished(session.id, result.event.id);
       const inHistory = state.finishedSessions.find((item) => item.id === session.id);
@@ -1244,6 +1251,7 @@ export function renderShell(root: HTMLElement): void {
       message = { text: `Publish failed: ${(error as Error).message}`, kind: 'bad' };
     }
     state.publishingSessionId = null;
+    state.publishingStatus = null;
     // A background render (canon/profile fetch) may have replaced the button
     // we were mutating — refresh from state, but never while a modal (workout
     // recap) is open: render() would wipe it. Toast last: render rebuilds #toast.
