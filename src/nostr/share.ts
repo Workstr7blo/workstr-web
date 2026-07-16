@@ -50,12 +50,13 @@ interface PublishRelayResult {
   reason: string;
 }
 
+const SIGN_TIMEOUT_MS = 120000;
 const PUBLISH_TIMEOUT_MS = 8000;
 const CONFIRM_TIMEOUT_MS = 3500;
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs = PUBLISH_TIMEOUT_MS): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, timeoutMs = PUBLISH_TIMEOUT_MS, label = 'timeout'): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+    const timer = setTimeout(() => reject(new Error(label)), timeoutMs);
     promise.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
   });
 }
@@ -81,10 +82,10 @@ export function summarizePublishResults(relays: string[], results: PromiseSettle
 }
 
 export async function publishWorkoutSummary(signer: Signer, session: ActiveSession, unit: WeightUnit, relays: string[] = CANON_RELAYS): Promise<PublishSummaryResult> {
-  const signed = await signer.signEvent(buildWorkoutSummaryEvent(session, unit));
+  const signed = await withTimeout(signer.signEvent(buildWorkoutSummaryEvent(session, unit)), SIGN_TIMEOUT_MS, 'signer approval timed out');
   const pool = new SimplePool();
   try {
-    const results = await Promise.allSettled(pool.publish(relays, signed as Parameters<typeof pool.publish>[1]).map((publish) => withTimeout(publish)));
+    const results = await Promise.allSettled(pool.publish(relays, signed as Parameters<typeof pool.publish>[1]).map((publish) => withTimeout(publish, PUBLISH_TIMEOUT_MS, 'relay publish timed out')));
     const relayResults = summarizePublishResults(relays, results);
     const okRelays = relayResults.filter((result) => result.accepted).map((result) => result.relay);
     const failedRelays = relayResults.filter((result) => !result.accepted).map((result) => result.relay);
@@ -93,14 +94,16 @@ export async function publishWorkoutSummary(signer: Signer, session: ActiveSessi
       throw new Error(`no relay accepted the note${firstFailure ? ` (${firstFailure.relay}: ${firstFailure.reason})` : ''}`);
     }
 
-    const confirmed = Boolean(await pool.get(okRelays, {
-      ids: [signed.id],
-      authors: [signed.pubkey],
-      kinds: [1],
-      limit: 1
-    }, { maxWait: CONFIRM_TIMEOUT_MS }));
-    if (!confirmed) {
-      throw new Error(`relay OK received but the note was not readable back yet (${signed.id})`);
+    let confirmed = false;
+    try {
+      confirmed = Boolean(await pool.get(okRelays, {
+        ids: [signed.id],
+        authors: [signed.pubkey],
+        kinds: [1],
+        limit: 1
+      }, { maxWait: CONFIRM_TIMEOUT_MS }));
+    } catch {
+      confirmed = false;
     }
 
     return { event: signed, okRelays, failedRelays, confirmed };
