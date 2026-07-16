@@ -694,7 +694,7 @@ export function renderShell(root: HTMLElement): void {
       const groups = [...new Set(state.qw.exercises.map((exercise) => exercise.muscleGroup).filter(Boolean))];
       const name = 'Quick — ' + (groups.length ? groups.join(', ') : 'Mixed');
       const program: RelayProgram = {
-        slug: 'quick-workout', name, description: '', tags: [], sourceLabel: '', eventId: '', pubkey: '', address: '', createdAt: Date.now(),
+        slug: 'quick-workout', name, description: '', tags: [], sourceLabel: '', muscleMapUrl: '', eventId: '', pubkey: '', address: '', createdAt: Date.now(),
         exercises: state.qw.exercises.map((exercise) => ({ address: '', name: exercise.name, muscleGroup: exercise.muscleGroup, sets: exercise.sets, reps: exercise.reps, restSec: exercise.restSec }))
       };
       state.qw.visible = false;
@@ -744,6 +744,7 @@ export function renderShell(root: HTMLElement): void {
       startedAt: session.started_at,
       finishedAt: session.finished_at,
       nostrEventId: session.nostr_event_id,
+      summaryImageUrl: session.summary_image_url,
       exercises,
       sets: sets.map((set) => ({
         exerciseSlug: set.exercise_slug || String(set.exercise_id || ''),
@@ -946,8 +947,8 @@ export function renderShell(root: HTMLElement): void {
   async function startTrainingSession(program: RelayProgram): Promise<void> {
     const exercises = programSessionExercises(program);
     const startedAt = new Date().toISOString();
-    const sessionId = state.store ? await state.store.createSession({ sheet_name: program.name || 'Freestyle', started_at: startedAt, exercises }) : Date.now();
-    state.activeSession = { id: sessionId, sheetName: program.name || 'Freestyle', startedAt, exercises, sets: [] };
+    const sessionId = state.store ? await state.store.createSession({ sheet_name: program.name || 'Freestyle', started_at: startedAt, summary_image_url: program.muscleMapUrl || '', exercises }) : Date.now();
+    state.activeSession = { id: sessionId, sheetName: program.name || 'Freestyle', startedAt, summaryImageUrl: program.muscleMapUrl || '', exercises, sets: [] };
     sessionExerciseIndex = 0;
     sessionSetCounts = setCountsFromSession(state.activeSession);
     await openSessionOverlay(state.activeSession);
@@ -1245,6 +1246,7 @@ export function renderShell(root: HTMLElement): void {
     try {
       const result = await publishWorkoutSummary(signer, session, normalizeWeightUnit(state.settings.unit), undefined, {
         exercises: state.exercises,
+        imageUrl: session.summaryImageUrl || '',
         onStage: (stage) => setPublishStatus(publishLabel(stage))
       });
       session.nostrEventId = result.event.id;

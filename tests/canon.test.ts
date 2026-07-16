@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
-import { EXERCISE_D_PREFIX, exerciseFromEvent, selectCanonEvents } from '../src/nostr/canon';
+import { EXERCISE_D_PREFIX, exerciseFromEvent, programFromEvent, selectCanonEvents } from '../src/nostr/canon';
 
 const operatorSecret = generateSecretKey();
 const operatorPubkey = getPublicKey(operatorSecret);
@@ -68,5 +68,27 @@ describe('exerciseFromEvent', () => {
     expect(exercise?.muscle_group).toBe('Chest');
     expect(exercise?.nostr_address).toBe(`33401:${operatorPubkey}:${EXERCISE_D_PREFIX}bench-press`);
     expect(exercise?.source_type).toBe('imported');
+  });
+});
+
+describe('programFromEvent', () => {
+  it('extracts Workstr muscle-map media from 33402 metadata', () => {
+    const event = finalizeEvent({
+      kind: 33402,
+      created_at: 100,
+      content: 'Chest and shoulders.',
+      tags: [
+        ['d', 'workstr:program:push-day'],
+        ['title', 'Push Day'],
+        ['t', 'workstr'],
+        ['exercise', `33401:${operatorPubkey}:workstr:exercise:bench`, 'wss://relay.test', '60', '5', '', 'normal'],
+        ['imeta', 'url https://nostr.build/i/push-map.svg', 'm image/svg+xml', 'alt Muscle map for Push Day'],
+        ['workstr_muscle_map', 'https://nostr.build/i/push-map.svg'],
+        ['workstr_meta', JSON.stringify({ v: 1, description: 'Chest and shoulders.', muscleMapUrl: 'https://nostr.build/i/push-map.svg', exercises: [{ address: `33401:${operatorPubkey}:workstr:exercise:bench`, name: 'Bench Press', sets: 1, reps: '5' }] })]
+      ]
+    }, operatorSecret);
+
+    const program = programFromEvent(event);
+    expect(program?.muscleMapUrl).toBe('https://nostr.build/i/push-map.svg');
   });
 });
