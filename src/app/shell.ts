@@ -1236,9 +1236,16 @@ export function renderShell(root: HTMLElement): void {
       state.publishingStatus = text;
       if (button?.isConnected) button.textContent = text;
     };
+    const publishLabel = (stage: string): string => ({
+      'preparing-image': 'Preparing muscle map...',
+      'waiting-for-signer': 'Waiting for signer...',
+      'uploading-image': 'Uploading muscle map...',
+      publishing: 'Publishing...'
+    }[stage] || 'Waiting for signer...');
     try {
       const result = await publishWorkoutSummary(signer, session, normalizeWeightUnit(state.settings.unit), undefined, {
-        onStage: (stage) => setPublishStatus(stage === 'waiting-for-signer' ? 'Waiting for signer...' : 'Publishing...')
+        exercises: state.exercises,
+        onStage: (stage) => setPublishStatus(publishLabel(stage))
       });
       session.nostrEventId = result.event.id;
       if (state.store) await state.store.markSessionPublished(session.id, result.event.id);
