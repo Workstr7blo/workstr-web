@@ -158,7 +158,7 @@ function workoutsView(state: AppState): string {
       <div class="panel"><div class="panel-head"><span>Programs</span><button class="button primary small" id="new-program">+ New program</button></div><p class="section-help">A program is the routine you take to the gym. Expand one to review its exercises, then hit Start to open the live logger.</p><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="program-list">${cards.map((program) => programCard(program, state)).join('') || '<div class="empty">No programs yet. Build your first routine.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
-      <div class="panel"><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="program-list">${state.programs.map((program) => programCard(program, state)).join('')}</div></div>
+      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost small" id="program-discover-refresh" type="button">Refresh</button></div><p class="section-help">Programs published to the Workstr canon on your relays. Refresh pulls the latest kind:33402 events and replaces the cached list for this identity.</p><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div><div class="program-list">${state.programs.map((program) => programCard(program, state)).join('') || '<div class="empty">No relay programs loaded yet. Tap Refresh.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p>${workoutHistory(state)}</div>
@@ -324,6 +324,7 @@ export function renderShell(root: HTMLElement): void {
     });
     root.querySelector('#lib-delete-selected')?.addEventListener('click', () => { void deleteSelectedExercises(); });
     root.querySelector('#discover-refresh')?.addEventListener('click', () => { void refreshExercises(); });
+    root.querySelector('#program-discover-refresh')?.addEventListener('click', () => { void refreshPrograms(); });
     root.querySelector('#discover-search')?.addEventListener('input', (event) => { state.discoverFilter.q = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#discover-search'); input?.focus(); input?.setSelectionRange(state.discoverFilter.q.length, state.discoverFilter.q.length); });
     root.querySelector('#discover-cat')?.addEventListener('change', (event) => { state.discoverFilter.cat = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#discover-muscle')?.addEventListener('change', (event) => { state.discoverFilter.muscle = (event.target as HTMLSelectElement).value; render(); });
@@ -944,6 +945,47 @@ export function renderShell(root: HTMLElement): void {
     return counts;
   }
 
+  function normalizedProgramName(name: string): string {
+    return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  function exerciseSlugSignature(exercises: SessionExercise[]): string {
+    return [...new Set(exercises.map((ex) => ex.exerciseSlug).filter(Boolean))].sort().join('|');
+  }
+
+  function findSessionProgramMap(session: ActiveSession, programs: RelayProgram[]): string {
+    const withMaps = programs.filter((program) => program.muscleMapUrl);
+    if (!withMaps.length) return '';
+    const sessionName = normalizedProgramName(session.sheetName);
+    const exactName = withMaps.filter((program) => normalizedProgramName(program.name) === sessionName).sort((a, b) => b.createdAt - a.createdAt);
+    if (exactName.length) return exactName[0].muscleMapUrl || '';
+
+    // Sessions can outlive a relay refresh, or a locally renamed/imported program can
+    // have the old display name. If the exercise roster uniquely matches a refreshed
+    // relay program, reuse that program's already-uploaded map instead of publishing
+    // a text-only kind:1.
+    const sessionSig = exerciseSlugSignature(session.exercises);
+    if (!sessionSig) return '';
+    const rosterMatches = withMaps.filter((program) => exerciseSlugSignature(programSessionExercises(program)) === sessionSig).sort((a, b) => b.createdAt - a.createdAt);
+    return rosterMatches.length === 1 ? rosterMatches[0].muscleMapUrl || '' : '';
+  }
+
+  async function resolveSessionSummaryImageUrl(session: ActiveSession): Promise<string> {
+    if (session.summaryImageUrl) return session.summaryImageUrl;
+    let url = findSessionProgramMap(session, state.programs);
+    if (url) return url;
+    try {
+      const fresh = await fetchCanonPrograms();
+      state.programs = fresh;
+      await persistCanonCache();
+      url = findSessionProgramMap(session, fresh);
+    } catch {
+      url = '';
+    }
+    if (url) session.summaryImageUrl = url;
+    return url;
+  }
+
   async function startTrainingSession(program: RelayProgram): Promise<void> {
     const exercises = programSessionExercises(program);
     const startedAt = new Date().toISOString();
@@ -1244,9 +1286,10 @@ export function renderShell(root: HTMLElement): void {
       publishing: 'Publishing...'
     }[stage] || 'Waiting for signer...');
     try {
+      const imageUrl = await resolveSessionSummaryImageUrl(session);
       const result = await publishWorkoutSummary(signer, session, normalizeWeightUnit(state.settings.unit), undefined, {
         exercises: state.exercises,
-        imageUrl: session.summaryImageUrl || '',
+        imageUrl,
         onStage: (stage) => setPublishStatus(publishLabel(stage))
       });
       session.nostrEventId = result.event.id;
