@@ -79,9 +79,17 @@ export function workoutSummaryText(session: ActiveSession, unit: WeightUnit, ima
   return lines.join('\n');
 }
 
+function mediaMime(url: string): string {
+  const clean = url.split('?')[0].toLowerCase();
+  if (clean.endsWith('.svg')) return 'image/svg+xml';
+  if (clean.endsWith('.webp')) return 'image/webp';
+  if (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) return 'image/jpeg';
+  return 'image/png';
+}
+
 export function buildWorkoutSummaryEvent(session: ActiveSession, unit: WeightUnit, imageUrl = '', exercises: Exercise[] = []): UnsignedNostrEvent {
   const tags = [['t', 'workout'], ['t', 'fitness'], ['t', 'workstr'], ['client', 'workstr']];
-  if (imageUrl) tags.push(['imeta', `url ${imageUrl}`, 'm image/png', `alt Muscle map for ${session.sheetName || 'Workstr workout'}`]);
+  if (imageUrl) tags.push(['imeta', `url ${imageUrl}`, `m ${mediaMime(imageUrl)}`, `alt Muscle map for ${session.sheetName || 'Workstr workout'}`]);
   return {
     kind: 1,
     created_at: Math.floor(Date.now() / 1000),
@@ -102,6 +110,7 @@ export type PublishSummaryStage = 'preparing-image' | 'waiting-for-signer' | 'up
 interface PublishSummaryOptions {
   onStage?: (stage: PublishSummaryStage) => void;
   exercises?: Exercise[];
+  imageUrl?: string;
 }
 
 interface PublishRelayResult {
@@ -256,7 +265,7 @@ async function createSummaryImageUrl(signer: Signer, session: ActiveSession, exe
 }
 
 export async function publishWorkoutSummary(signer: Signer, session: ActiveSession, unit: WeightUnit, relays: string[] = CANON_RELAYS, options: PublishSummaryOptions = {}): Promise<PublishSummaryResult> {
-  const imageUrl = await createSummaryImageUrl(signer, session, options.exercises || [], options.onStage);
+  const imageUrl = options.imageUrl || await createSummaryImageUrl(signer, session, options.exercises || [], options.onStage);
   options.onStage?.('waiting-for-signer');
   const signed = await withTimeout(signer.signEvent(buildWorkoutSummaryEvent(session, unit, imageUrl, options.exercises || [])), SIGN_TIMEOUT_MS, 'signer approval timed out');
   options.onStage?.('publishing');

@@ -65,6 +65,12 @@ describe('buildWorkoutSummaryEvent', () => {
     expect(event.content).toBe(workoutSummaryText(session(), 'kg'));
     expect(event.created_at).toBeGreaterThan(1_700_000_000);
   });
+
+  it('attaches an existing program muscle map URL without requiring a new upload', () => {
+    const event = buildWorkoutSummaryEvent(session(), 'kg', 'https://nostr.build/i/push-map.svg');
+    expect(event.content).toContain('https://nostr.build/i/push-map.svg');
+    expect(event.tags).toContainEqual(['imeta', 'url https://nostr.build/i/push-map.svg', 'm image/svg+xml', 'alt Muscle map for Push Day']);
+  });
 });
 
 describe('summarizePublishResults', () => {

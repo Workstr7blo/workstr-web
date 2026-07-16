@@ -32,6 +32,7 @@ export interface RelayProgram {
   tags: string[];
   exercises: RelayProgramExercise[];
   sourceLabel: string;
+  muscleMapUrl?: string;
   eventId: string;
   pubkey: string;
   address: string;
@@ -217,6 +218,7 @@ export function programFromEvent(event: Event): RelayProgram | null {
     tags: tagValues(tags, 't').filter((tag) => tag !== 'workstr'),
     exercises,
     sourceLabel: hasWorkstrIdentity(tags) ? 'Workstr' : 'NIP-101e',
+    muscleMapUrl: String(meta.muscleMapUrl || tagValue(tags, 'workstr_muscle_map') || imetaUrl(tags) || ''),
     eventId: event.id,
     pubkey: event.pubkey,
     address: eventAddress(33402, event, dTag),

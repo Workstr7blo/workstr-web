@@ -34,6 +34,7 @@ export interface ActiveSession {
   startedAt: string;
   finishedAt?: string;
   nostrEventId?: string;
+  summaryImageUrl?: string;
   exercises: SessionExercise[];
   sets: SessionSetLog[];
 }
