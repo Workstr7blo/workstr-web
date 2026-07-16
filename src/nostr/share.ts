@@ -141,6 +141,13 @@ export function summarizePublishResults(relays: string[], results: PromiseSettle
   }));
 }
 
+function browserBase64(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 function extractUploadUrl(value: unknown): string {
   if (!value) return '';
   if (typeof value === 'string') return /^https:\/\//i.test(value) ? value : '';
@@ -212,29 +219,36 @@ async function muscleMapPng(session: ActiveSession, exercises: Exercise[]): Prom
   return svgToPngBlob(svg);
 }
 
-async function uploadSummaryImage(file: Blob): Promise<string> {
+async function uploadSummaryImage(signer: Signer, file: Blob, onStage?: (stage: PublishSummaryStage) => void): Promise<string> {
+  const url = 'https://nostr.build/api/v2/nip96/upload';
+  onStage?.('waiting-for-signer');
+  const authEvent = await withTimeout(signer.signEvent({
+    kind: 27235,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [['u', url], ['method', 'POST']],
+    content: ''
+  }), SIGN_TIMEOUT_MS, 'signer approval timed out');
+  onStage?.('uploading-image');
   const form = new FormData();
-  form.append('reqtype', 'fileupload');
-  form.append('time', '72h');
-  form.append('fileToUpload', file, 'workstr-muscle-map.png');
-  const response = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
+  form.append('file', file, 'workstr-muscle-map.png');
+  const response = await fetch(url, {
     method: 'POST',
+    headers: { Authorization: `Nostr ${browserBase64(JSON.stringify(authEvent))}` },
     body: form
   });
-  if (!response.ok) throw new Error(`image upload failed (${response.status})`);
-  const text = await response.text();
-  const uploaded = extractUploadUrl(text);
-  if (!uploaded) throw new Error('image upload response did not include a URL');
+  if (!response.ok) throw new Error(`nostr.build upload failed (${response.status})`);
+  const json = await response.json();
+  const uploaded = extractUploadUrl(json);
+  if (!uploaded) throw new Error('nostr.build upload response did not include a URL');
   return uploaded;
 }
 
-async function createSummaryImageUrl(session: ActiveSession, exercises: Exercise[], onStage?: (stage: PublishSummaryStage) => void): Promise<string> {
+async function createSummaryImageUrl(signer: Signer, session: ActiveSession, exercises: Exercise[], onStage?: (stage: PublishSummaryStage) => void): Promise<string> {
   try {
     onStage?.('preparing-image');
     const image = await muscleMapPng(session, exercises);
     if (!image) return '';
-    onStage?.('uploading-image');
-    return await uploadSummaryImage(image);
+    return await uploadSummaryImage(signer, image, onStage);
   } catch (error) {
     console.warn('Workstr summary image skipped:', error);
     return '';
@@ -242,7 +256,7 @@ async function createSummaryImageUrl(session: ActiveSession, exercises: Exercise
 }
 
 export async function publishWorkoutSummary(signer: Signer, session: ActiveSession, unit: WeightUnit, relays: string[] = CANON_RELAYS, options: PublishSummaryOptions = {}): Promise<PublishSummaryResult> {
-  const imageUrl = await createSummaryImageUrl(session, options.exercises || [], options.onStage);
+  const imageUrl = await createSummaryImageUrl(signer, session, options.exercises || [], options.onStage);
   options.onStage?.('waiting-for-signer');
   const signed = await withTimeout(signer.signEvent(buildWorkoutSummaryEvent(session, unit, imageUrl, options.exercises || [])), SIGN_TIMEOUT_MS, 'signer approval timed out');
   options.onStage?.('publishing');
