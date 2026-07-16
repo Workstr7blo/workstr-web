@@ -33,6 +33,7 @@ export interface ActiveSession {
   sheetName: string;
   startedAt: string;
   finishedAt?: string;
+  nostrEventId?: string;
   exercises: SessionExercise[];
   sets: SessionSetLog[];
 }
@@ -63,6 +64,7 @@ export interface AppState {
   discoverFilter: { q: string; cat: string; muscle: string; diff: string };
   activeSession: ActiveSession | null;
   finishedSessions: ActiveSession[];
+  publishingSessionId: number | null;
   editingId: number | null;
   filter: string;
   programFilter: string;
