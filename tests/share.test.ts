@@ -25,12 +25,13 @@ function session(overrides: Partial<ActiveSession> = {}): ActiveSession {
 describe('workoutSummaryText', () => {
   it('summarises done sets per exercise with top set and volume', () => {
     const text = workoutSummaryText(session(), 'kg');
-    expect(text).toContain('Workout: Push Day');
-    expect(text).toContain('- Bench Press: 2 sets, top 85kg x 6');
-    expect(text).toContain('- Lateral Raise: 1 set, top 10kg x 12');
+    expect(text).toContain('Workstr training summary');
+    expect(text).toContain('Program: Push Day');
+    expect(text).toContain('- Bench Press: 2 sets, top 85 kg x 6');
+    expect(text).toContain('- Lateral Raise: 1 set, top 10 kg x 12');
     // 8*80 + 6*85 + 12*10 = 1270; the undone set does not count
-    expect(text).toContain('Total volume: 1270 kg');
-    expect(text).toContain('#workout #fitness');
+    expect(text).toContain('Volume: 1270 kg');
+    expect(text).toContain('#workout #fitness #workstr');
   });
 
   it('resolves the exercise name from the session members when sets lack it', () => {
@@ -41,8 +42,8 @@ describe('workoutSummaryText', () => {
 
   it('converts weights and volume to lbs', () => {
     const text = workoutSummaryText(session(), 'lbs');
-    expect(text).toContain('top 187.4lbs x 6');
-    expect(text).toContain('Total volume: 2800 lbs');
+    expect(text).toContain('top 187.4 lbs x 6');
+    expect(text).toContain('Volume: 2800 lbs');
   });
 
   it('falls back to Freestyle and handles weightless sets', () => {
@@ -50,9 +51,9 @@ describe('workoutSummaryText', () => {
       sheetName: '',
       sets: [{ exerciseSlug: 'plank', exerciseName: 'Plank', setNumber: 1, reps: null, weight: null, done: true, completedAt: '2026-07-16T10:10:00.000Z' }]
     }), 'kg');
-    expect(text).toContain('Workout: Freestyle');
-    expect(text).toContain('- Plank: 1 set, top - x -');
-    expect(text).toContain('Total volume: 0 kg');
+    expect(text).toContain('Program: Freestyle');
+    expect(text).toContain('- Plank: 1 set, top bodyweight x -');
+    expect(text).toContain('Volume: 0 kg');
   });
 });
 
@@ -60,7 +61,7 @@ describe('buildWorkoutSummaryEvent', () => {
   it('builds a kind:1 note with workout tags and client identity', () => {
     const event = buildWorkoutSummaryEvent(session(), 'kg');
     expect(event.kind).toBe(1);
-    expect(event.tags).toEqual([['t', 'workout'], ['t', 'fitness'], ['client', 'workstr']]);
+    expect(event.tags).toEqual([['t', 'workout'], ['t', 'fitness'], ['t', 'workstr'], ['client', 'workstr']]);
     expect(event.content).toBe(workoutSummaryText(session(), 'kg'));
     expect(event.created_at).toBeGreaterThan(1_700_000_000);
   });
