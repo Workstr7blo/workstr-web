@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ActiveSession } from '../src/app/state';
-import { buildWorkoutSummaryEvent, workoutSummaryText } from '../src/nostr/share';
+import { buildWorkoutSummaryEvent, summarizePublishResults, workoutSummaryText } from '../src/nostr/share';
 
 function session(overrides: Partial<ActiveSession> = {}): ActiveSession {
   return {
@@ -63,5 +63,31 @@ describe('buildWorkoutSummaryEvent', () => {
     expect(event.tags).toEqual([['t', 'workout'], ['t', 'fitness'], ['client', 'workstr']]);
     expect(event.content).toBe(workoutSummaryText(session(), 'kg'));
     expect(event.created_at).toBeGreaterThan(1_700_000_000);
+  });
+});
+
+describe('summarizePublishResults', () => {
+  it('treats nostr-tools connection failure strings as failed relay publishes', () => {
+    const relays = ['wss://nos.lol', 'wss://relay.example'];
+    const results: PromiseSettledResult<string>[] = [
+      { status: 'fulfilled', value: 'success' },
+      { status: 'fulfilled', value: 'connection failure: Error: WebSocket failed' }
+    ];
+
+    expect(summarizePublishResults(relays, results)).toEqual([
+      { relay: 'wss://nos.lol', accepted: true, reason: 'success' },
+      { relay: 'wss://relay.example', accepted: false, reason: 'connection failure: Error: WebSocket failed' }
+    ]);
+  });
+
+  it('keeps relay OK rejections as failed publishes with their reason', () => {
+    const relays = ['wss://relay.nostr.band'];
+    const results: PromiseSettledResult<string>[] = [
+      { status: 'rejected', reason: new Error('blocked: invalid signature') }
+    ];
+
+    expect(summarizePublishResults(relays, results)).toEqual([
+      { relay: 'wss://relay.nostr.band', accepted: false, reason: 'blocked: invalid signature' }
+    ]);
   });
 });
