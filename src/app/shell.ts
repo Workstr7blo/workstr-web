@@ -1,7 +1,7 @@
 import { nip19, SimplePool } from 'nostr-tools';
 import { renderSVG } from 'uqr';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
-import { createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
+import { clearCachedNip46Signer, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
 import { slugify } from '../core/ids';
 import { canonMuscle } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft, type SheetWithExercises } from '../db/store';
@@ -834,6 +834,7 @@ export function renderShell(root: HTMLElement): void {
   // stays on the device unless explicitly removed.
   async function signOut(): Promise<void> {
     activeSigner = null;
+    clearCachedNip46Signer();
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SIGNER_TYPE_KEY);
     state.editingId = null;
@@ -1252,12 +1253,17 @@ export function renderShell(root: HTMLElement): void {
     renderFinished(finished);
   }
 
-  // The live signer only survives the tab; a persisted NIP-07 session can
-  // recreate one from the extension, a persisted NIP-46 session cannot.
-  function getActiveSigner(): Signer | null {
+  // The live signer only survives the tab. Recreate a signer from the
+  // persisted local client credentials instead of forcing a full reconnect
+  // after the user closes and reopens the PWA.
+  async function getActiveSigner(): Promise<Signer | null> {
     if (activeSigner) return activeSigner;
     if (state.signerType === 'nip07' && hasNip07()) {
       activeSigner = createNip07Signer();
+      return activeSigner;
+    }
+    if (state.signerType === 'nip46') {
+      activeSigner = createCachedNip46Signer({ onAuthUrl: launchSignerRequest });
       return activeSigner;
     }
     return null;
@@ -1265,7 +1271,7 @@ export function renderShell(root: HTMLElement): void {
 
   async function publishSessionSummary(session: ActiveSession, button: HTMLButtonElement | null): Promise<void> {
     if (session.nostrEventId || state.publishingSessionId !== null) return;
-    const signer = getActiveSigner();
+    const signer = await getActiveSigner();
     if (!signer) {
       toast(state.pubkey ? 'Signer connection was lost — sign in again from Settings to publish' : 'Sign in with your Nostr signer in Settings to publish', 'bad');
       return;

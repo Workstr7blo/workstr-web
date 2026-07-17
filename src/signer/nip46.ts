@@ -1,10 +1,11 @@
 import { SimplePool, type VerifiedEvent } from 'nostr-tools';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { BunkerSigner, createNostrConnectURI, parseBunkerInput } from 'nostr-tools/nip46';
+import { BunkerSigner, createNostrConnectURI, parseBunkerInput, type BunkerPointer } from 'nostr-tools/nip46';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from './types';
 
 const CLIENT_SECRET_KEY = 'workstr.nip46.clientSecret';
+const CACHED_CONNECTION_KEY = 'workstr.nip46.connection';
 const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol'];
 
 interface BunkerOptions {
@@ -14,6 +15,11 @@ interface BunkerOptions {
 interface ConnectedBunkerSigner {
   pubkey: string;
   signer: Signer;
+}
+
+interface CachedConnection {
+  clientSecret: string;
+  bunker: BunkerPointer;
 }
 
 interface NostrConnectRequest {
@@ -44,24 +50,56 @@ function wrapBunkerSigner(signer: BunkerSigner): Signer {
   };
 }
 
+function cacheConnection(clientSecret: Uint8Array, bunker: BunkerPointer): void {
+  localStorage.setItem(CACHED_CONNECTION_KEY, JSON.stringify({
+    clientSecret: bytesToHex(clientSecret),
+    bunker
+  } satisfies CachedConnection));
+}
+
+function readCachedConnection(): CachedConnection | null {
+  try {
+    const raw = localStorage.getItem(CACHED_CONNECTION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedConnection;
+    const validSecret = /^[a-f0-9]{64}$/i.test(parsed.clientSecret || '');
+    const validBunker = parsed.bunker
+      && /^[a-f0-9]{64}$/i.test(parsed.bunker.pubkey || '')
+      && Array.isArray(parsed.bunker.relays)
+      && parsed.bunker.relays.length > 0;
+    return validSecret && validBunker ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearCachedNip46Signer(): void {
+  localStorage.removeItem(CACHED_CONNECTION_KEY);
+}
+
 export async function createBunkerSigner(input: string, options: BunkerOptions = {}): Promise<Signer> {
   const pointer = await parseBunkerInput(input.trim());
   if (!pointer) {
     throw new Error('Invalid bunker URL or NIP-05 identifier');
   }
 
+  const secret = clientSecretKey();
   const pool = new SimplePool();
-  const signer = BunkerSigner.fromBunker(clientSecretKey(), pointer, { pool, onauth: options.onAuthUrl });
+  const signer = BunkerSigner.fromBunker(secret, pointer, { pool, onauth: options.onAuthUrl });
   await signer.connect({
     name: 'Workstr',
     url: window.location.origin
   });
+  cacheConnection(secret, pointer);
 
   return wrapBunkerSigner(signer);
 }
 
 export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options: BunkerOptions = {}): NostrConnectRequest {
-  const secret = generateSecretKey();
+  // The remote signer authorizes this client pubkey. Persisting the client
+  // secret lets Workstr recreate the same NIP-46 client after a tab/app close
+  // instead of appearing connected while publish paths have no live signer.
+  const secret = clientSecretKey();
   const clientPubkey = getPublicKey(secret);
   const connectionSecret = bytesToHex(generateSecretKey());
   const cleanRelays = relays.map((relay) => relay.trim()).filter(Boolean);
@@ -77,11 +115,22 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
   return {
     uri,
     relays: cleanRelays,
-    signer: BunkerSigner.fromURI(secret, uri, { pool, onauth: options.onAuthUrl }, 300000).then((signer) => ({
-      pubkey: signer.bp.pubkey,
-      signer: wrapBunkerSigner(signer)
-    }))
+    signer: BunkerSigner.fromURI(secret, uri, { pool, onauth: options.onAuthUrl }, 300000).then((signer) => {
+      cacheConnection(secret, signer.bp);
+      return {
+        pubkey: signer.bp.pubkey,
+        signer: wrapBunkerSigner(signer)
+      };
+    })
   };
+}
+
+export function createCachedNip46Signer(options: BunkerOptions = {}): Signer | null {
+  const cached = readCachedConnection();
+  if (!cached) return null;
+  const pool = new SimplePool();
+  const signer = BunkerSigner.fromBunker(hexToBytes(cached.clientSecret), cached.bunker, { pool, onauth: options.onAuthUrl });
+  return wrapBunkerSigner(signer);
 }
 
 export function isLikelyBunkerInput(value: string): boolean {
