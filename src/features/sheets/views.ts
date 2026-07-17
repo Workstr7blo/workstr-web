@@ -106,7 +106,7 @@ export function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
     name: sheet.name,
     description: sheet.notes || '',
     tags: [],
-    sourceLabel: 'local only',
+    sourceLabel: sheet.nostr_address ? 'in library' : 'local',
     eventId: sheet.nostr_event_id || '',
     pubkey: '',
     address: `local:${sheet.id}`,
@@ -183,14 +183,14 @@ export function programBody(program: RelayProgram, state: AppState): string {
   }).join('') : '<p class="empty" style="padding:10px 0">No exercises yet.</p>';
   const importState = isLocalProgram(program) ? null : programImportState(program, state.sheets);
   const actions = importState === null
-    ? `<button class="button ghost small" type="button" data-edit-sheet="${localSheetId(program)}">Edit</button>
+    ? `<button class="button gold small" type="button" data-start-program="${html(program.address)}">Start workout</button>
+      <button class="button ghost small" type="button" data-edit-sheet="${localSheetId(program)}">Edit</button>
       <button class="button danger small" type="button" data-del-sheet="${localSheetId(program)}">Delete</button>`
     : importState === 'in-library'
       ? '<button class="button ghost small" type="button" disabled>In library</button>'
       : `<button class="button ${importState === 'update' ? 'gold' : 'primary'} small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>`;
   return `<div class="wk-ex-list">${exHtml}</div>
     <div class="workout-card-actions">
-      <button class="button gold small" type="button" data-start-program="${html(program.address)}">Start workout</button>
       ${actions}
     </div>`;
 }

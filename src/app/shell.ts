@@ -150,15 +150,14 @@ function workoutsView(state: AppState): string {
   const query = state.programFilter.toLowerCase();
   const locals = state.sheets.map(sheetToProgram).filter((program) => [program.name, program.description].join(' ').toLowerCase().includes(query));
   const programs = state.programs.filter((program) => [program.name, program.description, ...program.tags].join(' ').toLowerCase().includes(query));
-  const cards = [...locals, ...programs];
   return `<div class="page active" id="page-workouts">
     <div class="page-title">Workouts</div>
     ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
     <div class="sub-panel ${active === 'programs' ? 'active' : ''}" id="sub-workouts-programs">
-      <div class="panel"><div class="panel-head"><span>Programs</span><button class="button primary small" id="new-program">+ New program</button></div><p class="section-help">A program is the routine you take to the gym. Expand one to review its exercises, then hit Start to open the live logger.</p><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="program-list">${cards.map((program) => programCard(program, state)).join('') || '<div class="empty">No programs yet. Build your first routine.</div>'}</div></div>
+      <div class="panel"><div class="panel-head"><span>Programs</span><button class="button primary small" id="new-program">+ New program</button></div><p class="section-help">Your local program library: routines you created here or imported from Discover. Relay-only programs stay in Discover until you import them.</p><div class="filter-bar"><input class="grow" id="program-filter" placeholder="Search programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="program-list">${locals.map((program) => programCard(program, state)).join('') || '<div class="empty">No programs in your library yet. Build one or import from Discover.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
-      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost small" id="program-discover-refresh" type="button">Refresh</button></div><p class="section-help">Programs published to the Workstr canon on your relays. Refresh pulls the latest kind:33402 events and replaces the cached list for this identity.</p><div class="filter-bar"><input class="grow" placeholder="Search programs..." autocomplete="off" /></div><div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div><div class="program-list">${state.programs.map((program) => programCard(program, state)).join('') || '<div class="empty">No relay programs loaded yet. Tap Refresh.</div>'}</div></div>
+      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost small" id="program-discover-refresh" type="button">Refresh</button></div><p class="section-help">Relay programs published by Workstr. Import a program to add a local copy to your Programs library before editing or running it.</p><div class="filter-bar"><input class="grow" id="program-discover-filter" placeholder="Search relay programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div><div class="program-list">${programs.map((program) => programCard(program, state)).join('') || '<div class="empty">No relay programs loaded yet. Tap Refresh.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p>${workoutHistory(state)}</div>
@@ -358,6 +357,7 @@ export function renderShell(root: HTMLElement): void {
     });
     root.querySelector('#discover-import-selected')?.addEventListener('click', () => { void importSelectedDiscovered(); });
     root.querySelector('#program-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#program-filter'); input?.focus(); input?.setSelectionRange(state.programFilter.length, state.programFilter.length); });
+    root.querySelector('#program-discover-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#program-discover-filter'); input?.focus(); input?.setSelectionRange(state.programFilter.length, state.programFilter.length); });
     root.querySelectorAll<HTMLElement>('[data-toggle-program]').forEach((header) => header.addEventListener('click', () => {
       const address = header.dataset.toggleProgram || null;
       state.expandedProgramAddress = state.expandedProgramAddress === address ? null : address;
@@ -372,8 +372,7 @@ export function renderShell(root: HTMLElement): void {
     root.querySelectorAll<HTMLElement>('[data-start-program]').forEach((button) => button.addEventListener('click', (event) => {
       event.stopPropagation();
       const address = button.dataset.startProgram;
-      const program = state.programs.find((item) => item.address === address)
-        || state.sheets.map(sheetToProgram).find((item) => item.address === address);
+      const program = state.sheets.map(sheetToProgram).find((item) => item.address === address);
       if (program) startTrainingSession(program);
     }));
     root.querySelectorAll<HTMLElement>('[data-import-program]').forEach((button) => button.addEventListener('click', async (event) => {
