@@ -5,6 +5,7 @@ import { clearCachedNip46Signer, createCachedNip46Signer, createNostrConnectSign
 import { canonMuscle } from '../core/muscles';
 import { WorkstrStore, type ExerciseDraft, type SheetWithExercises } from '../db/store';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
+import { downloadExport, parseExport } from '../db/export';
 import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
@@ -140,6 +141,9 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void signOut(); });
     root.querySelector('#remove-account-data')?.addEventListener('click', () => { void signOutAndRemoveData(); });
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void saveUnitPreference((event.target as HTMLSelectElement).value); });
+    root.querySelector('#export-data')?.addEventListener('click', () => { void exportUserData(); });
+    root.querySelector('#import-data')?.addEventListener('click', () => root.querySelector<HTMLInputElement>('#import-file')?.click());
+    root.querySelector('#import-file')?.addEventListener('change', (event) => { void importUserData(event.target as HTMLInputElement); });
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void refreshExercises(); }));
     root.querySelectorAll('#refresh-programs').forEach((button) => button.addEventListener('click', () => { void refreshPrograms(); }));
     root.querySelector('#ex-search')?.addEventListener('input', (event) => { state.filter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#ex-search'); input?.focus(); input?.setSelectionRange(state.filter.length, state.filter.length); });
@@ -566,6 +570,31 @@ export function renderShell(root: HTMLElement): void {
     state.settings = { ...state.settings, unit: normalizeWeightUnit(value) };
     await state.store.saveSettings(state.settings);
     render();
+  }
+
+  async function exportUserData(): Promise<void> {
+    if (!state.store) return;
+    try {
+      downloadExport(await state.store.exportData(state.pubkey ?? LOCAL_NAMESPACE));
+      toast('Exported your data');
+    } catch (error) {
+      toast(`Export failed: ${(error as Error).message}`, 'bad');
+    }
+  }
+
+  async function importUserData(input: HTMLInputElement): Promise<void> {
+    const file = input.files?.[0];
+    input.value = ''; // allow re-picking the same file later
+    if (!file || !state.store) return;
+    try {
+      const data = parseExport(await file.text());
+      const confirmation = window.prompt('This ERASES all data in this account and replaces it with the file. Type REPLACE to confirm.');
+      if (confirmation !== 'REPLACE') { toast('Import cancelled'); return; }
+      await state.store.importData(data);
+      window.location.reload();
+    } catch (error) {
+      toast(`Import failed: ${(error as Error).message}`, 'bad');
+    }
   }
 
   async function loadFinishedSessions(): Promise<ActiveSession[]> {
