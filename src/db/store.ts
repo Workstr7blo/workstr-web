@@ -1,5 +1,6 @@
 import type { IDBPDatabase } from 'idb';
 import { openWorkstrDB, type WorkstrDB } from './schema';
+import { exportDatabase, importDatabase, type WorkstrExport } from './export';
 import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, WorkstrSettings } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
@@ -30,6 +31,14 @@ export class WorkstrStore {
 
   close(): void {
     this.db.close();
+  }
+
+  async exportData(pubkeyNamespace: string): Promise<WorkstrExport> {
+    return exportDatabase(this.db, pubkeyNamespace);
+  }
+
+  async importData(data: WorkstrExport): Promise<void> {
+    return importDatabase(this.db, data);
   }
 
   async upsertExercise(exercise: ExerciseDraft | Exercise): Promise<number> {
