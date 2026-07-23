@@ -8,7 +8,8 @@ import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData }
 import { downloadExport, parseExport } from '../db/export';
 import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
-import { canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
+import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
+import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
 import type { Signer } from '../signer/types';
 import type { ActiveSession, AppState, SessionExercise, SubView, View } from './state';
@@ -23,28 +24,37 @@ import { sheetToProgram, type BuilderState } from '../features/sheets/views';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
-const PROFILE_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://purplepag.es', 'wss://user.kindpag.es', 'wss://relay.nostr.band'];
 const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
 
-async function fetchProfileName(pubkey: string): Promise<string | null> {
+function profileName(profile: RelayProfile | null): string | null {
+  return profile?.name?.trim() || profile?.nip05?.trim() || null;
+}
+
+async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<RelayProfile | null> {
   const pool = new SimplePool();
   try {
     const event = await Promise.race([
-      pool.get(PROFILE_RELAYS, { kinds: [0], authors: [pubkey] }),
+      pool.get(relays, { kinds: [0], authors: [pubkey] }),
       new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 5000))
     ]);
     if (!event) return null;
-    const profile = JSON.parse(event.content) as { display_name?: string; displayName?: string; name?: string; username?: string; nip05?: string };
-    return profile.display_name?.trim() || profile.displayName?.trim() || profile.name?.trim() || profile.username?.trim() || profile.nip05?.trim() || null;
+    const profile = JSON.parse(event.content) as { display_name?: string; displayName?: string; name?: string; username?: string; picture?: string; image?: string; avatar?: string; nip05?: string };
+    return {
+      pubkey,
+      name: profile.display_name?.trim() || profile.displayName?.trim() || profile.name?.trim() || profile.username?.trim() || profile.nip05?.trim() || undefined,
+      picture: profile.picture?.trim() || profile.image?.trim() || profile.avatar?.trim() || undefined,
+      nip05: profile.nip05?.trim() || undefined,
+      createdAt: event.created_at
+    };
   } catch {
     return null;
   } finally {
-    pool.close(PROFILE_RELAYS);
+    pool.close(relays);
   }
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -74,7 +84,7 @@ export function renderShell(root: HTMLElement): void {
       if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
     }
     await loadNamespace(pubkey);
-    state.profileName = await fetchProfileName(pubkey);
+    state.profileName = profileName(await fetchProfile(pubkey));
   }
 
   // Anonymous local account — the default; no signer involved.
@@ -103,6 +113,7 @@ export function renderShell(root: HTMLElement): void {
       state.programs = cached.programs;
       state.exerciseStatus = `showing ${cached.exercises.length} Workstr exercises from the last sync`;
       state.programStatus = `showing ${cached.programs.length} Workstr programs from the last sync`;
+      void refreshDiscoverProfiles();
     }
     await reloadLibrary();
     state.activeSession = await loadUnfinishedSession();
@@ -667,6 +678,7 @@ export function renderShell(root: HTMLElement): void {
       state.discoverExercises = exercises;
       state.exerciseStatus = `loaded ${exercises.length} Workstr exercises`;
       await persistCanonCache();
+      void refreshDiscoverProfiles();
     } catch (error) {
       const cached = state.discoverExercises.length;
       state.exerciseStatus = cached
@@ -688,7 +700,7 @@ export function renderShell(root: HTMLElement): void {
       state.programs = programs;
       state.programStatus = `loaded ${programs.length} Workstr programs`;
       await persistCanonCache();
-      void refreshProgramProfiles(programs);
+      void refreshDiscoverProfiles();
     } catch (error) {
       const cached = state.programs.length;
       state.programStatus = cached
@@ -698,13 +710,21 @@ export function renderShell(root: HTMLElement): void {
     render();
   }
 
-  async function refreshProgramProfiles(programs: RelayProgram[]): Promise<void> {
-    const pubkeys = [...new Set(programs.map((program) => program.pubkey).filter(Boolean))].filter((pubkey) => !state.profileNames[pubkey]);
+  async function refreshDiscoverProfiles(): Promise<void> {
+    state.authorProfiles ||= {};
+    const pubkeys = [...new Set([
+      ...state.discoverExercises.map((exercise) => exercise.nostr_pubkey).filter((pubkey): pubkey is string => Boolean(pubkey)),
+      ...state.programs.map((program) => program.pubkey).filter((pubkey): pubkey is string => Boolean(pubkey))
+    ])].filter((pubkey) => !state.authorProfiles?.[pubkey]);
     if (!pubkeys.length) return;
-    const entries = await Promise.all(pubkeys.map(async (pubkey) => [pubkey, await fetchProfileName(pubkey)] as const));
+    const entries = await Promise.all(pubkeys.map(async (pubkey) => [pubkey, await fetchProfile(pubkey, CANON_RELAYS)] as const));
     let changed = false;
-    for (const [pubkey, name] of entries) {
-      if (name) { state.profileNames[pubkey] = name; changed = true; }
+    for (const [pubkey, profile] of entries) {
+      if (profile) {
+        state.authorProfiles[pubkey] = profile;
+        if (profile.name) state.profileNames[pubkey] = profile.name;
+        changed = true;
+      }
     }
     if (changed) render();
   }

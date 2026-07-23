@@ -85,6 +85,10 @@
 .builder-pick-state { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--border); color: var(--dim); }
 .builder-pick-state svg { width: 14px; height: 14px; }
 .builder-pick-item.added .builder-pick-state { color: var(--success-green); border-color: var(--success-green); }
+.discover-card-meta { justify-content: space-between; gap: 10px; }
+.discover-card-meta .muscle { min-width: 0; }
+.discover-card-meta .author-pill { margin-left: auto; max-width: 46%; }
+.discover-import { justify-content: center; text-align: center; }
 .ex-grid.selecting .ex-card.unselectable { opacity: .45; }
 .glyph { background: #0b0616; border: 1px solid var(--border-hot); }
 .glyph img { width: 19px; height: 19px; object-fit: contain; display: block; }

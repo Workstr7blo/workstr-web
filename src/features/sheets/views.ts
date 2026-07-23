@@ -5,7 +5,7 @@ import type { SheetWithExercises } from '../../db/store';
 import type { RelayProgram } from '../../nostr/canon';
 import { programImportState } from '../../nostr/programImport';
 import type { AppState } from '../../app/state';
-import { displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
+import { authorPill, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 
 export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string }
@@ -89,7 +89,12 @@ export function inferProgramMuscle(name: string): string {
 
 export function programAuthor(program: RelayProgram, state: AppState): string {
   if (!program.pubkey) return 'unknown';
-  return state.profileNames[program.pubkey] || displayPubkey(program.pubkey);
+  return state.authorProfiles?.[program.pubkey]?.name || state.profileNames[program.pubkey] || displayPubkey(program.pubkey);
+}
+
+export function programAuthorPill(program: RelayProgram, state: AppState): string {
+  if (!program.pubkey) return '';
+  return authorPill(state.authorProfiles?.[program.pubkey], program.pubkey);
 }
 
 export function isLocalProgram(program: RelayProgram): boolean {
@@ -139,7 +144,7 @@ export function programCard(program: RelayProgram, state: AppState): string {
       <div class="workout-card-info">
         <div class="workout-card-name">${html(program.name)}<span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span></div>
         <div class="workout-card-meta">${meta}</div>
-        ${program.pubkey ? `<div class="workout-card-author">${html(programAuthor(program, state))}</div>` : ''}
+        ${program.pubkey ? `<div class="workout-card-author">${programAuthorPill(program, state)}</div>` : ''}
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(', '))}</div>` : ''}
       </div>
       <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
