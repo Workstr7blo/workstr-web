@@ -1,6 +1,7 @@
 import { nip19 } from 'nostr-tools';
 import { canonMuscle } from '../core/muscles';
 import type { Exercise } from '../core/types';
+import type { RelayProfile } from '../nostr/pool';
 import type { AppState } from './state';
 
 export function html(value: unknown): string {
@@ -33,6 +34,16 @@ export function displayPubkey(pubkey: string): string {
   } catch {
     return pubkey.slice(0, 8) + '…';
   }
+}
+
+export function authorPill(profile: RelayProfile | undefined, pubkey: string, { compact = false } = {}): string {
+  const name = profile?.name || displayPubkey(pubkey);
+  const title = [profile?.nip05, pubkey].filter(Boolean).join(' · ');
+  const initial = name.trim().slice(0, 1).toUpperCase() || '?';
+  const avatar = profile?.picture
+    ? `<img src="${html(profile.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'author-avatar-fallback',textContent:'${html(initial)}'}))">`
+    : `<span class="author-avatar-fallback">${html(initial)}</span>`;
+  return `<span class="author-pill${compact ? ' compact' : ''}" title="${html(title)}">${avatar}<span>${html(name)}</span></span>`;
 }
 
 export const EX_PLACEHOLDER = '<div class="card-placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>';

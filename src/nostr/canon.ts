@@ -8,7 +8,8 @@ import { DEFAULT_PUBLIC_RELAYS } from './pool';
 // The canon is everything signed by the operator key. The d-tag convention
 // gives cohesion; the author filter gives control — anyone can copy a d-tag,
 // nobody can forge the signature.
-export const OPERATOR_PUBKEY = '20e17dd0ec1bb0832688e739ad89709d047deb23ed5146822efdd2d22ae504d7';
+// Workstr canon key: npub1aujzgcepu37azm8vjcx56d68qwhhs5zapevu2v4s2j6svr3h90tqm8xhzg
+export const OPERATOR_PUBKEY = 'ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6';
 export const CANON_RELAYS = DEFAULT_PUBLIC_RELAYS;
 
 export interface RelayProgramExercise {

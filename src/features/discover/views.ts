@@ -1,6 +1,6 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
-import { difficultyBadgeClass, EX_PLACEHOLDER, exerciseFilterValues, fillSelectHtml, filterExercises, html } from '../../app/format';
+import { authorPill, difficultyBadgeClass, EX_PLACEHOLDER, exerciseFilterValues, fillSelectHtml, filterExercises, html } from '../../app/format';
 
 export type DiscoverImportState = 'new' | 'in-library' | 'update';
 
@@ -33,6 +33,7 @@ export function discoverCardHtml(exercise: Exercise, state: AppState): string {
   // Only importable cards (new/update) take part in select mode.
   const selectable = sel.active && importState !== 'in-library';
   const selected = selectable && sel.addresses.has(exercise.nostr_address || exercise.slug);
+  const author = exercise.nostr_pubkey ? authorPill(state.authorProfiles?.[exercise.nostr_pubkey], exercise.nostr_pubkey, { compact: true }) : '';
   return `
     <div class="ex-card${selected ? ' selected' : ''}${sel.active && !selectable ? ' unselectable' : ''}" data-address="${html(exercise.nostr_address || exercise.slug)}">
       <div class="card-img">
@@ -43,8 +44,9 @@ export function discoverCardHtml(exercise: Exercise, state: AppState): string {
       </div>
       <div class="card-body">
         <div class="card-name">${html(exercise.name)}</div>
-        <div class="card-meta">
+        <div class="card-meta discover-card-meta">
           ${exercise.muscle_group ? `<span class="muscle">${html(exercise.muscle_group)}</span>` : ''}
+          ${author}
         </div>
         ${importButton(exercise, importState)}
       </div>
