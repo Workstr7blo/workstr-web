@@ -1,5 +1,5 @@
 import { SimplePool } from 'nostr-tools';
-import { CANON_RELAYS } from './canon';
+import { DEFAULT_WRITE_RELAYS } from './pool';
 import { canonMuscle } from '../core/muscles';
 import type { Exercise } from '../core/types';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../signer/types';
@@ -149,7 +149,7 @@ export function summarizePublishResults(relays: string[], results: PromiseSettle
   }));
 }
 
-export async function publishWorkoutSummary(signer: Signer, session: ActiveSession, unit: WeightUnit, relays: string[] = CANON_RELAYS, options: PublishSummaryOptions = {}): Promise<PublishSummaryResult> {
+export async function publishWorkoutSummary(signer: Signer, session: ActiveSession, unit: WeightUnit, relays: string[] = DEFAULT_WRITE_RELAYS, options: PublishSummaryOptions = {}): Promise<PublishSummaryResult> {
   // Workstr Web should not ask the signer for NIP-98 media-upload auth during
   // summary publish when a relay-published program did not carry a map URL.
   // Reuse the program map when present; otherwise publish a text-only kind:1.
