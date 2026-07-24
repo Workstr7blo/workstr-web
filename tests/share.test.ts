@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ActiveSession } from '../src/app/state';
 import { buildWorkoutSummaryEvent, summarizePublishResults, workoutSummaryText } from '../src/nostr/share';
+import { DEFAULT_WRITE_RELAYS } from '../src/nostr/pool';
 
 function session(overrides: Partial<ActiveSession> = {}): ActiveSession {
   return {
@@ -95,6 +96,24 @@ describe('summarizePublishResults', () => {
 
     expect(summarizePublishResults(relays, results)).toEqual([
       { relay: 'wss://relay.nostr.band', accepted: false, reason: 'blocked: invalid signature' }
+    ]);
+  });
+});
+
+describe('DEFAULT_WRITE_RELAYS', () => {
+  it('uses the configured write relay list for personal workout notes', () => {
+    expect(DEFAULT_WRITE_RELAYS).toEqual([
+      'wss://nos.lol',
+      'wss://nostr.mom',
+      'wss://relay.primal.net',
+      'wss://relay.damus.io',
+      'wss://relay.snort.social',
+      'wss://relay.wellorder.net',
+      'wss://bitcoiner.social',
+      'wss://relay.powr.build',
+      'wss://relay.nos.social',
+      'wss://nostr.bitcoiner.social',
+      'wss://nostr-pub.wellorder.net'
     ]);
   });
 });
