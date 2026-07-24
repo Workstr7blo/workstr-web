@@ -272,8 +272,44 @@ async function queryCanon(kind: 33401 | 33402, limit: number): Promise<Event[]> 
 }
 
 function exercisesFrom(events: Event[]): Exercise[] {
-  return events.map(exerciseFromEvent).filter((item): item is Exercise => item !== null)
+  return dedupeCanonExercises(events.map(exerciseFromEvent).filter((item): item is Exercise => item !== null))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function exerciseTitleKey(exercise: Exercise): string {
+  return slugify(exercise.name).toLowerCase();
+}
+
+function isGeneratedDuplicateSlug(exercise: Exercise): boolean {
+  return /-[a-z0-9]{8,10}$/i.test(exercise.slug) && exercise.slug !== exerciseTitleKey(exercise);
+}
+
+function exerciseDedupScore(exercise: Exercise): number {
+  const titleSlug = exerciseTitleKey(exercise);
+  if (exercise.slug === titleSlug) return 3;
+  if (!isGeneratedDuplicateSlug(exercise)) return 2;
+  return 1;
+}
+
+function preferredExercise(current: Exercise, candidate: Exercise): Exercise {
+  const currentScore = exerciseDedupScore(current);
+  const candidateScore = exerciseDedupScore(candidate);
+  if (candidateScore !== currentScore) return candidateScore > currentScore ? candidate : current;
+  return (candidate.origin_created_at || 0) > (current.origin_created_at || 0) ? candidate : current;
+}
+
+// Workstr's public catalog can contain the same exercise title under a clean
+// slug and a one-off generated slug from an import retry. Discover should show
+// one card per movement title, preferring the stable clean slug so imports and
+// program references stay predictable.
+export function dedupeCanonExercises(exercises: Exercise[]): Exercise[] {
+  const byTitle = new Map<string, Exercise>();
+  for (const exercise of exercises) {
+    const key = exerciseTitleKey(exercise);
+    const existing = byTitle.get(key);
+    byTitle.set(key, existing ? preferredExercise(existing, exercise) : exercise);
+  }
+  return [...byTitle.values()];
 }
 
 function programsFrom(events: Event[]): RelayProgram[] {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
-import { EXERCISE_D_PREFIX, exerciseFromEvent, programFromEvent, selectCanonEvents } from '../src/nostr/canon';
+import { dedupeCanonExercises, EXERCISE_D_PREFIX, exerciseFromEvent, programFromEvent, selectCanonEvents } from '../src/nostr/canon';
 
 const operatorSecret = generateSecretKey();
 const operatorPubkey = getPublicKey(operatorSecret);
@@ -68,6 +68,22 @@ describe('exerciseFromEvent', () => {
     expect(exercise?.muscle_group).toBe('Chest');
     expect(exercise?.nostr_address).toBe(`33401:${operatorPubkey}:${EXERCISE_D_PREFIX}bench-press`);
     expect(exercise?.source_type).toBe('imported');
+  });
+});
+
+describe('dedupeCanonExercises', () => {
+  it('keeps the clean title slug over a newer generated duplicate slug', () => {
+    const clean = exerciseFromEvent(exerciseEvent(operatorSecret, 'dumbbell-squat', 100, 'Dumbbell Squat'))!;
+    const generated = exerciseFromEvent(exerciseEvent(operatorSecret, 'dumbbell-squat-mryb0nmx', 300, 'Dumbbell Squat'))!;
+
+    expect(dedupeCanonExercises([generated, clean]).map((exercise) => exercise.slug)).toEqual(['dumbbell-squat']);
+  });
+
+  it('keeps the newest event when duplicate titles have equal-quality slugs', () => {
+    const older = exerciseFromEvent(exerciseEvent(operatorSecret, 'dumbbell-squat-mryb0nmx', 100, 'Dumbbell Squat'))!;
+    const newer = exerciseFromEvent(exerciseEvent(operatorSecret, 'dumbbell-squat-mryb0nmy', 300, 'Dumbbell Squat'))!;
+
+    expect(dedupeCanonExercises([older, newer]).map((exercise) => exercise.slug)).toEqual(['dumbbell-squat-mryb0nmy']);
   });
 });
 
