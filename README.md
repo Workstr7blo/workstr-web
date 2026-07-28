@@ -2,9 +2,7 @@
 
 Static, local-first Nostr workout tracker PWA.
 
-The source of truth for this project is `docs/instruction.md`, copied from:
-
-`docs/instruction.md`
+The source of truth for this project is [`docs/instruction.md`](docs/instruction.md).
 
 This is a separate product from the self-hosted Workstr server app. It uses Vite, TypeScript, IndexedDB, NIP-07/NIP-46 signers, and GitHub Pages/static hosting.
 

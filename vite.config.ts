@@ -6,7 +6,9 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: false,
-    allowedHosts: ['host.tailnet.ts.net', '100.64.0.10', '192.168.1.10']
+    // Vite always allows IP and localhost host headers, so this only needs to
+    // cover named hosts. The leading dot matches any Tailscale MagicDNS name.
+    allowedHosts: ['.ts.net']
   },
   test: {
     environment: 'jsdom',
