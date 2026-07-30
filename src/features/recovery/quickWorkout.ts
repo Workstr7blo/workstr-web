@@ -1,4 +1,5 @@
 import { canonMuscle } from '../../core/muscles';
+import { equipmentKey, matchesEquipment } from '../../core/equipment';
 import type { Exercise } from '../../core/types';
 import { completedSets, type ActiveSession, type QwExercise } from '../../app/state';
 import { programMuscleLabel } from '../../app/format';
@@ -14,13 +15,24 @@ function qwCanonMuscle(raw: string | undefined): string {
 
 // Ported verbatim from self-hosted Workstr src/app/store.js getQuickWorkout().
 // Untrained muscle groups report 100% recovery, so they are always in readySet.
-export function getQuickWorkout(sessions: ActiveSession[], exercises: Exercise[], durationMinutes = 45, minRecovery = 80): QuickWorkoutData {
+export function getQuickWorkout(
+  sessions: ActiveSession[],
+  exercises: Exercise[],
+  durationMinutes = 45,
+  minRecovery = 80,
+  ownedEquipment: string[] = []
+): QuickWorkoutData {
   const recovery = getRecovery(sessions, exercises);
   const readySet = new Set(recovery.muscleGroups.filter((group) => group.percent >= minRecovery).map((group) => group.name));
   if (!readySet.size) return { exercises: [], pool: {}, targetMuscleGroups: [], estimatedDurationMin: 0 };
 
+  // A saved kit narrows the candidate pool: proposing a barbell lift to someone
+  // with two dumbbells is worse than proposing nothing. An empty kit filters
+  // nothing, and exercises needing no equipment always qualify.
+  const allowed = new Set(ownedEquipment.map(equipmentKey).filter(Boolean));
   const rows = [...exercises]
     .filter((exercise) => exercise.muscle_group && readySet.has(qwCanonMuscle(exercise.muscle_group)))
+    .filter((exercise) => matchesEquipment(exercise.equipment, allowed))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   const loggedSlugs = new Set(completedSets(sessions).map((set) => set.exerciseSlug));
 

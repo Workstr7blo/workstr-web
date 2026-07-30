@@ -63,8 +63,8 @@ export interface AppState {
   librarySelect: { active: boolean; slugs: Set<string> };
   discoverSelect: { active: boolean; addresses: Set<string> };
   discoverExercises: Exercise[];
-  exFilter: { cat: string; muscle: string; diff: string };
-  discoverFilter: { q: string; cat: string; muscle: string; diff: string };
+  exFilter: { cat: string; muscle: string; diff: string; equip: string };
+  discoverFilter: { q: string; cat: string; muscle: string; diff: string; equip: string };
   activeSession: ActiveSession | null;
   finishedSessions: ActiveSession[];
   publishingSessionId: number | null;

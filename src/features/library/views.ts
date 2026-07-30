@@ -1,11 +1,12 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
-import { difficultyBadgeClass, EX_PLACEHOLDER, exerciseFilterValues, exerciseSourceLabel, fillSelectHtml, filterExercises, html } from '../../app/format';
+import { difficultyBadgeClass, equipmentSelectHtml, EX_PLACEHOLDER, exerciseFilterValues, exerciseSourceLabel, fillSelectHtml, filterExercises, html } from '../../app/format';
 
 export function libraryPanel(state: AppState): string {
   const filters = exerciseFilterValues(state.library);
-  const list = filterExercises(state.library, state.filter, state.exFilter.cat, state.exFilter.muscle, state.exFilter.diff);
-  const hasFilters = Boolean(state.filter || state.exFilter.cat || state.exFilter.muscle || state.exFilter.diff);
+  const owned = state.settings.ownedEquipment || [];
+  const list = filterExercises(state.library, { ...state.exFilter, q: state.filter, ownedEquipment: owned });
+  const hasFilters = Boolean(state.filter || state.exFilter.cat || state.exFilter.muscle || state.exFilter.diff || state.exFilter.equip);
   const emptyText = state.library.length === 0 && !hasFilters
     ? '<p>Your library is empty. Add exercises from the Workstr catalog.</p><button class="button primary" data-parent="exercises" data-subtab="discover">Browse Discover</button>'
     : 'No exercises match.';
@@ -27,6 +28,7 @@ export function libraryPanel(state: AppState): string {
       ${fillSelectHtml('ex-cat', filters.categories, 'All categories', state.exFilter.cat)}
       ${fillSelectHtml('ex-muscle', filters.muscles, 'All muscles', state.exFilter.muscle)}
       ${fillSelectHtml('ex-diff', filters.difficulties, 'All levels', state.exFilter.diff)}
+      ${equipmentSelectHtml('ex-equip', filters.equipment, state.exFilter.equip, owned.length)}
     </div>
     <div id="ex-grid" class="ex-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => exerciseCardHtml(exercise, sel.active, sel.slugs.has(exercise.slug))).join('')}</div>
     <div id="ex-empty" class="empty" style="display:${list.length ? 'none' : 'block'}">${emptyText}</div>

@@ -92,3 +92,14 @@
 .ex-grid.selecting .ex-card.unselectable { opacity: .45; }
 .glyph { background: #0b0616; border: 1px solid var(--border-hot); }
 .glyph img { width: 19px; height: 19px; object-fit: contain; display: block; }
+
+/* My equipment: a plain checkbox list rather than a chip row, so it stays
+   readable as the catalog adds equipment types. 44px rows keep it tappable. */
+.equip-options { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.equip-option {
+  display: flex; align-items: center; gap: 11px;
+  min-height: 44px; padding: 4px 2px;
+  font-size: 14px; font-weight: 700; color: var(--text);
+  cursor: pointer;
+}
+.equip-option input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--sovereign-purple); }

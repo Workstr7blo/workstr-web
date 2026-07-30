@@ -136,5 +136,8 @@ export interface WorkstrSettings {
   syncCursor?: number;
   heightCm?: number;
   targetWeightKg?: number;
+  // Normalized equipment keys the user owns. Drives the "My equipment" filter
+  // option and keeps Quick Workout from proposing exercises you cannot do.
+  ownedEquipment?: string[];
   canonCache?: CanonCache;
 }

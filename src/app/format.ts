@@ -1,5 +1,6 @@
 import { nip19 } from 'nostr-tools';
 import { canonMuscle } from '../core/muscles';
+import { equipmentKey, equipmentOptions, matchesEquipment, MY_EQUIPMENT } from '../core/equipment';
 import type { Exercise } from '../core/types';
 import type { RelayProfile } from '../nostr/pool';
 import type { AppState } from './state';
@@ -74,7 +75,12 @@ export function exerciseCanonMuscleSet(exercise: Exercise): Set<string> {
 }
 
 // Filter helpers shared by the Library and Discover grids.
-export function exerciseFilterValues(exercises: Exercise[]): { categories: string[]; muscles: string[]; difficulties: string[] } {
+export function exerciseFilterValues(exercises: Exercise[]): {
+  categories: string[];
+  muscles: string[];
+  difficulties: string[];
+  equipment: { key: string; label: string }[];
+} {
   const categories = new Set<string>();
   const muscles = new Set<string>();
   const difficulties = new Set<string>();
@@ -84,20 +90,59 @@ export function exerciseFilterValues(exercises: Exercise[]): { categories: strin
     for (const muscle of exerciseCanonMuscleSet(exercise)) muscles.add(muscle);
   }
   const sort = (set: Set<string>) => [...set].sort((a, b) => a.localeCompare(b));
-  return { categories: sort(categories), muscles: sort(muscles), difficulties: sort(difficulties) };
+  return {
+    categories: sort(categories),
+    muscles: sort(muscles),
+    difficulties: sort(difficulties),
+    equipment: equipmentOptions(exercises.map((exercise) => exercise.equipment))
+  };
 }
 
-export function filterExercises(exercises: Exercise[], q: string, cat: string, muscle: string, diff: string): Exercise[] {
-  const query = q.trim().toLowerCase();
+export interface ExerciseFilter {
+  q?: string;
+  cat?: string;
+  muscle?: string;
+  diff?: string;
+  // '' = every exercise, MY_EQUIPMENT = the saved kit, anything else = one key.
+  equip?: string;
+  ownedEquipment?: string[];
+}
+
+// Resolve the equipment select into the set of keys an exercise may require.
+// An empty set means "do not filter on equipment at all".
+export function allowedEquipmentKeys(equip: string | undefined, owned: string[] | undefined): Set<string> {
+  if (equip === MY_EQUIPMENT) return new Set((owned || []).map(equipmentKey).filter(Boolean));
+  const key = equipmentKey(equip);
+  return key ? new Set([key]) : new Set();
+}
+
+export function filterExercises(exercises: Exercise[], filter: ExerciseFilter = {}): Exercise[] {
+  const query = (filter.q || '').trim().toLowerCase();
+  const { cat, muscle, diff } = filter;
+  const allowed = allowedEquipmentKeys(filter.equip, filter.ownedEquipment);
   return exercises.filter((exercise) =>
     (!query || exercise.name.toLowerCase().includes(query) || (exercise.muscle_group || '').toLowerCase().includes(query))
     && (!cat || exercise.category === cat)
     && (!muscle || exerciseCanonMuscleSet(exercise).has(muscle))
-    && (!diff || exercise.difficulty === diff));
+    && (!diff || exercise.difficulty === diff)
+    && matchesEquipment(exercise.equipment, allowed));
 }
 
 export function fillSelectHtml(id: string, values: string[], allLabel: string, current: string): string {
   return `<select id="${id}"><option value="">${allLabel}</option>${values.map((value) => `<option value="${html(value)}" ${value === current ? 'selected' : ''}>${html(value)}</option>`).join('')}</select>`;
+}
+
+// The equipment select. "My equipment" only appears once a kit is saved, so the
+// list never offers an option that would blank the grid.
+export function equipmentSelectHtml(
+  id: string,
+  options: { key: string; label: string }[],
+  current: string,
+  ownedCount: number
+): string {
+  const option = (value: string, label: string) =>
+    `<option value="${html(value)}" ${value === current ? 'selected' : ''}>${html(label)}</option>`;
+  return `<select id="${id}">${ownedCount ? option(MY_EQUIPMENT, 'My equipment') : ''}${option('', 'All equipment')}${options.map((item) => option(item.key, item.label)).join('')}</select>`;
 }
 
 export function formatSessionDate(iso: string): string {

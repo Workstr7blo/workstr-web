@@ -3,8 +3,10 @@ import { nip19 } from 'nostr-tools';
 import {
   html, shortNpub, displayIdentity, displayPubkey, difficultyBadgeClass,
   exerciseSourceLabel, exerciseCanonMuscleSet, exerciseFilterValues, filterExercises,
-  fillSelectHtml, formatSessionDate, formatMinutes, exerciseImage, programMuscleLabel
+  fillSelectHtml, equipmentSelectHtml, allowedEquipmentKeys,
+  formatSessionDate, formatMinutes, exerciseImage, programMuscleLabel
 } from '../src/app/format';
+import { MY_EQUIPMENT } from '../src/core/equipment';
 import type { Exercise } from '../src/core/types';
 import type { AppState } from '../src/app/state';
 
@@ -92,16 +94,17 @@ describe('filterExercises', () => {
     ex({ name: 'Pull Up', muscle_group: 'lats', category: 'Bodyweight', difficulty: 'advanced' })
   ];
   it('matches query against name or muscle group, case-insensitively', () => {
-    expect(filterExercises(list, 'bench', '', '', '').map((e) => e.name)).toEqual(['Barbell Bench Press']);
-    expect(filterExercises(list, 'LATS', '', '', '').map((e) => e.name)).toEqual(['Pull Up']);
+    expect(filterExercises(list, { q: 'bench' }).map((e) => e.name)).toEqual(['Barbell Bench Press']);
+    expect(filterExercises(list, { q: 'LATS' }).map((e) => e.name)).toEqual(['Pull Up']);
   });
   it('filters by category, canonical muscle, and difficulty', () => {
-    expect(filterExercises(list, '', 'Strength', '', '').map((e) => e.name)).toEqual(['Barbell Bench Press']);
-    expect(filterExercises(list, '', '', 'Back', '').map((e) => e.name)).toEqual(['Pull Up']);
-    expect(filterExercises(list, '', '', '', 'advanced').map((e) => e.name)).toEqual(['Pull Up']);
+    expect(filterExercises(list, { cat: 'Strength' }).map((e) => e.name)).toEqual(['Barbell Bench Press']);
+    expect(filterExercises(list, { muscle: 'Back' }).map((e) => e.name)).toEqual(['Pull Up']);
+    expect(filterExercises(list, { diff: 'advanced' }).map((e) => e.name)).toEqual(['Pull Up']);
   });
   it('returns everything when no filters are set', () => {
-    expect(filterExercises(list, '', '', '', '')).toHaveLength(2);
+    expect(filterExercises(list, {})).toHaveLength(2);
+    expect(filterExercises(list)).toHaveLength(2);
   });
 });
 
@@ -149,5 +152,70 @@ describe('programMuscleLabel', () => {
     expect(programMuscleLabel('Lateral Deltoid')).toBe('Shoulders');
     expect(programMuscleLabel('Chest')).toBe('Chest');
     expect(programMuscleLabel('')).toBe('');
+  });
+});
+
+describe('equipment filtering', () => {
+  const list = [
+    ex({ name: 'Push Up', equipment: ['Body Weight'] }),
+    ex({ name: 'Curl', equipment: ['Dumbbell'] }),
+    ex({ name: 'Snatch', equipment: ['Barbell'] }),
+    ex({ name: 'Stretch', equipment: [] })
+  ];
+  const names = (out: Exercise[]) => out.map((e) => e.name);
+
+  it('lists distinct equipment as key/label pairs sorted by label', () => {
+    expect(exerciseFilterValues(list).equipment).toEqual([
+      { key: 'barbell', label: 'Barbell' },
+      { key: 'body weight', label: 'Body Weight' },
+      { key: 'dumbbell', label: 'Dumbbell' }
+    ]);
+  });
+
+  it('collapses spelling and spacing variants onto one key', () => {
+    const values = exerciseFilterValues([ex({ equipment: ['Dumbbell'] }), ex({ equipment: ['  dumbbell '] })]);
+    expect(values.equipment).toEqual([{ key: 'dumbbell', label: 'Dumbbell' }]);
+    // A kit saved from either spelling still matches both exercises.
+    expect(filterExercises(list, { equip: 'DUMBBELL' }).length).toBe(2);
+  });
+
+  it('filters to a single equipment key', () => {
+    expect(names(filterExercises(list, { equip: 'dumbbell' }))).toEqual(['Curl', 'Stretch']);
+  });
+
+  it('treats My equipment as the union of the saved kit', () => {
+    const owned = ['body weight', 'dumbbell'];
+    expect(names(filterExercises(list, { equip: MY_EQUIPMENT, ownedEquipment: owned })))
+      .toEqual(['Push Up', 'Curl', 'Stretch']);
+  });
+
+  it('never hides exercises that need no equipment', () => {
+    expect(names(filterExercises(list, { equip: MY_EQUIPMENT, ownedEquipment: ['barbell'] })))
+      .toEqual(['Snatch', 'Stretch']);
+  });
+
+  it('shows everything when the kit is empty rather than nothing', () => {
+    expect(filterExercises(list, { equip: MY_EQUIPMENT, ownedEquipment: [] })).toHaveLength(4);
+    expect(allowedEquipmentKeys(MY_EQUIPMENT, []).size).toBe(0);
+  });
+
+  it('ANDs equipment with the other filters', () => {
+    const mixed = [
+      ex({ name: 'A', equipment: ['Dumbbell'], difficulty: 'beginner' }),
+      ex({ name: 'B', equipment: ['Dumbbell'], difficulty: 'advanced' })
+    ];
+    expect(names(filterExercises(mixed, { equip: 'dumbbell', diff: 'advanced' }))).toEqual(['B']);
+  });
+});
+
+describe('equipmentSelectHtml', () => {
+  const options = [{ key: 'dumbbell', label: 'Dumbbell' }];
+  it('offers My equipment only once a kit is saved', () => {
+    expect(equipmentSelectHtml('ex-equip', options, '', 0)).not.toContain('My equipment');
+    expect(equipmentSelectHtml('ex-equip', options, '', 2)).toContain('My equipment');
+  });
+  it('marks the current selection and escapes labels', () => {
+    expect(equipmentSelectHtml('ex-equip', options, 'dumbbell', 1)).toContain('value="dumbbell" selected');
+    expect(equipmentSelectHtml('ex-equip', [{ key: 'x', label: '<script>' }], '', 0)).toContain('&lt;script&gt;');
   });
 });

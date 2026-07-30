@@ -19,8 +19,8 @@ function makeState(store: WorkstrStore): AppState {
     qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false },
     bodyEntries: [], sheets: [], library: [],
     librarySelect: { active: false, slugs: new Set() }, discoverSelect: { active: false, addresses: new Set() },
-    discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' },
-    discoverFilter: { q: '', cat: '', muscle: '', diff: '' }
+    discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' },
+    discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' }
   };
 }
 

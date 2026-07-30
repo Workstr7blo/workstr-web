@@ -1,6 +1,6 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
-import { authorPill, difficultyBadgeClass, EX_PLACEHOLDER, exerciseFilterValues, fillSelectHtml, filterExercises, html } from '../../app/format';
+import { authorPill, difficultyBadgeClass, equipmentSelectHtml, EX_PLACEHOLDER, exerciseFilterValues, fillSelectHtml, filterExercises, html } from '../../app/format';
 
 export type DiscoverImportState = 'new' | 'in-library' | 'update';
 
@@ -59,7 +59,8 @@ export function discoverImportable(list: Exercise[], library: Exercise[]): Exerc
 
 export function discoverPanel(state: AppState): string {
   const filters = exerciseFilterValues(state.discoverExercises);
-  const list = filterExercises(state.discoverExercises, state.discoverFilter.q, state.discoverFilter.cat, state.discoverFilter.muscle, state.discoverFilter.diff);
+  const owned = state.settings.ownedEquipment || [];
+  const list = filterExercises(state.discoverExercises, { ...state.discoverFilter, ownedEquipment: owned });
   const sel = state.discoverSelect;
   const importable = discoverImportable(list, state.library);
   const allVisibleSelected = importable.length > 0 && importable.every((exercise) => sel.addresses.has(exercise.nostr_address || exercise.slug));
@@ -81,6 +82,7 @@ export function discoverPanel(state: AppState): string {
       ${fillSelectHtml('discover-cat', filters.categories, 'All categories', state.discoverFilter.cat)}
       ${fillSelectHtml('discover-muscle', filters.muscles, 'All muscles', state.discoverFilter.muscle)}
       ${fillSelectHtml('discover-diff', filters.difficulties, 'All levels', state.discoverFilter.diff)}
+      ${equipmentSelectHtml('discover-equip', filters.equipment, state.discoverFilter.equip, owned.length)}
     </div>
     <div id="discover-status" class="discover-status">${html(state.exerciseStatus)}</div>
     <div id="discover-grid" class="ex-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => discoverCardHtml(exercise, state)).join('') || '<div class="empty">No exercises match.</div>'}</div>

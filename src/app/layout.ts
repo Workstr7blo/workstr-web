@@ -1,5 +1,6 @@
 import type { AppState, View } from './state';
-import { displayIdentity, html } from './format';
+import { displayIdentity, exerciseFilterValues, html } from './format';
+import { equipmentKey } from '../core/equipment';
 import { normalizeWeightUnit } from '../core/units';
 import { hasNip07 } from '../signer/nip07';
 import { libraryPanel } from '../features/library/views';
@@ -146,10 +147,26 @@ function statisticsView(state: AppState): string {
   </div>`;
 }
 
+// Kit options come from the library plus the Workstr catalog, so equipment can
+// be ticked before any exercise using it has been imported.
+function equipmentPanel(state: AppState): string {
+  const options = exerciseFilterValues([...state.library, ...state.discoverExercises]).equipment;
+  const owned = new Set((state.settings.ownedEquipment || []).map(equipmentKey));
+  if (!options.length) {
+    return `<div class="panel"><div class="panel-head"><span>My equipment</span></div><p class="section-help">No equipment listed yet. Import exercises from the Workstr catalog and the equipment they use appears here.</p></div>`;
+  }
+  const boxes = options.map((item) => `<label class="equip-option"><input type="checkbox" class="equip-toggle" value="${html(item.key)}" ${owned.has(item.key) ? 'checked' : ''} />${html(item.label)}</label>`).join('');
+  return `<div class="panel">
+    <div class="panel-head"><span>My equipment</span><span class="status-pill ${owned.size ? 'ok' : ''}">${owned.size ? `${owned.size} selected` : 'not set'}</span></div>
+    <p class="section-help">Tick what you can train with. The Exercises tab then offers a "My equipment" filter, and Quick Workout stops proposing exercises you cannot do. Exercises that need no equipment always stay visible.</p>
+    <div class="equip-options">${boxes}</div>
+  </div>`;
+}
+
 function settingsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   const account = state.pubkey
     ? `<p class="section-help">Signed in with your Nostr signer. Your training data lives in this identity's database on this device; keys stay in your signer.</p><div class="web-empty-actions"><button id="sign-out-settings" class="button ghost">Sign out</button><button id="remove-account-data" class="button ghost">Sign out and remove data from this device</button></div>`
     : `<p class="section-help">Workstr works fully on this device without an account — everything is saved locally. Sign in with a Nostr signer to attach your training data to your identity; sync, backup and publishing build on it later. On first sign-in your local data moves under your identity — nothing is ever merged.</p><div class="web-empty-actions"><button id="sign-in-settings" class="button primary">Sign in with signer app</button>${hasNip07() ? '<button id="sign-in-nip07" class="button ghost">Use browser extension</button>' : ''}</div>`;
-  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr account</span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'connected' : 'local'}</span></div>${account}<div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label></div><div class="panel"><div class="panel-head"><span>Backup</span></div><p class="section-help">Export your whole library, programs, history, body log and settings to a JSON file, or restore from one. Import replaces everything in this account.</p><div class="web-empty-actions"><button id="export-data" class="button ghost">Export data</button><button id="import-data" class="button ghost">Import data…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div></div></div>`;
+  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr account</span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'connected' : 'local'}</span></div>${account}<div class="terminal-mini">secure context: ${window.isSecureContext}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label></div>${equipmentPanel(state)}<div class="panel"><div class="panel-head"><span>Backup</span></div><p class="section-help">Export your whole library, programs, history, body log and settings to a JSON file, or restore from one. Import replaces everything in this account.</p><div class="web-empty-actions"><button id="export-data" class="button ghost">Export data</button><button id="import-data" class="button ghost">Import data…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div></div></div>`;
 }

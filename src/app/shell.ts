@@ -3,6 +3,7 @@ import { renderSVG } from 'uqr';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
 import { clearCachedNip46Signer, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
 import { canonMuscle } from '../core/muscles';
+import { MY_EQUIPMENT } from '../core/equipment';
 import { WorkstrStore, type ExerciseDraft, type SheetWithExercises } from '../db/store';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
@@ -54,7 +55,7 @@ async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<Rela
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -101,6 +102,12 @@ export function renderShell(root: HTMLElement): void {
     state.store?.close();
     state.store = await WorkstrStore.open(namespace);
     state.settings = await state.store.getSettings();
+    // A saved kit is the useful default view; without one the option does not
+    // exist yet and both grids stay on "All equipment".
+    if ((state.settings.ownedEquipment || []).length) {
+      state.exFilter.equip = MY_EQUIPMENT;
+      state.discoverFilter.equip = MY_EQUIPMENT;
+    }
     await state.store.removeStarterExercises();
     state.finishedSessions = await loadFinishedSessions();
     state.bodyEntries = await state.store.listBody();
@@ -152,6 +159,7 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void signOut(); });
     root.querySelector('#remove-account-data')?.addEventListener('click', () => { void signOutAndRemoveData(); });
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void saveUnitPreference((event.target as HTMLSelectElement).value); });
+    root.querySelectorAll('.equip-toggle').forEach((box) => box.addEventListener('change', () => { void saveOwnedEquipment(); }));
     root.querySelector('#export-data')?.addEventListener('click', () => { void exportUserData(); });
     root.querySelector('#import-data')?.addEventListener('click', () => root.querySelector<HTMLInputElement>('#import-file')?.click());
     root.querySelector('#import-file')?.addEventListener('change', (event) => { void importUserData(event.target as HTMLInputElement); });
@@ -161,6 +169,7 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#ex-cat')?.addEventListener('change', (event) => { state.exFilter.cat = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#ex-muscle')?.addEventListener('change', (event) => { state.exFilter.muscle = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#ex-diff')?.addEventListener('change', (event) => { state.exFilter.diff = (event.target as HTMLSelectElement).value; render(); });
+    root.querySelector('#ex-equip')?.addEventListener('change', (event) => { state.exFilter.equip = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#ex-grid')?.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
       const card = target.closest<HTMLElement>('[data-slug]');
@@ -181,7 +190,7 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#lib-select-toggle')?.addEventListener('click', () => { state.librarySelect = { active: true, slugs: new Set() }; render(); });
     root.querySelector('#lib-select-cancel')?.addEventListener('click', () => { state.librarySelect = { active: false, slugs: new Set() }; render(); });
     root.querySelector('#lib-select-all')?.addEventListener('click', () => {
-      const visible = filterExercises(state.library, state.filter, state.exFilter.cat, state.exFilter.muscle, state.exFilter.diff).map((exercise) => exercise.slug);
+      const visible = filterExercises(state.library, { ...state.exFilter, q: state.filter, ownedEquipment: state.settings.ownedEquipment }).map((exercise) => exercise.slug);
       const allSelected = visible.length > 0 && visible.every((slug) => state.librarySelect.slugs.has(slug));
       state.librarySelect.slugs = allSelected ? new Set() : new Set(visible);
       render();
@@ -193,6 +202,7 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#discover-cat')?.addEventListener('change', (event) => { state.discoverFilter.cat = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#discover-muscle')?.addEventListener('change', (event) => { state.discoverFilter.muscle = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#discover-diff')?.addEventListener('change', (event) => { state.discoverFilter.diff = (event.target as HTMLSelectElement).value; render(); });
+    root.querySelector('#discover-equip')?.addEventListener('change', (event) => { state.discoverFilter.equip = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#discover-grid')?.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
       const card = target.closest<HTMLElement>('[data-address]');
@@ -214,7 +224,7 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#discover-select-toggle')?.addEventListener('click', () => { state.discoverSelect = { active: true, addresses: new Set() }; render(); });
     root.querySelector('#discover-select-cancel')?.addEventListener('click', () => { state.discoverSelect = { active: false, addresses: new Set() }; render(); });
     root.querySelector('#discover-select-all')?.addEventListener('click', () => {
-      const visible = filterExercises(state.discoverExercises, state.discoverFilter.q, state.discoverFilter.cat, state.discoverFilter.muscle, state.discoverFilter.diff);
+      const visible = filterExercises(state.discoverExercises, { ...state.discoverFilter, ownedEquipment: state.settings.ownedEquipment });
       const importable = discoverImportable(visible, state.library).map((exercise) => exercise.nostr_address || exercise.slug);
       const allSelected = importable.length > 0 && importable.every((address) => state.discoverSelect.addresses.has(address));
       state.discoverSelect.addresses = allSelected ? new Set() : new Set(importable);
@@ -525,7 +535,7 @@ export function renderShell(root: HTMLElement): void {
       root.querySelectorAll<HTMLElement>('#qw-duration .qw-dur-btn').forEach((el) => el.classList.toggle('active', el === button));
     }));
     root.querySelector('#qw-generate')?.addEventListener('click', async () => {
-      const data = getQuickWorkout(state.finishedSessions, state.store ? await state.store.listExercises() : [], state.qw.duration, 80);
+      const data = getQuickWorkout(state.finishedSessions, state.store ? await state.store.listExercises() : [], state.qw.duration, 80, state.settings.ownedEquipment || []);
       if (!data.exercises.length) {
         state.qw.visible = false; state.qw.exercises = []; state.qw.pool = {};
         render();
@@ -580,6 +590,20 @@ export function renderShell(root: HTMLElement): void {
     if (!state.store) return;
     state.settings = { ...state.settings, unit: normalizeWeightUnit(value) };
     await state.store.saveSettings(state.settings);
+    render();
+  }
+
+  async function saveOwnedEquipment(): Promise<void> {
+    if (!state.store) return;
+    const checked = [...root.querySelectorAll<HTMLInputElement>('.equip-toggle:checked')].map((box) => box.value);
+    state.settings = { ...state.settings, ownedEquipment: checked };
+    await state.store.saveSettings(state.settings);
+    // "My equipment" disappears from the selects when the kit empties, so a
+    // filter still pointing at it would silently filter on nothing.
+    if (!checked.length) {
+      if (state.exFilter.equip === MY_EQUIPMENT) state.exFilter.equip = '';
+      if (state.discoverFilter.equip === MY_EQUIPMENT) state.discoverFilter.equip = '';
+    }
     render();
   }
 

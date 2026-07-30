@@ -3,8 +3,8 @@ import { getRecovery } from '../src/features/recovery/recovery';
 import { getQuickWorkout } from '../src/features/recovery/quickWorkout';
 import type { Exercise } from '../src/core/types';
 
-const libraryExercise = (slug: string, muscleGroup: string) =>
-  ({ slug, name: slug, muscle_group: muscleGroup, muscles: [muscleGroup], tags: [] } as unknown as Exercise);
+const libraryExercise = (slug: string, muscleGroup: string, equipment: string[] = []) =>
+  ({ slug, name: slug, muscle_group: muscleGroup, muscles: [muscleGroup], tags: [], equipment } as unknown as Exercise);
 
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3600000).toISOString();
 
@@ -86,5 +86,27 @@ describe('getQuickWorkout', () => {
     expect(groups).toContain('Quadriceps');
     expect(groups).toContain('Hamstrings');
     expect(groups).toContain('Shoulders');
+  });
+});
+
+describe('getQuickWorkout equipment awareness', () => {
+  const kitLibrary = [
+    libraryExercise('push-up', 'Chest', ['Body Weight']),
+    libraryExercise('bench-press', 'Chest', ['Barbell']),
+    libraryExercise('goblet-squat', 'Quadriceps', ['Dumbbell']),
+    libraryExercise('mobility-flow', 'Hamstrings', [])
+  ];
+  const slugs = (owned: string[]) => getQuickWorkout([], kitLibrary, 60, 80, owned).exercises.map((e) => e.slug).sort();
+
+  it('proposes only exercises the saved kit covers', () => {
+    expect(slugs(['body weight', 'dumbbell'])).toEqual(['goblet-squat', 'mobility-flow', 'push-up']);
+  });
+
+  it('keeps exercises that need no equipment', () => {
+    expect(slugs(['barbell'])).toContain('mobility-flow');
+  });
+
+  it('falls back to the whole library when no kit is saved', () => {
+    expect(slugs([])).toEqual(['bench-press', 'goblet-squat', 'mobility-flow', 'push-up']);
   });
 });
