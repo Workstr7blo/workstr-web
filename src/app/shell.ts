@@ -26,6 +26,8 @@ import { sheetToProgram, type BuilderState } from '../features/sheets/views';
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
 const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
+const PROGRAM_DIFFICULTIES = ['beginner', 'intermediate', 'advanced', 'Beast Mode'];
+const tagsFromCsv = (value: string): string[] => [...new Set(value.split(',').map((tag) => tag.trim()).filter(Boolean))];
 
 function profileName(profile: RelayProfile | null): string | null {
   return profile?.name?.trim() || profile?.nip05?.trim() || null;
@@ -292,6 +294,8 @@ export function renderShell(root: HTMLElement): void {
       sheetId: sheet?.id,
       name: sheet?.name || '',
       desc: sheet?.notes || '',
+      difficulty: sheet?.difficulty || '',
+      tags: sheet?.tags || [],
       library,
       rows: sheet
         ? sheet.exercises.map((row) => ({
@@ -313,11 +317,14 @@ export function renderShell(root: HTMLElement): void {
   function renderBuilderModal(): void {
     const current = builder;
     if (!current) return;
+    const difficultyOptions = [''].concat(PROGRAM_DIFFICULTIES).map((difficulty) => `<option value="${html(difficulty)}" ${current.difficulty === difficulty ? 'selected' : ''}>${difficulty ? html(difficulty) : 'Choose level'}</option>`).join('');
     openModal(`
       <h3>${current.sheetId ? 'Edit program' : 'New program'}</h3>
       <div class="form-grid">
         <label class="span-2">Name<input id="sheet-name" value="${html(current.name)}" placeholder="Push Day" /></label>
         <label class="span-2">Description<input id="sheet-desc" value="${html(current.desc)}" placeholder="optional" /></label>
+        <label>Difficulty<select id="sheet-difficulty">${difficultyOptions}</select></label>
+        <label>Tags (comma)<input id="sheet-tags" value="${html(current.tags.join(', '))}" placeholder="strength, hypertrophy" /></label>
       </div>
       <div class="subsection-head"><span>Add from your library</span></div>
       <div class="builder-search-wrap">
@@ -330,6 +337,8 @@ export function renderShell(root: HTMLElement): void {
     renderBuilderRows();
     root.querySelector('#sheet-name')?.addEventListener('input', (event) => { current.name = (event.target as HTMLInputElement).value; });
     root.querySelector('#sheet-desc')?.addEventListener('input', (event) => { current.desc = (event.target as HTMLInputElement).value; });
+    root.querySelector('#sheet-difficulty')?.addEventListener('change', (event) => { current.difficulty = (event.target as HTMLSelectElement).value; });
+    root.querySelector('#sheet-tags')?.addEventListener('input', (event) => { current.tags = tagsFromCsv((event.target as HTMLInputElement).value); });
     const search = root.querySelector<HTMLInputElement>('#builder-search');
     const picker = root.querySelector<HTMLElement>('#builder-picker');
     const sorted = [...current.library].sort((a, b) => Number(b.favourite) - Number(a.favourite) || a.name.localeCompare(b.name));
@@ -412,6 +421,8 @@ export function renderShell(root: HTMLElement): void {
       await state.store.saveSheet({
         name,
         notes: builder.desc.trim(),
+        difficulty: builder.difficulty,
+        tags: builder.tags,
         exercises: builder.rows.map((row, index) => ({
           exercise_slug: row.exerciseSlug,
           exercise_name: row.exerciseName,

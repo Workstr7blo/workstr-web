@@ -13,6 +13,8 @@ export interface SheetWithExercises extends Sheet { exercises: SheetExercise[] }
 export interface SheetDraft {
   name: string;
   notes?: string;
+  difficulty?: string;
+  tags?: string[];
   is_temporary?: boolean;
   nostr_pubkey?: string;
   nostr_address?: string;
@@ -20,6 +22,11 @@ export interface SheetDraft {
   nostr_published_at?: string;
   origin_created_at?: number;
   exercises: Omit<SheetExercise, 'id' | 'sheet_id'>[];
+}
+
+function cleanTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((tag) => String(tag || '').trim()).filter(Boolean))];
 }
 
 export class WorkstrStore {
@@ -127,6 +134,8 @@ export class WorkstrStore {
       slug,
       name: draft.name,
       notes: draft.notes || '',
+      difficulty: draft.difficulty ?? existing?.difficulty ?? '',
+      tags: cleanTags(draft.tags ?? existing?.tags),
       is_temporary: draft.is_temporary ?? existing?.is_temporary ?? false,
       // Import = snapshot: the nostr identity comes only from the draft, so a
       // builder save (which carries none) forks an imported sheet and canon

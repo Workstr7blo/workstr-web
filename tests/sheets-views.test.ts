@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   estimateProgramMin, resolveProgramExercise, programExerciseName, inferProgramMuscle,
-  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram
+  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard
 } from '../src/features/sheets/views';
 import type { Exercise } from '../src/core/types';
 import type { RelayProgram, RelayProgramExercise } from '../src/nostr/canon';
@@ -127,7 +127,7 @@ describe('isLocalProgram / localSheetId', () => {
 
 describe('sheetToProgram', () => {
   const baseSheet: SheetWithExercises = {
-    id: 7, slug: 'push-day', name: 'Push Day', notes: 'chest & tris', is_temporary: false,
+    id: 7, slug: 'push-day', name: 'Push Day', notes: 'chest & tris', difficulty: 'Beast Mode', tags: ['hypertrophy', 'push'], is_temporary: false,
     created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     exercises: [{ sheet_id: 7, exercise_slug: 'bench', exercise_name: 'Bench Press', position: 0, sets: 4, reps: 8, rest: 120, weight: 60 }]
   };
@@ -136,7 +136,15 @@ describe('sheetToProgram', () => {
     expect(program.address).toBe('local:7');
     expect(program.name).toBe('Push Day');
     expect(program.description).toBe('chest & tris');
+    expect(program.difficulty).toBe('Beast Mode');
+    expect(program.tags).toEqual(['hypertrophy', 'push']);
     expect(program.exercises[0]).toMatchObject({ name: 'Bench Press', sets: 4, reps: '8', restSec: 120, weight: '60' });
+  });
+  it('renders difficulty and tag pills on program cards', () => {
+    const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState);
+    expect(card).toContain('Beast Mode');
+    expect(card).toContain('diff-beast');
+    expect(card).toContain('hypertrophy');
   });
   it('labels the source by whether the sheet is published', () => {
     expect(sheetToProgram(baseSheet).sourceLabel).toBe('local');

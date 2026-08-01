@@ -100,11 +100,36 @@ describe('programFromEvent', () => {
         ['exercise', `33401:${operatorPubkey}:workstr:exercise:bench`, 'wss://relay.test', '60', '5', '', 'normal'],
         ['imeta', 'url https://nostr.build/i/push-map.svg', 'm image/svg+xml', 'alt Muscle map for Push Day'],
         ['workstr_muscle_map', 'https://nostr.build/i/push-map.svg'],
-        ['workstr_meta', JSON.stringify({ v: 1, description: 'Chest and shoulders.', muscleMapUrl: 'https://nostr.build/i/push-map.svg', exercises: [{ address: `33401:${operatorPubkey}:workstr:exercise:bench`, name: 'Bench Press', sets: 1, reps: '5' }] })]
+        ['difficulty', 'Beast Mode'],
+        ['t', 'hypertrophy'],
+        ['t', 'beast-mode'],
+        ['workstr_meta', JSON.stringify({ v: 1, description: 'Chest and shoulders.', difficulty: 'Beast Mode', tags: ['hypertrophy', 'push'], muscleMapUrl: 'https://nostr.build/i/push-map.svg', exercises: [{ address: `33401:${operatorPubkey}:workstr:exercise:bench`, name: 'Bench Press', sets: 1, reps: '5' }] })]
       ]
     }, operatorSecret);
 
     const program = programFromEvent(event);
     expect(program?.muscleMapUrl).toBe('https://nostr.build/i/push-map.svg');
+    expect(program?.difficulty).toBe('Beast Mode');
+    expect(program?.tags).toEqual(['hypertrophy', 'push']);
+  });
+
+  it('falls back to top-level difficulty and t tags for generic 33402 events', () => {
+    const event = finalizeEvent({
+      kind: 33402,
+      created_at: 100,
+      content: 'Legs.',
+      tags: [
+        ['d', 'workstr:program:leg-day'],
+        ['title', 'Leg Day'],
+        ['difficulty', 'advanced'],
+        ['t', 'workstr'],
+        ['t', 'legs'],
+        ['t', 'advanced'],
+        ['exercise', `33401:${operatorPubkey}:workstr:exercise:squat`, 'wss://relay.test', '60', '5', '', 'normal']
+      ]
+    }, operatorSecret);
+    const program = programFromEvent(event);
+    expect(program?.difficulty).toBe('advanced');
+    expect(program?.tags).toEqual(['legs']);
   });
 });

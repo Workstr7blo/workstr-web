@@ -50,7 +50,7 @@ export function authorPill(profile: RelayProfile | undefined, pubkey: string, { 
 export const EX_PLACEHOLDER = '<div class="card-placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>';
 
 export const difficultyBadgeClass = (difficulty?: string): string =>
-  ({ beginner: 'diff-beginner', intermediate: 'diff-intermediate', advanced: 'diff-advanced' } as Record<string, string>)[String(difficulty || '').trim().toLowerCase()] || 'diff-unknown';
+  ({ beginner: 'diff-beginner', intermediate: 'diff-intermediate', advanced: 'diff-advanced', 'beast mode': 'diff-beast', 'beast-mode': 'diff-beast' } as Record<string, string>)[String(difficulty || '').trim().toLowerCase()] || 'diff-unknown';
 
 // User-facing source badge: anything from the official catalog (imported,
 // legacy bundle rows, premium) is labeled "Workstr"; "canon" stays code-only.

@@ -43,6 +43,10 @@
 .workout-card-map.has-map svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 14px rgba(124,60,255,.12)); }
 .workout-card-map.has-map polygon { vector-effect: non-scaling-stroke; }
 .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 148px minmax(0,1fr) 22px; align-items: center; }
+.diff-beast { background: linear-gradient(135deg, #f7931a, #ff3864 55%, #7c3cff); color: #fff; border-color: rgba(255,255,255,.22); }
+.diff-badge.inline { position: static; display: inline-flex; align-items: center; padding: 4px 7px; }
+.program-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.program-tags .tag-pill { padding: 4px 8px; font-size: 10px; }
 
 /* Session logger: size is intentionally inherited from the self-hosted Workstr CSS in workstr-reference.css.
    Keep only functional web fixes here so the UI does not drift larger than self-hosted. */

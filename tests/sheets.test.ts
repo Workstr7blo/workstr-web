@@ -7,6 +7,8 @@ describe('WorkstrStore sheets', () => {
     const id = await store.saveSheet({
       name: 'Push Day',
       notes: 'chest focus',
+      difficulty: 'Beast Mode',
+      tags: ['hypertrophy', 'push', 'push'],
       exercises: [
         { exercise_slug: 'bench-press', exercise_name: 'Bench Press', muscle_group: 'Chest', sets: 4, reps: '6-8', rest: 120, weight: 80, position: 0 },
         { exercise_slug: 'lateral-raise', exercise_name: 'Lateral Raise', muscle_group: 'Shoulders', sets: 3, reps: '12-15', rest: 60, weight: null, position: 1 }
@@ -14,13 +16,15 @@ describe('WorkstrStore sheets', () => {
     });
     let sheets = await store.listSheets();
     expect(sheets).toHaveLength(1);
-    expect(sheets[0]).toMatchObject({ id, name: 'Push Day', notes: 'chest focus', slug: 'push-day' });
+    expect(sheets[0]).toMatchObject({ id, name: 'Push Day', notes: 'chest focus', difficulty: 'Beast Mode', tags: ['hypertrophy', 'push'], slug: 'push-day' });
     expect(sheets[0].exercises.map((row) => row.exercise_slug)).toEqual(['bench-press', 'lateral-raise']);
 
     // Edit: rename, reorder — slug must stay stable, rows fully replaced
     await store.saveSheet({
       name: 'Push Day v2',
       notes: '',
+      difficulty: 'advanced',
+      tags: ['strength'],
       exercises: [
         { exercise_slug: 'lateral-raise', exercise_name: 'Lateral Raise', sets: 3, reps: '12-15', rest: 60, weight: null, position: 0 },
         { exercise_slug: 'bench-press', exercise_name: 'Bench Press', sets: 5, reps: '5', rest: 180, weight: 85, position: 1 }
@@ -29,6 +33,8 @@ describe('WorkstrStore sheets', () => {
     sheets = await store.listSheets();
     expect(sheets).toHaveLength(1);
     expect(sheets[0].name).toBe('Push Day v2');
+    expect(sheets[0].difficulty).toBe('advanced');
+    expect(sheets[0].tags).toEqual(['strength']);
     expect(sheets[0].slug).toBe('push-day');
     expect(sheets[0].exercises.map((row) => row.exercise_slug)).toEqual(['lateral-raise', 'bench-press']);
     expect(sheets[0].exercises[1].weight).toBe(85);

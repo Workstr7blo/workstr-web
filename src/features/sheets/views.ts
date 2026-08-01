@@ -5,12 +5,12 @@ import type { SheetWithExercises } from '../../db/store';
 import type { RelayProgram } from '../../nostr/canon';
 import { programImportState } from '../../nostr/programImport';
 import type { AppState } from '../../app/state';
-import { authorPill, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
+import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 
 export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string }
 
-export interface BuilderState { sheetId?: number; name: string; desc: string; rows: BuilderRow[]; library: Exercise[] }
+export interface BuilderState { sheetId?: number; name: string; desc: string; difficulty: string; tags: string[]; rows: BuilderRow[]; library: Exercise[] }
 
 export function estimateProgramMin(exercises: RelayProgram['exercises']): number {
   return exercises.reduce((total, exercise) => {
@@ -110,7 +110,8 @@ export function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
     slug: sheet.slug,
     name: sheet.name,
     description: sheet.notes || '',
-    tags: [],
+    difficulty: sheet.difficulty || '',
+    tags: sheet.tags || [],
     sourceLabel: sheet.nostr_address ? 'in library' : 'local',
     eventId: sheet.nostr_event_id || '',
     pubkey: '',
@@ -136,16 +137,18 @@ export function programCard(program: RelayProgram, state: AppState): string {
   const groups = programGroups(program, state.exercises);
   const map = programMuscleMap(program, state.exercises);
   const meta = [`${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
+  const tagPills = (program.tags || []).length ? `<div class="program-tags">${program.tags.map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('')}</div>` : '';
   const isExpanded = state.expandedProgramAddress === program.address;
   const statusCls = isLocalProgram(program) ? 'local' : 'published';
   return `<div class="workout-card ${isExpanded ? 'expanded' : ''}" data-program-address="${html(program.address)}">
     <div class="workout-card-header" data-toggle-program="${html(program.address)}">
       <div class="workout-card-map ${map ? 'has-map' : ''}">${map || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg>'}</div>
       <div class="workout-card-info">
-        <div class="workout-card-name">${html(program.name)}<span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span></div>
+        <div class="workout-card-name">${html(program.name)}<span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(program.difficulty)}</span>` : ''}</div>
         <div class="workout-card-meta">${meta}</div>
         ${program.pubkey ? `<div class="workout-card-author">${programAuthorPill(program, state)}</div>` : ''}
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(', '))}</div>` : ''}
+        ${tagPills}
       </div>
       <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
     </div>

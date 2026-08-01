@@ -38,6 +38,8 @@ export interface Sheet {
   slug: Slug;
   name: string;
   notes?: string;
+  difficulty?: string;
+  tags?: string[];
   is_temporary: boolean;
   nostr_pubkey?: string;
   nostr_address?: string;

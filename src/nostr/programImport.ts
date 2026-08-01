@@ -77,6 +77,8 @@ export function planProgramImport(program: RelayProgram, library: Exercise[], ca
     sheet: {
       name: program.name,
       notes: program.description,
+      difficulty: program.difficulty || '',
+      tags: program.tags,
       nostr_pubkey: program.pubkey,
       nostr_address: program.address,
       nostr_event_id: program.eventId,

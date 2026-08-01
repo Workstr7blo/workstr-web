@@ -112,8 +112,9 @@ function exercisesView(state: AppState): string {
 function workoutsView(state: AppState): string {
   const active = state.subState.workouts;
   const query = state.programFilter.toLowerCase();
-  const locals = state.sheets.map(sheetToProgram).filter((program) => [program.name, program.description].join(' ').toLowerCase().includes(query));
-  const programs = state.programs.filter((program) => [program.name, program.description, ...program.tags].join(' ').toLowerCase().includes(query));
+  const programMatches = (program: { name: string; description: string; difficulty?: string; tags: string[] }) => [program.name, program.description, program.difficulty || '', ...program.tags].join(' ').toLowerCase().includes(query);
+  const locals = state.sheets.map(sheetToProgram).filter(programMatches);
+  const programs = state.programs.filter(programMatches);
   return `<div class="page active" id="page-workouts">
     <div class="page-title">Workouts</div>
     ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}

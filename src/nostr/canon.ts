@@ -30,6 +30,7 @@ export interface RelayProgram {
   slug: string;
   name: string;
   description: string;
+  difficulty?: string;
   tags: string[];
   exercises: RelayProgramExercise[];
   sourceLabel: string;
@@ -186,6 +187,11 @@ export function programFromEvent(event: Event): RelayProgram | null {
   if (!dTag || !name) return null;
   if (!dTag.startsWith(PROGRAM_D_PREFIX)) return null;
   const meta = parseWorkstrMeta(tags);
+  const difficulty = String(meta.difficulty || tagValue(tags, 'difficulty') || '').trim();
+  const normalizedDifficulty = difficulty.toLowerCase().replace(/\s+/g, '-');
+  const programTags = Array.isArray(meta.tags)
+    ? [...new Set(meta.tags.map((tag) => String(tag || '').trim()).filter(Boolean))]
+    : tagValues(tags, 't').filter((tag) => tag !== 'workstr' && tag !== normalizedDifficulty);
   const metaExercises = Array.isArray(meta.exercises) ? meta.exercises as Array<Record<string, unknown>> : [];
   const exerciseRows = tagRows(tags, 'exercise');
   const exercises = metaExercises.length
@@ -216,7 +222,8 @@ export function programFromEvent(event: Event): RelayProgram | null {
     slug: dTag.startsWith(PROGRAM_D_PREFIX) ? dTag.slice(PROGRAM_D_PREFIX.length) : slugify(name),
     name,
     description: String(meta.description || event.content || ''),
-    tags: tagValues(tags, 't').filter((tag) => tag !== 'workstr'),
+    difficulty,
+    tags: programTags,
     exercises,
     sourceLabel: hasWorkstrIdentity(tags) ? 'Workstr' : 'NIP-101e',
     muscleMapUrl: String(meta.muscleMapUrl || tagValue(tags, 'workstr_muscle_map') || imetaUrl(tags) || ''),
