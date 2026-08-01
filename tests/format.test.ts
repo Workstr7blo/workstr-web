@@ -192,7 +192,23 @@ describe('equipment filtering', () => {
 
   it('never hides exercises that need no equipment', () => {
     expect(names(filterExercises(list, { equip: MY_EQUIPMENT, ownedEquipment: ['barbell'] })))
-      .toEqual(['Snatch', 'Stretch']);
+      .toEqual(['Push Up', 'Snatch', 'Stretch']);
+  });
+
+  // The catalog publishes bodyweight work as ["Body Weight"], never [], so a kit
+  // that treated it as a requirement hid nearly half the catalog.
+  it('treats bodyweight as free under a kit filter', () => {
+    expect(names(filterExercises(list, { equip: MY_EQUIPMENT, ownedEquipment: ['dumbbell'] })))
+      .toEqual(['Push Up', 'Curl', 'Stretch']);
+  });
+
+  it('still narrows to bodyweight when it is picked explicitly', () => {
+    expect(names(filterExercises(list, { equip: 'body weight' }))).toEqual(['Push Up', 'Stretch']);
+  });
+
+  it('ignores a kit that is bodyweight alone, since that owns nothing', () => {
+    expect(filterExercises(list, { equip: MY_EQUIPMENT, ownedEquipment: ['Body Weight'] })).toHaveLength(4);
+    expect(allowedEquipmentKeys(MY_EQUIPMENT, ['Body Weight']).size).toBe(0);
   });
 
   it('shows everything when the kit is empty rather than nothing', () => {
@@ -218,5 +234,11 @@ describe('equipmentSelectHtml', () => {
   it('marks the current selection and escapes labels', () => {
     expect(equipmentSelectHtml('ex-equip', options, 'dumbbell', 1)).toContain('value="dumbbell" selected');
     expect(equipmentSelectHtml('ex-equip', [{ key: 'x', label: '<script>' }], '', 0)).toContain('&lt;script&gt;');
+  });
+  // Deleting the last exercise using the selected equipment drops its option;
+  // without this the grid filters on a value the select no longer displays.
+  it('keeps a selection whose option no longer exists', () => {
+    const html = equipmentSelectHtml('ex-equip', options, 'kettlebell', 0);
+    expect(html).toContain('value="kettlebell" selected');
   });
 });

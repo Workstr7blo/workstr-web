@@ -3,7 +3,7 @@ import { renderSVG } from 'uqr';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
 import { clearCachedNip46Signer, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
 import { canonMuscle } from '../core/muscles';
-import { MY_EQUIPMENT } from '../core/equipment';
+import { mergeOwnedEquipment, MY_EQUIPMENT, ownedEquipmentKeys } from '../core/equipment';
 import { WorkstrStore, type ExerciseDraft, type SheetWithExercises } from '../db/store';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
@@ -106,7 +106,7 @@ export function renderShell(root: HTMLElement): void {
     state.settings = await state.store.getSettings();
     // A saved kit is the useful default view; without one the option does not
     // exist yet and both grids stay on "All equipment".
-    if ((state.settings.ownedEquipment || []).length) {
+    if (ownedEquipmentKeys(state.settings.ownedEquipment).length) {
       state.exFilter.equip = MY_EQUIPMENT;
       state.discoverFilter.equip = MY_EQUIPMENT;
     }
@@ -546,7 +546,7 @@ export function renderShell(root: HTMLElement): void {
       root.querySelectorAll<HTMLElement>('#qw-duration .qw-dur-btn').forEach((el) => el.classList.toggle('active', el === button));
     }));
     root.querySelector('#qw-generate')?.addEventListener('click', async () => {
-      const data = getQuickWorkout(state.finishedSessions, state.store ? await state.store.listExercises() : [], state.qw.duration, 80, state.settings.ownedEquipment || []);
+      const data = getQuickWorkout(state.finishedSessions, state.store ? await state.store.listExercises() : [], state.qw.duration, 80, ownedEquipmentKeys(state.settings.ownedEquipment));
       if (!data.exercises.length) {
         state.qw.visible = false; state.qw.exercises = []; state.qw.pool = {};
         render();
@@ -606,7 +606,12 @@ export function renderShell(root: HTMLElement): void {
 
   async function saveOwnedEquipment(): Promise<void> {
     if (!state.store) return;
-    const checked = [...root.querySelectorAll<HTMLInputElement>('.equip-toggle:checked')].map((box) => box.value);
+    // Merge rather than replace: the checkbox list only covers equipment the
+    // loaded catalog knows about, so a kit saved against a fuller catalog would
+    // lose entries if we took the DOM as the whole truth.
+    const rendered = [...root.querySelectorAll<HTMLInputElement>('.equip-toggle')].map((box) => box.value);
+    const ticked = [...root.querySelectorAll<HTMLInputElement>('.equip-toggle:checked')].map((box) => box.value);
+    const checked = mergeOwnedEquipment(state.settings.ownedEquipment, rendered, ticked);
     state.settings = { ...state.settings, ownedEquipment: checked };
     await state.store.saveSettings(state.settings);
     // "My equipment" disappears from the selects when the kit empties, so a

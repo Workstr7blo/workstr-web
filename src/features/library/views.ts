@@ -1,10 +1,11 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
 import { difficultyBadgeClass, equipmentSelectHtml, EX_PLACEHOLDER, exerciseFilterValues, exerciseSourceLabel, fillSelectHtml, filterExercises, html } from '../../app/format';
+import { ownedEquipmentKeys } from '../../core/equipment';
 
 export function libraryPanel(state: AppState): string {
   const filters = exerciseFilterValues(state.library);
-  const owned = state.settings.ownedEquipment || [];
+  const owned = ownedEquipmentKeys(state.settings.ownedEquipment);
   const list = filterExercises(state.library, { ...state.exFilter, q: state.filter, ownedEquipment: owned });
   const hasFilters = Boolean(state.filter || state.exFilter.cat || state.exFilter.muscle || state.exFilter.diff || state.exFilter.equip);
   const emptyText = state.library.length === 0 && !hasFilters

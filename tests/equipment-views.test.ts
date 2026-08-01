@@ -80,14 +80,18 @@ describe('My equipment settings panel', () => {
 
   it('renders one checkbox per equipment value, ticking the saved kit', () => {
     const html = settingsState({ ownedEquipment: ['dumbbell'] });
-    expect(html).toContain('value="body weight"');
     expect(html).toContain('value="dumbbell" checked');
     expect(html).toContain('value="barbell"');
     expect(html).not.toContain('value="barbell" checked');
   });
 
-  it('summarises how many are selected', () => {
-    expect(settingsState({ ownedEquipment: ['dumbbell', 'body weight'] })).toContain('2 selected');
+  it('offers no checkbox for bodyweight, which is not something you own', () => {
+    expect(settingsState({ ownedEquipment: ['dumbbell'] })).not.toContain('value="body weight"');
+  });
+
+  it('summarises how many are selected, ignoring bodyweight', () => {
+    expect(settingsState({ ownedEquipment: ['dumbbell', 'barbell'] })).toContain('2 selected');
+    expect(settingsState({ ownedEquipment: ['dumbbell', 'body weight'] })).toContain('1 selected');
     expect(settingsState()).toContain('not set');
   });
 

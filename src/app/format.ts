@@ -1,6 +1,6 @@
 import { nip19 } from 'nostr-tools';
 import { canonMuscle } from '../core/muscles';
-import { equipmentKey, equipmentOptions, matchesEquipment, MY_EQUIPMENT } from '../core/equipment';
+import { equipmentKey, equipmentLabel, equipmentOptions, kitEquipmentKeys, matchesEquipment, MY_EQUIPMENT } from '../core/equipment';
 import type { Exercise } from '../core/types';
 import type { RelayProfile } from '../nostr/pool';
 import type { AppState } from './state';
@@ -110,8 +110,12 @@ export interface ExerciseFilter {
 
 // Resolve the equipment select into the set of keys an exercise may require.
 // An empty set means "do not filter on equipment at all".
+//
+// Only the kit gets the free keys added. Picking "Body Weight" explicitly is a
+// narrowing question — show me what I can do with nothing — so that path stays
+// an exact match and keeps answering it.
 export function allowedEquipmentKeys(equip: string | undefined, owned: string[] | undefined): Set<string> {
-  if (equip === MY_EQUIPMENT) return new Set((owned || []).map(equipmentKey).filter(Boolean));
+  if (equip === MY_EQUIPMENT) return kitEquipmentKeys(owned);
   const key = equipmentKey(equip);
   return key ? new Set([key]) : new Set();
 }
@@ -142,7 +146,14 @@ export function equipmentSelectHtml(
 ): string {
   const option = (value: string, label: string) =>
     `<option value="${html(value)}" ${value === current ? 'selected' : ''}>${html(label)}</option>`;
-  return `<select id="${id}">${ownedCount ? option(MY_EQUIPMENT, 'My equipment') : ''}${option('', 'All equipment')}${options.map((item) => option(item.key, item.label)).join('')}</select>`;
+  // A selection can outlive its option: delete the last kettlebell exercise and
+  // the grid would still be filtering on a value the select no longer lists,
+  // which reads as an empty grid for no reason. Keep it listed so the active
+  // filter stays visible and can be undone.
+  const orphan = current && current !== MY_EQUIPMENT && !options.some((item) => item.key === current)
+    ? option(current, equipmentLabel(current))
+    : '';
+  return `<select id="${id}">${ownedCount ? option(MY_EQUIPMENT, 'My equipment') : ''}${option('', 'All equipment')}${options.map((item) => option(item.key, item.label)).join('')}${orphan}</select>`;
 }
 
 export function formatSessionDate(iso: string): string {

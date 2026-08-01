@@ -1,6 +1,7 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, equipmentSelectHtml, EX_PLACEHOLDER, exerciseFilterValues, fillSelectHtml, filterExercises, html } from '../../app/format';
+import { ownedEquipmentKeys } from '../../core/equipment';
 
 export type DiscoverImportState = 'new' | 'in-library' | 'update';
 
@@ -59,7 +60,7 @@ export function discoverImportable(list: Exercise[], library: Exercise[]): Exerc
 
 export function discoverPanel(state: AppState): string {
   const filters = exerciseFilterValues(state.discoverExercises);
-  const owned = state.settings.ownedEquipment || [];
+  const owned = ownedEquipmentKeys(state.settings.ownedEquipment);
   const list = filterExercises(state.discoverExercises, { ...state.discoverFilter, ownedEquipment: owned });
   const sel = state.discoverSelect;
   const importable = discoverImportable(list, state.library);

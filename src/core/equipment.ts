@@ -7,8 +7,19 @@
 
 export const MY_EQUIPMENT = '@mine';
 
+// Equipment that is not a thing you own. The catalog never publishes an empty
+// equipment list: Workstr maps "body only" and "other" onto ["Body Weight"], so
+// 18 of the 40 catalog exercises carry it. Treating those as a requirement made
+// a kit of one dumbbell hide every push-up and plank, in both grids and Quick
+// Workout. They are free, so a kit filter always lets them through.
+export const FREE_EQUIPMENT_KEYS = new Set(['body weight', 'bodyweight', 'body only', 'none', 'no equipment']);
+
 export function equipmentKey(value: unknown): string {
   return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+export function isFreeEquipment(value: unknown): boolean {
+  return FREE_EQUIPMENT_KEYS.has(equipmentKey(value));
 }
 
 export function equipmentLabel(value: unknown): string {
@@ -35,6 +46,37 @@ export function matchesEquipment(equipment: string[] | undefined, allowedKeys: S
   if (!keys.size) return true;
   for (const key of keys) if (allowedKeys.has(key)) return true;
   return false;
+}
+
+// The saved kit, normalized: deduped keys with the free ones dropped, since
+// bodyweight is never something you own. Every reader of the kit goes through
+// here so the Settings count, the "My equipment" option and the filter itself
+// can never disagree about how big the kit is.
+export function ownedEquipmentKeys(owned: string[] | undefined): string[] {
+  const keys = new Set<string>();
+  for (const item of owned || []) {
+    const key = equipmentKey(item);
+    if (key && !FREE_EQUIPMENT_KEYS.has(key)) keys.add(key);
+  }
+  return [...keys];
+}
+
+// What a saved kit can reach: the kit plus everything free. Empty when the kit
+// is empty, which every caller reads as "do not filter on equipment at all".
+export function kitEquipmentKeys(owned: string[] | undefined): Set<string> {
+  const keys = new Set(ownedEquipmentKeys(owned));
+  if (!keys.size) return keys;
+  for (const key of FREE_EQUIPMENT_KEYS) keys.add(key);
+  return keys;
+}
+
+// Fold the Settings checkboxes back into the stored kit. Only the options that
+// were actually rendered can be judged unchecked; a key with no checkbox in the
+// DOM (the catalog was still loading) is kept rather than silently dropped.
+export function mergeOwnedEquipment(stored: string[] | undefined, rendered: string[], checked: string[]): string[] {
+  const shown = new Set(rendered.map(equipmentKey));
+  const kept = ownedEquipmentKeys(stored).filter((key) => !shown.has(key));
+  return [...new Set([...kept, ...ownedEquipmentKeys(checked)])];
 }
 
 // Distinct equipment across a list, as {key, label} sorted by label. The first

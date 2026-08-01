@@ -106,6 +106,12 @@ describe('getQuickWorkout equipment awareness', () => {
     expect(slugs(['barbell'])).toContain('mobility-flow');
   });
 
+  // The catalog tags bodyweight work as ["Body Weight"] rather than [], so a kit
+  // of dumbbells must still be offered push-ups.
+  it('keeps bodyweight work whatever the kit', () => {
+    expect(slugs(['dumbbell'])).toEqual(['goblet-squat', 'mobility-flow', 'push-up']);
+  });
+
   it('falls back to the whole library when no kit is saved', () => {
     expect(slugs([])).toEqual(['bench-press', 'goblet-squat', 'mobility-flow', 'push-up']);
   });

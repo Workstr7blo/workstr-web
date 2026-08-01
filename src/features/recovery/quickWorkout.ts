@@ -1,5 +1,5 @@
 import { canonMuscle } from '../../core/muscles';
-import { equipmentKey, matchesEquipment } from '../../core/equipment';
+import { kitEquipmentKeys, matchesEquipment } from '../../core/equipment';
 import type { Exercise } from '../../core/types';
 import { completedSets, type ActiveSession, type QwExercise } from '../../app/state';
 import { programMuscleLabel } from '../../app/format';
@@ -28,8 +28,8 @@ export function getQuickWorkout(
 
   // A saved kit narrows the candidate pool: proposing a barbell lift to someone
   // with two dumbbells is worse than proposing nothing. An empty kit filters
-  // nothing, and exercises needing no equipment always qualify.
-  const allowed = new Set(ownedEquipment.map(equipmentKey).filter(Boolean));
+  // nothing, and bodyweight work always qualifies.
+  const allowed = kitEquipmentKeys(ownedEquipment);
   const rows = [...exercises]
     .filter((exercise) => exercise.muscle_group && readySet.has(qwCanonMuscle(exercise.muscle_group)))
     .filter((exercise) => matchesEquipment(exercise.equipment, allowed))

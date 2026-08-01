@@ -1,6 +1,6 @@
 import type { AppState, View } from './state';
 import { displayIdentity, exerciseFilterValues, html } from './format';
-import { equipmentKey } from '../core/equipment';
+import { isFreeEquipment, ownedEquipmentKeys } from '../core/equipment';
 import { normalizeWeightUnit } from '../core/units';
 import { hasNip07 } from '../signer/nip07';
 import { libraryPanel } from '../features/library/views';
@@ -151,15 +151,18 @@ function statisticsView(state: AppState): string {
 // Kit options come from the library plus the Workstr catalog, so equipment can
 // be ticked before any exercise using it has been imported.
 function equipmentPanel(state: AppState): string {
-  const options = exerciseFilterValues([...state.library, ...state.discoverExercises]).equipment;
-  const owned = new Set((state.settings.ownedEquipment || []).map(equipmentKey));
+  // Bodyweight is not something you own, so it gets no checkbox — it is always
+  // available and the filter treats it that way.
+  const options = exerciseFilterValues([...state.library, ...state.discoverExercises]).equipment
+    .filter((item) => !isFreeEquipment(item.key));
+  const owned = new Set(ownedEquipmentKeys(state.settings.ownedEquipment));
   if (!options.length) {
     return `<div class="panel"><div class="panel-head"><span>My equipment</span></div><p class="section-help">No equipment listed yet. Import exercises from the Workstr catalog and the equipment they use appears here.</p></div>`;
   }
   const boxes = options.map((item) => `<label class="equip-option"><input type="checkbox" class="equip-toggle" value="${html(item.key)}" ${owned.has(item.key) ? 'checked' : ''} />${html(item.label)}</label>`).join('');
   return `<div class="panel">
     <div class="panel-head"><span>My equipment</span><span class="status-pill ${owned.size ? 'ok' : ''}">${owned.size ? `${owned.size} selected` : 'not set'}</span></div>
-    <p class="section-help">Tick what you can train with. The Exercises tab then offers a "My equipment" filter, and Quick Workout stops proposing exercises you cannot do. Exercises that need no equipment always stay visible.</p>
+    <p class="section-help">Tick what you can train with. The Exercises tab then offers a "My equipment" filter, and Quick Workout stops proposing exercises you cannot do. Bodyweight exercises need nothing, so they stay visible whatever you tick.</p>
     <div class="equip-options">${boxes}</div>
   </div>`;
 }
