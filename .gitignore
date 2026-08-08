@@ -25,7 +25,6 @@ dist-ssr
 
 .claude/
 CLAUDE.md
-ROADMAP.md
 
 # stamped by CI at build time, never committed
 VERSION
