@@ -683,8 +683,8 @@ nothing.
     the published monthly infrastructure cost. Zero backend; zap receipts are public
     events. Ships in Phase 1 because it is *cheaper to build than the paywall*, and
     because a funding model that starts asking in Phase 3 has no data by Phase 2a.
-12. **Release pass:** offline QA matrix — iOS PWA install, fresh install, NIP-46 latency,
-    sign-in adoption paths — before tagging 1.0.
+12. **Release pass:** run `docs/RELEASE-QA.md` against the deployed site and clear its
+    blocking sections before tagging 1.0.
 
 **Exit criteria:** a stranger installs the app, trains for a month, and shares summaries
 **without ever creating an identity**; a Nostr user additionally signs in, adopts their
@@ -889,10 +889,11 @@ Recommended setup on a home server / VM:
    then script the app. Driver scripts must run where `node_modules` resolves. Any
    change to a view, the shell, or the session runner gets verified this way before it
    is called done.
-5. Test matrix that matters: iOS Safari PWA (wake lock, installability, NIP-46 via
-   Amber/relay round-trip latency), Chrome+extension (NIP-07), offline mode, the
-   sign-in adoption paths (empty target, occupied target, sign-out), catalog fetch with
-   every relay unreachable, and fresh-device restore (manifest → lazy decrypt).
+5. **Release QA pass.** The checks no automation reaches — real iPhone, real signer apps,
+   real relays, real network failure — live in `docs/RELEASE-QA.md` as a checklist with
+   an expected result per line and a stated blocking rule. It runs against the deployed
+   site before every tag. Phase 2a adds fresh-device restore (manifest → lazy decrypt) to
+   it; keep the checklist the single copy of that matrix rather than restating it here.
 
 ---
 
@@ -962,12 +963,19 @@ Recommended setup on a home server / VM:
 
 - **Phase 0:** PWA installs from the real domain over HTTPS; the app is usable with no
   identity; optional sign-in shows npub; CI deploys on push.
-- **Phase 1:** 30 days of real training logged by real users with zero operator
-  infrastructure, including at least one who never signed in; the seeded beginner
-  programs are trainable on a fresh install with no network; export/import verified;
-  shared summaries visible in mainstream Nostr clients; catalog import and update
-  detection verified against a real edit-fork; support screen live, funding panel showing
-  real zap receipts against a published cost.
+Phase 1 has two separate bars. Conflating them means never shipping, because the second
+kind cannot be satisfied before a release exists.
+
+- **Phase 1 — ready to tag v1.0** (gates the tag; every line is checkable in an
+  afternoon): the release QA pass in `docs/RELEASE-QA.md` is green — no failure in its
+  blocking sections; the seeded beginner programs are trainable on a fresh install with
+  no network; export/import verified on real hardware; a real summary is visible in a
+  mainstream Nostr client; catalog import and update detection verified against a real
+  republish and edit-fork; support screen live with a real zap appearing in the funding
+  panel against a published cost.
+- **Phase 1 — proven** (field evidence gathered *after* the tag; gates nothing, informs
+  what comes next): 30 days of real training logged by real users with zero operator
+  infrastructure, including at least one who never signed in.
 - **Phase 2a:** request access → auto-allowlist → cross-device restore, hands-off; LMDB
   backups restorable; curated library fetchable by anyone from public relays; storage
   quotas enforced; monthly cost published, and the 11.4 threshold set to a real number at
