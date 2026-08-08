@@ -1,0 +1,67 @@
+name: Release
+
+# Pushing a vX.Y.Z tag cuts the GitHub Release. Deployment is not handled here —
+# .github/workflows/pages.yml deploys every push to main, and the release commit
+# is itself a push to main, so the tag and the live site land together.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          APP_VERSION: ${{ github.ref_name }}
+
+      - name: Package the built site
+        run: tar -czf "workstr-web-${GITHUB_REF_NAME}.tar.gz" -C dist .
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # Print the body of the [x.y.z] section: everything after its heading,
+          # stopping at the next version heading or the link-reference block.
+          awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { capture = 1; next }
+            capture && /^## \[/      { exit }
+            capture && /^\[[^]]+\]:/ { exit }
+            capture                  { print }
+          ' CHANGELOG.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::no [$version] section found in CHANGELOG.md"
+            exit 1
+          fi
+          echo "Release notes for $version:"
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            workstr-web-${{ github.ref_name }}.tar.gz
+          fail_on_unmatched_files: false
