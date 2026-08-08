@@ -1,8 +1,7 @@
-import { renderSVG } from 'uqr';
 import { nip19 } from 'nostr-tools';
-import { MONTHLY_COST_SATS, OPERATOR_LUD16 } from '../../core/funding';
+import { MONTHLY_COST_SATS, OPERATOR_NOSTR_HANDLE, OPERATOR_NOSTR_URL } from '../../core/funding';
 import { OPERATOR_PUBKEY } from '../../nostr/canon';
-import { fundingTotals, lightningUri, type ZapReceipt } from '../../nostr/zaps';
+import { fundingTotals, type ZapReceipt } from '../../nostr/zaps';
 import { html } from '../../app/format';
 
 export type FundingStatus = 'idle' | 'loading' | 'ready' | 'offline';
@@ -45,22 +44,21 @@ function fundingPanel(state: SupportState): string {
 }
 
 // Defaults to idle so a caller that has not fetched yet — or a test rendering
-// a minimal state — gets the address and QR without a funding panel.
+// a minimal state — gets the zap target without a funding panel.
 export function supportPanel(state: SupportState = { status: 'idle', receipts: [] }): string {
   const npub = nip19.npubEncode(OPERATOR_PUBKEY);
   return `<div class="panel">
     <div class="panel-head"><span>Support Workstr</span></div>
     <p class="section-help">Workstr is free and stays free. It runs on donations rather than
     subscriptions: ${sats(MONTHLY_COST_SATS)} sats a month covers the relay, backups and the domain.
-    What comes in is shown below, read straight from public zap receipts — no analytics, no account.</p>
-    <div class="signer-qr">${renderSVG(lightningUri(OPERATOR_LUD16), { border: 2 })}</div>
-    <div class="terminal-mini">${html(OPERATOR_LUD16)}</div>
+    Support is zap-based so every counted donation leaves a public Nostr receipt — no analytics, no account.</p>
+    <div class="terminal-mini">zap target: ${html(OPERATOR_NOSTR_HANDLE)}\nnpub: ${html(npub)}\nreceipts: verified NIP-57 kind:9735 only</div>
     <div class="web-empty-actions">
-      <button id="copy-lightning" class="button primary" data-copy="${html(OPERATOR_LUD16)}">Copy Lightning address</button>
-      <button id="copy-npub" class="button ghost" data-copy="${html(npub)}">Copy npub to zap</button>
+      <a id="open-zap-target" class="button primary" href="${html(OPERATOR_NOSTR_URL)}" target="_blank" rel="noreferrer">Zap Workstr on Nostr</a>
+      <button id="copy-npub" class="button ghost" data-copy="${html(npub)}">Copy npub</button>
     </div>
-    <p class="section-help">Scan with any Lightning wallet, or zap the npub from your Nostr client —
-    both reach the same wallet, and only zaps show up in the total below.</p>
+    <p class="section-help">Plain Lightning and on-chain routes are not shown here because they bypass the
+    public receipt trail. The meter below counts only wallet-provider-signed zap receipts.</p>
     ${fundingPanel(state)}
   </div>`;
 }

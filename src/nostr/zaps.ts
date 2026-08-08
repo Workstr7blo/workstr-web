@@ -1,7 +1,7 @@
 import type { Event } from 'nostr-tools';
 import { SimplePool, verifyEvent } from 'nostr-tools';
 import { getSatoshisAmountFromBolt11 } from 'nostr-tools/nip57';
-import { OPERATOR_LUD16, ZAP_RECEIPT_SIGNER_PUBKEY, ZAP_RELAYS } from '../core/funding';
+import { ZAP_RECEIPT_SIGNER_PUBKEY, ZAP_RELAYS } from '../core/funding';
 import { OPERATOR_PUBKEY } from './canon';
 
 const QUERY_TIMEOUT_MS = 7000;
@@ -122,10 +122,4 @@ export async function fetchMonthlyZapReceipts(since = monthStartUnix()): Promise
   } finally {
     pool.close(ZAP_RELAYS);
   }
-}
-
-// `lightning:` is the URI scheme wallets register for, and a bare lightning
-// address is a valid payload for it.
-export function lightningUri(address: string = OPERATOR_LUD16): string {
-  return `lightning:${address}`;
 }

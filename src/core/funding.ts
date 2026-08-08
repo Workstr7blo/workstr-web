@@ -4,9 +4,13 @@
 // plan (docs/instruction.md section 11). The support screen therefore has to
 // be honest about two numbers: what came in, and what it costs to run.
 
-// Where donations go. Also published in the operator's kind:0 as `lud16`, so
-// zapping the npub from any Nostr client reaches the same wallet.
+// Zap target identity. The Lightning address is published in the operator's
+// kind:0 as `lud16`, but v1 support copy treats it as LNURL-pay plumbing behind
+// zaps rather than as a separate donation rail: every counted donation should
+// leave a NIP-57 receipt.
 export const OPERATOR_LUD16 = 'workstr@coinos.io';
+export const OPERATOR_NOSTR_HANDLE = 'workstr@workstr.fit';
+export const OPERATOR_NOSTR_URL = `https://njump.me/${OPERATOR_NOSTR_HANDLE}`;
 
 // The wallet provider's nostr key, taken from the LNURL-pay metadata for
 // OPERATOR_LUD16 (`nostrPubkey`). Zap receipts are signed by the provider, not

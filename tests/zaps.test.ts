@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
-import { collectZapReceipts, fundingTotals, lightningUri, monthStartUnix, parseZapReceipt } from '../src/nostr/zaps';
+import { collectZapReceipts, fundingTotals, monthStartUnix, parseZapReceipt } from '../src/nostr/zaps';
 import { OPERATOR_PUBKEY } from '../src/nostr/canon';
 
 // The amount lives in the bolt11 human-readable prefix. The decoder needs at
@@ -132,11 +132,5 @@ describe('monthStartUnix', () => {
   it('does not leak into the previous month', () => {
     const start = monthStartUnix(new Date(2026, 0, 1, 0, 0, 1));
     expect(new Date(start * 1000).getMonth()).toBe(0);
-  });
-});
-
-describe('lightningUri', () => {
-  it('builds a wallet-openable uri from the address', () => {
-    expect(lightningUri('workstr@coinos.io')).toBe('lightning:workstr@coinos.io');
   });
 });
