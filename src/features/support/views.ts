@@ -76,8 +76,8 @@ export function supportPanel(state: SupportState = { status: 'idle', receipts: [
       <a id="open-zap-target" class="button primary" href="${html(OPERATOR_NOSTR_URL)}" target="_blank" rel="noreferrer">Zap on Nostr</a>
       <button id="copy-npub" class="button ghost" data-copy="${html(npub)}">Copy npub</button>
     </div>
-    <p class="section-help support-note">Plain Lightning and on-chain routes are not shown here because they bypass the
-    public receipt trail. The meter below counts only wallet-provider-signed zap receipts — no analytics, no account.</p>
+    <p class="section-help support-note">The meter below counts verified NIP-57 zap receipts only. If support ever arrives
+    through another route, it will be accounted for separately instead of being mixed into the live zap total.</p>
     ${fundingPanel(state)}
   </div>`;
 }
