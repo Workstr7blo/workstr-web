@@ -4,20 +4,24 @@ import { dbName, openWorkstrDB } from './schema';
 // adopts it into `workstr-<pubkey>` per plan decision 6 — never merged.
 export const LOCAL_NAMESPACE = 'local';
 
-// Stores whose records only exist through user action; the legacy bundled
-// seed (removed 2026-07) wrote only exercises + settings.
-const USER_DATA_STORES = ['sessions', 'session_sets', 'sheets', 'sheet_exercises', 'bodyweight', 'plan', 'blobs'] as const;
+// Stores whose records only exist through user action. `sheets` is checked
+// separately because the starter seed writes programs, and `sheet_exercises`
+// is not checked at all — a row cannot outlive its sheet.
+const USER_DATA_STORES = ['sessions', 'session_sets', 'bodyweight', 'plan', 'blobs'] as const;
 
-// True when the namespace holds anything a user made (logged sessions,
-// programs, body entries, imported exercises, or legacy seed rows they
-// favourited). A fresh or seed-only namespace reports false, so sign-in
-// right after a clean boot never triggers the adoption prompt.
+// True when the namespace holds anything a user made (logged sessions, their
+// own or imported programs, body entries, imported exercises, or starter rows
+// they favourited, edited or deleted). A fresh or seed-only namespace reports
+// false, so sign-in right after a clean boot never triggers the adoption
+// prompt.
 export async function namespaceHasUserData(namespace: string): Promise<boolean> {
   const db = await openWorkstrDB(namespace);
   try {
     for (const store of USER_DATA_STORES) {
       if (await db.count(store)) return true;
     }
+    const sheets = await db.getAll('sheets');
+    if (sheets.some((sheet) => sheet.source_type !== 'bundle')) return true;
     const exercises = await db.getAll('exercises');
     return exercises.some((exercise) => exercise.favourite || exercise.status === 'deleted' || exercise.source_type !== 'bundle');
   } finally {

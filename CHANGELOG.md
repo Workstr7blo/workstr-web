@@ -7,8 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Next up is v1.0: bundled starter programs, the support surface, and the release QA pass.
-See `ROADMAP.md`.
+### Added
+
+- **Starter programs.** A fresh install now ships with three beginner programs —
+  Foundation Full Body, Core Stability Starter, and Legs & Glutes — and the ten exercises
+  they use. The app is usable offline, with no account and before Discover has ever been
+  opened. The seed is the operator's own signed catalog events, so a seeded entry is
+  identical to the imported one: Discover reports it as already in your library instead of
+  offering a duplicate, and still offers an update if the catalog entry is republished.
+- Settings shows the running app version.
+
+### Changed
+
+- Seeding is backfill-only and applies once per account: a starter exercise you delete
+  stays deleted, a program you edit becomes your own, and anything already occupying a
+  slot is left untouched.
+
+Still to come in v1.0: the support surface and the release QA pass. See `ROADMAP.md`.
 
 ## [0.9.0] - 2026-08-08
 

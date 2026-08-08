@@ -1,0 +1,1317 @@
+{
+ "generatedAt": "2026-08-08T03:36:38.745Z",
+ "operator": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+ "programs": [
+  {
+   "content": "First full-body routine, low intimidation, simple movements.",
+   "created_at": 1785552702,
+   "id": "3ad7de298e751f84782e43fd32a26b5a3df941ed8a541c36858f554d81c6e284",
+   "kind": 33402,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "784792380b7a220d38d2bfe6be3dc9d53f0d46d2952e4a49cb8645fb1fdb1b89b179ce949f4ca90dcac0272aa0c116f5d47cdf0c08b94cd8673181d16393e7b2",
+   "tags": [
+    [
+     "d",
+     "workstr:program:program-3"
+    ],
+    [
+     "title",
+     "Foundation Full Body"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:ankle-circles",
+     "wss://bitcoiner.social",
+     "",
+     "60",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:bodyweight-squat",
+     "wss://bitcoiner.social",
+     "",
+     "10",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:bodyweight-squat",
+     "wss://bitcoiner.social",
+     "",
+     "10",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:pushups",
+     "wss://bitcoiner.social",
+     "",
+     "6-10",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:pushups",
+     "wss://bitcoiner.social",
+     "",
+     "6-10",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:glute-kickback",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:glute-kickback",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:dead-bug",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:dead-bug",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:plank",
+     "wss://bitcoiner.social",
+     "",
+     "20-30s",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:plank",
+     "wss://bitcoiner.social",
+     "",
+     "20-30s",
+     "",
+     "normal"
+    ],
+    [
+     "t",
+     "stretching"
+    ],
+    [
+     "t",
+     "calves"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "quadriceps"
+    ],
+    [
+     "t",
+     "chest"
+    ],
+    [
+     "t",
+     "glutes"
+    ],
+    [
+     "t",
+     "abdominals"
+    ],
+    [
+     "t",
+     "core"
+    ],
+    [
+     "t",
+     "beginner"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/kalIzVhq0xYFPZSA.png",
+     "m image/png",
+     "alt Muscle map for Foundation Full Body"
+    ],
+    [
+     "workstr_muscle_map",
+     "https://i.nostr.build/kalIzVhq0xYFPZSA.png"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"First full-body routine, low intimidation, simple movements.\",\"difficulty\":\"beginner\",\"tags\":[],\"muscleMapUrl\":\"https://i.nostr.build/kalIzVhq0xYFPZSA.png\",\"exercises\":[{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:ankle-circles\",\"slug\":\"ankle-circles\",\"name\":\"Ankle Circles\",\"sets\":1,\"reps\":\"60\",\"restSec\":15,\"weight\":null,\"notes\":\"\",\"position\":0},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:bodyweight-squat\",\"slug\":\"bodyweight-squat\",\"name\":\"Bodyweight Squat\",\"sets\":2,\"reps\":\"10\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":1},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:pushups\",\"slug\":\"pushups\",\"name\":\"Pushups\",\"sets\":2,\"reps\":\"6-10\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":2},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:glute-kickback\",\"slug\":\"glute-kickback\",\"name\":\"Glute Kickback\",\"sets\":2,\"reps\":\"8-12\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":3},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:dead-bug\",\"slug\":\"dead-bug\",\"name\":\"Dead Bug\",\"sets\":2,\"reps\":\"8-12\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":4},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:plank\",\"slug\":\"plank\",\"name\":\"Plank\",\"sets\":2,\"reps\":\"20-30s\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":5}]}"
+    ]
+   ]
+  },
+  {
+   "content": "Safe beginner core without crushing people with sit-ups",
+   "created_at": 1785552717,
+   "id": "4ee67f90a828689520b7563710fd78b86b6a95570bb6eef0d565c9d9e5197c0a",
+   "kind": 33402,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "b5be0c4240cf4a2911e9b7192c156ac3a220694730edef215a1a1807c67c3399f37b1a876b1e759357ceb4f89b2b55c6ad6ee40816ea8e6678a5a87504b34599",
+   "tags": [
+    [
+     "d",
+     "workstr:program:full-body-2"
+    ],
+    [
+     "title",
+     "Core Stability Starter"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:dead-bug",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:dead-bug",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:bird-dog",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:bird-dog",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:plank",
+     "wss://bitcoiner.social",
+     "",
+     "30-60s",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:plank",
+     "wss://bitcoiner.social",
+     "",
+     "30-60s",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:side-bridge",
+     "wss://bitcoiner.social",
+     "",
+     "15-20s",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:side-bridge",
+     "wss://bitcoiner.social",
+     "",
+     "15-20s",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:superman",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:superman",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "abdominals"
+    ],
+    [
+     "t",
+     "core"
+    ],
+    [
+     "t",
+     "stretching"
+    ],
+    [
+     "t",
+     "lower back"
+    ],
+    [
+     "t",
+     "beginner"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/uo8jSzfwP97B2WqN.png",
+     "m image/png",
+     "alt Muscle map for Core Stability Starter"
+    ],
+    [
+     "workstr_muscle_map",
+     "https://i.nostr.build/uo8jSzfwP97B2WqN.png"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"Safe beginner core without crushing people with sit-ups\",\"difficulty\":\"beginner\",\"tags\":[],\"muscleMapUrl\":\"https://i.nostr.build/uo8jSzfwP97B2WqN.png\",\"exercises\":[{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:dead-bug\",\"slug\":\"dead-bug\",\"name\":\"Dead Bug\",\"sets\":2,\"reps\":\"8-12\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":0},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:bird-dog\",\"slug\":\"bird-dog\",\"name\":\"Bird Dog\",\"sets\":2,\"reps\":\"8-12\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":1},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:plank\",\"slug\":\"plank\",\"name\":\"Plank\",\"sets\":2,\"reps\":\"30-60s\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":2},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:side-bridge\",\"slug\":\"side-bridge\",\"name\":\"Side Bridge\",\"sets\":2,\"reps\":\"15-20s\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":3},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:superman\",\"slug\":\"superman\",\"name\":\"Superman\",\"sets\":2,\"reps\":\"8-12\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":4}]}"
+    ]
+   ]
+  },
+  {
+   "content": "Legs/glutes with no jumping and no equipment.",
+   "created_at": 1785720203,
+   "id": "8b7b911ff1239fc7a2f49f1ac6de4b01b62e6f83164db7aab21d49373b56a4fe",
+   "kind": 33402,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "896503b7abeb3b2bf9287d8b087917aadd5a211d10e4271f654730e37148c2753de1e80a7e7dd2277edae802486561e4565bc8d1fe43a8dae564ef42bb923bdf",
+   "tags": [
+    [
+     "d",
+     "workstr:program:lower-body"
+    ],
+    [
+     "title",
+     "Legs & Glutes"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:bodyweight-squat",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:bodyweight-squat",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:bodyweight-squat",
+     "wss://bitcoiner.social",
+     "",
+     "8-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:glute-kickback",
+     "wss://bitcoiner.social",
+     "",
+     "10-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:glute-kickback",
+     "wss://bitcoiner.social",
+     "",
+     "10-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:glute-kickback",
+     "wss://bitcoiner.social",
+     "",
+     "10-12",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:wall-sit",
+     "wss://bitcoiner.social",
+     "",
+     "20-30s",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:wall-sit",
+     "wss://bitcoiner.social",
+     "",
+     "20-30s",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:wall-sit",
+     "wss://bitcoiner.social",
+     "",
+     "20-30s",
+     "",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:ankle-circles",
+     "wss://bitcoiner.social",
+     "60",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:ankle-circles",
+     "wss://bitcoiner.social",
+     "60",
+     "normal"
+    ],
+    [
+     "exercise",
+     "33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:ankle-circles",
+     "wss://bitcoiner.social",
+     "60",
+     "normal"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "quadriceps"
+    ],
+    [
+     "t",
+     "glutes"
+    ],
+    [
+     "t",
+     "stretching"
+    ],
+    [
+     "t",
+     "calves"
+    ],
+    [
+     "t",
+     "beginner"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/Q2AQzxh6aiRjhDgw.png",
+     "m image/png",
+     "alt Muscle map for Legs & Glutes"
+    ],
+    [
+     "workstr_muscle_map",
+     "https://i.nostr.build/Q2AQzxh6aiRjhDgw.png"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"Legs/glutes with no jumping and no equipment.\",\"difficulty\":\"beginner\",\"tags\":[],\"muscleMapUrl\":\"https://i.nostr.build/Q2AQzxh6aiRjhDgw.png\",\"exercises\":[{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:bodyweight-squat\",\"slug\":\"bodyweight-squat\",\"name\":\"Bodyweight Squat\",\"sets\":3,\"reps\":\"8-12\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":0},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:glute-kickback\",\"slug\":\"glute-kickback\",\"name\":\"Glute Kickback\",\"sets\":3,\"reps\":\"10-12\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":1},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:wall-sit\",\"slug\":\"wall-sit\",\"name\":\"Wall Sit\",\"sets\":3,\"reps\":\"20-30s\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":2},{\"address\":\"33401:ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6:workstr:exercise:ankle-circles\",\"slug\":\"ankle-circles\",\"name\":\"Ankle Circles\",\"sets\":3,\"reps\":\"60s\",\"restSec\":45,\"weight\":null,\"notes\":\"\",\"position\":3}]}"
+    ]
+   ]
+  }
+ ],
+ "exercises": [
+  {
+   "content": "Use a sturdy object like a squat rack to hold yourself.\nLift the right leg in the air (just around 2 inches from the floor) and perform a circular motion with the big toe. Pretend that you are drawing a big circle with it. Tip: One circle equals 1 repetition. Breathe normally as you perform the movement.\nWhen you are done with the right foot, then repeat with the left leg.",
+   "created_at": 1785720198,
+   "id": "45193fe527ec64b62229f9bdc248bf87215ae5fd6d2e24315a7c666481334f6a",
+   "kind": 33401,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "3bca3790099b196a3c2aa046f73adec691feeb541abdd787f035d015d62c98d3f51b46752a3f49d337f258efa9d83f096ca52a651207e8353f9d5f0b2c3240f1",
+   "tags": [
+    [
+     "d",
+     "workstr:exercise:ankle-circles"
+    ],
+    [
+     "title",
+     "Ankle Circles"
+    ],
+    [
+     "format",
+     "weight",
+     "reps",
+     "rpe",
+     "set_type"
+    ],
+    [
+     "format_units",
+     "kg",
+     "count",
+     "0-10",
+     "warmup|normal|drop|failure"
+    ],
+    [
+     "equipment",
+     "body weight"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/aNwXVYjW645EksfO.png",
+     "m image/jpeg",
+     "alt Ankle Circles"
+    ],
+    [
+     "t",
+     "calves"
+    ],
+    [
+     "t",
+     "stretching"
+    ],
+    [
+     "t",
+     "pull"
+    ],
+    [
+     "t",
+     "isolation"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "workstr_muscle",
+     "Calves",
+     "primary"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"\",\"category\":\"stretching\",\"equipment\":[\"Body Weight\"],\"difficulty\":\"beginner\",\"tags\":[\"pull\",\"isolation\"],\"instructions\":[\"Use a sturdy object like a squat rack to hold yourself.\",\"Lift the right leg in the air (just around 2 inches from the floor) and perform a circular motion with the big toe. Pretend that you are drawing a big circle with it. Tip: One circle equals 1 repetition. Breathe normally as you perform the movement.\",\"When you are done with the right foot, then repeat with the left leg.\"],\"imagePublishUrl\":\"https://i.nostr.build/aNwXVYjW645EksfO.png\",\"defaultSets\":3,\"defaultReps\":\"8-12\",\"defaultRest\":90}"
+    ]
+   ]
+  },
+  {
+   "content": "A low-impact core and posterior-chain stability drill that trains anti-rotation control, spinal position, glutes, and shoulder coordination.\nStart on hands and knees with hands under shoulders and knees under hips.\nBrace the core and keep the spine neutral.\nReach one arm forward while extending the opposite leg backward.\nPause briefly with hips and shoulders square to the floor.\nReturn under control without shifting weight or arching the back.\nAlternate sides for the target reps, moving slowly and deliberately.",
+   "created_at": 1785552709,
+   "id": "a7f73dd0ac1c73a57d02eb1ad952f46fe477561a3ec0478d84e63ade712af2a5",
+   "kind": 33401,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "aaf574f1a9e09442647fb7830534a803109c9d69b59189937500eb71b7db04062673b33cceeff8b306708bb3311c78f459740a0cfbe3ae1fc942e448bc4eb300",
+   "tags": [
+    [
+     "d",
+     "workstr:exercise:bird-dog"
+    ],
+    [
+     "title",
+     "Bird Dog"
+    ],
+    [
+     "format",
+     "weight",
+     "reps",
+     "rpe",
+     "set_type"
+    ],
+    [
+     "format_units",
+     "kg",
+     "count",
+     "0-10",
+     "warmup|normal|drop|failure"
+    ],
+    [
+     "equipment",
+     "body weight"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/MqrhluaO3I9qIsID.png",
+     "m image/jpeg",
+     "alt Bird Dog"
+    ],
+    [
+     "t",
+     "core"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "stability"
+    ],
+    [
+     "t",
+     "anti-rotation"
+    ],
+    [
+     "t",
+     "posterior-chain"
+    ],
+    [
+     "t",
+     "low-impact"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "workstr_muscle",
+     "Core",
+     "primary"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"A low-impact core and posterior-chain stability drill that trains anti-rotation control, spinal position, glutes, and shoulder coordination.\",\"category\":\"strength\",\"equipment\":[\"Body Weight\"],\"difficulty\":\"beginner\",\"tags\":[\"core\",\"stability\",\"anti-rotation\",\"posterior-chain\",\"low-impact\"],\"instructions\":[\"Start on hands and knees with hands under shoulders and knees under hips.\",\"Brace the core and keep the spine neutral.\",\"Reach one arm forward while extending the opposite leg backward.\",\"Pause briefly with hips and shoulders square to the floor.\",\"Return under control without shifting weight or arching the back.\",\"Alternate sides for the target reps, moving slowly and deliberately.\"],\"imagePublishUrl\":\"https://i.nostr.build/MqrhluaO3I9qIsID.png\",\"defaultSets\":3,\"defaultReps\":\"8-12\",\"defaultRest\":60}"
+    ]
+   ]
+  },
+  {
+   "content": "Stand with your feet shoulder width apart. You can place your hands behind your head. This will be your starting position.\nBegin the movement by flexing your knees and hips, sitting back with your hips.\nContinue down to full depth if you are able,and quickly reverse the motion until you return to the starting position. As you squat, keep your head and chest up and push your knees out.",
+   "created_at": 1785720195,
+   "id": "fd52f49b1b14a83cddb6acfc5abeac9f180cd8a174ef8b2377d33af9cb7b06cf",
+   "kind": 33401,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "b0c8cda65b885b474570a51d8512ad80472da489edfac7bf24255ab4d6ca90475b97e5cd9363f829bdcb5c8ce1e9601eeae443ae467517ef0e1e573e49b9d29e",
+   "tags": [
+    [
+     "d",
+     "workstr:exercise:bodyweight-squat"
+    ],
+    [
+     "title",
+     "Bodyweight Squat"
+    ],
+    [
+     "format",
+     "weight",
+     "reps",
+     "rpe",
+     "set_type"
+    ],
+    [
+     "format_units",
+     "kg",
+     "count",
+     "0-10",
+     "warmup|normal|drop|failure"
+    ],
+    [
+     "equipment",
+     "body weight"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/EuqHS2LonZfwXvtt.png",
+     "m image/jpeg",
+     "alt Bodyweight Squat"
+    ],
+    [
+     "t",
+     "quadriceps"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "push"
+    ],
+    [
+     "t",
+     "compound"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "workstr_muscle",
+     "Quadriceps",
+     "primary"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"\",\"category\":\"strength\",\"equipment\":[\"Body Weight\"],\"difficulty\":\"beginner\",\"tags\":[\"push\",\"compound\"],\"instructions\":[\"Stand with your feet shoulder width apart. You can place your hands behind your head. This will be your starting position.\",\"Begin the movement by flexing your knees and hips, sitting back with your hips.\",\"Continue down to full depth if you are able,and quickly reverse the motion until you return to the starting position. As you squat, keep your head and chest up and push your knees out.\"],\"imagePublishUrl\":\"https://i.nostr.build/EuqHS2LonZfwXvtt.png\",\"defaultSets\":3,\"defaultReps\":\"8-12\",\"defaultRest\":90}"
+    ]
+   ]
+  },
+  {
+   "content": "Begin lying on your back with your hands extended above you toward the ceiling.\nBring your feet, knees, and hips up to 90 degrees.\nExhale hard to bring your ribcage down and flatten your back onto the floor, rotating your pelvis up and squeezing your glutes. Hold this position throughout the movement. This will be your starting position.\nInitiate the exercise by extending one leg, straightening the knee and hip to bring the leg just above the ground.\nMaintain the position of your lumbar and pelvis as you perform the movement, as your back is going to want to arch.\nStay tight and return the working leg to the starting position.\nRepeat on the opposite side, alternating until the set is complete.",
+   "created_at": 1785552708,
+   "id": "f689fff53f468e4c620a15907a716a0ff969d15e7f056fae5fc416d3717b03ff",
+   "kind": 33401,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "8ab24ea2f2391cf26f36388b8def3030e87b2915e5b3e61a1edaffc729cef3db253b029e224d5b06164bcd57bca8b4ce7165753b4e8c5ec12673cd5bc30cd7b8",
+   "tags": [
+    [
+     "d",
+     "workstr:exercise:dead-bug"
+    ],
+    [
+     "title",
+     "Dead Bug"
+    ],
+    [
+     "format",
+     "weight",
+     "reps",
+     "rpe",
+     "set_type"
+    ],
+    [
+     "format_units",
+     "kg",
+     "count",
+     "0-10",
+     "warmup|normal|drop|failure"
+    ],
+    [
+     "equipment",
+     "body weight"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/osbXsRivsBL47QDx.jpg",
+     "m image/jpeg",
+     "alt Dead Bug"
+    ],
+    [
+     "t",
+     "abdominals"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "pull"
+    ],
+    [
+     "t",
+     "compound"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "workstr_muscle",
+     "Abdominals",
+     "primary"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"\",\"category\":\"strength\",\"equipment\":[\"Body Weight\"],\"difficulty\":\"beginner\",\"tags\":[\"pull\",\"compound\"],\"instructions\":[\"Begin lying on your back with your hands extended above you toward the ceiling.\",\"Bring your feet, knees, and hips up to 90 degrees.\",\"Exhale hard to bring your ribcage down and flatten your back onto the floor, rotating your pelvis up and squeezing your glutes. Hold this position throughout the movement. This will be your starting position.\",\"Initiate the exercise by extending one leg, straightening the knee and hip to bring the leg just above the ground.\",\"Maintain the position of your lumbar and pelvis as you perform the movement, as your back is going to want to arch.\",\"Stay tight and return the working leg to the starting position.\",\"Repeat on the opposite side, alternating until the set is complete.\"],\"imagePublishUrl\":\"https://i.nostr.build/osbXsRivsBL47QDx.jpg\",\"defaultSets\":3,\"defaultReps\":\"8-12\",\"defaultRest\":90}"
+    ]
+   ]
+  },
+  {
+   "content": "Kneel on the floor or an exercise mat and bend at the waist with your arms extended in front of you (perpendicular to the torso) in order to get into a kneeling push-up position but with the arms spaced at shoulder width. Your head should be looking forward and the bend of the knees should create a 90-degree angle between the hamstrings and the calves. This will be your starting position.\nAs you exhale, lift up your right leg until the hamstrings are in line with the back while maintaining the 90-degree angle bend. Contract the glutes throughout this movement and hold the contraction at the top for a second. Tip: At the end of the movement the upper leg should be parallel to the floor while the calf should be perpendicular to it.\nGo back to the initial position as you inhale and now repeat with the left leg.\nContinue to alternate legs until all of the recommended repetitions have been performed.",
+   "created_at": 1785720197,
+   "id": "ea9797a4ab182ab236b05caad13a67f48f1a5cc3835f5393b33d6f4abd120cba",
+   "kind": 33401,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "4f2c8827732cfdc86c814cb5189025483256fdb9910970435d392cba5c001c23c18ede09b97527663bd80a3bd4471904160c09d1fcffdc8993941751c9dc82b4",
+   "tags": [
+    [
+     "d",
+     "workstr:exercise:glute-kickback"
+    ],
+    [
+     "title",
+     "Glute Kickback"
+    ],
+    [
+     "format",
+     "weight",
+     "reps",
+     "rpe",
+     "set_type"
+    ],
+    [
+     "format_units",
+     "kg",
+     "count",
+     "0-10",
+     "warmup|normal|drop|failure"
+    ],
+    [
+     "equipment",
+     "body weight"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/pXd7OwUqe1ZVj2zl.jpg",
+     "m image/jpeg",
+     "alt Glute Kickback"
+    ],
+    [
+     "t",
+     "glutes"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "push"
+    ],
+    [
+     "t",
+     "compound"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "workstr_muscle",
+     "Glutes",
+     "primary"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"\",\"category\":\"strength\",\"equipment\":[\"Body Weight\"],\"difficulty\":\"beginner\",\"tags\":[\"push\",\"compound\"],\"instructions\":[\"Kneel on the floor or an exercise mat and bend at the waist with your arms extended in front of you (perpendicular to the torso) in order to get into a kneeling push-up position but with the arms spaced at shoulder width. Your head should be looking forward and the bend of the knees should create a 90-degree angle between the hamstrings and the calves. This will be your starting position.\",\"As you exhale, lift up your right leg until the hamstrings are in line with the back while maintaining the 90-degree angle bend. Contract the glutes throughout this movement and hold the contraction at the top for a second. Tip: At the end of the movement the upper leg should be parallel to the floor while the calf should be perpendicular to it.\",\"Go back to the initial position as you inhale and now repeat with the left leg.\",\"Continue to alternate legs until all of the recommended repetitions have been performed.\"],\"imagePublishUrl\":\"https://i.nostr.build/pXd7OwUqe1ZVj2zl.jpg\",\"defaultSets\":3,\"defaultReps\":\"8-12\",\"defaultRest\":90}"
+    ]
+   ]
+  },
+  {
+   "content": "Get into a prone position on the floor, supporting your weight on your toes and your forearms. Your arms are bent and directly below the shoulder.\nKeep your body straight at all times, and hold this position as long as possible. To increase difficulty, an arm or leg can be raised.",
+   "created_at": 1785552709,
+   "id": "1ac9077817037ea8353550356bb862b6aeb896d45f4cfc290218da88fae355d9",
+   "kind": 33401,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "d996dc313d29bf18f4a0df20afeadea781676502ad5e5a0e389be93409d6fb3278e66b9f758ef651f632529fb924a2c0bcc9320e2a3be8444e80bc59050b92f2",
+   "tags": [
+    [
+     "d",
+     "workstr:exercise:plank"
+    ],
+    [
+     "title",
+     "Plank"
+    ],
+    [
+     "format",
+     "weight",
+     "reps",
+     "rpe",
+     "set_type"
+    ],
+    [
+     "format_units",
+     "kg",
+     "count",
+     "0-10",
+     "warmup|normal|drop|failure"
+    ],
+    [
+     "equipment",
+     "body weight"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/Und0oSi1LoByDnJV.jpg",
+     "m image/jpeg",
+     "alt Plank"
+    ],
+    [
+     "t",
+     "core"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "static"
+    ],
+    [
+     "t",
+     "isolation"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "workstr_muscle",
+     "Core",
+     "primary"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"\",\"category\":\"strength\",\"equipment\":[\"Body Weight\"],\"difficulty\":\"beginner\",\"tags\":[\"static\",\"isolation\"],\"instructions\":[\"Get into a prone position on the floor, supporting your weight on your toes and your forearms. Your arms are bent and directly below the shoulder.\",\"Keep your body straight at all times, and hold this position as long as possible. To increase difficulty, an arm or leg can be raised.\"],\"imagePublishUrl\":\"https://i.nostr.build/Und0oSi1LoByDnJV.jpg\",\"defaultSets\":3,\"defaultReps\":\"30-60s\",\"defaultRest\":60}"
+    ]
+   ]
+  },
+  {
+   "content": "Lie on the floor face down and place your hands about 36 inches apart while holding your torso up at arms length.\nNext, lower yourself downward until your chest almost touches the floor as you inhale.\nNow breathe out and press your upper body back up to the starting position while squeezing your chest.\nAfter a brief pause at the top contracted position, you can begin to lower yourself downward again for as many repetitions as needed.",
+   "created_at": 1785552695,
+   "id": "a42c42b26f4f8d5f476317bb811103dceef1545d8cb4b885aa1d80c4c36e7848",
+   "kind": 33401,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "fd7c5a2e95f2abee535ea8c43c59f150626f342263701fe2802a2d4befac0bcafe0a2efcfbddb8fa7db25675a1232a3e0f33402c88399d226083e7d353877153",
+   "tags": [
+    [
+     "d",
+     "workstr:exercise:pushups"
+    ],
+    [
+     "title",
+     "Pushups"
+    ],
+    [
+     "format",
+     "weight",
+     "reps",
+     "rpe",
+     "set_type"
+    ],
+    [
+     "format_units",
+     "kg",
+     "count",
+     "0-10",
+     "warmup|normal|drop|failure"
+    ],
+    [
+     "equipment",
+     "body weight"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/34ee9yS0eWKJwg6o.png",
+     "m image/jpeg",
+     "alt Pushups"
+    ],
+    [
+     "t",
+     "chest"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "push"
+    ],
+    [
+     "t",
+     "compound"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "workstr_muscle",
+     "Chest",
+     "primary"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"\",\"category\":\"strength\",\"equipment\":[\"Body Weight\"],\"difficulty\":\"beginner\",\"tags\":[\"push\",\"compound\"],\"instructions\":[\"Lie on the floor face down and place your hands about 36 inches apart while holding your torso up at arms length.\",\"Next, lower yourself downward until your chest almost touches the floor as you inhale.\",\"Now breathe out and press your upper body back up to the starting position while squeezing your chest.\",\"After a brief pause at the top contracted position, you can begin to lower yourself downward again for as many repetitions as needed.\"],\"imagePublishUrl\":\"https://i.nostr.build/34ee9yS0eWKJwg6o.png\",\"defaultSets\":3,\"defaultReps\":\"8-12\",\"defaultRest\":90}"
+    ]
+   ]
+  },
+  {
+   "content": "Demo video: https://i.nostr.build/OYKHu10z6wyVBfSM.jpg",
+   "created_at": 1785611941,
+   "id": "e60db4ceb2a4d63ee38a739e9046d91af62391974324ce04a69638cf8e422311",
+   "kind": 33401,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "7ef3a9cb5f7d8955cfbdaf165895bdae64d0a3b9f20c4b9c3c5c33ca9829d13cb2653ecf77b2158876033830fddd6cdb9b909c52dabd7fed472219ac052c0938",
+   "tags": [
+    [
+     "d",
+     "workstr:exercise:side-bridge"
+    ],
+    [
+     "title",
+     "Side Bridge"
+    ],
+    [
+     "format",
+     "weight",
+     "reps",
+     "rpe",
+     "set_type"
+    ],
+    [
+     "format_units",
+     "kg",
+     "count",
+     "0-10",
+     "warmup|normal|drop|failure"
+    ],
+    [
+     "equipment",
+     "body weight"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/aeIVB1k5ubKpGdTu.jpg",
+     "m image/jpeg",
+     "alt Side Bridge"
+    ],
+    [
+     "t",
+     "core"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "static"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "workstr_muscle",
+     "Core",
+     "primary"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"\",\"category\":\"strength\",\"equipment\":[\"Body Weight\"],\"difficulty\":\"beginner\",\"tags\":[\"static\",null],\"instructions\":[\"Demo video: https://i.nostr.build/OYKHu10z6wyVBfSM.jpg\"],\"imagePublishUrl\":\"https://i.nostr.build/aeIVB1k5ubKpGdTu.jpg\",\"defaultSets\":3,\"defaultReps\":\"8-12\",\"defaultRest\":90}"
+    ]
+   ]
+  },
+  {
+   "content": "To begin, lie straight and face down on the floor or exercise mat. Your arms should be fully extended in front of you. This is the starting position.\nSimultaneously raise your arms, legs, and chest off of the floor and hold this contraction for 2 seconds. Tip: Squeeze your lower back to get the best results from this exercise. Remember to exhale during this movement. Note: When holding the contracted position, you should look like superman when he is flying.\nSlowly begin to lower your arms, legs and chest back down to the starting position while inhaling.\nRepeat for the recommended amount of repetitions prescribed in your program.",
+   "created_at": 1785552713,
+   "id": "27d63e5ae659f0d55a822a768ae797c5e0b75157b3dc57c2fa3fde41376e986c",
+   "kind": 33401,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "a50fbe48194653576c52135c8e0d882b68f1dcf7c3b451b50201cfd35e86f7a53641aa23ec98aa9d0220e7d8ce9e768538b4681efe721698b10811fd6a94a9bb",
+   "tags": [
+    [
+     "d",
+     "workstr:exercise:superman"
+    ],
+    [
+     "title",
+     "Superman"
+    ],
+    [
+     "format",
+     "weight",
+     "reps",
+     "rpe",
+     "set_type"
+    ],
+    [
+     "format_units",
+     "kg",
+     "count",
+     "0-10",
+     "warmup|normal|drop|failure"
+    ],
+    [
+     "equipment",
+     "body weight"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/0ynRfSbaylKzkl5q.png",
+     "m image/jpeg",
+     "alt Superman"
+    ],
+    [
+     "t",
+     "lower back"
+    ],
+    [
+     "t",
+     "stretching"
+    ],
+    [
+     "t",
+     "static"
+    ],
+    [
+     "t",
+     "compound"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "workstr_muscle",
+     "Lower Back",
+     "primary"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"\",\"category\":\"stretching\",\"equipment\":[\"Body Weight\"],\"difficulty\":\"beginner\",\"tags\":[\"static\",\"compound\"],\"instructions\":[\"To begin, lie straight and face down on the floor or exercise mat. Your arms should be fully extended in front of you. This is the starting position.\",\"Simultaneously raise your arms, legs, and chest off of the floor and hold this contraction for 2 seconds. Tip: Squeeze your lower back to get the best results from this exercise. Remember to exhale during this movement. Note: When holding the contracted position, you should look like superman when he is flying.\",\"Slowly begin to lower your arms, legs and chest back down to the starting position while inhaling.\",\"Repeat for the recommended amount of repetitions prescribed in your program.\"],\"imagePublishUrl\":\"https://i.nostr.build/0ynRfSbaylKzkl5q.png\",\"defaultSets\":3,\"defaultReps\":\"8-12\",\"defaultRest\":90}"
+    ]
+   ]
+  },
+  {
+   "content": "An isometric lower-body hold for quad endurance, knee control, and mental toughness. Useful as a low-skill bodyweight finisher.\nStand with your back against a wall and feet roughly shoulder-width apart.\nWalk the feet forward and slide down the wall until the knees are bent about 90 degrees or to a comfortable depth.\nKeep the back, shoulders, and hips in contact with the wall.\nPress evenly through both feet and keep knees tracking over the toes.\nHold the position without resting the hands on the thighs.\nStand up carefully when the target time is complete.",
+   "created_at": 1785720198,
+   "id": "42fac66629e58b0e128798a50db5cf135ec00abef4f90c1ccfedcdcc47632bde",
+   "kind": 33401,
+   "pubkey": "ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6",
+   "sig": "1c4e5be7651f5a51b8f1f7e499f530a07d64138cc176991a92eba1df437101a5da7eb2ef2c7e574670bb6d44994605c6935e39cb8980f48bb9cd7a968fe34896",
+   "tags": [
+    [
+     "d",
+     "workstr:exercise:wall-sit"
+    ],
+    [
+     "title",
+     "Wall Sit"
+    ],
+    [
+     "format",
+     "weight",
+     "reps",
+     "rpe",
+     "set_type"
+    ],
+    [
+     "format_units",
+     "kg",
+     "count",
+     "0-10",
+     "warmup|normal|drop|failure"
+    ],
+    [
+     "equipment",
+     "body weight"
+    ],
+    [
+     "difficulty",
+     "beginner"
+    ],
+    [
+     "imeta",
+     "url https://i.nostr.build/3hr0ueLfGS8WfrFG.png",
+     "m image/jpeg",
+     "alt Wall Sit"
+    ],
+    [
+     "t",
+     "quadriceps"
+    ],
+    [
+     "t",
+     "strength"
+    ],
+    [
+     "t",
+     "lower-body"
+    ],
+    [
+     "t",
+     "isometric"
+    ],
+    [
+     "t",
+     "endurance"
+    ],
+    [
+     "t",
+     "finisher"
+    ],
+    [
+     "t",
+     "workstr"
+    ],
+    [
+     "client",
+     "workstr"
+    ],
+    [
+     "workstr_muscle",
+     "Quadriceps",
+     "primary"
+    ],
+    [
+     "workstr_meta",
+     "{\"v\":1,\"description\":\"An isometric lower-body hold for quad endurance, knee control, and mental toughness. Useful as a low-skill bodyweight finisher.\",\"category\":\"strength\",\"equipment\":[\"Body Weight\"],\"difficulty\":\"beginner\",\"tags\":[\"lower-body\",\"isometric\",\"endurance\",\"finisher\"],\"instructions\":[\"Stand with your back against a wall and feet roughly shoulder-width apart.\",\"Walk the feet forward and slide down the wall until the knees are bent about 90 degrees or to a comfortable depth.\",\"Keep the back, shoulders, and hips in contact with the wall.\",\"Press evenly through both feet and keep knees tracking over the toes.\",\"Hold the position without resting the hands on the thighs.\",\"Stand up carefully when the target time is complete.\"],\"imagePublishUrl\":\"https://i.nostr.build/3hr0ueLfGS8WfrFG.png\",\"defaultSets\":3,\"defaultReps\":\"30-60\",\"defaultRest\":90}"
+    ]
+   ]
+  }
+ ]
+}

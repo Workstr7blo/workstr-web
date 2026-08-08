@@ -405,7 +405,8 @@ SQLite columns to allow straight ports of store logic):
   the schema version does not need to move; delete it at the next migration.
 - `bodyweight`: id, date (unique index), weight_kg, notes
 - `settings`: key/value — unit preference, public relay list, Workstr relay URL, signer
-  type, sync cursor, height, target weight, owned equipment, and `canonCache`
+  type, sync cursor, height, target weight, owned equipment, `canonCache`, and
+  `seedVersion` (highest starter-seed version applied to this namespace)
 - `sync_queue`: pending outbound record addresses (Phase 2a)
 - `blobs`: locally cached exercise images (Cache API is also acceptable)
 

@@ -7,6 +7,7 @@ import { mergeOwnedEquipment, MY_EQUIPMENT, ownedEquipmentKeys } from '../core/e
 import { WorkstrStore, type ExerciseDraft, type SheetWithExercises } from '../db/store';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
+import { applyStarterSeed } from '../db/seed';
 import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
@@ -110,7 +111,9 @@ export function renderShell(root: HTMLElement): void {
       state.exFilter.equip = MY_EQUIPMENT;
       state.discoverFilter.equip = MY_EQUIPMENT;
     }
-    await state.store.removeStarterExercises();
+    // Backfills the starter programs on a fresh namespace, and is a no-op
+    // afterwards. Also retires any pre-seed bundled rows on first run.
+    if ((await applyStarterSeed(state.store)).applied) state.settings = await state.store.getSettings();
     state.finishedSessions = await loadFinishedSessions();
     state.bodyEntries = await state.store.listBody();
     state.sheets = await state.store.listSheets();

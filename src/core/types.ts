@@ -41,6 +41,10 @@ export interface Sheet {
   difficulty?: string;
   tags?: string[];
   is_temporary: boolean;
+  // 'bundle' marks an untouched starter program. Cleared the moment the user
+  // saves an edit, exactly like the nostr fields, so an edited starter counts
+  // as their own work.
+  source_type?: 'bundle';
   nostr_pubkey?: string;
   nostr_address?: string;
   nostr_event_id?: string;
@@ -136,6 +140,8 @@ export interface WorkstrSettings {
   paidRelay?: string;
   signerType?: 'nip07' | 'nip46' | 'idenstr';
   syncCursor?: number;
+  // Highest starter-seed version applied to this namespace; see db/seed.ts.
+  seedVersion?: number;
   heightCm?: number;
   targetWeightKg?: number;
   // Normalized equipment keys the user owns. Drives the "My equipment" filter

@@ -16,6 +16,7 @@ export interface SheetDraft {
   difficulty?: string;
   tags?: string[];
   is_temporary?: boolean;
+  source_type?: 'bundle';
   nostr_pubkey?: string;
   nostr_address?: string;
   nostr_event_id?: string;
@@ -81,6 +82,12 @@ export class WorkstrStore {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  // Includes soft-deleted rows. Only the seed needs this: a slug the user
+  // deleted is still taken, and must not be refilled.
+  async listExercisesIncludingDeleted(): Promise<Exercise[]> {
+    return this.db.getAll('exercises');
+  }
+
   async deleteExercise(id: number): Promise<void> {
     const existing = await this.db.get('exercises', id);
     if (!existing) return;
@@ -139,7 +146,9 @@ export class WorkstrStore {
       is_temporary: draft.is_temporary ?? existing?.is_temporary ?? false,
       // Import = snapshot: the nostr identity comes only from the draft, so a
       // builder save (which carries none) forks an imported sheet and canon
-      // updates never clobber local edits.
+      // updates never clobber local edits. The seed marker follows the same
+      // rule, so editing a starter program makes it the user's own.
+      source_type: draft.source_type,
       nostr_pubkey: draft.nostr_pubkey,
       nostr_address: draft.nostr_address,
       nostr_event_id: draft.nostr_event_id,
