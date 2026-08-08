@@ -12,11 +12,12 @@ Build **Workstr Web**: a browser-based, installable PWA workout tracker on the N
 protocol. The app is 100% client-side. It is served as static files from GitHub Pages
 on a custom domain. All application logic — exercise library, workout sheets (programs),
 training sessions, planning, progress analytics, recovery suggestions — runs in the
-browser. User data lives in the browser (IndexedDB) for free users, and additionally as
-**NIP-44-encrypted Nostr events on a paid, authenticated relay** for subscribers.
+browser. User data lives either in the browser (IndexedDB) in an initial phase, and additionally as
+**NIP-44-encrypted Nostr events on an authenticated relay** on a second phase.
 
 The operator hosts **no application backend**. The only server-side components are the
-paid relay (strfry) and a Lightning payment gate — and only in Phase 2.
+relay (strfry) and a small allowlist service, both in Phase 2a. Donations need no backend
+at all — a Lightning address and public zap receipts are enough (Section 11).
 
 ## 2. Vision
 
@@ -31,23 +32,32 @@ delegates signing to a companion app (Idenstr). The web version keeps the same p
 | SQLite (`workstr.db`)          | IndexedDB (same logical schema)                  |
 | Idenstr (server-side signer)   | User-owned signer: NIP-07 extension or NIP-46 remote signer |
 | LAN / Tailscale boundary       | Public website, keyless by design                |
-| Private data stays on server   | Private data stays in browser; optionally backed up **encrypted** to the paid relay |
+| Private data stays on server   | Private data stays in browser; optionally backed up **encrypted** to the Workstr relay |
 
-Long-term vision: the client is a complete free product; the **service around it** is
-the business — encrypted sync/backup, retention guarantees, a curated exercise library,
-media hosting, and eventually a platform where coaches publish programs.
+Long-term vision: the client is a complete free product and stays free. The **service
+around it** — encrypted sync/backup, retention guarantees, a curated exercise library,
+media hosting, and eventually a platform where coaches publish programs — costs money to
+run, and the plan is to fund that cost with **donations rather than subscriptions**:
+recurring zaps, targeted fundraisers, and supporter recognition. A paid tier is the
+documented fallback, not the goal. Section 11 states what it would cost, what donations
+must cover, and the exact condition under which the fallback activates.
 
 ## 3. Purpose (why this exists)
 
 1. **Sovereignty**: no accounts, no passwords, no email. Identity is a Nostr keypair the
    user already owns. The operator never sees a private key and never holds plaintext
    user data. Health data is sensitive; here it is either local or ciphertext.
-2. **Zero-cost distribution**: static hosting is free; public Nostr relays are free;
-   the free tier costs the operator nothing per user.
-3. **Honest monetization**: everything paid is enforced **server-side by the relay**
-   (pubkey whitelist), never by client-side flags — the client is open source and
-   client-side gates are unenforceable.
-4. **Marketing loop**: free users publish workout summaries and shared programs to
+2. **Zero-cost distribution**: static hosting is free; public Nostr relays are free.
+   Phase 1 costs the operator nothing per user. Phase 2a adds a relay, which is the only
+   thing in the product that has a running bill.
+3. **Honest funding**: everything that can be free stays free. The client is open source
+   and client-side gates are unenforceable, so the only things that could ever be gated
+   are services the operator genuinely pays for. The intent is that users who find the
+   product valuable fund development and infrastructure directly, and that gating never
+   has to be turned on.
+4. **Transparent by default**: running costs and donations received are published, in the
+   app and in the repo. Asking for money without showing the bill is not an option.
+5. **Marketing loop**: free users publish workout summaries and shared programs to
    *public* relays, which advertises the product inside the Nostr social graph.
 
 ## 4. Infrastructure philosophy
@@ -58,15 +68,21 @@ Rules that govern every technical decision:
    browser runs in the browser. A server component may only exist if the feature is
    *physically impossible* client-side (cross-user shared state, work while the user's
    browser is closed, secrets, payment verification).
-2. **The relay is the product.** Free = local + public relays. Paid = the operator's
-   authenticated relay. All gating happens at the relay (NIP-42 + pubkey whitelist).
+2. **The relay is the cost center, not the paywall.** Free = local + public relays. The
+   operator's authenticated relay adds encrypted sync, retention, and media hosting — it
+   is what donations pay for. Access is still gated at the relay (NIP-42 + pubkey
+   allowlist), because a keyless public client cannot enforce anything. But the
+   *admission criterion* is a policy knob, not an architecture: open to anyone who asks
+   while capacity allows, paid-only if funding fails. The mechanism never changes; only
+   the rule that decides which rows get written to the allowlist file.
 3. **Keys never touch the app.** All signing and NIP-44 encryption/decryption is
    delegated to the user's signer through a signer abstraction. The app never asks for,
    stores, or transmits an `nsec`. Pasting an nsec is not offered, ever.
 4. **Local-first.** IndexedDB is the source of truth for the UI. The relay is an
    encrypted replica. The app must be fully usable offline (PWA service worker).
-5. **Data is never hostage.** Free users get JSON export/import. Paid users' relay data
-   is standard Nostr events readable by any client with their key.
+5. **Data is never hostage.** Free users get JSON export/import. Relay data is standard
+   Nostr events readable by any client with their key. If funding fails and the relay
+   shuts down, the wind-down commitment in Section 11 applies.
 6. **Modular by contract.** Small modules with explicit interfaces (Section 8), so each
    can be built, tested, and AI-generated independently with minimal context.
 7. **Operator privacy.** Public infrastructure (domain, Pages, VPS or home relay) is
@@ -78,24 +94,50 @@ Rules that govern every technical decision:
 ### 5.1 Functional (feature parity with self-hosted Workstr)
 
 - **Exercise library**: search, filter by category/muscle/equipment/difficulty,
-  favourites, create/edit/delete, images.
+  favourites, images, and removal from the library. **Catalog-only**: exercises are
+  imported from the Workstr catalog, not authored locally — there is no create or edit
+  form, by the same reasoning that keeps publishing closed (below). Users compose at the
+  program level, not the movement level.
+- **Owned equipment**: the user records the equipment they actually have; it drives a
+  "My equipment" filter in the library and keeps generated workouts from proposing
+  exercises the user cannot perform. Bodyweight movements stay visible under every kit.
 - **Workout sheets (programs)**: ordered exercises with set/rep/rest/weight targets;
   temporary sheets; stable slug per sheet.
-- **Train**: start a session from a sheet, log sets (reps, weight in kg canonical,
-  RPE optional), rest timer, wake-lock (no-sleep video fallback), finish & review.
-- **Plan**: 7-day weekly grid + mesocycle blocks.
+- **Train**: start a session from a sheet, log sets (reps, weight in kg canonical),
+  rest timer, wake-lock (no-sleep video fallback), finish & review.
 - **Progress**: weekly volume, muscle distribution, estimated-1RM records, training
   streak, body-weight log.
 - **Recovery generator**: suggests exercises based on muscle recovery state computed
   from session history + the canonical muscle map (`muscles.js`, reused verbatim).
+- **Quick Workout**: one-tap generated session from recovery state and owned equipment,
+  for when the user has no program in mind.
 - **Nostr layer**:
-  - Publish an exercise publicly (NIP-101e `kind:33401`).
-  - Publish a program publicly (NIP-101e `kind:33402`, referencing exercises by a-tag).
-  - Share a session summary as a `kind:1` note (with optional uploaded image).
-  - Discover: browse/import exercises and programs from public relays with spam
-    filtering and author profile display.
-- **Paid tier (Phase 2)**: encrypted multi-device sync of all private data; curated
-  premium exercise library; media hosting for images.
+  - Discover: browse and import the Workstr catalog — operator-signed exercises and
+    programs read from public relays, every signature verified (Section 6.1).
+  - Share a session summary as a `kind:1` note, text plus the program's muscle map when
+    one exists.
+  - Support the project: Lightning address + QR, zap the operator npub, live funding
+    panel built from public zap receipts (Section 11).
+- **Workstr relay (Phase 2a)**: encrypted multi-device sync of all private data; retention
+  guarantee. Available to allowlisted pubkeys.
+
+**Deliberately not in the product** (each was specified, evaluated, and dropped — do not
+reintroduce without revisiting the reasoning):
+
+- **Users publishing exercises.** Permanent. Open exercise publishing fills a catalog with
+  off-standard entries and duplicates of the same movement; the Workstr catalog stays
+  operator-signed so it stays coherent. See Section 6.1.
+- **Weekly plan / mesocycle planner.** Cut. The `plan` object store survives in the schema
+  unused (Section 7.2) — no feature reads or writes it.
+- **NIP-98 media upload.** Removed after implementation: unreliable in practice, and it put
+  a second signer prompt in the middle of a publish for no user-visible gain. Summaries
+  carry the program's existing muscle-map URL or go text-only.
+- **RPE logging.** `session_sets.rpe` is typed and never written. Open question, not a
+  commitment — see Section 13.12 before building it.
+
+**Planned for a later phase:** users publishing their own *programs* (`kind:33402`) —
+Section 10, Phase 3. Programs are authored work, so the duplicate-and-garbage problem that
+rules out open exercise publishing does not apply the same way.
 
 ### 5.2 Non-functional
 
@@ -106,22 +148,32 @@ Rules that govern every technical decision:
 - **No build-time secrets**: the repo is public; config is public constants.
 - **Performance**: first load < 500 KB gzipped (no heavy frameworks required; see 5.3);
   IndexedDB reads must render lists of 1,000+ sessions without jank.
+- **Honest publish state**: nothing is reported as Published unless a relay actually
+  acknowledged the EVENT. `nostr-tools` resolves some connection failures as a *string*
+  rather than rejecting, so relay results are inspected, not merely awaited, and the
+  event is re-queried to confirm before the UI claims success.
 - **Modularity**: no file > ~400 lines; no module imports more than 3 sibling modules.
   (Lesson from the predecessor project: a monolithic `index.html` is unmaintainable
-  and expensive to feed to AI tools.)
+  and expensive to feed to AI tools.) **This is a target being worked toward, not a
+  satisfied constraint** — `app/shell.ts` (~1,090 lines) and `app/session-runner.ts`
+  (~520) are over it today. Both are scheduled for extraction; the rule binds every new
+  file and every file touched, and neither of those two may grow.
 
 ### 5.3 Stack
 
 - **Language**: modern JavaScript (ES modules) or TypeScript (recommended: TypeScript
   for AI-assisted coding — types are compressed documentation).
 - **Build**: Vite. Output = static `dist/` deployable to GitHub Pages.
-- **UI**: keep it lean. Either vanilla + lit-html, or Preact. Reuse the existing
-  Workstr CSS (`public/styles.css`) and UI structure as the design reference.
+- **UI**: vanilla TypeScript with template-string rendering — no framework was needed and
+  none was added. The self-hosted Workstr CSS is vendored as `workstr-reference.css` and
+  is the design reference.
 - **Nostr**: `nostr-tools` (event creation, filters, relay pool, nip19, nip44 helpers)
   — but all *signing/encryption* calls go through the signer abstraction, never
   directly to a key.
 - **Storage**: IndexedDB via the `idb` wrapper library.
-- **Testing**: Vitest for pure modules (event codecs, recovery math, sync merge logic).
+- **Testing**: Vitest for pure modules (catalog parsing, recovery math, stats, equipment
+  matching, import-state resolution, sync merge), `fake-indexeddb` for store tests, and
+  Playwright headless Chromium for the browser surface (Section 12).
 
 ---
 
@@ -133,83 +185,175 @@ Rules that govern every technical decision:
 | **NIP-07** | Browser-extension signer (`window.nostr`): `getPublicKey()`, `signEvent()`, `nip44.encrypt/decrypt`. Primary desktop login. |
 | **NIP-46** | Remote signer ("bunker"/Amber): same operations over an encrypted relay channel. Primary mobile login. Connect via `bunker://` URI or `nostrconnect://` QR. |
 | **NIP-44** | Versioned encryption used to encrypt **all private data events** to the user's *own* pubkey (self-encryption: conversation key of user↔user). |
-| **NIP-78 (kind 30078)** | Arbitrary app data, addressable-replaceable. Carrier for every private encrypted record (sessions, sheets, plan, body-weight, settings, library overrides). `d` tag = record address (Section 7.3). |
-| **NIP-101e (kind 33401)** | Public exercise template. Same tag layout the self-hosted app already emits: `d`, `title`, `format`, `format_units`, `equipment`, `t` topics, plus Workstr's granular `workstr_muscle` tags. |
-| **NIP-101e (kind 33402)** | Public workout template (program). References exercises via `a` tags: `33401:<pubkey>:<d>`. |
-| **kind 1** | Public workout summary note (social sharing). |
-| **NIP-42** | Relay AUTH. The paid relay requires AUTH and only accepts read/write from whitelisted (paying) pubkeys. |
-| **NIP-98** | HTTP Auth events (kind 27235) for authenticated uploads to media servers (nostr.build in Phase 1, own Blossom server in Phase 2). |
+| **NIP-78 (kind 30078)** | Arbitrary app data, addressable-replaceable. Carrier for every private encrypted record (sessions, sheets, body-weight, settings, library overrides). `d` tag = record address (Section 7.3). Phase 2a. |
+| **NIP-101e (kind 33401)** | Exercise template. **Read-only for the client**: the app imports these, it never authors them. Written only by the operator key. Tag layout as the self-hosted app emits it: `d`, `title`, `format`, `format_units`, `equipment`, `t` topics, Workstr's granular `workstr_muscle` tags, a `workstr_meta` JSON tag, and `imeta` for media. |
+| **NIP-101e (kind 33402)** | Workout template (program). References exercises via `a` tags: `33401:<pubkey>:<d>`. Read-only today; user-authored programs are a Phase 3 item. |
+| **kind 1** | Public workout summary note (social sharing). The only event type the client currently signs on the user's behalf. |
+| **NIP-42** | Relay AUTH. The Workstr relay requires AUTH and only accepts read/write from allowlisted pubkeys. Who lands on the allowlist is a policy decision (Section 11), not a protocol one. |
+| **NIP-98** | HTTP Auth events (kind 27235). **Rejected for media upload** — built and removed: unreliable against the media host, and it inserted a second signer prompt mid-publish for no user-visible gain. Kept in this table as a decision record; if media hosting returns it is via Blossom on the operator's own host (Phase 3), re-evaluated from scratch. Still the right tool for authenticating a request to the operator's *own* endpoint (relay-access requests, Phase 2a). |
 | **NIP-19** | bech32 encoding (`npub`, `naddr`, `nevent`) for display and share links. |
-| **NIP-47 (NWC)** | *Optional, Phase 3.* Nostr Wallet Connect so subscribers can pay renewals / zap from inside the app. Not required for launch: Phase 2 payments are plain Lightning invoices (QR / copy). |
-| **NIP-57** | *Optional, Phase 3.* Zap receipts for milestone-zap donation prompts. |
+| **LNURL-pay / lud16** | Lightning address in the operator's `kind:0`. The whole donation path on a static site: address + QR, no backend, no payment service. Ships in Phase 1. |
+| **NIP-57** | Zaps and zap receipts (`kind:9735`). Donation prompts, supporter recognition, and — because receipts are public events — the funding transparency panel, computed client-side. Phase 1, core, not optional. |
+| **NIP-47 (NWC)** | *Optional, Phase 3.* Nostr Wallet Connect for one-tap in-app zaps without leaving for a wallet. Convenience only; the lud16 path already works without it. |
 
 **Important distinction**: NIP-46 = remote *signing* (identity). NIP-47/NWC = remote
 *wallet* (payments). They are separate connections with separate permissions.
 
+**Terminology (used consistently from here on)**: a **supporter** is someone who has
+donated. An **allowlisted** pubkey is one the Workstr relay accepts. These are
+deliberately *not* the same set — under donation funding, allowlisting is granted on
+request while capacity allows, and supporting is voluntary. Do not use "subscriber",
+"paying user", or "premium" anywhere in the product or the code.
+
 ### 6.1 How the NIPs work together (flows)
 
-**Login**
-1. User picks a signer: NIP-07 (if `window.nostr` exists) or NIP-46 (paste
+**Boot (no identity — the default state)**
+1. The app opens straight into training against the `local` namespace
+   (`workstr-local`). No signer, no prompt, no npub. Everything except the Nostr layer
+   works here, forever, for a user who never signs in.
+2. Sign-in is optional and lives in Settings. It is not a gate, a splash screen, or a
+   precondition for any local feature.
+
+**Sign in and adopt (optional)**
+1. User picks a signer in Settings: NIP-07 (if `window.nostr` exists) or NIP-46 (paste
    `bunker://` URI or scan QR).
-2. App calls `signer.getPublicKey()` → `pubkey` becomes the user ID.
-3. App opens/creates the IndexedDB database namespaced by pubkey
+2. App calls `signer.getPublicKey()` → `pubkey` names the target namespace
    (`workstr-<pubkey>`), so multiple identities on one device never mix.
+3. **Adoption, decided once:**
+   - Target namespace is empty → the `local` namespace is copied into it wholesale.
+     Keys are preserved so autoincrement ids and cross-store references (`sheet_id`,
+     `session_id`, `exercise_id`) stay valid.
+   - Target namespace already holds data → ask the user, once, which side to keep.
+   - **Namespaces are never merged.** Merging two histories without a sync protocol
+     produces duplicates nobody can untangle; a copy-or-keep choice is comprehensible.
+4. "Has user data" means: any session, set, sheet, sheet row, body-weight entry, plan
+   row or blob, or any exercise the user favourited, deleted, or that did not come from
+   the bundled seed. A namespace holding only untouched seed rows counts as empty, so
+   signing in right after a clean install never triggers the prompt.
+5. Sign-out returns to the `local` namespace and leaves both databases intact.
 
 **Save (free, always)**
 1. User edits a sheet / logs a set / finishes a session.
 2. Store module writes to IndexedDB immediately. UI reads only from IndexedDB.
-3. If the user is a subscriber, the record is queued for encrypted sync (below).
+3. If the user's pubkey is allowlisted on the Workstr relay, the record is queued for
+   encrypted sync (below).
 
-**Encrypted sync (paid)**
+**Encrypted sync (phase 2)**
 1. Sync engine serializes the changed record to canonical JSON.
 2. `signer.nip44Encrypt(ownPubkey, json)` → ciphertext. (Self-encryption: only the
    user's key can decrypt.)
 3. Wrap in `kind:30078`, tags: `[["d", "<address>"], ["client", "workstr"]]`,
    `content = ciphertext`. `signer.signEvent(event)`.
-4. Publish to the paid relay. Relay demands NIP-42 AUTH; the app answers the AUTH
+4. Publish to the Workstr relay. Relay demands NIP-42 AUTH; the app answers the AUTH
    challenge with a signer-signed `kind:22242` event; relay checks the pubkey against
-   the paying whitelist.
+   the allowlist.
 5. On another device: REQ `{kinds:[30078], authors:[pubkey], since:<lastSync>}` →
    decrypt each event via `signer.nip44Decrypt` → merge into IndexedDB
    (last-write-wins on `updated_at`, per record).
 6. Decrypted results are cached in IndexedDB so decryption is a once-per-device cost
    (NIP-46 round-trips are slow; batch and lazy-decrypt oldest history on demand).
 
-**Publish an exercise (free)**
-1. Build the `kind:33401` from the local exercise row (same mapping as the
-   self-hosted `idenstr.js` publish path).
-2. `signer.signEvent` → publish to the user's public relays + (if subscriber) the
-   paid relay.
-3. Store `nostr_address` (`33401:<pubkey>:<d>`) back on the local row.
-
-**Publish a program (free)**
-1. Dependency walk: every referenced exercise that has no `nostr_address` is
-   published first (a template pointing at unpublished exercises is broken).
-2. Build `kind:33402` with `a` tags for each exercise; sign; publish; store address.
-
 **Share a session summary (free)**
-1. Render summary text (kg or lb per user setting; canonical storage is kg).
-2. Optional image: upload via NIP-98-signed request to the media server; put the URL
-   in the note.
-3. Sign `kind:1`; publish to public relays.
+1. Render summary text (kg or lb per user setting; canonical storage is kg): program
+   name, duration, set count, volume, muscles worked, top set per exercise.
+2. If the session came from a catalog program that carries a rendered muscle map, attach
+   that URL as an `imeta` tag and append it to the note. No upload happens — see the
+   NIP-98 decision above. Otherwise the note is text-only.
+3. Sign `kind:1`; publish to the write-relay set (Section 6.2); verify acknowledgement
+   before reporting success (Section 5.2).
 
-**Discover & import (free)**
-1. REQ to public relays: `{kinds:[33401]}` / `{kinds:[33402]}` with limits.
-2. Validate (port of the self-hosted `discover.js` rules): require `title`, `d`,
-   `equipment`, `format`, `format_units`; drop known spam `t` tags
-   (`bikel`, `bikel-challenge`, `catallax`); recognize movement-topic tags.
-3. Fetch author `kind:0` profiles (cached 30 min) for display.
-4. Import = insert into IndexedDB with `source_type: 'imported'` and the origin
-   address. **Programs import as snapshots** (no auto-follow of author updates).
+**Discover & import — the Workstr catalog (free)**
 
-**Subscribe (paid, Phase 2)**
-1. App requests an invoice from the payment API (`POST /api/subscribe {pubkey, plan}`).
-2. LNbits (connected to the operator's LND node) issues a Lightning invoice; app
-   shows QR + copy string.
-3. On settlement, a webhook/poller adds the pubkey (+ expiry) to the whitelist file;
-   strfry's NIP-42 plugin reloads it.
-4. Client retries relay AUTH → now accepted → sync engine activates. Client stores
-   subscription expiry (also queryable via `GET /api/status/<pubkey>`).
+This is an author-filtered catalog, *not* open discovery of the Nostr commons. The
+distinction is deliberate and load-bearing:
+
+1. REQ each catalog relay in parallel: `{kinds:[33401], authors:[OPERATOR_PUBKEY], limit}`
+   and the same for `33402`. Per-relay timeout; partial failure is tolerated; if *no*
+   relay answered, throw, so the UI can tell "offline" from "the catalog is empty".
+2. `verifyEvent` every event. Drop anything that fails. **The author filter plus the
+   signature check is the entire spam and quality model** — no keyword blocklists, no
+   heuristic validation, no `t`-tag denylist. Anyone may copy a `d` tag; nobody can forge
+   the operator's signature.
+3. Merge across relays and dedupe by full address `<kind>:<pubkey>:<d>`, keeping the
+   newest `created_at`. A second dedupe pass collapses catalog entries that describe the
+   same movement under a generated slug, preferring the clean title-derived slug.
+4. Cache the raw signed events in `settings.canonCache` with a fetch timestamp, so
+   Discover renders offline and a cold start does not block on the network.
+5. Import = insert into IndexedDB with the origin address and `origin_created_at`.
+   **Everything imports as a snapshot** — no auto-follow of catalog updates. Programs
+   import through a dependency walk that pulls in every referenced exercise first.
+6. Author `kind:0` profiles are fetched and cached for display.
+
+**Why exercises are operator-signed, permanently**: an open exercise vocabulary degrades.
+Real relay data fills with entries that ignore the tag standard and with a dozen
+near-identical copies of the same movement, and no client-side filter reliably sorts the
+good from the noise. A curated, signed catalog is the only version of this that stays
+usable — and because it is published to *public* relays under a plain NIP-101e kind, any
+other client can read it. Curation is a quality decision, not a lock (Section 11.3).
+
+**Update detection (why an import is not a copy)**
+1. A row's identity is its full `nostr_address`, never the slug alone.
+2. A row still carrying its address is by definition unmodified, so a newer remote
+   `created_at` on that address means an update is genuinely available — surfaced as
+   Import / In library / Update per card.
+3. **Fork-on-edit is the standing rule for any future edit path**: whatever first lets a
+   user modify an imported row must clear that row's nostr fields, making it the user's
+   own so no catalog update can clobber their work. Today exercises are catalog-only
+   (no edit form exists), so the rule binds programs and anything added later — it is
+   written down now because retrofitting it after edits ship means silently overwriting
+   somebody's work.
+
+**Support the project (free, Phase 1)**
+1. Support screen reads the operator's `kind:0` for `lud16`; renders the Lightning
+   address, a QR, and suggested amounts. Nothing is stored, nothing is gated.
+2. If NWC is connected (Phase 3), zap in-app; otherwise the user pays from any wallet.
+3. Funding panel: REQ `{kinds:[9735], "#p":[operatorPubkey], since:<monthStart>}` from
+   public relays, sum the bolt11 amounts, display month-to-date against the published
+   monthly infrastructure cost. Entirely client-side — zap receipts are public events,
+   so transparency costs no backend.
+
+**Get relay access (Phase 2a)**
+1. User asks for access from the app: a NIP-98-signed request to the allowlist endpoint,
+   or a DM to the operator npub. No payment involved by default.
+2. Operator (or the endpoint, automatically, while capacity allows) appends the pubkey to
+   the allowlist file; strfry's NIP-42 plugin hot-reloads it.
+3. Client retries relay AUTH → now accepted → sync engine activates. Access status is
+   queryable via `GET /api/status/<pubkey>`.
+4. Supporters above the recognition threshold are allowlisted automatically, resolved
+   from zap receipts — a convenience, not a price.
+5. *Only if the Section 11 fallback has fired:* new pubkeys go through the invoice flow
+   instead (Phase 2b), and the status response carries an expiry.
+
+### 6.2 Relay sets (there is more than one "public relays")
+
+Three distinct sets, and conflating them causes real bugs:
+
+| Set | Used for | Shape |
+|---|---|---|
+| **Catalog relays** | Reading the operator-signed Workstr catalog | Small (about 3). Queried in parallel, results merged and deduped. More relays here buys nothing — the same signed events live on each. |
+| **Write relays** | Publishing the user's `kind:1` summaries | Broad (about a dozen). Reach is the goal: a summary is an advertisement, and relays reject or drop writes unpredictably. |
+| **Workstr relay** | Encrypted `kind:30078` sync (Phase 2a) | Exactly one, NIP-42 gated. Never mixed into either set above. |
+
+Both public sets ship as defaults and are user-editable in settings.
+
+### 6.3 The operator key is the trust root
+
+One hardcoded public key defines the catalog. It is a public constant in the client, and
+its **private** half is what signs every catalog event — held by the operator, never by
+the app, and never on the relay host.
+
+Consequences to design around:
+
+- Losing it means the catalog can never be updated again under the same addresses.
+  Clients would keep working from cache and from already-imported snapshots, but the
+  catalog would be frozen. Back it up with the same seriousness as the LMDB snapshots.
+- Rotating it invalidates every `nostr_address` in every user's library, since the pubkey
+  is part of the address. Imported rows would go on working — they are snapshots — but
+  update detection would break for every one of them. There is no cheap rotation.
+  Treat the key as permanent; if it ever must change, the migration is a client release
+  that maps old addresses to new ones, not a config change.
+- Compromise means an attacker can publish catalog entries users will trust. Detection is
+  manual. This is the price of the curation model and it is worth stating plainly.
 
 ---
 
@@ -219,41 +363,80 @@ Rules that govern every technical decision:
 
 | Tier | Where | Contents | Who |
 |---|---|---|---|
-| **Local** | IndexedDB (per pubkey, per device) | Everything: exercises, sheets, sessions, sets, plan, body-weight, settings, caches of decrypted sync data | Everyone |
-| **Public relays** | e.g. relay.damus.io, nos.lol, user's own relay list | Only what the user explicitly shares: `33401` exercises, `33402` programs, `kind:1` summaries. Plaintext by design. | Everyone |
-| **Paid relay** | Operator's strfry (NIP-42 gated) | `kind:30078` NIP-44 ciphertext of all private records; also receives copies of the user's public events for retention; curated premium `33401`/`33402` catalog published by the operator key | Subscribers only |
+| **Local** | IndexedDB, per namespace, per device | Everything: exercises, sheets, sessions, sets, body-weight, settings, catalog cache, caches of decrypted sync data | Everyone |
+| **Public relays** | Catalog relays for reads, write relays for shares (Section 6.2) | Inbound: the operator-signed `33401`/`33402` catalog. Outbound: only `kind:1` summaries the user explicitly shares. Plaintext by design. | Everyone |
+| **Workstr relay** | Operator's strfry (NIP-42 gated) | `kind:30078` NIP-44 ciphertext of all private records; also receives copies of the user's public events for retention | Allowlisted pubkeys |
 
-Free users' private data exists **only** in IndexedDB (plus manual JSON export).
-This fragility is deliberate — sync/backup is the paid product — but export/import
-must exist so data is never hostage.
+Note that the curated exercise library is **not** in that table: it is published to public
+relays like any other catalog (Section 10, Phase 2a). Locking curation behind the relay
+would contradict Section 3, and a public library is a better marketing asset than a gated
+one.
+
+Users without relay access keep their private data **only** in IndexedDB (plus manual JSON
+export). That fragility is a real limitation, not a lever — the relay exists to fix it for
+whoever wants it, and export/import exists so data is never hostage either way.
 
 ### 7.2 IndexedDB schema (mirror of the SQLite schema)
 
-Database: `workstr-<pubkey>`, version-managed migrations.
+Database: `workstr-<namespace>`, version-managed migrations. The namespace is either
+`local` (the anonymous account the app boots into) or a hex pubkey after sign-in. Same
+schema either way; see the adoption rules in Section 6.1.
 
 Object stores (key → value shape; keep field names identical to the self-hosted
 SQLite columns to allow straight ports of store logic):
 
-- `exercises` (key `id` auto): slug (unique index), name, description, category,
-  muscle_group, muscles[], equipment[], difficulty, tags[], instructions[],
+- `exercises` (key `id` auto): slug (unique index), status (index), name, description,
+  category, muscle_group, muscles[], equipment[], difficulty, tags[], instructions[],
   image_url, favourite, default_sets, default_reps, default_rest, source_type,
   status, nostr_event_id, nostr_pubkey, nostr_address, nostr_published_at,
-  created_at, updated_at
-- `sheets` (programs): id, slug, name, notes, is_temporary, nostr_pubkey,
-  nostr_address, nostr_event_id, nostr_published_at, created_at, updated_at
-- `sheet_exercises`: id, sheet_id (index), exercise_id, position, sets, reps, rest,
-  weight
-- `sessions`: id, sheet_id, started_at, finished_at, notes, summary_image_url,
-  nostr_event_id (of the kind:1, if shared)
-- `session_sets`: id, session_id (index), exercise_id, set_number, reps, weight_kg,
-  rpe, completed_at
-- `plan`: weekly grid entries + mesocycle blocks
-- `bodyweight`: id, date, weight_kg
-- `settings`: key/value (unit preference, relay list, signer type, sync cursor)
-- `sync_queue`: pending outbound record addresses (Phase 2)
+  **origin_created_at**, created_at, updated_at
+- `sheets` (programs): id, slug, name, notes, difficulty, tags[], is_temporary,
+  nostr_pubkey, nostr_address, nostr_event_id, nostr_published_at,
+  **origin_created_at**, created_at, updated_at
+- `sheet_exercises`: id, sheet_id (index), exercise_id, exercise_slug, exercise_name,
+  muscle_group, image_url, position, sets, reps, rest, weight, notes
+- `sessions`: id, sheet_id (index), sheet_name, started_at (index), finished_at, notes,
+  summary_image_url, nostr_event_id (of the kind:1, if shared), exercises[] (denormalized
+  snapshot of what was trained, so history survives library edits)
+- `session_sets`: id, session_id (index), exercise_id (index), exercise_slug,
+  exercise_name, set_number, reps, weight_kg, rpe *(typed, never written — see 5.1)*,
+  completed_at
+- `plan`: **vestigial.** The store is created; no feature reads or writes it. Kept so
+  the schema version does not need to move; delete it at the next migration.
+- `bodyweight`: id, date (unique index), weight_kg, notes
+- `settings`: key/value — unit preference, public relay list, Workstr relay URL, signer
+  type, sync cursor, height, target weight, owned equipment, and `canonCache`
+- `sync_queue`: pending outbound record addresses (Phase 2a)
 - `blobs`: locally cached exercise images (Cache API is also acceptable)
 
-### 7.3 Encrypted record addressing (the `d` tag scheme)
+**`origin_created_at`** is the provenance field the whole import model turns on: the
+`created_at` of the catalog event a row came from. Together with `nostr_address` it
+answers "is this row still an untouched copy, and is there a newer one upstream?" —
+see the update-detection flow in Section 6.1.
+
+**`canonCache`** holds raw signed catalog events plus a fetch timestamp. Storing the
+*signed* events rather than parsed rows means the offline path re-verifies signatures
+exactly like the online path; there is one parser, not two.
+
+### 7.3 The two `d` tag conventions
+
+There are two separate address vocabularies. They must not be confused, and the
+difference in versioning is deliberate.
+
+**Public catalog (shipped, operator-signed, plaintext):**
+
+```
+workstr:exercise:<slug>           → one catalog exercise  (kind 33401)
+workstr:program:<slug>            → one catalog program   (kind 33402)
+```
+
+No `v1` segment, on purpose: these addresses are **permanent public identifiers**.
+Every imported row in every user's library stores the full address
+`33401:<operator>:<d>`, and update detection compares against it. Versioning the prefix
+would orphan every existing import the day it changed — the schema evolves through tags
+inside the event, never through the address.
+
+**Private sync records (Phase 2a, self-encrypted):**
 
 One `kind:30078` event per logical record, addressable and replaceable. The `d` tag
 encodes the record type and identity; edits republish the same `d` (relay keeps only
@@ -263,11 +446,14 @@ the latest). Deletions publish a tombstone payload (`{"deleted":true}`).
 workstr:v1:exercise:<slug>        → one exercise (only user-created/modified ones)
 workstr:v1:sheet:<slug>           → one program, including its exercise rows
 workstr:v1:session:<uuid>         → one session including all its sets
-workstr:v1:plan                   → the whole plan (small, replaceable)
 workstr:v1:bodyweight             → the whole body-weight log (append-heavy but tiny)
 workstr:v1:settings               → user settings worth syncing
 workstr:v1:manifest               → index of all record addresses + updated_at, for fast diff sync
 ```
+
+Here `v1` *is* wanted: these addresses are private, single-author, and rewritable in
+bulk by the client that owns them, so a format break is a migration the app can perform
+against its own data.
 
 Granularity rationale: per-set events would be chatty (NIP-46 signing round-trips);
 one blob for everything would exceed relay event-size limits (typically 64–256 KB)
@@ -290,61 +476,84 @@ few siblings, and can be generated/tested in isolation. **This layout is the
 AI-credit-efficiency plan**: to work on a module, an AI needs only this section, the
 module's own file, and its direct interfaces — never the whole codebase.
 
+Modules marked `[planned]` do not exist yet; everything else is shipped.
+
 ```
 src/
   core/
-    types.ts           # All shared types: Exercise, Sheet, Session, Set, ... (no logic)
-    ids.ts             # slugify, uuid, address builders (workstr:v1:...)
+    types.ts           # All shared types: Exercise, Sheet, Session, Set, settings (no logic)
+    ids.ts             # slugify, uuid, address builders
     units.ts           # kg↔lb, e1RM formulas (pure functions)
-    muscles.ts         # canonical muscle map — copied verbatim from existing public/muscles.js
+    muscles.ts         # canonical muscle map — copied verbatim from public/muscles.js
+    equipment.ts       # equipment key normalization, owned-equipment matching,
+                       #   bodyweight-always-available rule
   signer/
     types.ts           # interface Signer { getPublicKey; signEvent; nip44Encrypt; nip44Decrypt }
     nip07.ts           # window.nostr adapter
     nip46.ts           # bunker adapter (connect URI/QR, request queue, batching)
-    idenstr.ts         # OPTIONAL third backend: HTTP adapter to a self-hosted Idenstr,
-                       # so this codebase can also replace the self-hosted UI later
+    idenstr.ts         # [planned] OPTIONAL third backend: HTTP adapter to a self-hosted
+                       #   Idenstr, so this codebase can also replace the self-hosted UI
   db/
-    schema.ts          # IndexedDB stores + versioned migrations
+    schema.ts          # IndexedDB stores + versioned migrations, namespace naming
     store.ts           # CRUD API — port of self-hosted src/app/store.js semantics
+    adopt.ts           # anonymous `local` namespace, has-user-data detection,
+                       #   whole-namespace copy, namespace delete (Section 6.1)
     export.ts          # JSON export/import of the entire local DB
   nostr/
-    pool.ts            # relay pool: connect, REQ, publish, AUTH callback hook
-    codecs.ts          # local record ⇄ event mapping: 33401, 33402, kind:1 builders
-                       #   and parsers; 30078 encrypt/decrypt wrappers (uses signer)
-    discover.ts        # port of self-hosted discover.js: filters, validation,
-                       #   spam rules, profile cache, import
-    publish.ts         # publish flows incl. program dependency walk
-    auth.ts            # NIP-42 AUTH handling for the paid relay
+    pool.ts            # relay sets (catalog / write) and shared profile types
+    canon.ts           # the Workstr catalog: operator-filtered queries, signature
+                       #   verification, 33401/33402 → local row mapping, dedupe,
+                       #   offline cache
+    programImport.ts   # program import + dependency walk, import-state resolution
+    share.ts           # kind:1 summary composition, publish, acknowledgement check
+    auth.ts            # [planned, Phase 2a] NIP-42 AUTH for the Workstr relay
+    codecs30078.ts     # [planned, Phase 2a] 30078 encrypt/decrypt wrappers (uses signer)
   sync/
-    engine.ts          # queue, manifest diff, push/pull, LWW merge, lazy decrypt
-  media/
-    upload.ts          # NIP-98 signed upload (nostr.build now, Blossom later)
+    engine.ts          # [stub] LWW comparison only. Phase 2a fills in queue, manifest
+                       #   diff, push/pull, lazy decrypt.
   features/
     library/           # exercise library UI
     sheets/            # program builder UI
     train/             # live session UI (timers, wake lock)
-    plan/              # weekly grid + mesocycles UI
-    progress/          # charts, records, streaks, body-weight
-    recovery/          # recovery-state computation + suggestions (pure logic + UI)
-    share/             # summary composer, publish dialogs
-    discover/          # discover/browse/import UI
-    subscribe/         # Phase 2: paywall UI, invoice QR, status
+    progress/          # charts, records, streaks, body-weight (stats.ts is pure)
+    recovery/          # recovery-state computation + suggestions + Quick Workout
+                       #   (recovery.ts and quickWorkout.ts are pure)
+    discover/          # catalog browse/import UI
+    support/           # [planned, Phase 1] Lightning address + QR, zap prompts, funding
+                       #   panel (reads kind:9735 receipts). Phase 2a adds the
+                       #   relay-access request UI; the invoice path lands here only if
+                       #   the Section 11 fallback fires.
   app/
-    router.ts, shell.ts, settings.ts, pwa.ts (service worker registration)
+    shell.ts           # root render, navigation, settings, modals  [over the line limit]
+    session-runner.ts  # live session state machine                 [over the line limit]
+    state.ts           # AppState shape, view/subview union, active-session types
+    layout.ts          # page chrome
+    format.ts          # shared HTML helpers, filters, author pills
+    bodymap.ts         # muscle-map rendering
+    pwa.ts             # service worker registration
 public/
-  manifest.webmanifest, icons/, nosleep.mp4/webm, styles.css (reuse existing)
+  manifest.webmanifest, icons, sw.js, favicon, workstr-reference.css
 ```
+
+Navigation is four views — exercises, workouts, statistics, settings — with subviews
+(library, discover, programs, history, recovery, training, body). There is no router
+module and no URL routing; view state lives in `app/state.ts`. If deep links are ever
+wanted, hash routing is the option Section 9.1 reserves.
 
 Coding rules for AI efficiency:
 1. Generate `core/types.ts` and `signer/types.ts` first; every other module is written
    against them.
-2. Pure-logic modules (`units`, `recovery`, `codecs`, sync merge) get Vitest tests in
-   the same PR — they are the cheapest to verify and the costliest to get silently wrong.
+2. Pure-logic modules (`units`, `recovery`, `quickWorkout`, `stats`, `equipment`, canon
+   parsing, import-state resolution, sync merge) get Vitest tests in the same PR — they
+   are the cheapest to verify and the costliest to get silently wrong.
 3. Never let a `features/*` module import another feature; they communicate through
-   `db/store` and events.
-4. Port, don't reinvent: the self-hosted repo's `store.js`, `discover.js`, and the
-   publish mappings in `idenstr.js` are the reference semantics. Translating a known
-   spec is cheaper and safer than re-deriving one.
+   `db/store` and `app/state`.
+4. Port, don't reinvent: the self-hosted repo's `store.js` and the tag mappings in
+   `idenstr.js` are the reference semantics. Translating a known spec is cheaper and
+   safer than re-deriving one.
+5. `app/shell.ts` and `app/session-runner.ts` are over the 400-line rule and are being
+   extracted incrementally (Section 5.2). New work goes into new modules; neither file
+   may grow.
 
 ---
 
@@ -380,10 +589,10 @@ or source-available — decide before first release, not after.
 3. In the GitHub Pages settings, set the custom domain; GitHub provisions a
    Let's Encrypt certificate automatically once DNS propagates. Verify the domain
    under the org's settings (TXT record) to prevent takeover.
-4. Phase 2 adds: `relay` → address of the relay host (see 10.2), managed by a small
+4. Phase 2a adds: `relay` → address of the relay host (see 9.3), managed by a small
    DDNS updater against Njalla's API if the relay is home-hosted behind a VPN.
 
-### 9.3 Where the relay lives (Phase 2 choice)
+### 9.3 Where the relay lives (Phase 2a choice)
 
 Two valid options, identical architecture, trivially migratable (strfry's LMDB
 directory is portable; cutover is a DNS change):
@@ -396,14 +605,16 @@ directory is portable; cutover is a DNS change):
   websites need 443. TLS via **DNS-01** ACME challenge (no port 80 required); ACME
   clients support Njalla's DNS API. Caveats: residential uptime, VPN IP reputation,
   some networks block VPN ranges.
-- **Option B — small VPS (when there's revenue):** 2 vCPU / 4 GB / 40 GB from a
+- **Option B — small VPS (when donations sustainably cover it):** 2 vCPU / 4 GB / 40 GB from a
   privacy-friendly provider (Njalla sells crypto-payable VPSes; cheaper mainstream
   providers exist). Caddy terminates TLS on 443; home IP never involved. Lightning
   payments still route to the operator's home LND node over a private mesh
   (e.g. Tailscale) — the node never moves.
 
-**Recommendation: launch Phase 1 with no relay at all; do Phase 2 as Option A; move
-to Option B when subscriber revenue exceeds the VPS cost.**
+**Recommendation: launch Phase 1 with no relay at all; do Phase 2a as Option A; move to
+Option B once recurring donations exceed the VPS cost with margin.** Option A is chosen
+precisely because it survives at zero revenue — do not design the relay around donation
+income arriving.
 
 ---
 
@@ -420,107 +631,237 @@ compiles and is testable against the blocks before it.
    Pages workflow deploying a hello-world PWA (manifest + service worker) to the
    Njalla CNAME domain. *Deploy pipeline works before any feature exists.*
 2. `core/types.ts`, `core/ids.ts`, `core/units.ts` (+tests), copy `muscles.ts`.
-3. `signer/types.ts` + `signer/nip07.ts`; login screen that shows the connected npub.
-4. `db/schema.ts` + `db/store.ts` (+tests, using fake-indexeddb).
+3. `signer/types.ts` + `signer/nip07.ts`; optional sign-in from Settings showing the
+   connected npub.
+4. `db/schema.ts` + `db/store.ts` + `db/adopt.ts` (+tests, using fake-indexeddb) — the
+   `local` namespace exists from the first commit; identity is added on top of it, never
+   underneath it.
 5. Dev environment (see Section 12) proven from a phone.
 
-**Exit criteria:** visit the real domain, install as PWA, log in with a NIP-07
-extension, see your npub, offline reload works.
+**Exit criteria:** visit the real domain, install as PWA, use the app with no identity at
+all, optionally sign in with a NIP-07 extension and see your npub, offline reload works.
 
-### Phase 1 — The free product (no paid relay, no server at all)
+### Phase 1 — The free product (no workstr relay, no server at all)
 
 **Goal:** full Workstr feature parity, local-first, public sharing. Operator hosts
 nothing.
 
-1. **Library block:** exercise CRUD UI on `db/store`; seed pack of starter exercises
-   bundled as JSON.
+1. **Library block:** library UI on `db/store` — browse, search, filter, favourite,
+   remove — plus equipment normalization and the owned-equipment filter. No authoring
+   form; the library is filled from the catalog and the bundled seed.
 2. **Sheets block:** program builder (ordered exercises, targets, slugs).
 3. **Train block:** session runner — start from sheet, log sets, rest timer,
    wake lock, finish & review. This is the daily-use core; polish it first.
 4. **Progress block:** volume/muscle charts, e1RM records, streak, body-weight log.
 5. **Recovery block:** recovery-state computation from session history + muscle map;
-   suggestion UI. Pure functions + tests.
+   suggestion UI and Quick Workout. Pure functions + tests.
 6. **Signer block 2:** `signer/nip46.ts` (bunker URI + QR connect, request batching)
-   → mobile login without an extension.
-7. **Nostr block:** `nostr/pool.ts`, `nostr/codecs.ts`, `nostr/publish.ts` —
-   publish exercise (33401), publish program (33402, with dependency walk),
-   share summary (kind:1) with NIP-98 image upload to nostr.build.
-8. **Discover block:** port validation/spam rules; browse, profile display, import
-   as snapshot.
+   → mobile sign-in without an extension.
+7. **Nostr block:** `nostr/pool.ts`, `nostr/share.ts` — compose and publish the `kind:1`
+   summary to the write-relay set, with acknowledgement checking. No media upload; no
+   user-authored 33401/33402.
+8. **Discover block:** `nostr/canon.ts` + `nostr/programImport.ts` — operator-filtered
+   catalog queries, signature verification, dedupe, offline cache, snapshot import with
+   dependency walk, fork-on-edit provenance.
 9. **Safety valve:** JSON export/import of the whole local DB.
-10. **Release:** announce on Nostr; the app itself is the ad (every shared summary
-    links back).
+10. **Starter seed:** bundle **three beginner programs and every exercise they
+    reference** as JSON, shipped with the app. A first-run library that is empty until
+    the user finds Discover is a bad first impression, and the seed makes the app
+    genuinely useful with no network and no identity. Rules:
+    - Seeded rows carry `source_type: 'bundle'`, which the adoption check already treats
+      as "not user data" — so seeding does not make a clean install look occupied
+      (Section 6.1).
+    - **The seed only ever backfills.** It must never overwrite, re-create, or resurrect
+      a row the user has edited, favourited, or deleted. Seeding is idempotent and runs
+      against empty slots only.
+    - Seed content mirrors catalog entries where they exist, so importing the catalog
+      later recognizes them by address instead of duplicating them.
+11. **Support block:** a support screen — operator Lightning address (lud16) + QR, npub
+    for zaps, suggested amounts, and a live funding panel that REQs `kind:9735` zap
+    receipts for the operator pubkey from public relays and shows month-to-date against
+    the published monthly infrastructure cost. Zero backend; zap receipts are public
+    events. Ships in Phase 1 because it is *cheaper to build than the paywall*, and
+    because a funding model that starts asking in Phase 3 has no data by Phase 2a.
+12. **Release pass:** offline QA matrix — iOS PWA install, fresh install, NIP-46 latency,
+    sign-in adoption paths — before tagging 1.0.
 
-**Exit criteria:** a stranger with a Nostr identity can train for a month, share
-summaries, publish and import programs — with the operator hosting zero
-infrastructure.
+**Exit criteria:** a stranger installs the app, trains for a month, and shares summaries
+**without ever creating an identity**; a Nostr user additionally signs in, adopts their
+local history, imports catalog programs, and supports the project with a zap — with the
+operator hosting zero infrastructure.
 
-### Phase 2 — The paid relay (monetization)
+### Phase 2a — The Workstr relay (donation-funded)
 
-**Goal:** subscriptions unlock encrypted sync/backup + premium library. All gating
-server-side.
+**Goal:** encrypted sync/backup and retention for anyone who asks, funded by donations.
+No payment service is built in this phase.
 
 Server side (Docker Compose on home server behind VPN, or VPS):
 1. **strfry** with NIP-42 AUTH required; write/read policy plugin checks pubkey
-   against a whitelist file (pubkey + expiry). Reject non-whitelisted AUTH.
-2. **Payment glue** (the one custom service, ~small): LNbits (or direct LND REST)
-   connected to the operator's existing LND node over the private mesh;
-   `POST /api/subscribe {pubkey, plan}` → invoice; on settle → append pubkey+expiry
-   to whitelist, hot-reload strfry policy; `GET /api/status/<pubkey>` → expiry.
-   Nightly job prunes expired pubkeys (grace period, e.g. 14 days, before their
-   events stop being served).
-3. **TLS + DNS:** Caddy (VPS, port 443) or DNS-01 certs + high port (home/VPN);
+   against an allowlist file (pubkey + optional expiry, unused by default). Reject
+   non-allowlisted AUTH.
+2. **Allowlist glue** (the one custom service, small): `POST /api/access` accepts a
+   NIP-98-signed request and appends the pubkey while capacity allows, hot-reloading the
+   strfry policy; `GET /api/status/<pubkey>` reports access state. A zap-receipt watcher
+   auto-allowlists supporters above the recognition threshold. No invoices, no LNbits,
+   no expiry pruning — none of that exists unless Phase 2b is triggered.
+3. **Capacity caps:** per-pubkey storage quota and a ceiling on allowlist size. Free
+   access has no natural rate limit, so the limit has to be explicit (Section 13).
+4. **TLS + DNS:** Caddy (VPS, port 443) or DNS-01 certs + high port (home/VPN);
    `relay.workstr.example` DNS record; DDNS updater if home-hosted.
-4. **Backups:** nightly snapshot of strfry's LMDB directory off-machine
-   (paying customers' encrypted backups are the one thing that must never be lost).
+5. **Backups:** nightly snapshot of strfry's LMDB directory off-machine
+   (users' encrypted backups are the one thing that must never be lost).
+6. **Cost publication:** the monthly running cost goes in the repo and into the Phase 1
+   funding panel. Rule 3.4 is not optional.
 
 Client side:
-5. **Auth block:** `nostr/auth.ts` — NIP-42 challenge signing against the paid relay.
-6. **Sync block:** `sync/engine.ts` — 30078 encrypt/publish on change, manifest diff
+7. **Auth block:** `nostr/auth.ts` — NIP-42 challenge signing against the Workstr relay.
+8. **Sync block:** `sync/engine.ts` — 30078 encrypt/publish on change, manifest diff
    pull on login, LWW merge, lazy decryption (recent first), decrypted cache.
-7. **Subscribe block:** paywall UI — invoice QR/copy, payment detection, status
-   display, renewal reminder.
-8. **Premium library:** operator key publishes the curated 33401/33402 catalog
-   **only to the paid relay**; client shows a locked preview to free users
-   (metadata teaser), full fetch for subscribers. Curation pipeline: operator-authored
-   seed + graduation of the best community-shared exercises (with attribution).
-9. Retention perk: subscribers' public events are also mirrored to the paid relay.
+9. **Access block:** extend `features/support/` with the request-access flow and status
+   display.
+10. **Catalog growth:** the operator key keeps publishing the curated 33401/33402 catalog
+    to **public relays**, readable by everyone including other Nostr clients. Authored
+    and published from the self-hosted Workstr install. Target: from the launch set
+    toward 50–100 exercises and 5–10 programs. Curation is the operator's job by design
+    — see Section 6.1 on why exercise authoring is not opened up.
+11. Retention perk: allowlisted users' public events are also mirrored to the Workstr
+    relay.
 
-**Exit criteria:** pay a Lightning invoice on phone → whitelist updates without
-operator action → open laptop, log in, entire history appears after decryption.
+**Exit criteria:** request access from a phone → allowlist updates without manual
+operator action → open laptop, log in, entire history appears after decryption. Funding
+panel shows real donations against a published real cost.
+
+### Phase 2b — Paid access (fallback only, build nothing until triggered)
+
+Built **only** if the funding trigger in Section 11 fires. Scoped here so the fallback is
+a known, small delta rather than a redesign:
+
+1. **Payment glue:** LNbits (or direct LND REST) connected to the operator's existing LND
+   node over the private mesh; `POST /api/subscribe {pubkey, plan}` → invoice; on settle
+   → append pubkey + expiry to the same allowlist file, hot-reload the same policy
+   plugin; `GET /api/status/<pubkey>` gains an expiry field.
+2. Nightly job prunes expired pubkeys (grace period, e.g. 14 days, before their events
+   stop being served).
+3. **Client:** invoice QR/copy, payment detection, renewal reminder — added to
+   `features/support/`, reusing the existing status display.
+4. Everyone allowlisted before the trigger date is grandfathered and never sees any of
+   this. Nothing on the "never gated" list in Section 11 moves.
+
+Note what is *not* in this list: the relay, AUTH, the allowlist file, the policy plugin,
+the sync engine, and the client status UI are all already built in 2a and unchanged. That
+is the point of rule 4.2.
 
 ### Phase 3 — Growth (optional, in rough order of value)
 
-1. **Blossom media server** on the relay host: premium image hosting (own the media
-   path instead of nostr.build).
-2. **NIP-47 (NWC)** wallet connect: in-app renewal payments and one-tap zaps.
-3. **NIP-57 milestone zaps:** donation prompts at PRs/streaks (free-tier revenue).
-4. **Push notifications** for planned workouts (requires a small always-on push
-   service — subscribers only, honest server-side gate).
-5. **Supporter badge** on shared kind:1 summaries + supporters page (honor system,
-   converts well in zap culture).
-6. **Coach platform:** third-party trainers publish paid programs on the relay
-   (program-follow with updates as a premium feature; imports elsewhere remain
-   snapshots). This replaces solo curation as the long-term content engine.
-7. **Idenstr signer backend** (`signer/idenstr.ts`): the web codebase becomes usable
+1. **Milestone zap prompts:** contextual donation moments at PRs, streaks, and after a
+   restore-from-relay actually saves someone's history. Builds on the Phase 1 support
+   block; this is the highest-value growth item under donation funding, not the third.
+2. **Supporter badge** on shared kind:1 summaries + supporters page, resolved from public
+   zap receipts. Honor system, no enforcement — it converts well in zap culture and costs
+   nothing to run.
+3. **User-published programs (`kind:33402`).** The one authoring capability that does open
+   up. A program is composed work — a named, ordered, deliberate arrangement — so it does
+   not produce the duplicate-and-garbage failure that rules out open exercise authoring
+   (Section 6.1). Requirements when it ships:
+   - Programs may only reference exercises that already have an address — in practice,
+     catalog exercises. That constraint is what keeps the exercise vocabulary clean while
+     letting anyone compose on top of it, and it removes the need for a publish-time
+     dependency walk entirely.
+   - User programs are a **separate discovery surface** from the operator catalog. Never
+     merge them into one list: the catalog's whole value is that everything in it is
+     signed by one curator.
+   - Import stays a snapshot, with the same fork-on-edit provenance as catalog imports.
+4. **Blossom media server (optional)** on the relay host: image hosting for allowlisted
+   users. Re-open the media-upload question here, from scratch — NIP-98 against a third
+   party failed (Section 6), a self-hosted Blossom endpoint is a different problem.
+5. **NIP-47 (NWC)** wallet connect: one-tap in-app zaps.
+6. **Push notifications** for scheduled workouts (requires a small always-on push
+   service — allowlisted users only, since it has a genuine per-user cost).
+7. **Coach platform:** third-party trainers publish programs on the relay, keeping their
+   own zap/payment relationship with their followers (program-follow with updates;
+   imports elsewhere remain snapshots). Builds directly on item 3. The operator's cut, if
+   any, is a later decision — this is a content engine first.
+8. **Idenstr signer backend (optional)** (`signer/idenstr.ts`): the web codebase becomes usable
    as the UI for self-hosted installs too — one codebase, three signer backends.
 
 ---
 
-## 11. Monetization summary
+## 11. Funding
 
-- **Free:** full app, local data, public sharing/discover, JSON export. Costs the
-  operator nothing; markets the product.
-- **Paid (sats, via the operator's own LND — no processor, no fees):**
-  encrypted multi-device sync + backup with retention guarantee, curated premium
-  exercise library, premium media hosting, (later) push notifications and
-  coach-program follows.
-- **Gating rule (non-negotiable):** every paid feature is enforced by the relay or a
-  server the operator runs. Client-side-only locks are forbidden — the client is
-  public JavaScript either way.
-- **Donations:** milestone zap prompts, supporter recognition.
-- Pricing suggestion: one simple plan, priced in sats, monthly/yearly; keep it under
-  the "don't think about it" threshold and raise later if needed.
+The product is funded by donations. A paid tier is a documented fallback with a stated
+trigger, not a roadmap item.
+
+### 11.1 What costs money
+
+| Line item | When | Approx. monthly |
+|---|---|---|
+| Domain (Njalla) | Phase 0 | `[FILL IN]` |
+| GitHub Pages hosting | Phase 0 | 0 |
+| Relay host — Option A, home | Phase 2a | electricity only |
+| Relay host — Option B, VPS | later | `[FILL IN]` |
+| Off-machine backups | Phase 2a | `[FILL IN]` |
+| Media storage | Phase 3 | `[FILL IN]` |
+| Development time | ongoing | the real cost, and the honest one to name |
+
+**Publish this table with real numbers**, in the repo and in the app's funding panel.
+Rule 3.4: asking for money without showing the bill is not an option. Phase 1 is close to
+zero; the bill only starts at Phase 2a, which is why the support block ships first — it
+gets a season of data before there is anything to pay for.
+
+### 11.2 Funding ladder, in priority order
+
+1. **Recurring and one-off zaps** from users — in-app support screen, milestone prompts
+   at PRs and streaks.
+2. **Targeted fundraisers** for specific line items: a year of VPS, the curated library
+   photo shoot, a specific feature. Concrete asks outperform open-ended ones.
+3. **Supporter recognition** — badge on shared summaries, supporters page. Honor system,
+   resolved from public zap receipts, no enforcement anywhere.
+4. *Fallback only:* **paid relay access** (Phase 2b), under the trigger in 11.4.
+
+### 11.3 Never gated, under any funding outcome
+
+- The client itself — open source, installable, complete.
+- Local data and all local features: library, sheets, train, progress, recovery, plan.
+- JSON export and import.
+- Publishing to and discovering from public relays.
+- The curated exercise library.
+
+This list does not move. If it ever needs to move, the honest action is to shut down, not
+to re-gate (11.5).
+
+### 11.4 Fallback trigger
+
+If donations cover less than **`[X]`%** of the trailing 12-month infrastructure cost for
+**two consecutive quarters**, relay admission switches to paid for *new* pubkeys only:
+
+- Everyone already allowlisted is grandfathered, permanently.
+- Announced at least 30 days ahead, on Nostr and in the app.
+- Nothing in 11.3 moves; only Workstr-relay admission changes.
+- Pricing, if it happens: one plan, priced in sats through the operator's own LND (no
+  processor, no fees), under the "don't think about it" threshold.
+
+Writing the condition down *before* it is needed is what makes an optional paywall
+credible instead of a rug-pull.
+
+`[X]` is deliberately unset. It cannot be chosen honestly yet: Phase 1 has no
+infrastructure bill, so the denominator does not exist. **Fill it in when Phase 2a goes
+live**, alongside the real cost figures in 11.1 — at that point the monthly bill is known,
+the funding panel has a season of zap data behind it, and the number is an observation
+rather than a guess. Until then the trigger reads as "there is a threshold, and it will be
+published with the costs it refers to", which is the commitment that matters. Do not
+launch 2a with the placeholder still in place.
+
+### 11.5 Wind-down commitment
+
+If funding fails outright and the relay shuts down: 30 days' notice, export tooling
+verified working before the announcement, and a final window to pull everything down. The
+client keeps working — it is local-first and needs no server. Rule 4.5 is the whole point.
+
+### 11.6 Gating rule (non-negotiable, unchanged)
+
+If anything is ever gated, it is enforced by the relay or a server the operator runs.
+Client-side-only locks are forbidden — the client is public JavaScript either way, so a
+client-side lock is theatre that costs trust and buys nothing.
 
 ---
 
@@ -536,45 +877,100 @@ Recommended setup on a home server / VM:
 2. Expose it inside a private mesh with automatic HTTPS — e.g. Tailscale:
    `tailscale serve 5173` → `https://<host>.<tailnet>.ts.net`, a real trusted cert,
    reachable from any personal device including iPhone, invisible to the internet.
-3. **Dev relay stack** (compose file in the repo, `dev/compose.yaml`): strfry with
-   the same NIP-42 policy plugin + LNbits pointed at a regtest/testnet Lightning
-   backend + a fake-settle endpoint, so the full subscribe→whitelist→sync loop is
-   testable without real sats.
-4. Test matrix that matters: iOS Safari PWA (wake lock, installability, NIP-46 via
-   Amber/relay round-trip latency), Chrome+extension (NIP-07), offline mode,
-   fresh-device restore (manifest → lazy decrypt).
+3. **Dev relay stack** (compose file in the repo, `dev/compose.yaml`): strfry with the
+   same NIP-42 policy plugin and the same allowlist glue, so the full
+   request→allowlist→sync loop is testable locally. If Phase 2b is ever built, add LNbits
+   against a regtest/testnet backend plus a fake-settle endpoint to the same compose file.
+4. **Browser-surface verification.** Unit tests cover pure logic; they cannot catch a
+   broken render, a dead button, or an IndexedDB migration that fails on a real origin.
+   Drive the **production build** — not the dev server — in headless Chromium via
+   Playwright (a devDependency): `npm run build`, serve `dist/` with `vite preview`,
+   then script the app. Driver scripts must run where `node_modules` resolves. Any
+   change to a view, the shell, or the session runner gets verified this way before it
+   is called done.
+5. Test matrix that matters: iOS Safari PWA (wake lock, installability, NIP-46 via
+   Amber/relay round-trip latency), Chrome+extension (NIP-07), offline mode, the
+   sign-in adoption paths (empty target, occupied target, sign-out), catalog fetch with
+   every relay unreachable, and fresh-device restore (manifest → lazy decrypt).
 
 ---
 
 ## 13. Risks & explicit trade-offs (state these in the product, not just here)
 
 1. **Key loss = data loss.** NIP-44 self-encryption is unrecoverable without the
-   user's key. Say it loudly at onboarding; offer JSON export as mitigation.
+   user's key. Say it loudly at onboarding; offer JSON export as mitigation. Note this
+   only ever applies to a user who *chose* to sign in — the anonymous default has no key
+   to lose, only a browser database to clear.
 2. **NIP-46 latency.** Every sign/encrypt is a relay round-trip; batch, lazy-decrypt,
    cache. Design flows so a normal workout needs zero signer prompts.
-3. **Curated library is copyable.** Signed by the operator key, provenance is
-   obvious, but subscribers can republish it. The gate is social+bundled, not
-   cryptographic; price accordingly.
-4. **Public relays owe nothing.** Free users' shared events can be purged — that's
-   the retention pitch, but also a support-question generator.
+3. **Curated library is copyable.** Signed by the operator key, provenance is obvious,
+   and anyone can republish it. This is now a non-issue by design: the library is
+   published publicly (Section 7.1), so copying is distribution, not leakage.
+4. **Public relays owe nothing.** Shared events can be purged — that's the retention
+   argument for the Workstr relay, but also a support-question generator.
 5. **Home-hosted relay fragility** (if Option A): residential uptime, VPN IP
-   reputation, some networks block VPN ranges. Acceptable at launch; revisit at
-   first paying cohort.
+   reputation, some networks block VPN ranges. Acceptable at launch; revisit when the
+   allowlist reaches its capacity ceiling.
 6. **Addressable-event size limits.** Keep every 30078 under ~64 KB; per-session
    granularity guarantees this.
-7. **Legal/boring:** ToS + privacy page (short, honest: "we store ciphertext"),
-   and local tax registration once revenue crosses the relevant small-supplier
-   threshold.
+7. **Legal/boring:** ToS + privacy page (short, honest: "we store ciphertext"), and local
+   tax registration once income crosses the relevant small-supplier threshold. Donations
+   are not automatically tax-free income — check the local rule before the first
+   fundraiser, not after.
+8. **Donations very likely undershoot.** The modal outcome for a niche, self-hosted-adjacent
+   tool is that donations cover hosting and nothing close to development time. Plan for it:
+   Option A (home-hosted) is chosen so the relay survives at zero revenue, and no roadmap
+   item may depend on donation income arriving. Treat any month that covers the bill as
+   the success case, not the baseline.
+9. **Free relay access invites abuse.** Payment is an accidental rate limiter; removing it
+   removes the limiter. Per-pubkey storage quotas and a hard ceiling on allowlist size are
+   required from day one of Phase 2a, not added after the first abusive pubkey.
+10. **Introducing a paywall later costs credibility.** Mitigated by publishing the trigger
+    and the grandfather clause up front (11.4) — but a community that funded the project
+    on "it stays free" will read any gate as a betrayal unless the condition was visible
+    beforehand. Never soften 11.3 to make the fallback easier.
+11. **Anonymity conflicts with fundraising.** Rule 4.7 keeps the operator private
+    (Njalla, crypto, no exposed identity), while donations flow toward a visible person or
+    a project people feel they know. In Nostr culture a consistent pseudonymous npub with
+    a build-in-public presence is usually enough to resolve this — but decide it
+    deliberately now, because a support screen asking for money from a faceless entity
+    converts badly.
+12. **RPE is an open question, not a backlog item.** The field is typed and unwritten
+    because the design question was never settled, and shipping a number nobody
+    interprets the same way is worse than shipping nothing. If it is revisited, the
+    decisions are: RPE or RIR (RIR is easier for beginners to answer honestly); prompted
+    per set or per exercise (per set is more data and more friction, and friction during
+    a working set is expensive); and what consumes it — a value logged and never read is
+    dead weight, so the consumer should exist before the input does. Until those three
+    have answers, the field stays unwritten.
+13. **Anonymous data is one browser clear away.** The default account lives entirely in
+    one browser profile's IndexedDB, with no key, no sync, and no recovery. Clearing site
+    data, losing the device, or an aggressive storage eviction takes everything. Export is
+    the only mitigation; surface it honestly rather than burying it in Settings.
+14. **A single unmerged namespace decision is irreversible in practice.** Adoption asks
+    once and copies wholesale. A user who picks the wrong side keeps both databases on
+    disk, but the app offers no path back — make the prompt unambiguous about which side
+    is which and what is about to happen.
+15. **Operator key loss or compromise** — see Section 6.3. Losing it freezes the catalog;
+    rotating it breaks update detection for every imported row in every library. Back it
+    up with the same seriousness as the relay's LMDB snapshots, and treat it as permanent.
 
 ---
 
 ## 14. Definition of done, per phase
 
-- **Phase 0:** PWA installs from the real domain over HTTPS; login shows npub;
-  CI deploys on push.
+- **Phase 0:** PWA installs from the real domain over HTTPS; the app is usable with no
+  identity; optional sign-in shows npub; CI deploys on push.
 - **Phase 1:** 30 days of real training logged by real users with zero operator
-  infrastructure; export/import verified; shared events visible in mainstream
-  Nostr clients.
-- **Phase 2:** invoice → auto-whitelist → cross-device restore, hands-off;
-  LMDB backups restorable; premium library fetchable only with a paying pubkey.
+  infrastructure, including at least one who never signed in; the seeded beginner
+  programs are trainable on a fresh install with no network; export/import verified;
+  shared summaries visible in mainstream Nostr clients; catalog import and update
+  detection verified against a real edit-fork; support screen live, funding panel showing
+  real zap receipts against a published cost.
+- **Phase 2a:** request access → auto-allowlist → cross-device restore, hands-off; LMDB
+  backups restorable; curated library fetchable by anyone from public relays; storage
+  quotas enforced; monthly cost published, and the 11.4 threshold set to a real number at
+  the same time.
+- **Phase 2b:** not done — not started. Done means the trigger in 11.4 fired, was
+  announced 30 days ahead, and existing pubkeys were grandfathered without action.
 - **Phase 3:** each item ships independently; nothing in it blocks 1–2.
