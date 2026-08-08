@@ -17,7 +17,8 @@ browser. User data lives either in the browser (IndexedDB) in an initial phase, 
 
 The operator hosts **no application backend**. The only server-side components are the
 relay (strfry) and a small allowlist service, both in Phase 2a. Donations need no backend
-at all — a Lightning address and public zap receipts are enough (Section 11).
+in v1 because the canonical funding rail is Nostr zaps: LNURL-pay creates the invoice,
+public zap receipts create the accounting trail (Section 11).
 
 ## 2. Vision
 
@@ -116,8 +117,8 @@ Rules that govern every technical decision:
     programs read from public relays, every signature verified (Section 6.1).
   - Share a session summary as a `kind:1` note, text plus the program's muscle map when
     one exists.
-  - Support the project: Lightning address + QR, zap the operator npub, live funding
-    panel built from public zap receipts (Section 11).
+  - Support the project: zap the operator npub, with the app and landing page aligned
+    around public zap receipts as the funding/accounting trail (Section 11).
 - **Workstr relay (Phase 2a)**: encrypted multi-device sync of all private data; retention
   guarantee. Available to allowlisted pubkeys.
 
@@ -192,9 +193,9 @@ rules out open exercise publishing does not apply the same way.
 | **NIP-42** | Relay AUTH. The Workstr relay requires AUTH and only accepts read/write from allowlisted pubkeys. Who lands on the allowlist is a policy decision (Section 11), not a protocol one. |
 | **NIP-98** | HTTP Auth events (kind 27235). **Rejected for media upload** — built and removed: unreliable against the media host, and it inserted a second signer prompt mid-publish for no user-visible gain. Kept in this table as a decision record; if media hosting returns it is via Blossom on the operator's own host (Phase 3), re-evaluated from scratch. Still the right tool for authenticating a request to the operator's *own* endpoint (relay-access requests, Phase 2a). |
 | **NIP-19** | bech32 encoding (`npub`, `naddr`, `nevent`) for display and share links. |
-| **LNURL-pay / lud16** | Lightning address in the operator's `kind:0`. The whole donation path on a static site: address + QR, no backend, no payment service. Ships in Phase 1. |
-| **NIP-57** | Zaps and zap receipts (`kind:9735`). Donation prompts, supporter recognition, and — because receipts are public events — the funding transparency panel, computed client-side. Phase 1, core, not optional. |
-| **NIP-47 (NWC)** | *Optional, Phase 3.* Nostr Wallet Connect for one-tap in-app zaps without leaving for a wallet. Convenience only; the lud16 path already works without it. |
+| **LNURL-pay / lud16** | The operator's Lightning address in `kind:0`, used as the LNURL-pay target behind zaps. It is payment plumbing, not a separate primary donation rail: v1 support copy steers users to Nostr zaps because zaps produce public receipts. |
+| **NIP-57** | Zaps and zap receipts (`kind:9735`). The canonical donation path for Workstr, because every counted donation must leave a verifiable public receipt. Donation prompts, supporter recognition, and the funding transparency panel are computed from these receipts client-side. Phase 1, core, not optional. |
+| **NIP-47 (NWC)** | V2 support follow-up. Nostr Wallet Connect enables custom in-app zap amounts without leaving Workstr: build/sign the NIP-57 zap request, fetch the LNURL invoice, pay through the user's wallet, then verify the `kind:9735` receipt before claiming success. |
 
 **Important distinction**: NIP-46 = remote *signing* (identity). NIP-47/NWC = remote
 *wallet* (payments). They are separate connections with separate permissions.
@@ -304,26 +305,27 @@ other client can read it. Curation is a quality decision, not a lock (Section 11
    somebody's work.
 
 **Support the project (free, Phase 1)**
-1. Support panel in Settings renders the operator's Lightning address, a `lightning:` QR,
-   and copy buttons for the address and the npub. Nothing is stored, nothing is gated, no
-   identity required. The address is also published in the operator's `kind:0` as `lud16`,
-   so zapping the npub from any Nostr client reaches the same wallet.
-2. **No suggested-amount buttons.** They are not implementable here: without NWC or an
-   LNURL callback the client cannot mint an invoice for a chosen amount, and a button that
-   only copies a number is worse than the QR. They return in Phase 3 with NIP-47.
-3. Funding panel: REQ `{kinds:[9735], "#p":[operatorPubkey], since:<monthStart>}` from the
+1. The app support panel and the Workstr landing/support page must stay in sync: both
+   present **Nostr zaps as the canonical donation route** because zaps create public
+   `kind:9735` receipts. The support surface may show the operator npub, zap links, and
+   explanatory Lightning/LNURL context, but it must not advertise plain Lightning or
+   on-chain BTC as normal v1 donation paths that bypass receipt accounting.
+2. Funding panel: REQ `{kinds:[9735], "#p":[operatorPubkey], since:<monthStart>}` from the
    broad read set, sum the bolt11 amounts, display month-to-date against
    `MONTHLY_COST_SATS`. Both sides are sats, so the percentage is exact and needs no price
    feed. Entirely client-side — zap receipts are public events, so transparency costs no
    backend.
-4. **Only receipts signed by the wallet provider's key count** (`ZAP_RECEIPT_SIGNER_PUBKEY`,
+3. **Only receipts signed by the wallet provider's key count** (`ZAP_RECEIPT_SIGNER_PUBKEY`,
    pinned in `core/funding.ts` from the LNURL-pay metadata). Anyone can publish a
    `kind:9735` tagged to any pubkey; without the signer check the published total would be
    a number strangers control, and the transparency claim in 3.4 would be worthless.
-5. **A failed fetch reports "unknown", never zero.** "Nobody donated" and "we could not
+4. **A failed fetch reports "unknown", never zero.** "Nobody donated" and "we could not
    check" are different claims and only one is true. Note `querySync` *resolves empty* on
    an unreachable relay rather than rejecting — the same trap `share.ts` documents for
    publish — so the connection is established explicitly before the query.
+5. **No custom in-app amount buttons in v1.** They require NWC/NIP-47 plus the full NIP-57
+   zap flow. In v2, Workstr can add custom in-app zaps: sign zap request, fetch invoice,
+   pay via NWC, then verify the receipt before claiming success.
 
 **Get relay access (Phase 2a-alpha)**
 1. User asks for encrypted backup access from the app. The app sends a NIP-98-signed
@@ -540,10 +542,10 @@ src/
     recovery/          # recovery-state computation + suggestions + Quick Workout
                        #   (recovery.ts and quickWorkout.ts are pure)
     discover/          # catalog browse/import UI
-    support/           # Lightning address + QR, copy actions, funding panel (reads
-                       #   kind:9735 receipts). Phase 2a adds the relay-access request
-                       #   UI; the invoice path lands here only if the Section 11
-                       #   fallback fires.
+    support/           # zap-first support UI, funding panel (reads kind:9735 receipts),
+                       #   and later NWC custom-zap flow. Phase 2a adds the relay-access
+                       #   request UI; paid relay invoicing lands here only if the
+                       #   Section 11 fallback fires.
   app/
     shell.ts           # root render, navigation, settings, modals  [over the line limit]
     session-runner.ts  # live session state machine                 [over the line limit]
@@ -697,12 +699,14 @@ nothing.
       against empty slots only.
     - Seed content mirrors catalog entries where they exist, so importing the catalog
       later recognizes them by address instead of duplicating them.
-11. **Support block:** a support screen — operator Lightning address (lud16) + QR, npub
-    for zaps, suggested amounts, and a live funding panel that REQs `kind:9735` zap
-    receipts for the operator pubkey from public relays and shows month-to-date against
-    the published monthly infrastructure cost. Zero backend; zap receipts are public
-    events. Ships in Phase 1 because it is *cheaper to build than the paywall*, and
-    because a funding model that starts asking in Phase 3 has no data by Phase 2a.
+11. **Support block:** a zap-first support screen aligned with the landing/support page:
+    operator npub/zap target, clear receipt-based funding copy, and a live funding panel
+    that REQs `kind:9735` zap receipts for the operator pubkey from public relays and
+    shows month-to-date against the published monthly infrastructure cost. No on-chain BTC
+    or plain-Lightning donation route in v1; every advertised donation path should produce
+    a public receipt. Zero backend; zap receipts are public events. Ships in Phase 1
+    because it is *cheaper to build than the paywall*, and because a funding model that
+    starts asking in Phase 3 has no data by Phase 2a.
 12. **Release pass:** run `docs/RELEASE-QA.md` against the deployed site and clear its
     blocking sections before tagging 1.0.
 
@@ -841,13 +845,21 @@ forbids.
 
 ### 11.2 Funding ladder, in priority order
 
-1. **Recurring and one-off zaps** from users — in-app support screen, milestone prompts
-   at PRs and streaks.
-2. **Targeted fundraisers** for specific line items: a year of VPS, the curated library
-   photo shoot, a specific feature. Concrete asks outperform open-ended ones.
+1. **Recurring and one-off zaps** from users — app support screen, landing support page,
+   and later milestone prompts at PRs and streaks. Zaps are the canonical funding rail
+   because they create public receipts.
+2. **Targeted zap fundraisers** for specific line items: a year of VPS, the curated library
+   photo shoot, a specific feature. Concrete asks outperform open-ended ones, but the
+   accounting still resolves from NIP-57 receipts.
 3. **Supporter recognition** — badge on shared summaries, supporters page. Honor system,
    resolved from public zap receipts, no enforcement anywhere.
 4. *Fallback only:* **paid relay access** (Phase 2b), under the trigger in 11.4.
+
+Plain Lightning payments and on-chain BTC are deliberately not normal donation routes in
+v1 because they do not reliably produce the public Nostr receipts the funding meter uses.
+If an exceptional out-of-band donation ever happens, do not silently add it to the live
+zap total; publish a separate signed accounting note or leave it out of the automated
+meter.
 
 ### 11.3 Never gated, under any funding outcome
 

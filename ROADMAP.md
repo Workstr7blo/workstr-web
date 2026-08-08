@@ -63,10 +63,12 @@ The shortest path to something a stranger can use. Nothing here is new architect
    from the operator's signed catalog events by `scripts/generate-seed.mjs` and parsed
    through the same codecs as a Discover import. Backfill-only, once per account; seeded
    rows do not count as user data for adoption, and editing a starter program forks it.
-2. ~~**Support surface**~~ — done. Lightning address, QR and copy actions in Settings,
-   plus a funding panel reading public `kind:9735` receipts against the published 50,000
-   sats monthly cost. Only provider-signed receipts count; an unreachable relay reports
-   unknown, never zero. Suggested-amount buttons wait for NWC in v3.
+2. **Support surface** — implemented, with one v1 alignment pass remaining. App and
+   landing support must tell the same zap-only transparency story: zaps are the canonical
+   donation route because they produce public `kind:9735` receipts; plain Lightning and
+   on-chain BTC are not normal v1 donation paths. The funding panel reads verified zap
+   receipts against the published 50,000 sats monthly cost; unreachable relays report
+   unknown, never zero.
 3. **Release plumbing** — mostly done for v0.9.0: `CHANGELOG.md`, tag-triggered release
    workflow, and a GitHub Release exist. For v1.0, promote `[Unreleased]` to `1.0.0`, tag
    after QA clears, and verify the release artifact/domain.
@@ -118,12 +120,14 @@ Detailed execution plan: `docs/plans/v2-encrypted-backup-alpha.md`.
 
 **Client**
 
-6. Encrypted backup access UI in `features/support/`.
-7. `nostr/auth.ts` — NIP-42 challenge signing.
-8. `nostr/codecs30078.ts` — NIP-44 encrypted `kind:30078` private-record codecs.
-9. `sync/engine.ts` — write queue, manifest, tombstones, LWW merge, push, pull, and lazy
+6. NWC/NIP-47 support flow for custom in-app zaps: amount/comment UI, zap request signing,
+   LNURL invoice fetch, NWC payment, receipt verification, and funding-panel refresh.
+7. Encrypted backup access UI in `features/support/`.
+8. `nostr/auth.ts` — NIP-42 challenge signing.
+9. `nostr/codecs30078.ts` — NIP-44 encrypted `kind:30078` private-record codecs.
+10. `sync/engine.ts` — write queue, manifest, tombstones, LWW merge, push, pull, and lazy
    restore.
-10. Automatic non-blocking sync UX with pending count, last-sync state, retry, and manual
+11. Automatic non-blocking sync UX with pending count, last-sync state, retry, and manual
     sync-now fallback.
 
 **Done when:** phone → relay → laptop restore works after decryption, with no manual
@@ -133,7 +137,8 @@ operator step and no plaintext private training data leaving the browser.
 
 Independently shippable, roughly in order of value. Nothing here blocks v1 or v2.
 
-1. Milestone zap prompts — contextual donation moments at PRs and streaks.
+1. Milestone zap prompts — contextual donation moments at PRs and streaks, built on the
+   v2 NWC support flow rather than a separate payment rail.
 2. Supporter badge and supporters page, resolved from public zap receipts.
 3. **User-published programs** (`kind:33402`) — the one authoring capability that opens
    up. Programs may only reference exercises that already have an address, which keeps
@@ -141,10 +146,9 @@ Independently shippable, roughly in order of value. Nothing here blocks v1 or v2
    Separate discovery surface from the operator catalog; imports stay snapshots.
 4. Blossom media server on the relay host — and only there does the media-upload question
    reopen, from scratch.
-5. NIP-47 wallet connect for one-tap zaps.
-6. Push notifications for scheduled workouts.
-7. Coach platform, built on item 3.
-8. `signer/idenstr.ts` — one codebase, three signer backends.
+5. Push notifications for scheduled workouts.
+6. Coach platform, built on item 3.
+7. `signer/idenstr.ts` — one codebase, three signer backends.
 
 ## Fallback — paid relay access
 
