@@ -325,16 +325,21 @@ other client can read it. Curation is a quality decision, not a lock (Section 11
    an unreachable relay rather than rejecting — the same trap `share.ts` documents for
    publish — so the connection is established explicitly before the query.
 
-**Get relay access (Phase 2a)**
-1. User asks for access from the app: a NIP-98-signed request to the allowlist endpoint,
-   or a DM to the operator npub. No payment involved by default.
-2. Operator (or the endpoint, automatically, while capacity allows) appends the pubkey to
-   the allowlist file; strfry's NIP-42 plugin hot-reloads it.
-3. Client retries relay AUTH → now accepted → sync engine activates. Access status is
+**Get relay access (Phase 2a-alpha)**
+1. User asks for encrypted backup access from the app. The app sends a NIP-98-signed
+   request to the access endpoint. No payment and no manual operator approval are part of
+   the alpha admission path.
+2. The endpoint verifies the signature, checks that the pubkey is not blocked, and admits
+   the pubkey automatically while the private-alpha cap has room. Initial cap: **50
+   pubkeys**. Initial quota: **50 MB per pubkey**.
+3. The endpoint records the pubkey in the relay allowlist; strfry's NIP-42 policy uses
+   that allowlist for AUTH. Admin tooling may exist for debugging, blocking, and emergency
+   fixes, but normal onboarding is self-serve.
+4. Client retries relay AUTH → now accepted → sync engine activates. Access status is
    queryable via `GET /api/status/<pubkey>`.
-4. Supporters above the recognition threshold are allowlisted automatically, resolved
-   from zap receipts — a convenience, not a price.
-5. *Only if the Section 11 fallback has fired:* new pubkeys go through the invoice flow
+5. Supporters above the recognition threshold may be allowlisted automatically later,
+   resolved from zap receipts — a convenience, not a price.
+6. *Only if the Section 11 fallback has fired:* new pubkeys go through the invoice flow
    instead (Phase 2b), and the status response carries an expiry.
 
 ### 6.2 Relay sets (there is more than one "public relays")
@@ -711,17 +716,18 @@ operator hosting zero infrastructure.
 **Goal:** encrypted sync/backup and retention for anyone who asks, funded by donations.
 No payment service is built in this phase.
 
-Server side (Docker Compose on home server behind VPN, or VPS):
-1. **strfry** with NIP-42 AUTH required; write/read policy plugin checks pubkey
-   against an allowlist file (pubkey + optional expiry, unused by default). Reject
-   non-allowlisted AUTH.
-2. **Allowlist glue** (the one custom service, small): `POST /api/access` accepts a
-   NIP-98-signed request and appends the pubkey while capacity allows, hot-reloading the
-   strfry policy; `GET /api/status/<pubkey>` reports access state. A zap-receipt watcher
-   auto-allowlists supporters above the recognition threshold. No invoices, no LNbits,
-   no expiry pruning — none of that exists unless Phase 2b is triggered.
-3. **Capacity caps:** per-pubkey storage quota and a ceiling on allowlist size. Free
-   access has no natural rate limit, so the limit has to be explicit (Section 13).
+Server side:
+1. **strfry** with NIP-42 AUTH required; write/read policy checks authenticated pubkeys
+   against the Workstr access allowlist. Reject non-admitted or blocked pubkeys.
+2. **Automatic alpha access glue** (the one custom service, small): `POST /api/access`
+   accepts a NIP-98-signed request and admits the pubkey automatically while the
+   private-alpha cap has room. Initial cap: **50 pubkeys**. Initial quota: **50 MB per
+   pubkey**. `GET /api/status/<pubkey>` reports access, quota, and alpha-cap state.
+   Admin tooling exists only for blocking, debugging, status checks, and emergency fixes;
+   it is not the normal onboarding path.
+3. **Capacity caps:** per-pubkey storage quota and a ceiling on admitted pubkeys. Free
+   self-serve access has no natural rate limit, so the limits are explicit from day one
+   (Section 13).
 4. **TLS + DNS:** Caddy (VPS, port 443) or DNS-01 certs + high port (home/VPN);
    `relay.workstr.example` DNS record; DDNS updater if home-hosted.
 5. **Backups:** nightly snapshot of strfry's LMDB directory off-machine
