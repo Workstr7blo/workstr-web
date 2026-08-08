@@ -67,10 +67,11 @@ The shortest path to something a stranger can use. Nothing here is new architect
    plus a funding panel reading public `kind:9735` receipts against the published 50,000
    sats monthly cost. Only provider-signed receipts count; an unreachable relay reports
    unknown, never zero. Suggested-amount buttons wait for NWC in v3.
-3. **Release plumbing** — `CHANGELOG.md`, first tag, release workflow. None of this
-   exists today; the repo has 84 commits and zero tags.
+3. **Release plumbing** — mostly done for v0.9.0: `CHANGELOG.md`, tag-triggered release
+   workflow, and a GitHub Release exist. For v1.0, promote `[Unreleased]` to `1.0.0`, tag
+   after QA clears, and verify the release artifact/domain.
 4. **Release pass** — work `docs/RELEASE-QA.md` against the deployed site: real iPhone,
-   real signers, real relays. Blocking sections must be clear before the tag.
+   real signers, real relays. Blocking sections must be clear before the v1.0 tag.
 
 **Done when:** a stranger installs from the domain, trains a real session with no network
 and no identity, and can support the project without leaving the app. Whether people
