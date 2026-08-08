@@ -16,11 +16,13 @@ describe('supportPanel', () => {
     expect(markup).toContain(npub);
     expect(markup).toContain('Copy npub');
     expect(markup).toContain('Zaps keep support public and receipt-backed');
-    expect(markup).toContain('The meter below counts verified NIP-57 zap receipts only');
-    expect(markup).toContain('accounted for separately instead of being mixed into the live zap total');
+    expect(markup).toContain('The only donation path is a Nostr zap');
+    expect(markup).toContain('transparently');
+    expect(markup).toContain('verified NIP-57 zap receipts in the meter below');
     expect(markup).toContain('NIP-57');
 
     expect(markup).not.toContain('Plain Lightning and on-chain routes are not shown here');
+    expect(markup).not.toContain('If support ever arrives');
     expect(markup).not.toContain('Copy Lightning address');
     expect(markup).not.toContain('lightning:');
     expect(markup).not.toContain('Scan with any Lightning wallet');
