@@ -8,6 +8,7 @@ import { WorkstrStore, type ExerciseDraft, type SheetWithExercises } from '../db
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
 import { applyStarterSeed } from '../db/seed';
+import { fetchMonthlyZapReceipts } from '../nostr/zaps';
 import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
@@ -58,7 +59,7 @@ async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<Rela
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -146,6 +147,7 @@ export function renderShell(root: HTMLElement): void {
       render();
       if (state.view === 'exercises' && !state.discoverExercises.length) void refreshExercises();
       if (state.view === 'workouts' && !state.programs.length) void refreshPrograms();
+      if (state.view === 'settings') void refreshFunding();
     }));
     root.querySelectorAll<HTMLElement>('[data-subtab]').forEach((button) => button.addEventListener('click', () => {
       const parent = button.dataset.parent as keyof AppState['subState'];
@@ -158,7 +160,11 @@ export function renderShell(root: HTMLElement): void {
         if (parent === 'workouts' && !state.programs.length) void refreshPrograms();
       }
     }));
-    root.querySelector('#account-chip')?.addEventListener('click', () => { state.view = 'settings'; render(); });
+    root.querySelector('#account-chip')?.addEventListener('click', () => { state.view = 'settings'; render(); void refreshFunding(); });
+    root.querySelectorAll<HTMLElement>('[data-copy]').forEach((button) => button.addEventListener('click', () => {
+      void navigator.clipboard.writeText(button.dataset.copy || '')
+        .then(() => toast('Copied'), () => toast('Could not copy', 'bad'));
+    }));
     root.querySelector('#sign-in-settings')?.addEventListener('click', startRemoteSignerRequest);
     root.querySelector('#sign-in-nip07')?.addEventListener('click', () => { void connectNip07(); });
     root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void signOut(); });
@@ -507,6 +513,20 @@ export function renderShell(root: HTMLElement): void {
       render();
       toast('Profile saved');
     });
+  }
+
+  // Zap receipts are public, so this needs no identity and runs whether or not
+  // the user is signed in. Refetched at most once per settings visit.
+  async function refreshFunding(): Promise<void> {
+    if (state.support.status === 'loading' || state.support.status === 'ready') return;
+    state.support = { ...state.support, status: 'loading' };
+    render();
+    try {
+      state.support = { status: 'ready', receipts: await fetchMonthlyZapReceipts(), fetchedAt: Date.now() };
+    } catch {
+      state.support = { ...state.support, status: 'offline' };
+    }
+    render();
   }
 
   function toast(message: string, kind: 'ok' | 'bad' = 'ok'): void {

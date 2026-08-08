@@ -304,13 +304,26 @@ other client can read it. Curation is a quality decision, not a lock (Section 11
    somebody's work.
 
 **Support the project (free, Phase 1)**
-1. Support screen reads the operator's `kind:0` for `lud16`; renders the Lightning
-   address, a QR, and suggested amounts. Nothing is stored, nothing is gated.
-2. If NWC is connected (Phase 3), zap in-app; otherwise the user pays from any wallet.
-3. Funding panel: REQ `{kinds:[9735], "#p":[operatorPubkey], since:<monthStart>}` from
-   public relays, sum the bolt11 amounts, display month-to-date against the published
-   monthly infrastructure cost. Entirely client-side — zap receipts are public events,
-   so transparency costs no backend.
+1. Support panel in Settings renders the operator's Lightning address, a `lightning:` QR,
+   and copy buttons for the address and the npub. Nothing is stored, nothing is gated, no
+   identity required. The address is also published in the operator's `kind:0` as `lud16`,
+   so zapping the npub from any Nostr client reaches the same wallet.
+2. **No suggested-amount buttons.** They are not implementable here: without NWC or an
+   LNURL callback the client cannot mint an invoice for a chosen amount, and a button that
+   only copies a number is worse than the QR. They return in Phase 3 with NIP-47.
+3. Funding panel: REQ `{kinds:[9735], "#p":[operatorPubkey], since:<monthStart>}` from the
+   broad read set, sum the bolt11 amounts, display month-to-date against
+   `MONTHLY_COST_SATS`. Both sides are sats, so the percentage is exact and needs no price
+   feed. Entirely client-side — zap receipts are public events, so transparency costs no
+   backend.
+4. **Only receipts signed by the wallet provider's key count** (`ZAP_RECEIPT_SIGNER_PUBKEY`,
+   pinned in `core/funding.ts` from the LNURL-pay metadata). Anyone can publish a
+   `kind:9735` tagged to any pubkey; without the signer check the published total would be
+   a number strangers control, and the transparency claim in 3.4 would be worthless.
+5. **A failed fetch reports "unknown", never zero.** "Nobody donated" and "we could not
+   check" are different claims and only one is true. Note `querySync` *resolves empty* on
+   an unreachable relay rather than rejecting — the same trap `share.ts` documents for
+   publish — so the connection is established explicitly before the query.
 
 **Get relay access (Phase 2a)**
 1. User asks for access from the app: a NIP-98-signed request to the allowlist endpoint,
@@ -488,6 +501,7 @@ src/
     muscles.ts         # canonical muscle map — copied verbatim from public/muscles.js
     equipment.ts       # equipment key normalization, owned-equipment matching,
                        #   bodyweight-always-available rule
+    funding.ts         # lud16, pinned zap-receipt signer key, published monthly cost
   signer/
     types.ts           # interface Signer { getPublicKey; signEvent; nip44Encrypt; nip44Decrypt }
     nip07.ts           # window.nostr adapter
@@ -502,6 +516,7 @@ src/
     export.ts          # JSON export/import of the entire local DB
   nostr/
     pool.ts            # relay sets (catalog / write) and shared profile types
+    zaps.ts            # zap-receipt validation, sats totals, month boundary, fetch
     canon.ts           # the Workstr catalog: operator-filtered queries, signature
                        #   verification, 33401/33402 → local row mapping, dedupe,
                        #   offline cache
@@ -520,10 +535,10 @@ src/
     recovery/          # recovery-state computation + suggestions + Quick Workout
                        #   (recovery.ts and quickWorkout.ts are pure)
     discover/          # catalog browse/import UI
-    support/           # [planned, Phase 1] Lightning address + QR, zap prompts, funding
-                       #   panel (reads kind:9735 receipts). Phase 2a adds the
-                       #   relay-access request UI; the invoice path lands here only if
-                       #   the Section 11 fallback fires.
+    support/           # Lightning address + QR, copy actions, funding panel (reads
+                       #   kind:9735 receipts). Phase 2a adds the relay-access request
+                       #   UI; the invoice path lands here only if the Section 11
+                       #   fallback fires.
   app/
     shell.ts           # root render, navigation, settings, modals  [over the line limit]
     session-runner.ts  # live session state machine                 [over the line limit]
@@ -794,20 +809,29 @@ trigger, not a roadmap item.
 
 ### 11.1 What costs money
 
-| Line item | When | Approx. monthly |
+**Published monthly cost: 50,000 sats.** That single figure is what the app shows, and it
+is the denominator for everything below. It lives in `src/core/funding.ts` as
+`MONTHLY_COST_SATS`; changing the real cost means changing that constant and shipping.
+
+| Line item | When | Share of the 50k |
 |---|---|---|
-| Domain (Njalla) | Phase 0 | `[FILL IN]` |
+| Domain (Njalla) | Phase 0 | small, annual, amortised |
 | GitHub Pages hosting | Phase 0 | 0 |
 | Relay host — Option A, home | Phase 2a | electricity only |
-| Relay host — Option B, VPS | later | `[FILL IN]` |
-| Off-machine backups | Phase 2a | `[FILL IN]` |
-| Media storage | Phase 3 | `[FILL IN]` |
-| Development time | ongoing | the real cost, and the honest one to name |
+| Relay host — Option B, VPS | later | the bulk of it, once it exists |
+| Off-machine backups | Phase 2a | small |
+| Media storage | Phase 3 | not yet incurred |
+| Development time | ongoing | the real cost, and the honest one to name — not in the 50k |
 
-**Publish this table with real numbers**, in the repo and in the app's funding panel.
+**Denominated in sats on purpose.** Donations arrive in sats, so a sats budget compares
+directly and the funding panel never needs a price feed to tell the truth. A fiat budget
+would drift against the same donations every time the exchange rate moved, and the app
+would have to fetch a rate from a third party to say anything at all.
+
 Rule 3.4: asking for money without showing the bill is not an option. Phase 1 is close to
-zero; the bill only starts at Phase 2a, which is why the support block ships first — it
-gets a season of data before there is anything to pay for.
+zero in real spend; the figure is published from the start anyway, because the support
+screen ships in Phase 1 and a screen that asks without showing is exactly what 3.4
+forbids.
 
 ### 11.2 Funding ladder, in priority order
 

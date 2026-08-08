@@ -2,6 +2,7 @@ import type { WorkstrStore, SheetWithExercises } from '../db/store';
 import type { BodyWeightEntry, Exercise, WorkstrSettings } from '../core/types';
 import type { RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
+import type { SupportState } from '../features/support/views';
 
 export type View = 'exercises' | 'workouts' | 'statistics' | 'settings';
 export type SubView = 'library' | 'discover' | 'programs' | 'history' | 'recovery' | 'training' | 'body';
@@ -50,6 +51,7 @@ export interface AppState {
   authorProfiles?: Record<string, RelayProfile>;
   store: WorkstrStore | null;
   settings: WorkstrSettings;
+  support: SupportState;
   signerType: 'nip07' | 'nip46' | null;
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
