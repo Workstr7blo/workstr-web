@@ -9,13 +9,14 @@ describe('supportPanel', () => {
     const markup = supportPanel();
     const npub = nip19.npubEncode(OPERATOR_PUBKEY);
 
-    expect(markup).toContain('Zap Workstr on Nostr');
+    expect(markup).toContain('Zap on Nostr');
     expect(markup).toContain(`href="${OPERATOR_NOSTR_URL}"`);
-    expect(markup).toContain(`zap target: ${OPERATOR_NOSTR_HANDLE}`);
+    expect(markup).toContain('Fund the build. Keep the receipt.');
+    expect(markup).toContain(`>${OPERATOR_NOSTR_HANDLE}</strong>`);
     expect(markup).toContain(npub);
     expect(markup).toContain('Copy npub');
-    expect(markup).toContain('Support is zap-based');
-    expect(markup).toContain('verified NIP-57 kind:9735 only');
+    expect(markup).toContain('Zaps keep support public and receipt-backed');
+    expect(markup).toContain('NIP-57');
 
     expect(markup).not.toContain('Copy Lightning address');
     expect(markup).not.toContain('lightning:');
@@ -31,8 +32,8 @@ describe('supportPanel', () => {
       ]
     });
 
-    expect(markup).toContain('received: 3,000 sats');
-    expect(markup).toContain('monthly cost: 50,000 sats');
+    expect(markup).toContain('<strong>3,000 sats</strong>');
+    expect(markup).toContain('<strong>50,000 sats</strong>');
     expect(markup).toContain('2 zaps from 2 supporters');
   });
 
