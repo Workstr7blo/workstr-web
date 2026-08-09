@@ -62,10 +62,14 @@
 .support-meter-head strong { color: var(--text); font-size: 20px; letter-spacing: -.03em; }
 .support-track { height: 10px; margin: 13px 0 14px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.075); }
 .support-track span { display: block; height: 100%; min-width: 4px; border-radius: inherit; background: linear-gradient(90deg, var(--sovereign-purple), var(--success-green)); box-shadow: 0 0 18px rgba(124,60,255,.55); }
-.support-stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+.support-meter.under { border-color: rgba(255,72,112,.34); }
+.support-meter.under .support-track span { background: linear-gradient(90deg, #ff4870, var(--sovereign-purple)); }
+.support-meter.covered { border-color: rgba(0,208,132,.34); }
+.support-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
 .support-stats div { min-width: 0; padding: 10px; border-radius: 13px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.055); }
 .support-stats span { display: block; color: var(--dim); font: 800 10px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .09em; }
 .support-stats strong { display: block; margin-top: 6px; color: var(--text); font-size: 13px; line-height: 1.25; overflow-wrap: anywhere; }
+.support-meter-note { margin: 12px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
 .metric-grid.mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .workout-card-map.has-map {
   width: 148px;

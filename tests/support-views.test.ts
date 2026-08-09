@@ -16,6 +16,9 @@ describe('supportPanel', () => {
     expect(markup).toContain(npub);
     expect(markup).toContain('Copy npub');
     expect(markup).toContain('Zaps keep support public and receipt-backed');
+    expect(markup).toContain('85,000 sats monthly target');
+    expect(markup).toContain('55k sats for AI credits and development');
+    expect(markup).toContain('workstr.fit/support');
     expect(markup).toContain('The only donation path is a Nostr zap');
     expect(markup).toContain('transparently');
     expect(markup).toContain('verified NIP-57 zap receipts in the meter below');
@@ -38,7 +41,9 @@ describe('supportPanel', () => {
     });
 
     expect(markup).toContain('<strong>3,000 sats</strong>');
-    expect(markup).toContain('<strong>50,000 sats</strong>');
+    expect(markup).toContain('<strong>85,000 sats</strong>');
+    expect(markup).toContain('<span>gap / runway</span><strong>-82,000 sats</strong>');
+    expect(markup).toContain('The remaining gap is founder-funded');
     expect(markup).toContain('2 zaps from 2 supporters');
   });
 

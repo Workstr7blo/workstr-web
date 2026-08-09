@@ -24,11 +24,12 @@ export const OPERATOR_NOSTR_URL = `https://njump.me/${OPERATOR_NOSTR_HANDLE}`;
 // correct, since the old wallet is no longer the operator's.
 export const ZAP_RECEIPT_SIGNER_PUBKEY = '72bdbc57bdd6dfc4e62685051de8041d148c3c68fe42bf301f71aa6cf53e52fb';
 
-// Published monthly infrastructure cost. Section 3.4: asking for money without
+// Published monthly operating cost. Section 3.4: asking for money without
 // showing the bill is not an option. Denominated in sats deliberately —
 // donations arrive in sats, so a sats budget compares directly and the app
-// never needs a price feed to tell the truth.
-export const MONTHLY_COST_SATS = 50_000;
+// never needs a price feed to tell the truth. This stays aligned with the
+// public support page at workstr.fit/support/.
+export const MONTHLY_COST_SATS = 85_000;
 
 // Relays queried for zap receipts. Receipts are published by the wallet
 // provider to widely-read relays, so this is the broad read set rather than

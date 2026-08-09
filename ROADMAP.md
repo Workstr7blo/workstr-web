@@ -67,7 +67,7 @@ The shortest path to something a stranger can use. Nothing here is new architect
    landing support must tell the same zap-only transparency story: zaps are the canonical
    donation route because they produce public `kind:9735` receipts; plain Lightning and
    on-chain BTC are not normal v1 donation paths. The funding panel reads verified zap
-   receipts against the published 50,000 sats monthly cost; unreachable relays report
+   receipts against the published 85,000 sats monthly operating target; unreachable relays report
    unknown, never zero.
 3. **Release plumbing** — mostly done for v0.9.0: `CHANGELOG.md`, tag-triggered release
    workflow, and a GitHub Release exist. For v1.0, promote `[Unreleased]` to `1.0.0`, tag

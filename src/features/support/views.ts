@@ -29,21 +29,28 @@ function fundingPanel(state: SupportState): string {
 
   const totals = fundingTotals(state.receipts, MONTHLY_COST_SATS);
   const supporters = new Set(state.receipts.map((receipt) => receipt.senderPubkey).filter(Boolean)).size;
+  const rawPercent = MONTHLY_COST_SATS > 0 ? Math.round((totals.sats / MONTHLY_COST_SATS) * 100) : 0;
+  const gap = totals.sats - MONTHLY_COST_SATS;
+  const isCovered = gap >= 0;
   const detail = totals.count
     ? `${totals.count} zap${totals.count === 1 ? '' : 's'}${supporters ? ` from ${supporters} supporter${supporters === 1 ? '' : 's'}` : ''}`
     : 'no zaps yet this month';
   return `
-    <div class="support-meter">
+    <div class="support-meter ${isCovered ? 'covered' : 'under'}">
       <div class="support-meter-head">
         <span>This month</span>
-        <strong>${totals.percent}%</strong>
+        <strong>${rawPercent}%</strong>
       </div>
       <div class="support-track" aria-hidden="true"><span style="width:${totals.percent}%"></span></div>
       <div class="support-stats">
         <div><span>received</span><strong>${sats(totals.sats)} sats</strong></div>
-        <div><span>monthly cost</span><strong>${sats(MONTHLY_COST_SATS)} sats</strong></div>
+        <div><span>monthly target</span><strong>${sats(MONTHLY_COST_SATS)} sats</strong></div>
+        <div><span>gap / runway</span><strong>${gap >= 0 ? '+' : '-'}${sats(Math.abs(gap))} sats</strong></div>
         <div><span>receipts</span><strong>${html(detail)}</strong></div>
       </div>
+      <p class="support-meter-note">${isCovered
+        ? 'This month is covered. Extra verified zaps become Workstr runway.'
+        : 'Verified zaps are under the monthly operating target. The remaining gap is founder-funded.'}</p>
     </div>`;
 }
 
@@ -57,8 +64,7 @@ export function supportPanel(state: SupportState = { status: 'idle', receipts: [
       <div>
         <div class="panel-head"><span>Support Workstr</span><strong>zap receipts</strong></div>
         <h3>Fund the build. Keep the receipt.</h3>
-        <p class="section-help">Workstr is free and stays free. Donations cover the relay, backups and domain:
-        ${sats(MONTHLY_COST_SATS)} sats a month. Zaps keep support public and receipt-backed.</p>
+        <p class="section-help">Workstr is free and stays free. The ${sats(MONTHLY_COST_SATS)} sats monthly target is the same public operating target shown on workstr.fit/support: about 55k sats for AI credits and development, 22k for growth tests, 2k for Nostr.build media hosting, 5k for the domain, and 1k buffer. Zaps keep support public and receipt-backed.</p>
       </div>
     </div>
     <div class="support-zap-card">

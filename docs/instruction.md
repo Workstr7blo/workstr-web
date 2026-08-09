@@ -819,19 +819,21 @@ trigger, not a roadmap item.
 
 ### 11.1 What costs money
 
-**Published monthly cost: 50,000 sats.** That single figure is what the app shows, and it
+**Published monthly target: 85,000 sats.** That single figure is what the app shows, and it
 is the denominator for everything below. It lives in `src/core/funding.ts` as
 `MONTHLY_COST_SATS`; changing the real cost means changing that constant and shipping.
+The target mirrors the public support page: about 55k sats for AI credits and development,
+22k for growth tests, 2k for Nostr.build media hosting, 5k for the domain, and 1k buffer.
 
-| Line item | When | Share of the 50k |
+| Line item | When | Monthly equivalent |
 |---|---|---|
-| Domain (Njalla) | Phase 0 | small, annual, amortised |
+| AI credits + development | ongoing | ~55k sats |
+| Growth experiments / ads | ongoing | ~22k sats |
+| Nostr.build media hosting | paid annually | ~2k sats |
+| Domain infrastructure | paid annually | ~5k sats |
+| Buffer / rounding | ongoing | ~1k sats |
 | GitHub Pages hosting | Phase 0 | 0 |
-| Relay host — Option A, home | Phase 2a | electricity only |
-| Relay host — Option B, VPS | later | the bulk of it, once it exists |
-| Off-machine backups | Phase 2a | small |
-| Media storage | Phase 3 | not yet incurred |
-| Development time | ongoing | the real cost, and the honest one to name — not in the 50k |
+| Relay host / encrypted backup | later | separate targeted asks when incurred |
 
 **Denominated in sats on purpose.** Donations arrive in sats, so a sats budget compares
 directly and the funding panel never needs a price feed to tell the truth. A fiat budget

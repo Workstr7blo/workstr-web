@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings shows the running app version.
 - **Support Workstr.** A support panel in Settings with the project's Lightning address,
   a scannable QR, and copy buttons for the address and the npub. Below it, a live funding
-  panel showing what came in this month against the published 50,000 sats monthly running
+  panel showing what came in this month against the published 85,000 sats monthly running
   cost — read directly from public zap receipts, with no account, no analytics and no
   server. Only receipts signed by the wallet provider are counted, and when the relays
   cannot be reached the panel says the total is unknown rather than reporting zero.
