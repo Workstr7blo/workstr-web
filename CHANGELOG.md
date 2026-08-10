@@ -16,12 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   identical to the imported one: Discover reports it as already in your library instead of
   offering a duplicate, and still offers an update if the catalog entry is republished.
 - Settings shows the running app version.
-- **Support Workstr.** A support panel in Settings with the project's Lightning address,
-  a scannable QR, and copy buttons for the address and the npub. Below it, a live funding
-  panel showing what came in this month against the published 85,000 sats monthly running
-  cost — read directly from public zap receipts, with no account, no analytics and no
-  server. Only receipts signed by the wallet provider are counted, and when the relays
-  cannot be reached the panel says the total is unknown rather than reporting zero.
+- **Support Workstr.** A zap-first support panel in Settings with the project's Nostr
+  identity, a canonical "Zap on Nostr" action, and a copy button for the npub. Below it,
+  a live funding panel shows what came in this month against the published 85,000 sats
+  monthly running cost — read directly from public NIP-57 zap receipts, with no account,
+  analytics or server. Plain Lightning and on-chain routes are not presented as separate
+  donation paths. Only receipts signed by the wallet provider are counted, and when the
+  relays cannot be reached the panel says the total is unknown rather than reporting zero.
 
 ### Changed
 
