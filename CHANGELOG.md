@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-11
+
 ### Added
 
 - **Starter programs.** A fresh install now ships with three beginner programs —
@@ -30,7 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stays deleted, a program you edit becomes your own, and anything already occupying a
   slot is left untouched.
 
-Still to come in v1.0: the support surface and the release QA pass. See `ROADMAP.md`.
+### Fixed
+
+- Rest timers now reconcile against wall-clock time after iOS suspends and resumes the
+  installed PWA.
+- Android opens mobile signer deep links in the existing app context instead of leaving
+  users in a blank browser window.
+- Exercise images loaded from the Workstr catalog are cached for offline cold starts.
 
 ## [0.9.0] - 2026-08-08
 
@@ -78,5 +86,6 @@ Nostr read path; it is versioned here so releases are traceable while v1.0 is fi
 - Weights are stored canonically in kilograms; the display unit is a user preference.
 - `session_sets.rpe` exists in the schema but is never written — see `ROADMAP.md`.
 
-[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Workstr7blo/workstr-web/releases/tag/v1.0.0
 [0.9.0]: https://github.com/Workstr7blo/workstr-web/releases/tag/v0.9.0
