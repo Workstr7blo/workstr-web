@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createSessionRunner, type SessionRunnerContext } from '../src/app/session-runner';
+import { createSessionRunner, restSecondsRemaining, type SessionRunnerContext } from '../src/app/session-runner';
 import { shellMarkup } from '../src/app/layout';
 import type { AppState } from '../src/app/state';
 import type { RelayProgram } from '../src/nostr/canon';
@@ -109,5 +109,13 @@ describe('session runner', () => {
     expect(root.querySelector('#modal')?.classList.contains('open')).toBe(true);
     expect(root.querySelector('#modal-content')?.textContent).toContain('recap');
     expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(false);
+  });
+});
+
+describe('rest timer timing', () => {
+  it('derives remaining seconds from a wall-clock deadline', () => {
+    expect(restSecondsRemaining(65_000, 5_000)).toBe(60);
+    expect(restSecondsRemaining(65_000, 64_001)).toBe(1);
+    expect(restSecondsRemaining(65_000, 70_000)).toBe(0);
   });
 });

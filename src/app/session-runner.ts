@@ -32,6 +32,10 @@ export interface SessionRunner {
   bindSessionControls(): void;
 }
 
+export function restSecondsRemaining(endsAt: number, now = Date.now()): number {
+  return Math.max(0, Math.ceil((endsAt - now) / 1000));
+}
+
 export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   const { state, root } = ctx;
 
@@ -40,6 +44,8 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   let sessionRestTimer = 0;
   let sessionRestTotal = 0;
   let sessionRestRemaining = 0;
+  let sessionRestEndsAt = 0;
+  let sessionRestAutoAdvance = false;
   let sessionElapsedTimer = 0;
   let sessionWakeLock: WakeLockSentinel | null = null;
   const sessionPreviousSets = new Map<string, SessionSetLog[]>();
@@ -143,7 +149,9 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && state.activeSession && root.querySelector('#session-overlay')?.classList.contains('open')) void requestSessionWakeLock();
+    if (document.visibilityState !== 'visible') return;
+    if (state.activeSession && root.querySelector('#session-overlay')?.classList.contains('open')) void requestSessionWakeLock();
+    if (sessionRestEndsAt) reconcileSessionRest();
   });
 
   async function openSessionOverlay(session: ActiveSession): Promise<void> {
@@ -332,6 +340,8 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     root.querySelector('#session-rest-overlay')?.classList.add('show');
     sessionRestTotal = Number(sec) || 90;
     sessionRestRemaining = sessionRestTotal;
+    sessionRestEndsAt = Date.now() + sessionRestTotal * 1000;
+    sessionRestAutoAdvance = autoAdvance;
     const nextUp = root.querySelector('#rest-nextup');
     if (nextUp && state.activeSession) {
       const exercises = getSessionExercises(state.activeSession);
@@ -340,17 +350,20 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     }
     updateSessionRestDisplay();
     window.clearInterval(sessionRestTimer);
-    sessionRestTimer = window.setInterval(() => {
-      sessionRestRemaining -= 1;
-      updateSessionRestDisplay();
-      if (sessionRestRemaining <= 0) {
-        skipSessionRest();
-        if (autoAdvance && state.activeSession) {
-          const exercises = getSessionExercises(state.activeSession);
-          if (sessionExerciseIndex < exercises.length - 1) { sessionExerciseIndex += 1; void renderSessionExercise(state.activeSession); }
-        }
-      }
-    }, 1000);
+    sessionRestTimer = window.setInterval(reconcileSessionRest, 1000);
+  }
+
+  function reconcileSessionRest(): void {
+    if (!sessionRestEndsAt) return;
+    sessionRestRemaining = restSecondsRemaining(sessionRestEndsAt);
+    updateSessionRestDisplay();
+    if (sessionRestRemaining > 0) return;
+    const autoAdvance = sessionRestAutoAdvance;
+    skipSessionRest();
+    if (autoAdvance && state.activeSession) {
+      const exercises = getSessionExercises(state.activeSession);
+      if (sessionExerciseIndex < exercises.length - 1) { sessionExerciseIndex += 1; void renderSessionExercise(state.activeSession); }
+    }
   }
 
   function updateSessionRestDisplay(): void {
@@ -366,13 +379,17 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   }
 
   function adjustRest(delta: number): void {
+    if (sessionRestEndsAt) sessionRestRemaining = restSecondsRemaining(sessionRestEndsAt);
     sessionRestRemaining = Math.max(5, sessionRestRemaining + delta);
+    sessionRestEndsAt = Date.now() + sessionRestRemaining * 1000;
     if (sessionRestTotal < sessionRestRemaining) sessionRestTotal = sessionRestRemaining;
     updateSessionRestDisplay();
   }
 
   function skipSessionRest(): void {
     window.clearInterval(sessionRestTimer);
+    sessionRestEndsAt = 0;
+    sessionRestAutoAdvance = false;
     root.querySelector('#session-rest-overlay')?.classList.remove('show');
   }
 

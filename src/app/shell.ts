@@ -35,6 +35,17 @@ function profileName(profile: RelayProfile | null): string | null {
   return profile?.name?.trim() || profile?.nip05?.trim() || null;
 }
 
+export function launchSignerUri(uri: string, mobile: boolean, doc: Document = document): void {
+  const link = doc.createElement('a');
+  link.href = uri;
+  // Android can leave an empty browser tab behind when a custom signer URI
+  // is opened with target=_blank. Reuse the current PWA context on mobile;
+  // if no app handles it, the still-rendered modal offers copy/retry recovery.
+  if (!mobile) link.target = '_blank';
+  link.rel = 'noreferrer'; link.style.display = 'none';
+  doc.body.appendChild(link); link.click(); link.remove();
+}
+
 async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<RelayProfile | null> {
   const pool = new SimplePool();
   try {
@@ -955,9 +966,7 @@ export function renderShell(root: HTMLElement): void {
   }
 
   function launchSignerRequest(uri: string): void {
-    const link = document.createElement('a');
-    link.href = uri; link.target = '_blank'; link.rel = 'noreferrer'; link.style.display = 'none';
-    document.body.appendChild(link); link.click(); link.remove();
+    launchSignerUri(uri, /android|iphone|ipad|ipod/i.test(navigator.userAgent));
   }
 
   async function openAndRender(pubkey: string, signerType: AppState['signerType'] = state.signerType): Promise<void> {

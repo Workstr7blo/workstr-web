@@ -27,16 +27,19 @@ async function trimCache(name, maxEntries) {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  // Same-origin only: cross-origin requests (relay media, external images) go
-  // straight to the network and never enter the cache.
-  if (new URL(event.request.url).origin !== self.location.origin) return;
   const isImage = event.request.destination === 'image';
+  const sameOrigin = new URL(event.request.url).origin === self.location.origin;
+  // App assets stay same-origin. Exercise images are intentionally allowed
+  // cross-origin so their opaque no-cors responses remain available offline.
+  if (!sameOrigin && !isImage) return;
   const cacheName = isImage ? IMAGE_CACHE : CACHE;
   event.respondWith(
-    fetch(event.request)
+    (isImage ? caches.match(event.request) : Promise.resolve(undefined))
+      .then((cached) => cached || fetch(event.request))
       .then((response) => {
-        // Never cache opaque or error responses (opaque entries are quota bombs).
-        if (response.ok && response.type === 'basic') {
+        // Cross-origin <img> requests produce opaque responses. They can still
+        // be cached and replayed safely, with a small FIFO limit for quota.
+        if (!response.bodyUsed && (response.ok || response.type === 'opaque')) {
           const copy = response.clone();
           event.waitUntil(
             caches.open(cacheName)
