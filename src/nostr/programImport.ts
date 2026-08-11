@@ -79,6 +79,7 @@ export function planProgramImport(program: RelayProgram, library: Exercise[], ca
       notes: program.description,
       difficulty: program.difficulty || '',
       tags: program.tags,
+      blocks: program.blocks,
       nostr_pubkey: program.pubkey,
       nostr_address: program.address,
       nostr_event_id: program.eventId,

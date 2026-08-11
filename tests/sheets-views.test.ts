@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   estimateProgramMin, resolveProgramExercise, programExerciseName, inferProgramMuscle,
-  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard
+  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, emomBlockFromBuilder
 } from '../src/features/sheets/views';
 import type { Exercise } from '../src/core/types';
 import type { RelayProgram, RelayProgramExercise } from '../src/nostr/canon';
@@ -149,5 +149,23 @@ describe('sheetToProgram', () => {
   it('labels the source by whether the sheet is published', () => {
     expect(sheetToProgram(baseSheet).sourceLabel).toBe('local');
     expect(sheetToProgram({ ...baseSheet, nostr_address: 'workstr:program:push-day' }).sourceLabel).toBe('in library');
+  });
+});
+
+describe('emomBlockFromBuilder', () => {
+  it('groups timed exercises into intervals while preserving rep targets', () => {
+    const base = { muscleGroup: 'Core', imageUrl: '', sets: 1, restSec: 60, weight: null, notes: '' };
+    const block = emomBlockFromBuilder([
+      { ...base, exerciseSlug: 'a', exerciseName: 'A', reps: '12', intervalIndex: 0, durationSec: 20 },
+      { ...base, exerciseSlug: 'b', exerciseName: 'B', reps: '10', intervalIndex: 0, durationSec: 20 },
+      { ...base, exerciseSlug: 'c', exerciseName: 'C', reps: '8', intervalIndex: 1, durationSec: 0 }
+    ], 5, 60);
+    expect(block.rounds).toBe(5);
+    expect(block.intervals).toHaveLength(2);
+    expect(block.intervals[0].steps).toMatchObject([
+      { exerciseSlug: 'a', targetReps: '12', targetDurationSec: 20 },
+      { exerciseSlug: 'b', targetReps: '10', targetDurationSec: 20 }
+    ]);
+    expect(block.intervals[1].steps[0]).toMatchObject({ exerciseSlug: 'c', targetReps: '8' });
   });
 });

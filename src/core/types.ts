@@ -3,6 +3,35 @@ import type { WeightUnit } from './units';
 export type ISODateTime = string;
 export type Slug = string;
 
+export interface TrainingStep {
+  exerciseSlug: string;
+  exerciseName?: string;
+  targetReps?: string;
+  targetDurationSec?: number;
+  weight?: number | null;
+  notes?: string;
+}
+
+export interface StraightBlock {
+  type: 'straight';
+  rounds: number;
+  steps: TrainingStep[];
+  restAfterRoundSec?: number;
+}
+
+export interface EmomInterval {
+  durationSec: number;
+  steps: TrainingStep[];
+}
+
+export interface EmomBlock {
+  type: 'emom';
+  rounds: number;
+  intervals: EmomInterval[];
+}
+
+export type TrainingBlock = StraightBlock | EmomBlock;
+
 export interface Exercise {
   id?: number;
   slug: Slug;
@@ -40,6 +69,7 @@ export interface Sheet {
   notes?: string;
   difficulty?: string;
   tags?: string[];
+  blocks?: TrainingBlock[];
   is_temporary: boolean;
   // 'bundle' marks an untouched starter program. Cleared the moment the user
   // saves an edit, exactly like the nostr fields, so an edited starter counts
@@ -95,6 +125,8 @@ export interface Session {
   summary_image_url?: string;
   nostr_event_id?: string;
   exercises?: StoredSessionExercise[];
+  blocks?: TrainingBlock[];
+  emom_started_at?: ISODateTime;
 }
 
 export interface SessionSet {
@@ -107,6 +139,11 @@ export interface SessionSet {
   reps: number | null;
   weight_kg?: number | null;
   rpe?: number;
+  duration_sec?: number;
+  block_index?: number;
+  round_index?: number;
+  interval_index?: number;
+  step_index?: number;
   completed_at: ISODateTime;
 }
 

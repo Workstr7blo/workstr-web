@@ -2,7 +2,7 @@ import type { Event } from 'nostr-tools';
 import { SimplePool, verifyEvent } from 'nostr-tools';
 import { canonMuscle } from '../core/muscles';
 import { slugify } from '../core/ids';
-import type { CanonCache, Exercise } from '../core/types';
+import type { CanonCache, Exercise, TrainingBlock, TrainingStep } from '../core/types';
 import { DEFAULT_PUBLIC_RELAYS } from './pool';
 
 // The canon is everything signed by the operator key. The d-tag convention
@@ -33,6 +33,7 @@ export interface RelayProgram {
   difficulty?: string;
   tags: string[];
   exercises: RelayProgramExercise[];
+  blocks?: TrainingBlock[];
   sourceLabel: string;
   muscleMapUrl?: string;
   eventId: string;
@@ -74,6 +75,48 @@ function hasWorkstrIdentity(tags: string[][]): boolean {
   return tagValues(tags, 't').some((value) => value.toLowerCase() === 'workstr') ||
     tagRows(tags, 'client').some((tag) => (tag[1] || '').toLowerCase() === 'workstr') ||
     Boolean(tagValue(tags, 'workstr_meta'));
+}
+
+function parseTrainingBlocks(value: unknown): TrainingBlock[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const blocks: TrainingBlock[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue;
+    const item = raw as Record<string, unknown>;
+    const rounds = Math.max(1, Math.floor(Number(item.rounds) || 1));
+    if (item.type === 'emom' && Array.isArray(item.intervals)) {
+      const intervals = item.intervals.flatMap((candidate) => {
+        if (!candidate || typeof candidate !== 'object') return [];
+        const interval = candidate as Record<string, unknown>;
+        const steps = parseTrainingSteps(interval.steps);
+        const durationSec = Math.max(1, Math.floor(Number(interval.durationSec) || 60));
+        return steps.length ? [{ durationSec, steps }] : [];
+      });
+      if (intervals.length) blocks.push({ type: 'emom', rounds, intervals });
+    } else if (item.type === 'straight') {
+      const steps = parseTrainingSteps(item.steps);
+      if (steps.length) blocks.push({ type: 'straight', rounds, steps, restAfterRoundSec: Number(item.restAfterRoundSec) || undefined });
+    }
+  }
+  return blocks.length ? blocks : undefined;
+}
+
+function parseTrainingSteps(value: unknown): TrainingStep[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== 'object') return [];
+    const item = candidate as Record<string, unknown>;
+    const exerciseSlug = String(item.exerciseSlug || item.slug || '').trim();
+    if (!exerciseSlug) return [];
+    return [{
+      exerciseSlug,
+      exerciseName: item.exerciseName == null && item.name == null ? undefined : String(item.exerciseName || item.name),
+      targetReps: item.targetReps == null && item.reps == null ? undefined : String(item.targetReps || item.reps),
+      targetDurationSec: Number(item.targetDurationSec || item.durationSec) || undefined,
+      weight: item.weight == null || !Number.isFinite(Number(item.weight)) ? undefined : Number(item.weight),
+      notes: item.notes == null ? undefined : String(item.notes)
+    }];
+  });
 }
 
 function imetaUrl(tags: string[][]): string {
@@ -224,6 +267,7 @@ export function programFromEvent(event: Event): RelayProgram | null {
     description: String(meta.description || event.content || ''),
     difficulty,
     tags: programTags,
+    blocks: parseTrainingBlocks(meta.blocks),
     exercises,
     sourceLabel: hasWorkstrIdentity(tags) ? 'Workstr' : 'NIP-101e',
     muscleMapUrl: String(meta.muscleMapUrl || tagValue(tags, 'workstr_muscle_map') || imetaUrl(tags) || ''),

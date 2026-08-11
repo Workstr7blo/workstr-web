@@ -86,4 +86,14 @@ describe('WorkstrStore', () => {
     expect(saved?.finished_at).toBe('2026-07-13T14:02:00.000Z');
     expect(await store.listSessionSets(sessionId)).toMatchObject([{ exercise_slug: 'dumbbell-squat', reps: 8, weight_kg: 6.8 }]);
   });
+
+  it('persists EMOM program blocks and resumable session timing', async () => {
+    const store = await WorkstrStore.open('emom-session-test-pubkey');
+    const blocks = [{ type: 'emom' as const, rounds: 3, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'squat', targetReps: '10', targetDurationSec: 20 }] }] }];
+    const sheetId = await store.saveSheet({ name: 'EMOM', blocks, exercises: [] });
+    expect((await store.listSheets()).find((sheet) => sheet.id === sheetId)?.blocks).toEqual(blocks);
+    const sessionId = await store.createSession({ sheet_name: 'EMOM', started_at: '2026-01-01T00:00:00Z', blocks, exercises: [] });
+    await store.startSessionEmom(sessionId, '2026-01-01T00:01:00Z');
+    expect((await store.listSessions()).find((session) => session.id === sessionId)).toMatchObject({ blocks, emom_started_at: '2026-01-01T00:01:00Z' });
+  });
 });

@@ -4,6 +4,8 @@ import { html, programMuscleLabel } from './format';
 import { inferProgramMuscle, programExerciseName, resolveProgramExercise } from '../features/sheets/views';
 import { fetchCanonPrograms, type RelayProgram } from '../nostr/canon';
 import { publishWorkoutSummary } from '../nostr/share';
+import type { EmomBlock } from '../core/types';
+import { compileEmomSchedule, emomPosition, type EmomPosition, type EmomSlot } from '../features/train/emom';
 import type { ActiveSession, AppState, SessionExercise, SessionSetLog } from './state';
 import type { Signer } from '../signer/types';
 
@@ -47,6 +49,8 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   let sessionRestEndsAt = 0;
   let sessionRestAutoAdvance = false;
   let sessionElapsedTimer = 0;
+  let emomTimer = 0;
+  let emomRenderKey = '';
   let sessionWakeLock: WakeLockSentinel | null = null;
   const sessionPreviousSets = new Map<string, SessionSetLog[]>();
 
@@ -129,8 +133,9 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   async function startTrainingSession(program: RelayProgram): Promise<void> {
     const exercises = programSessionExercises(program);
     const startedAt = new Date().toISOString();
-    const sessionId = state.store ? await state.store.createSession({ sheet_name: program.name || 'Freestyle', started_at: startedAt, summary_image_url: program.muscleMapUrl || '', exercises }) : Date.now();
-    state.activeSession = { id: sessionId, sheetName: program.name || 'Freestyle', startedAt, summaryImageUrl: program.muscleMapUrl || '', exercises, sets: [] };
+    const blocks = program.blocks?.length ? program.blocks : undefined;
+    const sessionId = state.store ? await state.store.createSession({ sheet_name: program.name || 'Freestyle', started_at: startedAt, summary_image_url: program.muscleMapUrl || '', exercises, blocks }) : Date.now();
+    state.activeSession = { id: sessionId, sheetName: program.name || 'Freestyle', startedAt, summaryImageUrl: program.muscleMapUrl || '', exercises, blocks, sets: [] };
     sessionExerciseIndex = 0;
     sessionSetCounts = setCountsFromSession(state.activeSession);
     await openSessionOverlay(state.activeSession);
@@ -152,6 +157,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (document.visibilityState !== 'visible') return;
     if (state.activeSession && root.querySelector('#session-overlay')?.classList.contains('open')) void requestSessionWakeLock();
     if (sessionRestEndsAt) reconcileSessionRest();
+    if (activeEmomBlock()) reconcileEmom();
   });
 
   async function openSessionOverlay(session: ActiveSession): Promise<void> {
@@ -161,7 +167,145 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     updateSessionElapsed(session);
     sessionElapsedTimer = window.setInterval(() => { if (state.activeSession) updateSessionElapsed(state.activeSession); }, 1000);
     if (!Object.keys(sessionSetCounts).length) sessionSetCounts = setCountsFromSession(session);
-    await renderSessionExercise(session);
+    window.clearInterval(emomTimer);
+    emomRenderKey = '';
+    if (activeEmomBlock()) {
+      reconcileEmom();
+      emomTimer = window.setInterval(reconcileEmom, 1000);
+    } else {
+      await renderSessionExercise(session);
+    }
+  }
+
+  function activeEmomBlock(): EmomBlock | null {
+    const block = state.activeSession?.blocks?.find((candidate) => candidate.type === 'emom');
+    return block?.type === 'emom' ? block : null;
+  }
+
+  function reconcileEmom(): void {
+    const session = state.activeSession;
+    const block = activeEmomBlock();
+    if (!session || !block) return;
+    const schedule = compileEmomSchedule(block);
+    const startedAt = session.emomStartedAt ? new Date(session.emomStartedAt).getTime() : null;
+    const position = emomPosition(schedule, startedAt);
+    const countdown = root.querySelector('#emom-countdown');
+    if (countdown) countdown.textContent = String(position.secondsRemaining);
+    const progress = root.querySelector<HTMLElement>('#session-progress-fill');
+    if (progress) {
+      const completed = position.phase === 'complete' ? schedule.length : position.slot?.index || 0;
+      progress.style.width = schedule.length ? `${Math.round((completed / schedule.length) * 100)}%` : '0%';
+    }
+    const key = `${position.phase}:${position.slot?.index ?? -1}:${position.activeStepIndex ?? -1}`;
+    if (key === emomRenderKey) return;
+    emomRenderKey = key;
+    renderEmomSession(block, schedule, position);
+  }
+
+  function renderEmomSession(block: EmomBlock, schedule: EmomSlot[], position: EmomPosition): void {
+    const session = state.activeSession;
+    const title = root.querySelector('#session-title');
+    const meta = root.querySelector('#session-meta');
+    const nav = root.querySelector('#session-ex-nav');
+    const body = root.querySelector('#session-body');
+    const footer = root.querySelector('#session-footer');
+    if (!session || !title || !meta || !nav || !body || !footer) return;
+    title.textContent = session.sheetName || 'EMOM';
+    nav.innerHTML = '';
+    if (position.phase === 'pending') {
+      meta.textContent = `EMOM · ${block.rounds} round${block.rounds === 1 ? '' : 's'} · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}`;
+      body.innerHTML = `<div class="emom-hero"><div class="emom-badge">EMOM</div><div class="emom-countdown" id="emom-countdown">${position.secondsRemaining}</div><div class="emom-caption">seconds per first interval</div><p>The clock starts when you are ready. Actual reps are logged separately from each timed target.</p></div>`;
+      footer.innerHTML = '<button class="session-finish-btn" id="emom-start" type="button">Start EMOM</button>';
+      root.querySelector('#emom-start')?.addEventListener('click', () => { void startEmom(); });
+      bindSessionControls();
+      return;
+    }
+    if (position.phase === 'complete' || !position.slot) {
+      meta.textContent = 'EMOM complete';
+      body.innerHTML = '<div class="emom-hero complete"><div class="emom-badge">Complete</div><div class="session-ex-name">EMOM finished</div><p>Review your logged work, then finish the session when you are ready.</p></div>';
+      footer.innerHTML = '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>';
+      bindSessionControls();
+      return;
+    }
+    const slot = position.slot;
+    meta.textContent = `EMOM · Round ${slot.roundIndex + 1} of ${block.rounds} · Interval ${slot.intervalIndex + 1} of ${block.intervals.length}`;
+    const steps = slot.steps.map((step, stepIndex) => {
+      const exercise = session.exercises.find((candidate) => candidate.exerciseSlug === step.exerciseSlug);
+      const logged = session.sets.find((set) => set.blockIndex === 0 && set.roundIndex === slot.roundIndex && set.intervalIndex === slot.intervalIndex && set.stepIndex === stepIndex);
+      const hasUntimedSteps = slot.steps.some((candidate) => !Number(candidate.targetDurationSec));
+      const active = position.activeStepIndex === stepIndex || (position.activeStepIndex == null && hasUntimedSteps);
+      const target = [step.targetDurationSec ? `${step.targetDurationSec}s` : '', step.targetReps ? `${html(step.targetReps)} reps` : ''].filter(Boolean).join(' · ');
+      return `<div class="emom-step ${active ? 'active' : ''} ${logged ? 'done' : ''}" data-emom-step="${stepIndex}">
+        <div class="emom-step-head"><span>${stepIndex + 1}</span><div><strong>${html(step.exerciseName || exercise?.exerciseName || step.exerciseSlug)}</strong><small>${target || 'Open target'}</small></div></div>
+        <div class="emom-log-row">
+          <input class="session-set-input" data-emom-reps type="number" inputmode="numeric" placeholder="actual reps" ${logged ? `value="${logged.reps ?? ''}" disabled` : ''}>
+          <input class="session-set-input" data-emom-weight type="number" inputmode="decimal" step="0.5" placeholder="${ctx.unitLabel()}" ${logged ? `value="${logged.weight == null ? '' : sessionWeightDisplay(logged.weight)}" disabled` : ''}>
+          <button class="session-log-btn ${logged ? 'done' : ''}" data-log-emom="${stepIndex}" type="button" ${logged ? 'disabled' : ''}>${logged ? 'Done' : 'Log'}</button>
+        </div>
+      </div>`;
+    }).join('');
+    body.innerHTML = `<div class="emom-clock"><div class="emom-badge">EMOM</div><div class="emom-countdown" id="emom-countdown">${position.secondsRemaining}</div><div class="emom-caption">seconds left</div></div><div class="emom-steps">${steps}</div>`;
+    footer.innerHTML = `<div class="emom-next">${slot.index + 1} / ${schedule.length} intervals</div><button class="session-finish-btn" id="finish-session" type="button">Finish early</button>`;
+    root.querySelectorAll<HTMLButtonElement>('[data-log-emom]').forEach((button) => button.addEventListener('click', () => { void logEmomStep(slot, Number(button.dataset.logEmom), button); }));
+    bindSessionControls();
+  }
+
+  async function startEmom(): Promise<void> {
+    if (!state.activeSession || !activeEmomBlock()) return;
+    const startedAt = new Date().toISOString();
+    state.activeSession.emomStartedAt = startedAt;
+    if (state.store) await state.store.startSessionEmom(state.activeSession.id, startedAt);
+    emomRenderKey = '';
+    reconcileEmom();
+  }
+
+  async function logEmomStep(slot: EmomSlot, stepIndex: number, button: HTMLButtonElement): Promise<void> {
+    const session = state.activeSession;
+    const step = slot.steps[stepIndex];
+    const host = button.closest<HTMLElement>('[data-emom-step]');
+    if (!session || !step || !host) return;
+    const repsRaw = host.querySelector<HTMLInputElement>('[data-emom-reps]')?.value || '';
+    const weightRaw = host.querySelector<HTMLInputElement>('[data-emom-weight]')?.value || '';
+    if (!repsRaw && !weightRaw && !step.targetDurationSec) {
+      host.querySelector<HTMLInputElement>('[data-emom-reps]')?.focus();
+      return;
+    }
+    const exercise = session.exercises.find((candidate) => candidate.exerciseSlug === step.exerciseSlug);
+    const reps = repsRaw ? Number(repsRaw) : null;
+    const weight = weightRaw ? storeWeightInput(weightRaw, normalizeWeightUnit(state.settings.unit)) : null;
+    const completedAt = new Date().toISOString();
+    const setNumber = session.sets.filter((set) => set.exerciseSlug === step.exerciseSlug).length + 1;
+    const loggedSet: SessionSetLog = {
+      exerciseSlug: step.exerciseSlug,
+      exerciseName: step.exerciseName || exercise?.exerciseName,
+      setNumber,
+      reps,
+      weight,
+      durationSec: step.targetDurationSec,
+      blockIndex: 0,
+      roundIndex: slot.roundIndex,
+      intervalIndex: slot.intervalIndex,
+      stepIndex,
+      done: true,
+      completedAt
+    };
+    if (state.store) await state.store.addSessionSet({
+      session_id: session.id,
+      exercise_slug: step.exerciseSlug,
+      exercise_name: loggedSet.exerciseName || step.exerciseSlug,
+      set_number: setNumber,
+      reps,
+      weight_kg: weight,
+      duration_sec: step.targetDurationSec,
+      block_index: 0,
+      round_index: slot.roundIndex,
+      interval_index: slot.intervalIndex,
+      step_index: stepIndex,
+      completed_at: completedAt
+    });
+    session.sets.push(loggedSet);
+    emomRenderKey = '';
+    reconcileEmom();
   }
 
   function updateSessionElapsed(session: ActiveSession): void {
@@ -462,6 +606,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   function closeSessionOverlay(clear = true): void {
     window.clearInterval(sessionRestTimer);
     window.clearInterval(sessionElapsedTimer);
+    window.clearInterval(emomTimer);
     releaseSessionWakeLock();
     root.querySelector('#session-rest-overlay')?.classList.remove('show');
     root.querySelector('#session-overlay')?.classList.remove('open');

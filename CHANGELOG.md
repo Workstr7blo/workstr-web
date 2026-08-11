@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **EMOM program blocks.** Programs can define rounds of one or more timed intervals,
+  including several duration-based exercises inside the same interval. The live runner
+  reconciles from wall-clock time, restores unfinished EMOM sessions, and logs actual
+  reps independently from prescribed work duration for training statistics.
+
 ## [1.0.0] - 2026-08-11
 
 ### Added

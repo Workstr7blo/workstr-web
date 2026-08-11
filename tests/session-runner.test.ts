@@ -31,6 +31,7 @@ function fakeStore(): { store: WorkstrStore; sets: unknown[]; finished: number[]
   const store = {
     createSession: async () => 1,
     addSessionSet: async (set: unknown) => { sets.push(set); return sets.length; },
+    startSessionEmom: async () => {},
     finishSession: async (id: number) => { finished.push(id); }
   } as unknown as WorkstrStore;
   return { store, sets, finished };
@@ -61,6 +62,18 @@ function oneExerciseProgram(): RelayProgram {
     slug: 'test', name: 'Test Program', description: '', tags: [], sourceLabel: '',
     eventId: '', pubkey: '', address: '', createdAt: Date.now(),
     exercises: [{ address: '', name: 'Bench Press', sets: 2, reps: '8', restSec: 60 }]
+  };
+}
+
+function emomProgram(): RelayProgram {
+  return {
+    ...oneExerciseProgram(),
+    name: 'Minute Work',
+    blocks: [{
+      type: 'emom', rounds: 2, intervals: [{ durationSec: 60, steps: [
+        { exerciseSlug: 'bench-press', exerciseName: 'Bench Press', targetDurationSec: 20, targetReps: '8' }
+      ] }]
+    }]
   };
 }
 
@@ -109,6 +122,21 @@ describe('session runner', () => {
     expect(root.querySelector('#modal')?.classList.contains('open')).toBe(true);
     expect(root.querySelector('#modal-content')?.textContent).toContain('recap');
     expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(false);
+  });
+
+  it('starts an EMOM clock and logs actual reps without opening normal rest', async () => {
+    await runner.startTrainingSession(emomProgram());
+    expect(root.querySelector('#emom-start')).toBeTruthy();
+    (root.querySelector('#emom-start') as HTMLButtonElement).click();
+    await tick();
+    expect(root.querySelector('#emom-countdown')?.textContent).toBe('60');
+    const step = root.querySelector<HTMLElement>('[data-emom-step="0"]')!;
+    (step.querySelector('[data-emom-reps]') as HTMLInputElement).value = '9';
+    (step.querySelector('[data-log-emom]') as HTMLButtonElement).click();
+    await tick();
+    expect(sets).toHaveLength(1);
+    expect(sets[0]).toMatchObject({ reps: 9, duration_sec: 20, round_index: 0, interval_index: 0, step_index: 0 });
+    expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(false);
   });
 });
 

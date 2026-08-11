@@ -1,5 +1,5 @@
 import { canonMuscle } from '../../core/muscles';
-import type { Exercise } from '../../core/types';
+import type { EmomBlock, Exercise } from '../../core/types';
 import { displayWeightKg, normalizeWeightUnit } from '../../core/units';
 import type { SheetWithExercises } from '../../db/store';
 import type { RelayProgram } from '../../nostr/canon';
@@ -8,11 +8,39 @@ import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 
-export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string }
+export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; intervalIndex: number; durationSec: number }
 
-export interface BuilderState { sheetId?: number; name: string; desc: string; difficulty: string; tags: string[]; rows: BuilderRow[]; library: Exercise[] }
+export interface BuilderState { sheetId?: number; name: string; desc: string; difficulty: string; tags: string[]; mode: 'normal' | 'emom'; emomRounds: number; emomIntervalSec: number; rows: BuilderRow[]; library: Exercise[] }
 
-export function estimateProgramMin(exercises: RelayProgram['exercises']): number {
+export function emomBlockFromBuilder(rows: BuilderRow[], rounds: number, intervalSec: number): EmomBlock {
+  const byInterval = new Map<number, BuilderRow[]>();
+  for (const row of rows) {
+    const index = Math.max(0, Math.floor(Number(row.intervalIndex) || 0));
+    byInterval.set(index, [...(byInterval.get(index) || []), row]);
+  }
+  const lastIndex = Math.max(0, ...byInterval.keys());
+  return {
+    type: 'emom',
+    rounds: Math.max(1, Math.floor(Number(rounds) || 1)),
+    intervals: Array.from({ length: lastIndex + 1 }, (_, index) => ({
+      durationSec: Math.max(1, Math.floor(Number(intervalSec) || 60)),
+      steps: (byInterval.get(index) || []).map((row) => ({
+        exerciseSlug: row.exerciseSlug,
+        exerciseName: row.exerciseName,
+        targetReps: row.reps || undefined,
+        targetDurationSec: Number(row.durationSec) || undefined,
+        weight: row.weight,
+        notes: row.notes || undefined
+      }))
+    })).filter((interval) => interval.steps.length)
+  };
+}
+
+export function estimateProgramMin(exercises: RelayProgram['exercises'], blocks?: RelayProgram['blocks']): number {
+  const emomSeconds = (blocks || []).reduce((total, block) => block.type === 'emom'
+    ? total + block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0)
+    : total, 0);
+  if (emomSeconds) return Math.max(1, Math.ceil(emomSeconds / 60));
   return exercises.reduce((total, exercise) => {
     const sets = Number(exercise.sets) || 3;
     const rest = Number(exercise.restSec || exercise.rest) || 90;
@@ -112,6 +140,7 @@ export function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
     description: sheet.notes || '',
     difficulty: sheet.difficulty || '',
     tags: sheet.tags || [],
+    blocks: sheet.blocks,
     sourceLabel: sheet.nostr_address ? 'in library' : 'local',
     eventId: sheet.nostr_event_id || '',
     pubkey: '',
@@ -133,10 +162,11 @@ export function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
 
 export function programCard(program: RelayProgram, state: AppState): string {
   const exerciseCount = program.exercises.length;
-  const time = formatMinutes(estimateProgramMin(program.exercises));
+  const time = formatMinutes(estimateProgramMin(program.exercises, program.blocks));
+  const emom = program.blocks?.find((block) => block.type === 'emom');
   const groups = programGroups(program, state.exercises);
   const map = programMuscleMap(program, state.exercises);
-  const meta = [`${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
+  const meta = [emom ? `EMOM · ${emom.rounds} rounds` : `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
   const tagPills = (program.tags || []).length ? `<div class="program-tags">${program.tags.map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('')}</div>` : '';
   const isExpanded = state.expandedProgramAddress === program.address;
   const statusCls = isLocalProgram(program) ? 'local' : 'published';

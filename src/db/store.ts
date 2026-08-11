@@ -1,7 +1,7 @@
 import type { IDBPDatabase } from 'idb';
 import { openWorkstrDB, type WorkstrDB } from './schema';
 import { exportDatabase, importDatabase, type WorkstrExport } from './export';
-import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, WorkstrSettings } from '../core/types';
+import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, TrainingBlock, WorkstrSettings } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
 
@@ -15,6 +15,7 @@ export interface SheetDraft {
   notes?: string;
   difficulty?: string;
   tags?: string[];
+  blocks?: TrainingBlock[];
   is_temporary?: boolean;
   source_type?: 'bundle';
   nostr_pubkey?: string;
@@ -143,6 +144,7 @@ export class WorkstrStore {
       notes: draft.notes || '',
       difficulty: draft.difficulty ?? existing?.difficulty ?? '',
       tags: cleanTags(draft.tags ?? existing?.tags),
+      blocks: draft.blocks,
       is_temporary: draft.is_temporary ?? existing?.is_temporary ?? false,
       // Import = snapshot: the nostr identity comes only from the draft, so a
       // builder save (which carries none) forks an imported sheet and canon
@@ -183,6 +185,12 @@ export class WorkstrStore {
     const session = await this.db.get('sessions', id);
     if (!session) return;
     await this.db.put('sessions', { ...session, finished_at: finishedAt });
+  }
+
+  async startSessionEmom(id: number, startedAt: string): Promise<void> {
+    const session = await this.db.get('sessions', id);
+    if (!session) return;
+    await this.db.put('sessions', { ...session, emom_started_at: startedAt });
   }
 
   async markSessionPublished(id: number, eventId: string): Promise<void> {

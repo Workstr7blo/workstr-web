@@ -23,7 +23,7 @@ import { paintBodyMapSvg } from './bodymap';
 import { discoverImportable, discoverImportState } from '../features/discover/views';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
 import { getQuickWorkout } from '../features/recovery/quickWorkout';
-import { sheetToProgram, type BuilderState } from '../features/sheets/views';
+import { emomBlockFromBuilder, sheetToProgram, type BuilderState } from '../features/sheets/views';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
@@ -310,14 +310,35 @@ export function renderShell(root: HTMLElement): void {
     if (!state.store) { toast('Sign in to create programs.', 'bad'); return; }
     // Programs are built from the user's library only, never the relay catalog.
     const library = await state.store.listExercises();
+    const emom = sheet?.blocks?.find((block) => block.type === 'emom');
+    const emomRows = emom?.intervals.flatMap((interval, intervalIndex) => interval.steps.map((step) => {
+      const row = sheet?.exercises.find((candidate) => candidate.exercise_slug === step.exerciseSlug);
+      const exercise = library.find((candidate) => candidate.slug === step.exerciseSlug);
+      return {
+        exerciseSlug: step.exerciseSlug,
+        exerciseName: step.exerciseName || row?.exercise_name || exercise?.name || step.exerciseSlug,
+        muscleGroup: row?.muscle_group || exercise?.muscle_group,
+        imageUrl: row?.image_url || exercise?.image_url,
+        sets: emom.rounds,
+        reps: step.targetReps || String(row?.reps ?? ''),
+        restSec: interval.durationSec,
+        weight: step.weight ?? row?.weight ?? null,
+        notes: step.notes || row?.notes || '',
+        intervalIndex,
+        durationSec: Number(step.targetDurationSec) || 0
+      };
+    })) || [];
     builder = {
       sheetId: sheet?.id,
       name: sheet?.name || '',
       desc: sheet?.notes || '',
       difficulty: sheet?.difficulty || '',
       tags: sheet?.tags || [],
+      mode: emom ? 'emom' : 'normal',
+      emomRounds: emom?.rounds || 10,
+      emomIntervalSec: emom?.intervals[0]?.durationSec || 60,
       library,
-      rows: sheet
+      rows: emomRows.length ? emomRows : sheet
         ? sheet.exercises.map((row) => ({
             exerciseSlug: row.exercise_slug || '',
             exerciseName: row.exercise_name || row.exercise_slug || 'Exercise',
@@ -327,7 +348,9 @@ export function renderShell(root: HTMLElement): void {
             reps: String(row.reps ?? '8-12'),
             restSec: Number(row.rest) || 90,
             weight: row.weight ?? null,
-            notes: row.notes || ''
+            notes: row.notes || '',
+            intervalIndex: 0,
+            durationSec: 0
           }))
         : []
     };
@@ -345,6 +368,9 @@ export function renderShell(root: HTMLElement): void {
         <label class="span-2">Description<input id="sheet-desc" value="${html(current.desc)}" placeholder="optional" /></label>
         <label>Difficulty<select id="sheet-difficulty">${difficultyOptions}</select></label>
         <label>Tags (comma)<input id="sheet-tags" value="${html(current.tags.join(', '))}" placeholder="strength, hypertrophy" /></label>
+        <label>Training mode<select id="sheet-mode"><option value="normal" ${current.mode === 'normal' ? 'selected' : ''}>Normal sets</option><option value="emom" ${current.mode === 'emom' ? 'selected' : ''}>EMOM</option></select></label>
+        <label class="emom-builder-setting" ${current.mode === 'emom' ? '' : 'hidden'}>Rounds<input id="sheet-emom-rounds" type="number" min="1" max="99" value="${current.emomRounds}" /></label>
+        <label class="emom-builder-setting" ${current.mode === 'emom' ? '' : 'hidden'}>Interval seconds<input id="sheet-emom-interval" type="number" min="10" max="600" step="5" value="${current.emomIntervalSec}" /></label>
       </div>
       <div class="subsection-head"><span>Add from your library</span></div>
       <div class="builder-search-wrap">
@@ -359,6 +385,12 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#sheet-desc')?.addEventListener('input', (event) => { current.desc = (event.target as HTMLInputElement).value; });
     root.querySelector('#sheet-difficulty')?.addEventListener('change', (event) => { current.difficulty = (event.target as HTMLSelectElement).value; });
     root.querySelector('#sheet-tags')?.addEventListener('input', (event) => { current.tags = tagsFromCsv((event.target as HTMLInputElement).value); });
+    root.querySelector('#sheet-mode')?.addEventListener('change', (event) => {
+      current.mode = (event.target as HTMLSelectElement).value === 'emom' ? 'emom' : 'normal';
+      renderBuilderModal();
+    });
+    root.querySelector('#sheet-emom-rounds')?.addEventListener('input', (event) => { current.emomRounds = Number((event.target as HTMLInputElement).value) || 1; });
+    root.querySelector('#sheet-emom-interval')?.addEventListener('input', (event) => { current.emomIntervalSec = Number((event.target as HTMLInputElement).value) || 60; });
     const search = root.querySelector<HTMLInputElement>('#builder-search');
     const picker = root.querySelector<HTMLElement>('#builder-picker');
     const sorted = [...current.library].sort((a, b) => Number(b.favourite) - Number(a.favourite) || a.name.localeCompare(b.name));
@@ -404,7 +436,9 @@ export function renderShell(root: HTMLElement): void {
           reps: String(exercise.default_reps || '8-12'),
           restSec: Number(exercise.default_rest) || 90,
           weight: null,
-          notes: ''
+          notes: '',
+          intervalIndex: current.mode === 'emom' ? Math.max(0, ...current.rows.map((row) => row.intervalIndex), 0) : 0,
+          durationSec: 0
         });
       }
       renderBuilderRows();
@@ -419,6 +453,8 @@ export function renderShell(root: HTMLElement): void {
       if (!entry || !field) return;
       if (field === 'sets') entry.sets = Number(target.value) || 0;
       else if (field === 'restSec') entry.restSec = Number(target.value) || 0;
+      else if (field === 'intervalIndex') entry.intervalIndex = Math.max(0, (Number(target.value) || 1) - 1);
+      else if (field === 'durationSec') entry.durationSec = Math.max(0, Number(target.value) || 0);
       else if (field === 'weight') entry.weight = storeWeightInput(target.value, normalizeWeightUnit(state.settings.unit));
       else if (field === 'reps') entry.reps = target.value;
     });
@@ -438,24 +474,30 @@ export function renderShell(root: HTMLElement): void {
       if (!state.store || !builder) return;
       const name = builder.name.trim();
       if (!name) { toast('name is required', 'bad'); return; }
+      const blocks = builder.mode === 'emom' ? [emomBlockFromBuilder(builder.rows, builder.emomRounds, builder.emomIntervalSec)] : undefined;
+      if (builder.mode === 'emom') {
+        const invalid = blocks?.[0].type === 'emom' && blocks[0].intervals.some((interval) => interval.steps.reduce((sum, step) => sum + (Number(step.targetDurationSec) || 0), 0) > interval.durationSec);
+        if (invalid) { toast('Timed steps cannot exceed the interval length', 'bad'); return; }
+      }
       await state.store.saveSheet({
         name,
         notes: builder.desc.trim(),
         difficulty: builder.difficulty,
         tags: builder.tags,
+        blocks,
         exercises: builder.rows.map((row, index) => ({
           exercise_slug: row.exerciseSlug,
           exercise_name: row.exerciseName,
           muscle_group: row.muscleGroup,
           image_url: row.imageUrl,
-          sets: row.sets,
+          sets: current.mode === 'emom' ? current.emomRounds : row.sets,
           reps: row.reps,
           rest: row.restSec,
           weight: row.weight,
           notes: row.notes,
           position: index
         }))
-      }, builder.sheetId);
+      }, current.sheetId);
       builder = null;
       state.sheets = await state.store.listSheets();
       closeModal();
@@ -484,10 +526,13 @@ export function renderShell(root: HTMLElement): void {
         <div class="wex-info">
           <div class="wex-name">${html(row.exerciseName)}${row.muscleGroup ? `<span class="wex-muscle">${html(row.muscleGroup)}</span>` : ''}</div>
           <div class="wex-params">
-            <div class="wex-param-group"><div class="wex-param-label">Sets</div><input class="wex-param-input" type="number" min="1" max="20" data-f="sets" value="${row.sets}"></div>
+            ${current.mode === 'emom'
+              ? `<div class="wex-param-group"><div class="wex-param-label">Interval</div><input class="wex-param-input" type="number" min="1" max="99" data-f="intervalIndex" value="${row.intervalIndex + 1}"></div>
+                <div class="wex-param-group"><div class="wex-param-label">Work sec</div><input class="wex-param-input" type="number" min="0" max="600" data-f="durationSec" placeholder="optional" value="${row.durationSec || ''}"></div>`
+              : `<div class="wex-param-group"><div class="wex-param-label">Sets</div><input class="wex-param-input" type="number" min="1" max="20" data-f="sets" value="${row.sets}"></div>`}
             <div class="wex-param-group"><div class="wex-param-label">Reps</div><input class="wex-param-input reps" data-f="reps" value="${html(row.reps)}"></div>
             <div class="wex-param-group"><div class="wex-param-label">${unit}</div><input class="wex-param-input" type="number" min="0" step="0.5" data-f="weight" placeholder="—" value="${row.weight != null ? displayWeightKg(row.weight, unit) : ''}"></div>
-            <div class="wex-param-group"><div class="wex-param-label">Rest</div><input class="wex-param-input" type="number" min="0" step="5" data-f="restSec" value="${row.restSec}"></div>
+            ${current.mode === 'normal' ? `<div class="wex-param-group"><div class="wex-param-label">Rest</div><input class="wex-param-input" type="number" min="0" step="5" data-f="restSec" value="${row.restSec}"></div>` : ''}
           </div>
         </div>
         <button class="wex-remove" type="button" data-rm="${index}" title="Remove">✕</button>
@@ -710,12 +755,19 @@ export function renderShell(root: HTMLElement): void {
       nostrEventId: session.nostr_event_id,
       summaryImageUrl: session.summary_image_url,
       exercises,
+      blocks: session.blocks,
+      emomStartedAt: session.emom_started_at,
       sets: sets.map((set) => ({
         exerciseSlug: set.exercise_slug || String(set.exercise_id || ''),
         exerciseName: set.exercise_name,
         setNumber: Number(set.set_number),
         reps: set.reps ?? null,
         weight: set.weight_kg ?? null,
+        durationSec: set.duration_sec,
+        blockIndex: set.block_index,
+        roundIndex: set.round_index,
+        intervalIndex: set.interval_index,
+        stepIndex: set.step_index,
         done: true,
         completedAt: set.completed_at
       }))

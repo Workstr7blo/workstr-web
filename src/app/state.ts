@@ -1,5 +1,5 @@
 import type { WorkstrStore, SheetWithExercises } from '../db/store';
-import type { BodyWeightEntry, Exercise, WorkstrSettings } from '../core/types';
+import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings } from '../core/types';
 import type { RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import type { SupportState } from '../features/support/views';
@@ -26,6 +26,11 @@ export interface SessionSetLog {
   setNumber: number;
   reps: number | null;
   weight: number | null;
+  durationSec?: number;
+  blockIndex?: number;
+  roundIndex?: number;
+  intervalIndex?: number;
+  stepIndex?: number;
   done: boolean;
   completedAt: string;
 }
@@ -38,6 +43,8 @@ export interface ActiveSession {
   nostrEventId?: string;
   summaryImageUrl?: string;
   exercises: SessionExercise[];
+  blocks?: TrainingBlock[];
+  emomStartedAt?: string;
   sets: SessionSetLog[];
 }
 
