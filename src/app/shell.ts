@@ -371,19 +371,12 @@ export function renderShell(root: HTMLElement): void {
         <label>Tags (comma)<input id="sheet-tags" value="${html(current.tags.join(', '))}" placeholder="strength, hypertrophy" /></label>
         <label>Training mode<select id="sheet-mode"><option value="normal" ${current.mode === 'normal' ? 'selected' : ''}>Normal sets</option><option value="emom" ${current.mode === 'emom' ? 'selected' : ''}>EMOM</option></select></label>
       </div>
-      ${current.mode === 'emom' ? `<div class="subsection-head"><span>EMOM sections</span><button class="button small" id="add-emom-section" type="button">Add EMOM section</button></div>
-        <div class="emom-section-list">${current.emomSections.map((section, index) => `<div class="emom-section-card" data-section="${index}">
-          <strong>Section ${index + 1}</strong>
-          <label>Rounds / minutes<input data-section-field="rounds" type="number" min="1" max="999" value="${section.rounds}"></label>
-          <label>Interval seconds<input data-section-field="intervalSec" type="number" min="10" max="600" step="5" value="${section.intervalSec}"></label>
-          <div class="emom-section-actions"><button type="button" data-move-section="${index}" data-dir="-1" title="Move section up">↑</button><button type="button" data-move-section="${index}" data-dir="1" title="Move section down">↓</button><button type="button" data-remove-section="${index}" ${current.emomSections.length === 1 ? 'disabled' : ''}>Remove</button></div>
-        </div>`).join('')}</div>` : ''}
-      <div class="subsection-head"><span>Add from your library</span></div>
-      <div class="builder-search-wrap">
-        <input id="builder-search" class="builder-search" placeholder="Filter your library..." autocomplete="off" />
-      </div>
-      <div id="builder-picker" class="builder-picker"></div>
-      <div class="subsection-head"><span>Program exercises</span></div>
+      ${current.mode === 'emom'
+        ? `<div class="subsection-head"><span>EMOM sections</span><button class="button small" id="add-emom-section" type="button">Add EMOM section</button></div>`
+        : `<div class="subsection-head"><span>Add from your library</span></div>
+          <div class="builder-search-wrap"><input id="builder-search" class="builder-search" placeholder="Filter your library..." autocomplete="off" /></div>
+          <div id="builder-picker" class="builder-picker"></div>
+          <div class="subsection-head"><span>Program exercises</span></div>`}
       <div id="builder-rows" class="builder-rows"></div>
       <div class="form-actions"><button class="button primary" id="sheet-save" type="button">${current.sheetId ? 'Save program' : 'Create program'}</button></div>`);
     renderBuilderRows();
@@ -396,32 +389,6 @@ export function renderShell(root: HTMLElement): void {
       renderBuilderModal();
     });
     root.querySelector('#add-emom-section')?.addEventListener('click', () => { current.emomSections.push({ rounds: 10, intervalSec: 60 }); renderBuilderModal(); });
-    const sectionsHost = root.querySelector<HTMLElement>('.emom-section-list');
-    sectionsHost?.addEventListener('input', (event) => {
-      const target = event.target as HTMLInputElement;
-      const host = target.closest<HTMLElement>('[data-section]');
-      const section = host ? current.emomSections[Number(host.dataset.section)] : undefined;
-      if (!section) return;
-      if (target.dataset.sectionField === 'rounds') section.rounds = Math.max(1, Number(target.value) || 1);
-      if (target.dataset.sectionField === 'intervalSec') section.intervalSec = Math.max(1, Number(target.value) || 60);
-    });
-    sectionsHost?.addEventListener('click', (event) => {
-      const target = (event.target as Element).closest<HTMLButtonElement>('button');
-      if (!target) return;
-      if (target.dataset.removeSection != null) {
-        const removed = Number(target.dataset.removeSection);
-        current.emomSections.splice(removed, 1);
-        current.rows = current.rows.filter((row) => row.sectionIndex !== removed).map((row) => ({ ...row, sectionIndex: row.sectionIndex > removed ? row.sectionIndex - 1 : row.sectionIndex }));
-        renderBuilderModal();
-      } else if (target.dataset.moveSection != null) {
-        const from = Number(target.dataset.moveSection);
-        const to = from + Number(target.dataset.dir);
-        if (to < 0 || to >= current.emomSections.length) return;
-        [current.emomSections[from], current.emomSections[to]] = [current.emomSections[to], current.emomSections[from]];
-        current.rows.forEach((row) => { if (row.sectionIndex === from) row.sectionIndex = to; else if (row.sectionIndex === to) row.sectionIndex = from; });
-        renderBuilderModal();
-      }
-    });
     const search = root.querySelector<HTMLInputElement>('#builder-search');
     const picker = root.querySelector<HTMLElement>('#builder-picker');
     const sorted = [...current.library].sort((a, b) => Number(b.favourite) - Number(a.favourite) || a.name.localeCompare(b.name));
@@ -479,6 +446,10 @@ export function renderShell(root: HTMLElement): void {
     const rowsHost = root.querySelector<HTMLElement>('#builder-rows');
     rowsHost?.addEventListener('input', (event) => {
       const target = event.target as HTMLInputElement;
+      const sectionHost = target.closest<HTMLElement>('[data-section]');
+      const section = sectionHost ? current.emomSections[Number(sectionHost.dataset.section)] : undefined;
+      if (section && target.dataset.sectionField === 'rounds') { section.rounds = Math.max(1, Number(target.value) || 1); return; }
+      if (section && target.dataset.sectionField === 'intervalSec') { section.intervalSec = Math.max(1, Number(target.value) || 60); return; }
       const row = target.closest<HTMLElement>('[data-i]');
       const entry = row ? current.rows[Number(row.dataset.i)] : undefined;
       const field = target.dataset.f;
@@ -490,13 +461,41 @@ export function renderShell(root: HTMLElement): void {
       else if (field === 'weight') entry.weight = storeWeightInput(target.value, normalizeWeightUnit(state.settings.unit));
       else if (field === 'reps') entry.reps = target.value;
     });
+    rowsHost?.addEventListener('change', (event) => {
+      const target = event.target as HTMLSelectElement;
+      if (target.dataset.addExercise == null || !target.value) return;
+      const sectionIndex = Number(target.dataset.addExercise);
+      const exercise = current.library.find((entry) => entry.slug === target.value);
+      if (!exercise) return;
+      current.rows.push({
+        exerciseSlug: exercise.slug, exerciseName: exercise.name, muscleGroup: exercise.muscle_group, imageUrl: exercise.image_url,
+        sets: Number(exercise.default_sets) || 3, reps: String(exercise.default_reps || '8-12'), restSec: Number(exercise.default_rest) || 90,
+        weight: null, notes: '', sectionIndex,
+        intervalIndex: Math.max(0, ...current.rows.filter((row) => row.sectionIndex === sectionIndex).map((row) => row.intervalIndex), 0), durationSec: 0
+      });
+      renderBuilderRows();
+    });
     rowsHost?.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
       if (target.dataset.rm != null) { current.rows.splice(Number(target.dataset.rm), 1); renderBuilderRows(); renderPicker(); return; }
-      if (target.dataset.move != null) {
+      if (target.dataset.removeSection != null) {
+        const removed = Number(target.dataset.removeSection);
+        current.emomSections.splice(removed, 1);
+        current.rows = current.rows.filter((row) => row.sectionIndex !== removed).map((row) => ({ ...row, sectionIndex: row.sectionIndex > removed ? row.sectionIndex - 1 : row.sectionIndex }));
+        renderBuilderRows();
+      } else if (target.dataset.moveSection != null) {
+        const from = Number(target.dataset.moveSection);
+        const to = from + Number(target.dataset.dir);
+        if (to < 0 || to >= current.emomSections.length) return;
+        [current.emomSections[from], current.emomSections[to]] = [current.emomSections[to], current.emomSections[from]];
+        current.rows.forEach((row) => { if (row.sectionIndex === from) row.sectionIndex = to; else if (row.sectionIndex === to) row.sectionIndex = from; });
+        renderBuilderRows();
+      } else if (target.dataset.move != null) {
         const index = Number(target.dataset.move);
-        const next = index + Number(target.dataset.dir);
-        if (next >= 0 && next < current.rows.length) {
+        const sectionRows = current.rows.map((row, rowIndex) => ({ row, rowIndex })).filter(({ row }) => row.sectionIndex === current.rows[index]?.sectionIndex);
+        const position = sectionRows.findIndex(({ rowIndex }) => rowIndex === index);
+        const next = sectionRows[position + Number(target.dataset.dir)]?.rowIndex;
+        if (next != null) {
           [current.rows[index], current.rows[next]] = [current.rows[next], current.rows[index]];
           renderBuilderRows();
         }
@@ -544,8 +543,7 @@ export function renderShell(root: HTMLElement): void {
     const current = builder;
     if (!host || !current) return;
     const unit = normalizeWeightUnit(state.settings.unit);
-    if (!current.rows.length) { host.innerHTML = '<div class="empty" style="padding:8px 0">No exercises yet. Search above to add.</div>'; return; }
-    host.innerHTML = current.rows.map((row, index) => {
+    const rowMarkup = (row: BuilderState['rows'][number], index: number): string => {
       const src = row.imageUrl || current.library.find((exercise) => exercise.slug === row.exerciseSlug)?.image_url;
       const img = src
         ? `<img class="wex-img" src="${html(src)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'wex-img placeholder'}))">`
@@ -557,7 +555,7 @@ export function renderShell(root: HTMLElement): void {
         </div>
         ${img}
         <div class="wex-info">
-          <div class="wex-name">${current.mode === 'emom' ? `<span class="wex-muscle">Section ${row.sectionIndex + 1}</span>` : ''}${html(row.exerciseName)}${row.muscleGroup ? `<span class="wex-muscle">${html(row.muscleGroup)}</span>` : ''}</div>
+          <div class="wex-name">${html(row.exerciseName)}${row.muscleGroup ? `<span class="wex-muscle">${html(row.muscleGroup)}</span>` : ''}</div>
           <div class="wex-params">
             ${current.mode === 'emom'
               ? `<div class="wex-param-group"><div class="wex-param-label">Interval</div><input class="wex-param-input" type="number" min="1" max="99" data-f="intervalIndex" value="${row.intervalIndex + 1}"></div>
@@ -570,7 +568,32 @@ export function renderShell(root: HTMLElement): void {
         </div>
         <button class="wex-remove" type="button" data-rm="${index}" title="Remove">✕</button>
       </div>`;
-    }).join('');
+    };
+    if (current.mode === 'normal') {
+      host.innerHTML = current.rows.length ? current.rows.map(rowMarkup).join('') : '<div class="empty" style="padding:8px 0">No exercises yet. Search above to add.</div>';
+      return;
+    }
+    const exerciseOptions = [...current.library]
+      .sort((a, b) => Number(b.favourite) - Number(a.favourite) || a.name.localeCompare(b.name))
+      .map((exercise) => `<option value="${html(exercise.slug)}">${html(exercise.name)}${exercise.muscle_group ? ` · ${html(exercise.muscle_group)}` : ''}</option>`).join('');
+    host.innerHTML = `<div class="emom-section-list">${current.emomSections.map((section, sectionIndex) => {
+      const rows = current.rows.map((row, index) => ({ row, index })).filter(({ row }) => row.sectionIndex === sectionIndex);
+      return `<section class="emom-section-card" data-section="${sectionIndex}">
+        <div class="emom-section-header"><strong>Section ${sectionIndex + 1}</strong><div class="emom-section-actions">
+          <button type="button" data-move-section="${sectionIndex}" data-dir="-1" title="Move section up" ${sectionIndex === 0 ? 'disabled' : ''}>↑</button>
+          <button type="button" data-move-section="${sectionIndex}" data-dir="1" title="Move section down" ${sectionIndex === current.emomSections.length - 1 ? 'disabled' : ''}>↓</button>
+          <button type="button" data-remove-section="${sectionIndex}" ${current.emomSections.length === 1 ? 'disabled' : ''}>Remove</button>
+        </div></div>
+        <div class="emom-section-settings">
+          <label>Rounds / minutes<input data-section-field="rounds" type="number" min="1" max="999" value="${section.rounds}"></label>
+          <label>Interval seconds<input data-section-field="intervalSec" type="number" min="10" max="600" step="5" value="${section.intervalSec}"></label>
+        </div>
+        <div class="emom-section-exercises">
+          <div class="emom-section-exercise-head"><span>Exercises</span><select data-add-exercise="${sectionIndex}"><option value="">Add from library…</option>${exerciseOptions}</select></div>
+          ${rows.length ? rows.map(({ row, index }) => rowMarkup(row, index)).join('') : '<div class="empty emom-section-empty">No exercises in this section yet.</div>'}
+        </div>
+      </section>`;
+    }).join('')}</div>`;
   }
 
   function bindBodyControls(): void {

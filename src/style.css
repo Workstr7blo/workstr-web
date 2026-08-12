@@ -154,14 +154,21 @@
 .builder-pick-state { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--border); color: var(--dim); }
 .builder-pick-state svg { width: 14px; height: 14px; }
 .builder-pick-item.added .builder-pick-state { color: var(--success-green); border-color: var(--success-green); }
-.emom-section-list { display: grid; gap: 10px; }
-.emom-section-card { display: grid; grid-template-columns: minmax(90px,1fr) repeat(2,minmax(110px,1fr)) auto; gap: 10px; align-items: end; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: rgba(124,60,255,.06); }
-.emom-section-card strong { align-self: center; }
+.emom-section-list { display: grid; gap: 16px; }
+.emom-section-card { overflow: hidden; border: 1px solid var(--border-hot); border-radius: 16px; background: rgba(124,60,255,.06); }
+.emom-section-header { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 14px; background: rgba(124,60,255,.12); }
+.emom-section-header strong { font-size: 15px; }
 .emom-section-actions { display: flex; gap: 6px; }
 .emom-section-actions button { min-height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); }
+.emom-section-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px; border-bottom: 1px solid var(--border); }
+.emom-section-exercises { padding: 14px; }
+.emom-section-exercise-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 10px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.emom-section-exercise-head select { width: min(260px,65%); text-transform: none; letter-spacing: normal; }
+.emom-section-empty { padding: 16px 0 4px; }
+.emom-section-exercises .wex-row:last-child { border-bottom: 0; }
 .emom-program-summary { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; color: var(--muted); font-size: 12px; }
 .emom-program-summary strong { width: 100%; color: var(--text); }
-@media (max-width: 680px) { .emom-section-card { grid-template-columns: 1fr 1fr; } .emom-section-card strong, .emom-section-actions { grid-column: 1 / -1; } }
+@media (max-width: 680px) { .emom-section-settings { grid-template-columns: 1fr; } .emom-section-header { align-items: flex-start; } .emom-section-exercise-head { align-items: stretch; flex-direction: column; } .emom-section-exercise-head select { width: 100%; } }
 .discover-card-meta { justify-content: space-between; gap: 10px; }
 .discover-card-meta .muscle { min-width: 0; }
 .discover-card-meta .author-pill { margin-left: auto; max-width: 46%; }
