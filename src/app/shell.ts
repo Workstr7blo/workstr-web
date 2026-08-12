@@ -406,7 +406,6 @@ export function renderShell(root: HTMLElement): void {
       picker.innerHTML = matches.map((exercise) => {
         const added = current.rows.some((row) => row.exerciseSlug === exercise.slug);
         return `<div class="builder-pick-item${added ? ' added' : ''}" data-pick-slug="${html(exercise.slug)}">
-          ${exerciseImage(exercise.image_url)}
           <div class="builder-pick-info">
             <div class="builder-pick-name">${html(exercise.name)}</div>
             ${exercise.muscle_group ? `<div class="builder-pick-muscle">${html(exercise.muscle_group)}</div>` : ''}
