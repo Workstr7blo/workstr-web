@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EmomBlock } from '../src/core/types';
-import { compileEmomSchedule, emomDurationSec, emomPosition } from '../src/features/train/emom';
+import { compileEmomBlocks, compileEmomSchedule, emomDurationSec, emomPosition } from '../src/features/train/emom';
 
 const alternating: EmomBlock = {
   type: 'emom',
@@ -12,6 +12,12 @@ const alternating: EmomBlock = {
 };
 
 describe('EMOM schedule', () => {
+  it('runs multiple blocks sequentially and retains their block indexes', () => {
+    const schedule = compileEmomBlocks([{ ...alternating, rounds: 1 }, { ...alternating, rounds: 2 }]);
+    expect(schedule).toHaveLength(6);
+    expect(schedule.map((slot) => slot.blockIndex)).toEqual([0, 0, 1, 1, 1, 1]);
+    expect(emomDurationSec(schedule)).toBe(360);
+  });
   it('rotates intervals for every round', () => {
     const schedule = compileEmomSchedule(alternating);
     expect(schedule.map((slot) => [slot.roundIndex, slot.intervalIndex, slot.steps[0].exerciseSlug])).toEqual([

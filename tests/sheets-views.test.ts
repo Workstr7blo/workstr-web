@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   estimateProgramMin, resolveProgramExercise, programExerciseName, inferProgramMuscle,
-  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, emomBlockFromBuilder
+  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, emomBlockFromBuilder, emomBlocksFromBuilder
 } from '../src/features/sheets/views';
 import type { Exercise } from '../src/core/types';
 import type { RelayProgram, RelayProgramExercise } from '../src/nostr/canon';
@@ -154,7 +154,7 @@ describe('sheetToProgram', () => {
 
 describe('emomBlockFromBuilder', () => {
   it('groups timed exercises into intervals while preserving rep targets', () => {
-    const base = { muscleGroup: 'Core', imageUrl: '', sets: 1, restSec: 60, weight: null, notes: '' };
+    const base = { muscleGroup: 'Core', imageUrl: '', sets: 1, restSec: 60, weight: null, notes: '', sectionIndex: 0 };
     const block = emomBlockFromBuilder([
       { ...base, exerciseSlug: 'a', exerciseName: 'A', reps: '12', intervalIndex: 0, durationSec: 20 },
       { ...base, exerciseSlug: 'b', exerciseName: 'B', reps: '10', intervalIndex: 0, durationSec: 20 },
@@ -167,5 +167,16 @@ describe('emomBlockFromBuilder', () => {
       { exerciseSlug: 'b', targetReps: '10', targetDurationSec: 20 }
     ]);
     expect(block.intervals[1].steps[0]).toMatchObject({ exerciseSlug: 'c', targetReps: '8' });
+  });
+
+  it('creates sequential blocks with independent rounds and interval lengths', () => {
+    const base = { muscleGroup: 'Core', imageUrl: '', sets: 1, restSec: 60, weight: null, notes: '', intervalIndex: 0, durationSec: 0 };
+    const blocks = emomBlocksFromBuilder([
+      { ...base, exerciseSlug: 'burpees', exerciseName: 'Burpees', reps: '5', sectionIndex: 0 },
+      { ...base, exerciseSlug: 'sit-up', exerciseName: 'Sit-Up', reps: '8', sectionIndex: 1 },
+      { ...base, exerciseSlug: 'jumping-jack', exerciseName: 'Jumping Jack', reps: '', sectionIndex: 2, durationSec: 40 }
+    ], [{ rounds: 10, intervalSec: 60 }, { rounds: 15, intervalSec: 60 }, { rounds: 10, intervalSec: 60 }]);
+    expect(blocks.map((block) => block.rounds)).toEqual([10, 15, 10]);
+    expect(estimateProgramMin([], blocks)).toBe(35);
   });
 });

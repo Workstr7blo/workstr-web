@@ -2,6 +2,7 @@ import type { EmomBlock, TrainingStep } from '../../core/types';
 
 export interface EmomSlot {
   index: number;
+  blockIndex: number;
   roundIndex: number;
   intervalIndex: number;
   startsAtSec: number;
@@ -18,26 +19,35 @@ export interface EmomPosition {
   activeStepIndex: number | null;
 }
 
-export function compileEmomSchedule(block: EmomBlock): EmomSlot[] {
+export function compileEmomSchedule(block: EmomBlock, blockIndex = 0, startsAtSec = 0, startsAtIndex = 0): EmomSlot[] {
   const rounds = Math.max(0, Math.floor(Number(block.rounds) || 0));
   const intervals = (block.intervals || []).filter((interval) => Number(interval.durationSec) > 0 && interval.steps?.length);
   const slots: EmomSlot[] = [];
-  let startsAtSec = 0;
+  let cursorSec = startsAtSec;
   for (let roundIndex = 0; roundIndex < rounds; roundIndex += 1) {
     for (let intervalIndex = 0; intervalIndex < intervals.length; intervalIndex += 1) {
       const interval = intervals[intervalIndex];
       const durationSec = Math.max(1, Math.floor(Number(interval.durationSec)));
       slots.push({
-        index: slots.length,
+        index: startsAtIndex + slots.length,
+        blockIndex,
         roundIndex,
         intervalIndex,
-        startsAtSec,
-        endsAtSec: startsAtSec + durationSec,
+        startsAtSec: cursorSec,
+        endsAtSec: cursorSec + durationSec,
         durationSec,
         steps: interval.steps
       });
-      startsAtSec += durationSec;
+      cursorSec += durationSec;
     }
+  }
+  return slots;
+}
+
+export function compileEmomBlocks(blocks: EmomBlock[]): EmomSlot[] {
+  const slots: EmomSlot[] = [];
+  for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
+    slots.push(...compileEmomSchedule(blocks[blockIndex], blockIndex, slots.at(-1)?.endsAtSec || 0, slots.length));
   }
   return slots;
 }

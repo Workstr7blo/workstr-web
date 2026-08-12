@@ -8,9 +8,11 @@ import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 
-export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; intervalIndex: number; durationSec: number }
+export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; sectionIndex: number; intervalIndex: number; durationSec: number }
 
-export interface BuilderState { sheetId?: number; name: string; desc: string; difficulty: string; tags: string[]; mode: 'normal' | 'emom'; emomRounds: number; emomIntervalSec: number; rows: BuilderRow[]; library: Exercise[] }
+export interface BuilderEmomSection { rounds: number; intervalSec: number }
+
+export interface BuilderState { sheetId?: number; name: string; desc: string; difficulty: string; tags: string[]; mode: 'normal' | 'emom'; emomSections: BuilderEmomSection[]; rows: BuilderRow[]; library: Exercise[] }
 
 export function emomBlockFromBuilder(rows: BuilderRow[], rounds: number, intervalSec: number): EmomBlock {
   const byInterval = new Map<number, BuilderRow[]>();
@@ -34,6 +36,12 @@ export function emomBlockFromBuilder(rows: BuilderRow[], rounds: number, interva
       }))
     })).filter((interval) => interval.steps.length)
   };
+}
+
+export function emomBlocksFromBuilder(rows: BuilderRow[], sections: BuilderEmomSection[]): EmomBlock[] {
+  return sections.map((section, sectionIndex) => emomBlockFromBuilder(
+    rows.filter((row) => (row.sectionIndex || 0) === sectionIndex), section.rounds, section.intervalSec
+  )).filter((block) => block.intervals.length);
 }
 
 export function estimateProgramMin(exercises: RelayProgram['exercises'], blocks?: RelayProgram['blocks']): number {
@@ -163,10 +171,12 @@ export function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
 export function programCard(program: RelayProgram, state: AppState): string {
   const exerciseCount = program.exercises.length;
   const time = formatMinutes(estimateProgramMin(program.exercises, program.blocks));
-  const emom = program.blocks?.find((block) => block.type === 'emom');
+  const emomBlocks = program.blocks?.filter((block) => block.type === 'emom') || [];
+  const emom = emomBlocks[0];
   const groups = programGroups(program, state.exercises);
   const map = programMuscleMap(program, state.exercises);
-  const meta = [emom ? `EMOM · ${emom.rounds} rounds` : `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
+  const emomLabel = emomBlocks.length > 1 ? `EMOM · ${emomBlocks.length} sections` : emom ? `EMOM · ${emom.rounds} rounds` : '';
+  const meta = [emomLabel || `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
   const tagPills = (program.tags || []).length ? `<div class="program-tags">${program.tags.map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('')}</div>` : '';
   const isExpanded = state.expandedProgramAddress === program.address;
   const statusCls = isLocalProgram(program) ? 'local' : 'published';
@@ -188,6 +198,8 @@ export function programCard(program: RelayProgram, state: AppState): string {
 
 export function programBody(program: RelayProgram, state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
+  const emomBlocks = program.blocks?.filter((block) => block.type === 'emom') || [];
+  const emomSummary = emomBlocks.length ? `<div class="emom-program-summary"><strong>${emomBlocks.length} EMOM section${emomBlocks.length === 1 ? '' : 's'} · ${formatMinutes(estimateProgramMin([], emomBlocks))}</strong>${emomBlocks.map((block, index) => `<span>Section ${index + 1}: ${block.rounds} round${block.rounds === 1 ? '' : 's'} · ${formatMinutes(Math.ceil(block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0) / 60))}</span>`).join('')}</div>` : '';
   const exHtml = program.exercises.length ? program.exercises.map((member, index) => {
     const full = resolveProgramExercise(member, state.exercises);
     const name = programExerciseName(member, full);
@@ -227,7 +239,7 @@ export function programBody(program: RelayProgram, state: AppState): string {
     : importState === 'in-library'
       ? '<button class="button ghost small" type="button" disabled>In library</button>'
       : `<button class="button ${importState === 'update' ? 'gold' : 'primary'} small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>`;
-  return `<div class="wk-ex-list">${exHtml}</div>
+  return `${emomSummary}<div class="wk-ex-list">${exHtml}</div>
     <div class="workout-card-actions">
       ${actions}
     </div>`;

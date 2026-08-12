@@ -5,7 +5,7 @@ import { inferProgramMuscle, programExerciseName, resolveProgramExercise } from 
 import { fetchCanonPrograms, type RelayProgram } from '../nostr/canon';
 import { publishWorkoutSummary } from '../nostr/share';
 import type { EmomBlock } from '../core/types';
-import { compileEmomSchedule, emomPosition, type EmomPosition, type EmomSlot } from '../features/train/emom';
+import { compileEmomBlocks, emomDurationSec, emomPosition, type EmomPosition, type EmomSlot } from '../features/train/emom';
 import type { ActiveSession, AppState, SessionExercise, SessionSetLog } from './state';
 import type { Signer } from '../signer/types';
 
@@ -157,7 +157,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (document.visibilityState !== 'visible') return;
     if (state.activeSession && root.querySelector('#session-overlay')?.classList.contains('open')) void requestSessionWakeLock();
     if (sessionRestEndsAt) reconcileSessionRest();
-    if (activeEmomBlock()) reconcileEmom();
+    if (activeEmomBlocks().length) reconcileEmom();
   });
 
   async function openSessionOverlay(session: ActiveSession): Promise<void> {
@@ -169,7 +169,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (!Object.keys(sessionSetCounts).length) sessionSetCounts = setCountsFromSession(session);
     window.clearInterval(emomTimer);
     emomRenderKey = '';
-    if (activeEmomBlock()) {
+    if (activeEmomBlocks().length) {
       reconcileEmom();
       emomTimer = window.setInterval(reconcileEmom, 1000);
     } else {
@@ -177,16 +177,15 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     }
   }
 
-  function activeEmomBlock(): EmomBlock | null {
-    const block = state.activeSession?.blocks?.find((candidate) => candidate.type === 'emom');
-    return block?.type === 'emom' ? block : null;
+  function activeEmomBlocks(): EmomBlock[] {
+    return (state.activeSession?.blocks || []).filter((candidate): candidate is EmomBlock => candidate.type === 'emom');
   }
 
   function reconcileEmom(): void {
     const session = state.activeSession;
-    const block = activeEmomBlock();
-    if (!session || !block) return;
-    const schedule = compileEmomSchedule(block);
+    const blocks = activeEmomBlocks();
+    if (!session || !blocks.length) return;
+    const schedule = compileEmomBlocks(blocks);
     const startedAt = session.emomStartedAt ? new Date(session.emomStartedAt).getTime() : null;
     const position = emomPosition(schedule, startedAt);
     const countdown = root.querySelector('#emom-countdown');
@@ -199,10 +198,10 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const key = `${position.phase}:${position.slot?.index ?? -1}:${position.activeStepIndex ?? -1}`;
     if (key === emomRenderKey) return;
     emomRenderKey = key;
-    renderEmomSession(block, schedule, position);
+    renderEmomSession(blocks, schedule, position);
   }
 
-  function renderEmomSession(block: EmomBlock, schedule: EmomSlot[], position: EmomPosition): void {
+  function renderEmomSession(blocks: EmomBlock[], schedule: EmomSlot[], position: EmomPosition): void {
     const session = state.activeSession;
     const title = root.querySelector('#session-title');
     const meta = root.querySelector('#session-meta');
@@ -213,7 +212,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     title.textContent = session.sheetName || 'EMOM';
     nav.innerHTML = '';
     if (position.phase === 'pending') {
-      meta.textContent = `EMOM · ${block.rounds} round${block.rounds === 1 ? '' : 's'} · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}`;
+      meta.textContent = blocks.length > 1 ? `EMOM · ${blocks.length} sections · ${Math.ceil(emomDurationSec(schedule) / 60)} min` : `EMOM · ${blocks[0].rounds} round${blocks[0].rounds === 1 ? '' : 's'} · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}`;
       body.innerHTML = `<div class="emom-hero"><div class="emom-badge">EMOM</div><div class="emom-countdown" id="emom-countdown">${position.secondsRemaining}</div><div class="emom-caption">seconds per first interval</div><p>The clock starts when you are ready. Actual reps are logged separately from each timed target.</p></div>`;
       footer.innerHTML = '<button class="session-finish-btn" id="emom-start" type="button">Start EMOM</button>';
       root.querySelector('#emom-start')?.addEventListener('click', () => { void startEmom(); });
@@ -228,10 +227,11 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       return;
     }
     const slot = position.slot;
-    meta.textContent = `EMOM · Round ${slot.roundIndex + 1} of ${block.rounds} · Interval ${slot.intervalIndex + 1} of ${block.intervals.length}`;
+    const block = blocks[slot.blockIndex];
+    meta.textContent = `${blocks.length > 1 ? `Section ${slot.blockIndex + 1} of ${blocks.length} · ` : ''}EMOM · Round ${slot.roundIndex + 1} of ${block.rounds} · Interval ${slot.intervalIndex + 1} of ${block.intervals.length}`;
     const steps = slot.steps.map((step, stepIndex) => {
       const exercise = session.exercises.find((candidate) => candidate.exerciseSlug === step.exerciseSlug);
-      const logged = session.sets.find((set) => set.blockIndex === 0 && set.roundIndex === slot.roundIndex && set.intervalIndex === slot.intervalIndex && set.stepIndex === stepIndex);
+      const logged = session.sets.find((set) => set.blockIndex === slot.blockIndex && set.roundIndex === slot.roundIndex && set.intervalIndex === slot.intervalIndex && set.stepIndex === stepIndex);
       const hasUntimedSteps = slot.steps.some((candidate) => !Number(candidate.targetDurationSec));
       const active = position.activeStepIndex === stepIndex || (position.activeStepIndex == null && hasUntimedSteps);
       const target = [step.targetDurationSec ? `${step.targetDurationSec}s` : '', step.targetReps ? `${html(step.targetReps)} reps` : ''].filter(Boolean).join(' · ');
@@ -251,7 +251,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   }
 
   async function startEmom(): Promise<void> {
-    if (!state.activeSession || !activeEmomBlock()) return;
+    if (!state.activeSession || !activeEmomBlocks().length) return;
     const startedAt = new Date().toISOString();
     state.activeSession.emomStartedAt = startedAt;
     if (state.store) await state.store.startSessionEmom(state.activeSession.id, startedAt);
@@ -282,7 +282,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       reps,
       weight,
       durationSec: step.targetDurationSec,
-      blockIndex: 0,
+      blockIndex: slot.blockIndex,
       roundIndex: slot.roundIndex,
       intervalIndex: slot.intervalIndex,
       stepIndex,
@@ -297,7 +297,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       reps,
       weight_kg: weight,
       duration_sec: step.targetDurationSec,
-      block_index: 0,
+      block_index: slot.blockIndex,
       round_index: slot.roundIndex,
       interval_index: slot.intervalIndex,
       step_index: stepIndex,

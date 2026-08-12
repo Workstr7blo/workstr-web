@@ -23,7 +23,7 @@ import { paintBodyMapSvg } from './bodymap';
 import { discoverImportable, discoverImportState } from '../features/discover/views';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
 import { getQuickWorkout } from '../features/recovery/quickWorkout';
-import { emomBlockFromBuilder, sheetToProgram, type BuilderState } from '../features/sheets/views';
+import { emomBlocksFromBuilder, sheetToProgram, type BuilderState } from '../features/sheets/views';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
@@ -310,8 +310,8 @@ export function renderShell(root: HTMLElement): void {
     if (!state.store) { toast('Sign in to create programs.', 'bad'); return; }
     // Programs are built from the user's library only, never the relay catalog.
     const library = await state.store.listExercises();
-    const emom = sheet?.blocks?.find((block) => block.type === 'emom');
-    const emomRows = emom?.intervals.flatMap((interval, intervalIndex) => interval.steps.map((step) => {
+    const emomBlocks = sheet?.blocks?.filter((block) => block.type === 'emom') || [];
+    const emomRows = emomBlocks.flatMap((emom, sectionIndex) => emom.intervals.flatMap((interval, intervalIndex) => interval.steps.map((step) => {
       const row = sheet?.exercises.find((candidate) => candidate.exercise_slug === step.exerciseSlug);
       const exercise = library.find((candidate) => candidate.slug === step.exerciseSlug);
       return {
@@ -324,19 +324,19 @@ export function renderShell(root: HTMLElement): void {
         restSec: interval.durationSec,
         weight: step.weight ?? row?.weight ?? null,
         notes: step.notes || row?.notes || '',
+        sectionIndex,
         intervalIndex,
         durationSec: Number(step.targetDurationSec) || 0
       };
-    })) || [];
+    })));
     builder = {
       sheetId: sheet?.id,
       name: sheet?.name || '',
       desc: sheet?.notes || '',
       difficulty: sheet?.difficulty || '',
       tags: sheet?.tags || [],
-      mode: emom ? 'emom' : 'normal',
-      emomRounds: emom?.rounds || 10,
-      emomIntervalSec: emom?.intervals[0]?.durationSec || 60,
+      mode: emomBlocks.length ? 'emom' : 'normal',
+      emomSections: emomBlocks.length ? emomBlocks.map((emom) => ({ rounds: emom.rounds, intervalSec: emom.intervals[0]?.durationSec || 60 })) : [{ rounds: 10, intervalSec: 60 }],
       library,
       rows: emomRows.length ? emomRows : sheet
         ? sheet.exercises.map((row) => ({
@@ -349,6 +349,7 @@ export function renderShell(root: HTMLElement): void {
             restSec: Number(row.rest) || 90,
             weight: row.weight ?? null,
             notes: row.notes || '',
+            sectionIndex: 0,
             intervalIndex: 0,
             durationSec: 0
           }))
@@ -369,9 +370,14 @@ export function renderShell(root: HTMLElement): void {
         <label>Difficulty<select id="sheet-difficulty">${difficultyOptions}</select></label>
         <label>Tags (comma)<input id="sheet-tags" value="${html(current.tags.join(', '))}" placeholder="strength, hypertrophy" /></label>
         <label>Training mode<select id="sheet-mode"><option value="normal" ${current.mode === 'normal' ? 'selected' : ''}>Normal sets</option><option value="emom" ${current.mode === 'emom' ? 'selected' : ''}>EMOM</option></select></label>
-        <label class="emom-builder-setting" ${current.mode === 'emom' ? '' : 'hidden'}>Rounds<input id="sheet-emom-rounds" type="number" min="1" max="99" value="${current.emomRounds}" /></label>
-        <label class="emom-builder-setting" ${current.mode === 'emom' ? '' : 'hidden'}>Interval seconds<input id="sheet-emom-interval" type="number" min="10" max="600" step="5" value="${current.emomIntervalSec}" /></label>
       </div>
+      ${current.mode === 'emom' ? `<div class="subsection-head"><span>EMOM sections</span><button class="button small" id="add-emom-section" type="button">Add EMOM section</button></div>
+        <div class="emom-section-list">${current.emomSections.map((section, index) => `<div class="emom-section-card" data-section="${index}">
+          <strong>Section ${index + 1}</strong>
+          <label>Rounds / minutes<input data-section-field="rounds" type="number" min="1" max="999" value="${section.rounds}"></label>
+          <label>Interval seconds<input data-section-field="intervalSec" type="number" min="10" max="600" step="5" value="${section.intervalSec}"></label>
+          <div class="emom-section-actions"><button type="button" data-move-section="${index}" data-dir="-1" title="Move section up">↑</button><button type="button" data-move-section="${index}" data-dir="1" title="Move section down">↓</button><button type="button" data-remove-section="${index}" ${current.emomSections.length === 1 ? 'disabled' : ''}>Remove</button></div>
+        </div>`).join('')}</div>` : ''}
       <div class="subsection-head"><span>Add from your library</span></div>
       <div class="builder-search-wrap">
         <input id="builder-search" class="builder-search" placeholder="Filter your library..." autocomplete="off" />
@@ -389,8 +395,33 @@ export function renderShell(root: HTMLElement): void {
       current.mode = (event.target as HTMLSelectElement).value === 'emom' ? 'emom' : 'normal';
       renderBuilderModal();
     });
-    root.querySelector('#sheet-emom-rounds')?.addEventListener('input', (event) => { current.emomRounds = Number((event.target as HTMLInputElement).value) || 1; });
-    root.querySelector('#sheet-emom-interval')?.addEventListener('input', (event) => { current.emomIntervalSec = Number((event.target as HTMLInputElement).value) || 60; });
+    root.querySelector('#add-emom-section')?.addEventListener('click', () => { current.emomSections.push({ rounds: 10, intervalSec: 60 }); renderBuilderModal(); });
+    const sectionsHost = root.querySelector<HTMLElement>('.emom-section-list');
+    sectionsHost?.addEventListener('input', (event) => {
+      const target = event.target as HTMLInputElement;
+      const host = target.closest<HTMLElement>('[data-section]');
+      const section = host ? current.emomSections[Number(host.dataset.section)] : undefined;
+      if (!section) return;
+      if (target.dataset.sectionField === 'rounds') section.rounds = Math.max(1, Number(target.value) || 1);
+      if (target.dataset.sectionField === 'intervalSec') section.intervalSec = Math.max(1, Number(target.value) || 60);
+    });
+    sectionsHost?.addEventListener('click', (event) => {
+      const target = (event.target as Element).closest<HTMLButtonElement>('button');
+      if (!target) return;
+      if (target.dataset.removeSection != null) {
+        const removed = Number(target.dataset.removeSection);
+        current.emomSections.splice(removed, 1);
+        current.rows = current.rows.filter((row) => row.sectionIndex !== removed).map((row) => ({ ...row, sectionIndex: row.sectionIndex > removed ? row.sectionIndex - 1 : row.sectionIndex }));
+        renderBuilderModal();
+      } else if (target.dataset.moveSection != null) {
+        const from = Number(target.dataset.moveSection);
+        const to = from + Number(target.dataset.dir);
+        if (to < 0 || to >= current.emomSections.length) return;
+        [current.emomSections[from], current.emomSections[to]] = [current.emomSections[to], current.emomSections[from]];
+        current.rows.forEach((row) => { if (row.sectionIndex === from) row.sectionIndex = to; else if (row.sectionIndex === to) row.sectionIndex = from; });
+        renderBuilderModal();
+      }
+    });
     const search = root.querySelector<HTMLInputElement>('#builder-search');
     const picker = root.querySelector<HTMLElement>('#builder-picker');
     const sorted = [...current.library].sort((a, b) => Number(b.favourite) - Number(a.favourite) || a.name.localeCompare(b.name));
@@ -424,7 +455,7 @@ export function renderShell(root: HTMLElement): void {
       const exercise = current.library.find((entry) => entry.slug === item.dataset.pickSlug);
       if (!exercise) return;
       const index = current.rows.findIndex((row) => row.exerciseSlug === exercise.slug);
-      if (index >= 0) {
+      if (index >= 0 && current.mode === 'normal') {
         current.rows.splice(index, 1);
       } else {
         current.rows.push({
@@ -437,7 +468,8 @@ export function renderShell(root: HTMLElement): void {
           restSec: Number(exercise.default_rest) || 90,
           weight: null,
           notes: '',
-          intervalIndex: current.mode === 'emom' ? Math.max(0, ...current.rows.map((row) => row.intervalIndex), 0) : 0,
+          sectionIndex: current.mode === 'emom' ? current.emomSections.length - 1 : 0,
+          intervalIndex: current.mode === 'emom' ? Math.max(0, ...current.rows.filter((row) => row.sectionIndex === current.emomSections.length - 1).map((row) => row.intervalIndex), 0) : 0,
           durationSec: 0
         });
       }
@@ -474,9 +506,10 @@ export function renderShell(root: HTMLElement): void {
       if (!state.store || !builder) return;
       const name = builder.name.trim();
       if (!name) { toast('name is required', 'bad'); return; }
-      const blocks = builder.mode === 'emom' ? [emomBlockFromBuilder(builder.rows, builder.emomRounds, builder.emomIntervalSec)] : undefined;
+      const blocks = builder.mode === 'emom' ? emomBlocksFromBuilder(builder.rows, builder.emomSections) : undefined;
       if (builder.mode === 'emom') {
-        const invalid = blocks?.[0].type === 'emom' && blocks[0].intervals.some((interval) => interval.steps.reduce((sum, step) => sum + (Number(step.targetDurationSec) || 0), 0) > interval.durationSec);
+        if (!blocks?.length) { toast('Add an exercise to an EMOM section', 'bad'); return; }
+        const invalid = blocks.some((block) => block.type === 'emom' && block.intervals.some((interval) => interval.steps.reduce((sum, step) => sum + (Number(step.targetDurationSec) || 0), 0) > interval.durationSec));
         if (invalid) { toast('Timed steps cannot exceed the interval length', 'bad'); return; }
       }
       await state.store.saveSheet({
@@ -490,7 +523,7 @@ export function renderShell(root: HTMLElement): void {
           exercise_name: row.exerciseName,
           muscle_group: row.muscleGroup,
           image_url: row.imageUrl,
-          sets: current.mode === 'emom' ? current.emomRounds : row.sets,
+          sets: current.mode === 'emom' ? current.emomSections[row.sectionIndex]?.rounds || 1 : row.sets,
           reps: row.reps,
           rest: row.restSec,
           weight: row.weight,
@@ -524,7 +557,7 @@ export function renderShell(root: HTMLElement): void {
         </div>
         ${img}
         <div class="wex-info">
-          <div class="wex-name">${html(row.exerciseName)}${row.muscleGroup ? `<span class="wex-muscle">${html(row.muscleGroup)}</span>` : ''}</div>
+          <div class="wex-name">${current.mode === 'emom' ? `<span class="wex-muscle">Section ${row.sectionIndex + 1}</span>` : ''}${html(row.exerciseName)}${row.muscleGroup ? `<span class="wex-muscle">${html(row.muscleGroup)}</span>` : ''}</div>
           <div class="wex-params">
             ${current.mode === 'emom'
               ? `<div class="wex-param-group"><div class="wex-param-label">Interval</div><input class="wex-param-input" type="number" min="1" max="99" data-f="intervalIndex" value="${row.intervalIndex + 1}"></div>
