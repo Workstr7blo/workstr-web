@@ -155,12 +155,12 @@
 .program-builder select { appearance: none; padding-right: 38px; background-image: linear-gradient(45deg,transparent 50%,var(--purple-2) 50%),linear-gradient(135deg,var(--purple-2) 50%,transparent 50%); background-position: calc(100% - 18px) 20px,calc(100% - 13px) 20px; background-size: 5px 5px,5px 5px; background-repeat: no-repeat; cursor: pointer; }
 .program-builder select option { padding: 12px; color: var(--text); background: #120c1f; }
 .program-builder .subsection-head { margin-top: 24px; margin-bottom: 12px; }
-.builder-pick-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.builder-pick-item { display: grid; grid-template-columns: minmax(0,1fr) 28px; gap: 10px; align-items: center; min-height: 42px; padding: 7px 10px 7px 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
 .builder-pick-item:last-child { border-bottom: none; }
 .builder-pick-item:hover { background: rgba(124,60,255,.14); }
 .builder-pick-info { flex: 1; min-width: 0; }
-.builder-pick-name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.builder-pick-muscle { color: var(--purple-2); font: 700 11px/1.4 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .04em; }
+.builder-pick-name { font-weight: 800; font-size: 14px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.builder-pick-muscle { margin-top: 3px; color: var(--purple-2); font: 800 9px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
 .builder-pick-state { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--border); color: var(--dim); }
 .builder-pick-state svg { width: 14px; height: 14px; }
 .builder-pick-item.added .builder-pick-state { color: var(--success-green); border-color: var(--success-green); }
