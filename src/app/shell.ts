@@ -336,7 +336,7 @@ export function renderShell(root: HTMLElement): void {
       difficulty: sheet?.difficulty || '',
       tags: sheet?.tags || [],
       mode: emomBlocks.length ? 'emom' : 'normal',
-      emomSections: emomBlocks.length ? emomBlocks.map((emom) => ({ rounds: emom.rounds, intervalSec: emom.intervals[0]?.durationSec || 60 })) : [{ rounds: 10, intervalSec: 60 }],
+      emomSections: emomBlocks.length ? emomBlocks.map((emom) => ({ rounds: emom.rounds, intervalSec: 60 })) : [{ rounds: 10, intervalSec: 60 }],
       library,
       rows: emomRows.length ? emomRows : sheet
         ? sheet.exercises.map((row) => ({
@@ -372,12 +372,13 @@ export function renderShell(root: HTMLElement): void {
         <label>Training mode<select id="sheet-mode"><option value="normal" ${current.mode === 'normal' ? 'selected' : ''}>Normal sets</option><option value="emom" ${current.mode === 'emom' ? 'selected' : ''}>EMOM</option></select></label>
       </div>
       ${current.mode === 'emom'
-        ? `<div class="subsection-head"><span>EMOM sections</span><button class="button small" id="add-emom-section" type="button">Add EMOM section</button></div>`
+        ? `<div class="subsection-head"><span>EMOM sections</span></div>`
         : `<div class="subsection-head"><span>Add from your library</span></div>
           <div class="builder-search-wrap"><input id="builder-search" class="builder-search" placeholder="Filter your library..." autocomplete="off" /></div>
           <div id="builder-picker" class="builder-picker"></div>
           <div class="subsection-head"><span>Program exercises</span></div>`}
       <div id="builder-rows" class="builder-rows"></div>
+      ${current.mode === 'emom' ? '<button class="button ghost emom-add-section" id="add-emom-section" type="button">+ Add EMOM section</button>' : ''}
       <div class="form-actions"><button class="button primary" id="sheet-save" type="button">${current.sheetId ? 'Save program' : 'Create program'}</button></div>`);
     renderBuilderRows();
     root.querySelector('#sheet-name')?.addEventListener('input', (event) => { current.name = (event.target as HTMLInputElement).value; });
@@ -458,25 +459,43 @@ export function renderShell(root: HTMLElement): void {
       else if (field === 'restSec') entry.restSec = Number(target.value) || 0;
       else if (field === 'intervalIndex') entry.intervalIndex = Math.max(0, (Number(target.value) || 1) - 1);
       else if (field === 'durationSec') entry.durationSec = Math.max(0, Number(target.value) || 0);
+      else if (field === 'targetValue') {
+        const type = target.dataset.targetType;
+        if (type === 'seconds') { entry.durationSec = Math.max(0, Number(target.value) || 0); entry.reps = ''; }
+        else if (type === 'reps') { entry.reps = target.value; entry.durationSec = 0; }
+      }
       else if (field === 'weight') entry.weight = storeWeightInput(target.value, normalizeWeightUnit(state.settings.unit));
       else if (field === 'reps') entry.reps = target.value;
     });
     rowsHost?.addEventListener('change', (event) => {
       const target = event.target as HTMLSelectElement;
-      if (target.dataset.addExercise == null || !target.value) return;
-      const sectionIndex = Number(target.dataset.addExercise);
-      const exercise = current.library.find((entry) => entry.slug === target.value);
-      if (!exercise) return;
-      current.rows.push({
-        exerciseSlug: exercise.slug, exerciseName: exercise.name, muscleGroup: exercise.muscle_group, imageUrl: exercise.image_url,
-        sets: Number(exercise.default_sets) || 3, reps: String(exercise.default_reps || '8-12'), restSec: Number(exercise.default_rest) || 90,
-        weight: null, notes: '', sectionIndex,
-        intervalIndex: Math.max(0, ...current.rows.filter((row) => row.sectionIndex === sectionIndex).map((row) => row.intervalIndex), 0), durationSec: 0
-      });
+      if (target.dataset.targetType == null) return;
+      const entry = current.rows[Number(target.dataset.targetType)];
+      if (!entry) return;
+      if (target.value === 'seconds') { entry.durationSec = Number(entry.durationSec) || 40; entry.reps = ''; }
+      else if (target.value === 'reps') { entry.reps = entry.reps || '5'; entry.durationSec = 0; }
+      else { entry.reps = ''; entry.durationSec = 0; }
       renderBuilderRows();
     });
     rowsHost?.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
+      const pickerToggle = target.closest<HTMLElement>('[data-toggle-section-picker]');
+      if (pickerToggle) {
+        const picker = rowsHost.querySelector<HTMLElement>(`[data-section-picker="${pickerToggle.dataset.toggleSectionPicker}"]`);
+        picker?.toggleAttribute('hidden');
+        return;
+      }
+      const exerciseChoice = target.closest<HTMLElement>('[data-section-exercise]');
+      if (exerciseChoice) {
+        const sectionIndex = Number(exerciseChoice.dataset.sectionExercise);
+        const exercise = current.library.find((entry) => entry.slug === exerciseChoice.dataset.slug);
+        if (!exercise) return;
+        current.rows = current.rows.filter((row) => row.sectionIndex !== sectionIndex);
+        current.rows.push({ exerciseSlug: exercise.slug, exerciseName: exercise.name, muscleGroup: exercise.muscle_group, imageUrl: exercise.image_url,
+          sets: 1, reps: String(exercise.default_reps || '5'), restSec: 60, weight: null, notes: '', sectionIndex, intervalIndex: 0, durationSec: 0 });
+        renderBuilderRows();
+        return;
+      }
       if (target.dataset.rm != null) { current.rows.splice(Number(target.dataset.rm), 1); renderBuilderRows(); renderPicker(); return; }
       if (target.dataset.removeSection != null) {
         const removed = Number(target.dataset.removeSection);
@@ -544,12 +563,14 @@ export function renderShell(root: HTMLElement): void {
     if (!host || !current) return;
     const unit = normalizeWeightUnit(state.settings.unit);
     const rowMarkup = (row: BuilderState['rows'][number], index: number): string => {
+      const targetType = row.durationSec ? 'seconds' : row.reps ? 'reps' : 'open';
+      const targetValue = targetType === 'seconds' ? row.durationSec : targetType === 'reps' ? row.reps : '';
       const src = row.imageUrl || current.library.find((exercise) => exercise.slug === row.exerciseSlug)?.image_url;
       const img = src
         ? `<img class="wex-img" src="${html(src)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'wex-img placeholder'}))">`
         : `<div class="wex-img placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>`;
       return `<div class="wex-row" data-i="${index}">
-        <div class="wex-move-btns">
+        <div class="wex-move-btns" ${current.mode === 'emom' ? 'hidden' : ''}>
           <button class="wex-move-btn" type="button" data-move="${index}" data-dir="-1" title="Move up">↑</button>
           <button class="wex-move-btn" type="button" data-move="${index}" data-dir="1" title="Move down">↓</button>
         </div>
@@ -558,11 +579,11 @@ export function renderShell(root: HTMLElement): void {
           <div class="wex-name">${html(row.exerciseName)}${row.muscleGroup ? `<span class="wex-muscle">${html(row.muscleGroup)}</span>` : ''}</div>
           <div class="wex-params">
             ${current.mode === 'emom'
-              ? `<div class="wex-param-group"><div class="wex-param-label">Interval</div><input class="wex-param-input" type="number" min="1" max="99" data-f="intervalIndex" value="${row.intervalIndex + 1}"></div>
-                <div class="wex-param-group"><div class="wex-param-label">Work sec</div><input class="wex-param-input" type="number" min="0" max="600" data-f="durationSec" placeholder="optional" value="${row.durationSec || ''}"></div>`
+              ? `<div class="wex-param-group"><div class="wex-param-label">Target</div><select class="wex-param-input" data-target-type="${index}"><option value="reps" ${targetType === 'reps' ? 'selected' : ''}>Reps</option><option value="seconds" ${targetType === 'seconds' ? 'selected' : ''}>Seconds</option><option value="open" ${targetType === 'open' ? 'selected' : ''}>Open</option></select></div>
+                ${targetType !== 'open' ? `<div class="wex-param-group"><div class="wex-param-label">${targetType === 'reps' ? 'Repetitions' : 'Work time'}</div><input class="wex-param-input" type="number" min="1" max="999" data-f="targetValue" data-target-type="${targetType}" value="${html(String(targetValue))}"></div>` : ''}`
               : `<div class="wex-param-group"><div class="wex-param-label">Sets</div><input class="wex-param-input" type="number" min="1" max="20" data-f="sets" value="${row.sets}"></div>`}
-            <div class="wex-param-group"><div class="wex-param-label">Reps</div><input class="wex-param-input reps" data-f="reps" value="${html(row.reps)}"></div>
-            <div class="wex-param-group"><div class="wex-param-label">${unit}</div><input class="wex-param-input" type="number" min="0" step="0.5" data-f="weight" placeholder="—" value="${row.weight != null ? displayWeightKg(row.weight, unit) : ''}"></div>
+            ${current.mode === 'normal' ? `<div class="wex-param-group"><div class="wex-param-label">Reps</div><input class="wex-param-input reps" data-f="reps" value="${html(row.reps)}"></div>
+            <div class="wex-param-group"><div class="wex-param-label">${unit}</div><input class="wex-param-input" type="number" min="0" step="0.5" data-f="weight" placeholder="—" value="${row.weight != null ? displayWeightKg(row.weight, unit) : ''}"></div>` : ''}
             ${current.mode === 'normal' ? `<div class="wex-param-group"><div class="wex-param-label">Rest</div><input class="wex-param-input" type="number" min="0" step="5" data-f="restSec" value="${row.restSec}"></div>` : ''}
           </div>
         </div>
@@ -575,7 +596,7 @@ export function renderShell(root: HTMLElement): void {
     }
     const exerciseOptions = [...current.library]
       .sort((a, b) => Number(b.favourite) - Number(a.favourite) || a.name.localeCompare(b.name))
-      .map((exercise) => `<option value="${html(exercise.slug)}">${html(exercise.name)}${exercise.muscle_group ? ` · ${html(exercise.muscle_group)}` : ''}</option>`).join('');
+      .map((exercise) => `<button type="button" data-section-exercise="SECTION_INDEX" data-slug="${html(exercise.slug)}">${html(exercise.name)}</button>`).join('');
     host.innerHTML = `<div class="emom-section-list">${current.emomSections.map((section, sectionIndex) => {
       const rows = current.rows.map((row, index) => ({ row, index })).filter(({ row }) => row.sectionIndex === sectionIndex);
       return `<section class="emom-section-card" data-section="${sectionIndex}">
@@ -585,12 +606,12 @@ export function renderShell(root: HTMLElement): void {
           <button type="button" data-remove-section="${sectionIndex}" ${current.emomSections.length === 1 ? 'disabled' : ''}>Remove</button>
         </div></div>
         <div class="emom-section-settings">
-          <label>Rounds / minutes<input data-section-field="rounds" type="number" min="1" max="999" value="${section.rounds}"></label>
-          <label>Interval seconds<input data-section-field="intervalSec" type="number" min="10" max="600" step="5" value="${section.intervalSec}"></label>
+          <label>Duration<input data-section-field="rounds" type="number" min="1" max="999" value="${section.rounds}"><span>minutes</span></label>
         </div>
         <div class="emom-section-exercises">
-          <div class="emom-section-exercise-head"><span>Exercises</span><select data-add-exercise="${sectionIndex}"><option value="">Add from library…</option>${exerciseOptions}</select></div>
-          ${rows.length ? rows.map(({ row, index }) => rowMarkup(row, index)).join('') : '<div class="empty emom-section-empty">No exercises in this section yet.</div>'}
+          <div class="emom-section-exercise-head"><span>Every minute</span><button class="button ghost small" type="button" data-toggle-section-picker="${sectionIndex}">${rows.length ? 'Change exercise' : '+ Add exercise'}</button></div>
+          <div class="emom-library-picker" data-section-picker="${sectionIndex}" hidden>${exerciseOptions.replaceAll('SECTION_INDEX', String(sectionIndex)) || '<div class="empty">Your library is empty.</div>'}</div>
+          ${rows.length ? rows.map(({ row, index }) => rowMarkup(row, index)).join('') : '<div class="empty emom-section-empty">Choose one exercise for this section.</div>'}
         </div>
       </section>`;
     }).join('')}</div>`;
