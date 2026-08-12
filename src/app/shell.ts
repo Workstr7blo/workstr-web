@@ -363,8 +363,9 @@ export function renderShell(root: HTMLElement): void {
     if (!current) return;
     const difficultyOptions = [''].concat(PROGRAM_DIFFICULTIES).map((difficulty) => `<option value="${html(difficulty)}" ${current.difficulty === difficulty ? 'selected' : ''}>${difficulty ? html(difficulty) : 'Choose level'}</option>`).join('');
     openModal(`
+      <div class="program-builder">
       <h3>${current.sheetId ? 'Edit program' : 'New program'}</h3>
-      <div class="form-grid">
+      <div class="form-grid program-builder-basics">
         <label class="span-2">Name<input id="sheet-name" value="${html(current.name)}" placeholder="Push Day" /></label>
         <label class="span-2">Description<input id="sheet-desc" value="${html(current.desc)}" placeholder="optional" /></label>
         <label>Difficulty<select id="sheet-difficulty">${difficultyOptions}</select></label>
@@ -379,7 +380,8 @@ export function renderShell(root: HTMLElement): void {
           <div class="subsection-head"><span>Program exercises</span></div>`}
       <div id="builder-rows" class="builder-rows"></div>
       ${current.mode === 'emom' ? '<button class="button ghost emom-add-section" id="add-emom-section" type="button">+ Add EMOM section</button>' : ''}
-      <div class="form-actions"><button class="button primary" id="sheet-save" type="button">${current.sheetId ? 'Save program' : 'Create program'}</button></div>`);
+      <div class="form-actions"><button class="button primary" id="sheet-save" type="button">${current.sheetId ? 'Save program' : 'Create program'}</button></div>
+      </div>`);
     renderBuilderRows();
     root.querySelector('#sheet-name')?.addEventListener('input', (event) => { current.name = (event.target as HTMLInputElement).value; });
     root.querySelector('#sheet-desc')?.addEventListener('input', (event) => { current.desc = (event.target as HTMLInputElement).value; });
