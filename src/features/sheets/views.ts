@@ -48,7 +48,7 @@ export function estimateProgramMin(exercises: RelayProgram['exercises'], blocks?
   const emomSeconds = (blocks || []).reduce((total, block) => block.type === 'emom'
     ? total + block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0)
     : total, 0);
-  if (emomSeconds) return Math.max(1, Math.ceil(emomSeconds / 60));
+  if (emomSeconds) return emomSeconds;
   return exercises.reduce((total, exercise) => {
     const sets = Number(exercise.sets) || 3;
     const rest = Number(exercise.restSec || exercise.rest) || 90;

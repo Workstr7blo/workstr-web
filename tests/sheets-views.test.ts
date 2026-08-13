@@ -177,6 +177,7 @@ describe('emomBlockFromBuilder', () => {
       { ...base, exerciseSlug: 'jumping-jack', exerciseName: 'Jumping Jack', reps: '', sectionIndex: 2, durationSec: 40 }
     ], [{ rounds: 10, intervalSec: 60 }, { rounds: 15, intervalSec: 60 }, { rounds: 10, intervalSec: 60 }]);
     expect(blocks.map((block) => block.rounds)).toEqual([10, 15, 10]);
-    expect(estimateProgramMin([], blocks)).toBe(35);
+    expect(estimateProgramMin([], blocks)).toBe(2100);
+    expect(programCard(prog({ blocks }), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState)).toContain('~35 min');
   });
 });
