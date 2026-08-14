@@ -190,7 +190,7 @@ export class WorkstrStore {
   async startSessionEmom(id: number, startedAt: string): Promise<void> {
     const session = await this.db.get('sessions', id);
     if (!session) return;
-    await this.db.put('sessions', { ...session, emom_started_at: startedAt });
+    await this.db.put('sessions', { ...session, started_at: startedAt, emom_started_at: startedAt });
   }
 
   async markSessionPublished(id: number, eventId: string): Promise<void> {
