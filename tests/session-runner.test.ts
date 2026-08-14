@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSessionRunner, restSecondsRemaining, type SessionRunnerContext } from '../src/app/session-runner';
 import { shellMarkup } from '../src/app/layout';
 import type { AppState } from '../src/app/state';
@@ -25,16 +25,17 @@ function makeState(store: WorkstrStore): AppState {
   };
 }
 
-function fakeStore(): { store: WorkstrStore; sets: unknown[]; finished: number[] } {
+function fakeStore(): { store: WorkstrStore; sets: unknown[]; finished: number[]; emomStarts: Array<{ id: number; startedAt: string }> } {
   const sets: unknown[] = [];
   const finished: number[] = [];
+  const emomStarts: Array<{ id: number; startedAt: string }> = [];
   const store = {
     createSession: async () => 1,
     addSessionSet: async (set: unknown) => { sets.push(set); return sets.length; },
-    startSessionEmom: async () => {},
+    startSessionEmom: async (id: number, startedAt: string) => { emomStarts.push({ id, startedAt }); },
     finishSession: async (id: number) => { finished.push(id); }
   } as unknown as WorkstrStore;
-  return { store, sets, finished };
+  return { store, sets, finished, emomStarts };
 }
 
 function makeContext(root: HTMLElement, state: AppState): SessionRunnerContext {
@@ -82,6 +83,7 @@ describe('session runner', () => {
   let state: AppState;
   let store: WorkstrStore;
   let sets: unknown[];
+  let emomStarts: Array<{ id: number; startedAt: string }>;
   let runner: ReturnType<typeof createSessionRunner>;
 
   beforeEach(() => {
@@ -90,9 +92,14 @@ describe('session runner', () => {
     const fake = fakeStore();
     store = fake.store;
     sets = fake.sets;
+    emomStarts = fake.emomStarts;
     state = makeState(store);
     root.innerHTML = shellMarkup(state);
     runner = createSessionRunner(makeContext(root, state));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('starts a session and renders the first exercise with a log control', async () => {
@@ -101,6 +108,14 @@ describe('session runner', () => {
     expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(true);
     expect(root.querySelector('#session-body')?.textContent).toContain('Bench Press');
     expect(root.querySelector('[data-session-log]')).toBeTruthy();
+  });
+
+  it('continues to start a normal session elapsed timer immediately', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
+    await runner.startTrainingSession(oneExerciseProgram());
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:05');
   });
 
   it('logs a set to the store and opens the rest overlay', async () => {
@@ -137,6 +152,44 @@ describe('session runner', () => {
     expect(sets).toHaveLength(1);
     expect(sets[0]).toMatchObject({ reps: 9, duration_sec: 20, round_index: 0, interval_index: 0, step_index: 0 });
     expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(false);
+  });
+
+  it('keeps elapsed time at zero until EMOM starts, then aligns both clocks', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
+    await runner.startTrainingSession(emomProgram());
+    const createdAt = state.activeSession?.startedAt;
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:00');
+
+    vi.setSystemTime(new Date('2026-08-14T12:02:00Z'));
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:00');
+    (root.querySelector('#emom-start') as HTMLButtonElement).click();
+    await Promise.resolve();
+
+    expect(state.activeSession?.startedAt).not.toBe(createdAt);
+    expect(state.activeSession?.startedAt).toBe('2026-08-14T12:02:00.000Z');
+    expect(state.activeSession?.emomStartedAt).toBe(state.activeSession?.startedAt);
+    expect(emomStarts).toEqual([{ id: 1, startedAt: '2026-08-14T12:02:00.000Z' }]);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:05');
+  });
+
+  it('resumes an active EMOM using its persisted EMOM start time', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-14T12:10:30Z'));
+    const program = emomProgram();
+    state.activeSession = {
+      id: 7,
+      sheetName: program.name,
+      startedAt: '2026-08-14T12:00:00.000Z',
+      emomStartedAt: '2026-08-14T12:10:00.000Z',
+      exercises: [],
+      blocks: program.blocks,
+      sets: []
+    };
+    await runner.openSessionOverlay(state.activeSession);
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:30');
   });
 });
 

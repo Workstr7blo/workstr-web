@@ -94,6 +94,10 @@ describe('WorkstrStore', () => {
     expect((await store.listSheets()).find((sheet) => sheet.id === sheetId)?.blocks).toEqual(blocks);
     const sessionId = await store.createSession({ sheet_name: 'EMOM', started_at: '2026-01-01T00:00:00Z', blocks, exercises: [] });
     await store.startSessionEmom(sessionId, '2026-01-01T00:01:00Z');
-    expect((await store.listSessions()).find((session) => session.id === sessionId)).toMatchObject({ blocks, emom_started_at: '2026-01-01T00:01:00Z' });
+    expect((await store.listSessions()).find((session) => session.id === sessionId)).toMatchObject({
+      blocks,
+      started_at: '2026-01-01T00:01:00Z',
+      emom_started_at: '2026-01-01T00:01:00Z'
+    });
   });
 });

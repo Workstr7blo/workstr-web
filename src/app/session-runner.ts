@@ -6,6 +6,7 @@ import { fetchCanonPrograms, type RelayProgram } from '../nostr/canon';
 import { publishWorkoutSummary } from '../nostr/share';
 import type { EmomBlock } from '../core/types';
 import { compileEmomBlocks, emomDurationSec, emomPosition, type EmomPosition, type EmomSlot } from '../features/train/emom';
+import { CountdownCueGuard, playCountdownCue, unlockCountdownAudio } from '../features/train/countdown-audio';
 import type { ActiveSession, AppState, SessionExercise, SessionSetLog } from './state';
 import type { Signer } from '../signer/types';
 
@@ -51,6 +52,10 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   let sessionElapsedTimer = 0;
   let emomTimer = 0;
   let emomRenderKey = '';
+  let emomPreviousPhase: EmomPosition['phase'] | null = null;
+  let emomPreviousSlotIndex: number | null = null;
+  let restCuePeriod = 0;
+  const countdownCueGuard = new CountdownCueGuard();
   let sessionWakeLock: WakeLockSentinel | null = null;
   const sessionPreviousSets = new Map<string, SessionSetLog[]>();
 
@@ -163,12 +168,12 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   async function openSessionOverlay(session: ActiveSession): Promise<void> {
     root.querySelector('#session-overlay')?.classList.add('open');
     void requestSessionWakeLock();
-    window.clearInterval(sessionElapsedTimer);
-    updateSessionElapsed(session);
-    sessionElapsedTimer = window.setInterval(() => { if (state.activeSession) updateSessionElapsed(state.activeSession); }, 1000);
+    startSessionElapsedTimer(session);
     if (!Object.keys(sessionSetCounts).length) sessionSetCounts = setCountsFromSession(session);
     window.clearInterval(emomTimer);
     emomRenderKey = '';
+    emomPreviousPhase = null;
+    emomPreviousSlotIndex = null;
     if (activeEmomBlocks().length) {
       reconcileEmom();
       emomTimer = window.setInterval(reconcileEmom, 1000);
@@ -181,6 +186,21 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     return (state.activeSession?.blocks || []).filter((candidate): candidate is EmomBlock => candidate.type === 'emom');
   }
 
+  function isEmomSession(session: ActiveSession): boolean {
+    return (session.blocks || []).some((candidate) => candidate.type === 'emom');
+  }
+
+  function effectiveSessionStartedAt(session: ActiveSession): string | null {
+    return isEmomSession(session) ? session.emomStartedAt || null : session.startedAt || null;
+  }
+
+  function startSessionElapsedTimer(session: ActiveSession): void {
+    window.clearInterval(sessionElapsedTimer);
+    updateSessionElapsed(session);
+    if (!effectiveSessionStartedAt(session)) return;
+    sessionElapsedTimer = window.setInterval(() => { if (state.activeSession) updateSessionElapsed(state.activeSession); }, 1000);
+  }
+
   function reconcileEmom(): void {
     const session = state.activeSession;
     const blocks = activeEmomBlocks();
@@ -188,6 +208,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const schedule = compileEmomBlocks(blocks);
     const startedAt = session.emomStartedAt ? new Date(session.emomStartedAt).getTime() : null;
     const position = emomPosition(schedule, startedAt);
+    cueEmomPosition(position);
     const countdown = root.querySelector('#emom-countdown');
     if (countdown) countdown.textContent = String(position.secondsRemaining);
     const progress = root.querySelector<HTMLElement>('#session-progress-fill');
@@ -199,6 +220,19 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (key === emomRenderKey) return;
     emomRenderKey = key;
     renderEmomSession(blocks, schedule, position);
+  }
+
+  function cueEmomPosition(position: EmomPosition): void {
+    const slotIndex = position.slot?.index ?? null;
+    if (emomPreviousPhase === 'running' && emomPreviousSlotIndex !== null
+      && (position.phase === 'complete' || slotIndex !== emomPreviousSlotIndex)) {
+      playCountdownCue(countdownCueGuard.finish('emom', emomPreviousSlotIndex));
+    }
+    if (position.phase === 'running' && slotIndex !== null) {
+      playCountdownCue(countdownCueGuard.countdown('emom', slotIndex, position.secondsRemaining));
+    }
+    emomPreviousPhase = position.phase;
+    emomPreviousSlotIndex = slotIndex;
   }
 
   function renderEmomSession(blocks: EmomBlock[], schedule: EmomSlot[], position: EmomPosition): void {
@@ -215,7 +249,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       meta.textContent = blocks.length > 1 ? `EMOM · ${blocks.length} sections · ${Math.ceil(emomDurationSec(schedule) / 60)} min` : `EMOM · ${blocks[0].rounds} round${blocks[0].rounds === 1 ? '' : 's'} · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}`;
       body.innerHTML = `<div class="emom-hero"><div class="emom-badge">EMOM</div><div class="emom-countdown" id="emom-countdown">${position.secondsRemaining}</div><div class="emom-caption">seconds per first interval</div><p>The clock starts when you are ready. Actual reps are logged separately from each timed target.</p></div>`;
       footer.innerHTML = '<button class="session-finish-btn" id="emom-start" type="button">Start EMOM</button>';
-      root.querySelector('#emom-start')?.addEventListener('click', () => { void startEmom(); });
+      root.querySelector('#emom-start')?.addEventListener('click', () => { unlockCountdownAudio(); void startEmom(); });
       bindSessionControls();
       return;
     }
@@ -254,9 +288,14 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (!state.activeSession || !activeEmomBlocks().length) return;
     const startedAt = new Date().toISOString();
     state.activeSession.emomStartedAt = startedAt;
-    if (state.store) await state.store.startSessionEmom(state.activeSession.id, startedAt);
+    state.activeSession.startedAt = startedAt;
+    startSessionElapsedTimer(state.activeSession);
+    const persisted = state.store?.startSessionEmom(state.activeSession.id, startedAt);
     emomRenderKey = '';
+    emomPreviousPhase = null;
+    emomPreviousSlotIndex = null;
     reconcileEmom();
+    if (persisted) await persisted;
   }
 
   async function logEmomStep(slot: EmomSlot, stepIndex: number, button: HTMLButtonElement): Promise<void> {
@@ -310,8 +349,10 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
 
   function updateSessionElapsed(session: ActiveSession): void {
     const el = root.querySelector('#session-elapsed');
-    if (!el || !session.startedAt) return;
-    const seconds = Math.max(0, Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000));
+    if (!el) return;
+    const startedAt = effectiveSessionStartedAt(session);
+    if (!startedAt) { el.textContent = '00:00'; return; }
+    const seconds = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
     const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), sec = seconds % 60;
     el.textContent = h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   }
@@ -485,6 +526,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     sessionRestTotal = Number(sec) || 90;
     sessionRestRemaining = sessionRestTotal;
     sessionRestEndsAt = Date.now() + sessionRestTotal * 1000;
+    restCuePeriod += 1;
     sessionRestAutoAdvance = autoAdvance;
     const nextUp = root.querySelector('#rest-nextup');
     if (nextUp && state.activeSession) {
@@ -493,6 +535,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       nextUp.innerHTML = next ? `Next up: <b>${html(next.exerciseName || next.exerciseSlug)}</b>` : '';
     }
     updateSessionRestDisplay();
+    cueRestCountdown();
     window.clearInterval(sessionRestTimer);
     sessionRestTimer = window.setInterval(reconcileSessionRest, 1000);
   }
@@ -501,6 +544,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (!sessionRestEndsAt) return;
     sessionRestRemaining = restSecondsRemaining(sessionRestEndsAt);
     updateSessionRestDisplay();
+    cueRestCountdown();
     if (sessionRestRemaining > 0) return;
     const autoAdvance = sessionRestAutoAdvance;
     skipSessionRest();
@@ -508,6 +552,13 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       const exercises = getSessionExercises(state.activeSession);
       if (sessionExerciseIndex < exercises.length - 1) { sessionExerciseIndex += 1; void renderSessionExercise(state.activeSession); }
     }
+  }
+
+  function cueRestCountdown(): void {
+    const cue = sessionRestRemaining === 0
+      ? countdownCueGuard.finish('rest', restCuePeriod)
+      : countdownCueGuard.countdown('rest', restCuePeriod, sessionRestRemaining);
+    playCountdownCue(cue);
   }
 
   function updateSessionRestDisplay(): void {
@@ -607,6 +658,9 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     window.clearInterval(sessionRestTimer);
     window.clearInterval(sessionElapsedTimer);
     window.clearInterval(emomTimer);
+    countdownCueGuard.reset();
+    emomPreviousPhase = null;
+    emomPreviousSlotIndex = null;
     releaseSessionWakeLock();
     root.querySelector('#session-rest-overlay')?.classList.remove('show');
     root.querySelector('#session-overlay')?.classList.remove('open');
@@ -619,8 +673,9 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   }
 
   function sessionDurationLabel(session: ActiveSession): string {
-    if (!session.startedAt || !session.finishedAt) return '—';
-    const sec = Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(session.startedAt).getTime()) / 1000));
+    const startedAt = effectiveSessionStartedAt(session);
+    if (!startedAt || !session.finishedAt) return '—';
+    const sec = Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(startedAt).getTime()) / 1000));
     const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
     if (h > 0) return `${h}h ${m}m`;
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
@@ -664,6 +719,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       void renderSessionExercise(state.activeSession);
     }));
     root.querySelectorAll<HTMLElement>('[data-session-log]').forEach((button) => button.addEventListener('click', () => {
+      unlockCountdownAudio();
       void logSessionSet(button.dataset.sessionLog || '', Number(button.dataset.setIndex) || 0, Number(button.dataset.rest) || 90);
     }));
     root.querySelectorAll<HTMLElement>('[data-add-session-set]').forEach((button) => button.addEventListener('click', () => {
