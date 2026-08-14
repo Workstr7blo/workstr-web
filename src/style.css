@@ -118,20 +118,25 @@
 .emom-log-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) 84px; gap: 10px; }
 .emom-next { color: var(--muted); font: 800 12px/1 ui-monospace, monospace; }
 .emom-live-layout { display: grid; gap: 22px; max-width: 760px; margin: 0 auto; }
-.emom-timer-panel { display: grid; justify-items: center; gap: 13px; padding: 22px; border: 1px solid rgba(188,151,255,.18); border-radius: 20px; background: radial-gradient(circle at 50% 25%, rgba(124,60,255,.18), rgba(0,0,0,.2) 65%); }
+.emom-timer-panel { display: grid; justify-items: center; gap: 9px; padding: 4px 0 10px; }
 .emom-timer-panel.paused { opacity: .78; }
-.emom-timer-wrap { width: 184px; height: 184px; }
-.emom-timer-wrap .emom-countdown { position: relative; margin: 0; font-size: 62px; letter-spacing: -.05em; }
-.emom-workout-card { opacity: .72; padding: 18px; }
-.emom-workout-card.active { opacity: 1; }
+.emom-timer-wrap, .emom-timer-wrap .rest-ring { width: 112px; height: 112px; }
+.emom-timer-wrap .emom-countdown { position: relative; margin: 0; font-size: 42px; letter-spacing: -.05em; }
+.emom-step.emom-workout-card { opacity: .72; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.emom-step.emom-workout-card.active { opacity: 1; border: 0; background: transparent; }
+.emom-step.emom-workout-card.done { background: transparent; }
 .emom-workout-card .session-ex-image { max-height: 260px; object-fit: cover; margin-bottom: 16px; }
 .emom-workout-card .session-ex-name { font-size: clamp(25px, 5vw, 36px); }
-.emom-next-card { display: grid; gap: 6px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,.035); }
+.emom-next-card { display: grid; gap: 5px; padding: 4px 0; border-top: 1px solid rgba(188,151,255,.12); }
 .emom-next-card span { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
 .emom-next-card strong { font-size: 18px; }
 .emom-next-card small { color: var(--muted); }
 .emom-pause-btn { background: linear-gradient(135deg, #2a1944, #4d1fd1); box-shadow: none; }
 .session-prev-btn:disabled { opacity: .38; cursor: default; }
+.emom-round-nav { justify-content: center; gap: 6px; }
+.emom-round-nav .session-ex-dot { width: 42px; height: 42px; }
+.emom-window-arrow { border-color: transparent; background: transparent; font-size: 24px; }
+.emom-window-arrow:disabled { opacity: .25; cursor: default; }
 
 @media (max-width: 700px) {
   input, textarea, select, button { font-size: 16px; }
@@ -155,6 +160,8 @@
   .session-body { padding-left: 22px !important; padding-right: 22px !important; }
   .session-ex-nav { padding-left: 22px !important; padding-right: 22px !important; }
   .session-ex-dot { width: 58px !important; height: 58px !important; }
+  .emom-round-nav { padding-left: 8px !important; padding-right: 8px !important; }
+  .emom-round-nav .session-ex-dot { width: 40px !important; height: 40px !important; }
   .session-set-row { grid-template-columns: 44px minmax(0,1fr) minmax(0,1fr) 70px !important; gap: 10px !important; }
   .session-footer { padding-left: 22px !important; padding-right: 22px !important; }
 }

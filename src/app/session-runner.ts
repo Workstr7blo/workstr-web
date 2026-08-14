@@ -58,6 +58,10 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   let restCuePeriod = 0;
   let emomCompletionHandled = false;
   let emomPersistQueue: Promise<void> = Promise.resolve();
+  let emomRoundWindowStart = 0;
+  let emomRoundWindowBlock = -1;
+  let emomRoundWindowManual = false;
+  let emomRoundWindowSlot = -1;
   const countdownCueGuard = new CountdownCueGuard();
   let sessionWakeLock: WakeLockSentinel | null = null;
   const sessionPreviousSets = new Map<string, SessionSetLog[]>();
@@ -177,6 +181,10 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     emomPreviousPhase = null;
     emomPreviousSlotIndex = null;
     emomCompletionHandled = false;
+    emomRoundWindowStart = 0;
+    emomRoundWindowBlock = -1;
+    emomRoundWindowManual = false;
+    emomRoundWindowSlot = -1;
     if (activeEmomBlocks().length) {
       if (session.emomStartedAt) {
         if (emomClockState(session).runningSinceMs != null) startEmomClockTimer(session);
@@ -258,6 +266,11 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const schedule = compileEmomBlocks(blocks);
     const clock = emomClockSnapshot(emomClockState(session), now);
     const position = session.emomStartedAt ? emomPosition(schedule, now - clock.positionSec * 1000, now) : emomPosition(schedule, null, now);
+    const positionSlotIndex = position.slot?.index ?? -1;
+    if (positionSlotIndex !== emomRoundWindowSlot) {
+      emomRoundWindowSlot = positionSlotIndex;
+      emomRoundWindowManual = false;
+    }
     if (position.phase === 'complete' && clock.running && !emomCompletionHandled) {
       emomCompletionHandled = true;
       applyEmomClock(session, { positionSec: emomDurationSec(schedule), activeSec: clock.activeSec, runningSinceMs: null });
@@ -304,6 +317,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const body = root.querySelector('#session-body');
     const footer = root.querySelector('#session-footer');
     if (!session || !title || !meta || !nav || !body || !footer) return;
+    nav.classList.add('emom-round-nav');
     title.textContent = session.sheetName || 'EMOM';
     nav.innerHTML = '';
     if (position.phase === 'pending') {
@@ -316,7 +330,8 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     }
     if (position.phase === 'complete' || !position.slot) {
       meta.textContent = 'EMOM complete';
-      nav.innerHTML = schedule.map((candidate) => `<button class="session-ex-dot done" data-emom-seek="${candidate.startsAtSec}" type="button" title="Return to interval ${candidate.index + 1}">${candidate.index + 1}</button>`).join('');
+      const lastSlot = schedule.at(-1);
+      nav.innerHTML = lastSlot ? emomRoundNav(schedule, lastSlot, true) : '';
       body.innerHTML = '<div class="emom-hero complete"><div class="emom-badge">Complete</div><div class="session-ex-name">EMOM finished</div><p>Review your logged work, then finish the session when you are ready.</p></div>';
       footer.innerHTML = '<button class="session-prev-btn" id="emom-prev" type="button">Previous</button><button class="session-finish-btn" id="finish-session" type="button">Finish session</button>';
       bindSessionControls();
@@ -326,10 +341,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const block = blocks[slot.blockIndex];
     const paused = emomClockState(session).runningSinceMs == null;
     meta.textContent = `${paused ? 'Paused · ' : ''}${blocks.length > 1 ? `Section ${slot.blockIndex + 1} of ${blocks.length} · ` : ''}Round ${slot.roundIndex + 1} of ${block.rounds} · Interval ${slot.intervalIndex + 1} of ${block.intervals.length}`;
-    nav.innerHTML = schedule.map((candidate) => {
-      const cls = candidate.index === slot.index ? 'current' : candidate.index < slot.index ? 'done' : '';
-      return `<button class="session-ex-dot ${cls}" data-emom-seek="${candidate.startsAtSec}" type="button" title="Section ${candidate.blockIndex + 1}, round ${candidate.roundIndex + 1}">${candidate.index + 1}</button>`;
-    }).join('');
+    nav.innerHTML = emomRoundNav(schedule, slot, false);
     const steps = slot.steps.map((step, stepIndex) => {
       const exercise = session.exercises.find((candidate) => candidate.exerciseSlug === step.exerciseSlug);
       const logged = session.sets.find((set) => set.blockIndex === slot.blockIndex && set.roundIndex === slot.roundIndex && set.intervalIndex === slot.intervalIndex && set.stepIndex === stepIndex);
@@ -362,6 +374,23 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     footer.innerHTML = `<button class="session-prev-btn" id="emom-prev" type="button" ${slot.index === 0 && position.elapsedInSlotSec <= 3 ? 'disabled' : ''}>Previous</button><button class="session-next-btn emom-pause-btn" id="emom-pause" type="button">${paused ? 'Resume' : 'Pause'}</button><button class="session-next-btn" id="emom-next" type="button">Next</button>`;
     root.querySelectorAll<HTMLButtonElement>('[data-log-emom]').forEach((button) => button.addEventListener('click', () => { void logEmomStep(slot, Number(button.dataset.logEmom), button); }));
     bindSessionControls();
+  }
+
+  function emomRoundNav(schedule: EmomSlot[], current: EmomSlot, complete: boolean): string {
+    const rounds = schedule.filter((candidate, index) => candidate.blockIndex === current.blockIndex
+      && schedule.findIndex((slot) => slot.blockIndex === candidate.blockIndex && slot.roundIndex === candidate.roundIndex) === index);
+    const maxStart = Math.max(0, rounds.length - 5);
+    if (emomRoundWindowBlock !== current.blockIndex) {
+      emomRoundWindowBlock = current.blockIndex;
+      emomRoundWindowManual = false;
+    }
+    if (!emomRoundWindowManual) emomRoundWindowStart = Math.max(0, Math.min(maxStart, current.roundIndex - 2));
+    emomRoundWindowStart = Math.max(0, Math.min(maxStart, emomRoundWindowStart));
+    const buttons = rounds.slice(emomRoundWindowStart, emomRoundWindowStart + 5).map((candidate) => {
+      const cls = !complete && candidate.roundIndex === current.roundIndex ? 'current' : complete || candidate.roundIndex < current.roundIndex ? 'done' : '';
+      return `<button class="session-ex-dot ${cls}" data-emom-seek="${candidate.startsAtSec}" type="button" title="Go to round ${candidate.roundIndex + 1}">${candidate.roundIndex + 1}</button>`;
+    }).join('');
+    return `<button class="session-ex-dot emom-window-arrow" data-emom-window="-1" type="button" aria-label="Show previous rounds" ${emomRoundWindowStart === 0 ? 'disabled' : ''}>‹</button>${buttons}<button class="session-ex-dot emom-window-arrow" data-emom-window="1" type="button" aria-label="Show next rounds" ${emomRoundWindowStart >= maxStart ? 'disabled' : ''}>›</button>`;
   }
 
   async function startEmom(): Promise<void> {
@@ -426,6 +455,13 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       const next = schedule[current.index + 1];
       seekEmomTo(next?.startsAtSec ?? emomDurationSec(schedule));
     }
+  }
+
+  function shiftEmomRoundWindow(direction: -1 | 1): void {
+    emomRoundWindowManual = true;
+    emomRoundWindowStart += direction * 5;
+    emomRenderKey = '';
+    reconcileEmomClocks();
   }
 
   async function logEmomStep(slot: EmomSlot, stepIndex: number, button: HTMLButtonElement): Promise<void> {
@@ -509,6 +545,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   function renderSessionNav(exercises: SessionExercise[]): void {
     const nav = root.querySelector('#session-ex-nav');
     if (!nav) return;
+    nav.classList.remove('emom-round-nav');
     nav.innerHTML = exercises.map((ex, i) => {
       const target = Number(ex.sets) || sessionSetCounts[ex.exerciseSlug] || 1;
       const cls = i === sessionExerciseIndex ? 'current' : loggedSetCount(ex.exerciseSlug) >= target ? 'done' : '';
@@ -855,6 +892,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (restSkipButton) restSkipButton.onclick = skipSessionRest;
     root.querySelectorAll<HTMLElement>('[data-rest-adjust]').forEach((button) => { button.onclick = () => adjustRest(Number(button.dataset.restAdjust) || 0); });
     root.querySelectorAll<HTMLElement>('[data-emom-seek]').forEach((button) => { button.onclick = () => seekEmomTo(Number(button.dataset.emomSeek) || 0); });
+    root.querySelectorAll<HTMLElement>('[data-emom-window]').forEach((button) => { button.onclick = () => shiftEmomRoundWindow(Number(button.dataset.emomWindow) < 0 ? -1 : 1); });
     const emomPreviousButton = root.querySelector<HTMLButtonElement>('#emom-prev');
     if (emomPreviousButton) emomPreviousButton.onclick = () => moveEmomSlot(-1);
     const emomPauseButton = root.querySelector<HTMLButtonElement>('#emom-pause');

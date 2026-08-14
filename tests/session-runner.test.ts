@@ -239,6 +239,20 @@ describe('session runner', () => {
     expect(root.querySelector('#emom-countdown')?.textContent).toBe('60');
     await vi.waitFor(() => expect(clockUpdates.length).toBeGreaterThanOrEqual(4));
   });
+
+  it('shows five rounds at a time and browses the round window without seeking', async () => {
+    const program = emomProgram();
+    if (program.blocks?.[0]?.type === 'emom') program.blocks[0].rounds = 35;
+    await runner.startTrainingSession(program);
+    (root.querySelector('#emom-start') as HTMLButtonElement).click();
+    await tick();
+    expect([...root.querySelectorAll('[data-emom-seek]')].map((button) => button.textContent)).toEqual(['1', '2', '3', '4', '5']);
+    expect(root.querySelector('#session-meta')?.textContent).toContain('Round 1 of 35');
+    (root.querySelector('[data-emom-window="1"]') as HTMLButtonElement).click();
+    expect([...root.querySelectorAll('[data-emom-seek]')].map((button) => button.textContent)).toEqual(['6', '7', '8', '9', '10']);
+    expect(root.querySelector('#session-meta')?.textContent).toContain('Round 1 of 35');
+    expect(root.querySelector('#emom-countdown')?.textContent).toBe('60');
+  });
 });
 
 describe('rest timer timing', () => {
