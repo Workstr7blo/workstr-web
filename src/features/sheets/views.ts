@@ -199,7 +199,7 @@ export function programCard(program: RelayProgram, state: AppState): string {
 export function programBody(program: RelayProgram, state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   const emomBlocks = program.blocks?.filter((block) => block.type === 'emom') || [];
-  const emomSummary = emomBlocks.length ? `<div class="emom-program-summary"><strong>${emomBlocks.length} EMOM section${emomBlocks.length === 1 ? '' : 's'} · ${formatMinutes(estimateProgramMin([], emomBlocks))}</strong>${emomBlocks.map((block, index) => `<span>Section ${index + 1}: ${block.rounds} round${block.rounds === 1 ? '' : 's'} · ${formatMinutes(Math.ceil(block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0) / 60))}</span>`).join('')}</div>` : '';
+  const emomSummary = emomBlocks.length ? `<div class="emom-program-summary"><strong>${emomBlocks.length} EMOM section${emomBlocks.length === 1 ? '' : 's'} · ${formatMinutes(estimateProgramMin([], emomBlocks))}</strong>${emomBlocks.map((block, index) => `<span>Section ${index + 1}: ${block.rounds} round${block.rounds === 1 ? '' : 's'} · ${formatMinutes(block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0))}</span>`).join('')}</div>` : '';
   const exHtml = program.exercises.length ? program.exercises.map((member, index) => {
     const full = resolveProgramExercise(member, state.exercises);
     const name = programExerciseName(member, full);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   estimateProgramMin, resolveProgramExercise, programExerciseName, inferProgramMuscle,
-  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, emomBlockFromBuilder, emomBlocksFromBuilder
+  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, programBody, emomBlockFromBuilder, emomBlocksFromBuilder
 } from '../src/features/sheets/views';
 import type { Exercise } from '../src/core/types';
 import type { RelayProgram, RelayProgramExercise } from '../src/nostr/canon';
@@ -179,5 +179,8 @@ describe('emomBlockFromBuilder', () => {
     expect(blocks.map((block) => block.rounds)).toEqual([10, 15, 10]);
     expect(estimateProgramMin([], blocks)).toBe(2100);
     expect(programCard(prog({ blocks }), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState)).toContain('~35 min');
+    const body = programBody(prog({ blocks }), { exercises: [], settings: { unit: 'kg' }, sheets: [] } as unknown as AppState);
+    expect(body).toContain('Section 1: 10 rounds · 10 min');
+    expect(body).toContain('Section 2: 15 rounds · 15 min');
   });
 });
