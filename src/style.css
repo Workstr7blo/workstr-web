@@ -131,7 +131,13 @@
 .emom-next-card span { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
 .emom-next-card strong { font-size: 18px; }
 .emom-next-card small { color: var(--muted); }
-.emom-pause-btn { background: linear-gradient(135deg, #2a1944, #4d1fd1); box-shadow: none; }
+.session-footer.emom-live-controls { position: relative; justify-content: center; min-height: 92px; border-top: 0; background: transparent; backdrop-filter: none; }
+.emom-pause-btn { width: 64px; height: 64px; display: grid; place-items: center; flex: 0 0 64px; padding: 0; border: 1px solid rgba(188,151,255,.5); border-radius: 50%; color: #fff; background: linear-gradient(135deg, #2a1944, #4d1fd1); box-shadow: 0 10px 30px rgba(77,31,209,.3); }
+.emom-pause-btn svg { width: 25px; height: 25px; fill: currentColor; }
+.emom-finish-action { position: absolute; right: clamp(20px, 4vw, 34px); padding: 8px 0; border: 0; color: var(--muted); background: transparent; box-shadow: none; font: 800 11px/1 ui-monospace, monospace; letter-spacing: .04em; }
+.emom-finish-action:hover { color: var(--text); background: transparent; }
+.emom-workout-card .session-instructions { margin-top: 18px; }
+.emom-workout-card .session-instructions-toggle { width: 100%; border: 0; border-radius: 0; background: transparent; box-shadow: none; text-align: left; }
 .session-prev-btn:disabled { opacity: .38; cursor: default; }
 .emom-round-nav { justify-content: center; gap: 6px; }
 .emom-round-nav .session-ex-dot { width: 42px; height: 42px; }

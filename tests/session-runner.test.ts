@@ -212,7 +212,7 @@ describe('session runner', () => {
     expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:30');
   });
 
-  it('pauses, resumes, and moves between EMOM intervals without changing active time', async () => {
+  it('pauses and resumes an EMOM without changing active time', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
     await runner.startTrainingSession(emomProgram());
@@ -222,7 +222,7 @@ describe('session runner', () => {
     expect(root.querySelector('#emom-countdown')?.textContent).toBe('55');
 
     (root.querySelector('#emom-pause') as HTMLButtonElement).click();
-    expect(root.querySelector('#emom-pause')?.textContent).toBe('Resume');
+    expect(root.querySelector('#emom-pause')?.getAttribute('aria-label')).toBe('Resume EMOM');
     await vi.advanceTimersByTimeAsync(5_000);
     expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:05');
     expect(root.querySelector('#emom-countdown')?.textContent).toBe('55');
@@ -231,13 +231,25 @@ describe('session runner', () => {
     await vi.advanceTimersByTimeAsync(2_000);
     expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:07');
     expect(root.querySelector('#emom-countdown')?.textContent).toBe('53');
+    expect(root.querySelector('#emom-next')).toBeNull();
+    expect(root.querySelector('#emom-prev')).toBeNull();
+    expect(root.querySelector('#finish-session')?.textContent).toBe('Finish early');
+    await vi.waitFor(() => expect(clockUpdates.length).toBeGreaterThanOrEqual(2));
+  });
 
-    (root.querySelector('#emom-next') as HTMLButtonElement).click();
-    expect(root.querySelector('#emom-countdown')?.textContent).toBe('60');
-    expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:07');
-    (root.querySelector('#emom-prev') as HTMLButtonElement).click();
-    expect(root.querySelector('#emom-countdown')?.textContent).toBe('60');
-    await vi.waitFor(() => expect(clockUpdates.length).toBeGreaterThanOrEqual(4));
+  it('shows collapsible exercise instructions in an EMOM', async () => {
+    state.exercises = [{ slug: 'bench-press', name: 'Bench Press', instructions: ['Brace firmly.', 'Press with control.'] } as never];
+    await runner.startTrainingSession(emomProgram());
+    (root.querySelector('#emom-start') as HTMLButtonElement).click();
+    await tick();
+    const toggle = root.querySelector('[data-toggle-emom-instructions]') as HTMLButtonElement;
+    expect(toggle).toBeTruthy();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(root.querySelector('[data-emom-instructions]')?.classList.contains('open')).toBe(false);
+    toggle.click();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(root.querySelector('[data-emom-instructions]')?.classList.contains('open')).toBe(true);
+    expect(root.querySelector('[data-emom-instructions]')?.textContent).toContain('Brace firmly.');
   });
 
   it('shows five rounds at a time and browses the round window without seeking', async () => {

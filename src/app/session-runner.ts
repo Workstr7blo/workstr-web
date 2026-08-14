@@ -62,6 +62,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   let emomRoundWindowBlock = -1;
   let emomRoundWindowManual = false;
   let emomRoundWindowSlot = -1;
+  const emomExpandedInstructions = new Set<string>();
   const countdownCueGuard = new CountdownCueGuard();
   let sessionWakeLock: WakeLockSentinel | null = null;
   const sessionPreviousSets = new Map<string, SessionSetLog[]>();
@@ -318,6 +319,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const footer = root.querySelector('#session-footer');
     if (!session || !title || !meta || !nav || !body || !footer) return;
     nav.classList.add('emom-round-nav');
+    footer.classList.remove('emom-live-controls');
     title.textContent = session.sheetName || 'EMOM';
     nav.innerHTML = '';
     if (position.phase === 'pending') {
@@ -349,6 +351,16 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       const active = position.activeStepIndex === stepIndex || (position.activeStepIndex == null && hasUntimedSteps);
       const target = [step.targetDurationSec ? `${step.targetDurationSec}s` : '', step.targetReps ? `${html(step.targetReps)} reps` : ''].filter(Boolean).join(' · ');
       const name = step.exerciseName || exercise?.exerciseName || step.exerciseSlug;
+      const instructionKey = `${slot.blockIndex}:${slot.roundIndex}:${slot.intervalIndex}:${step.exerciseSlug}`;
+      const instructions = exercise?.instructions || [];
+      const instructionsHtml = instructions.length ? `<div class="session-instructions ${emomExpandedInstructions.has(instructionKey) ? 'open' : ''}" data-emom-instructions="${html(instructionKey)}">
+        <button class="session-instructions-toggle" data-toggle-emom-instructions="${html(instructionKey)}" type="button" aria-expanded="${emomExpandedInstructions.has(instructionKey)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>How to perform</span>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="session-instructions-body">${instructions.map((instruction, index) => `<div class="session-instructions-step"><b>${index + 1}</b>${html(instruction)}</div>`).join('')}</div>
+      </div>` : '';
       return `<div class="emom-step emom-workout-card ${active ? 'active' : ''} ${logged ? 'done' : ''}" data-emom-step="${stepIndex}">
         ${exercise?.imageUrl ? `<img class="session-ex-image" src="${html(exercise.imageUrl)}" alt="${html(name)}">` : ''}
         <div class="session-ex-name">${html(name)}</div>
@@ -358,6 +370,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
           <input class="session-set-input" data-emom-weight type="number" inputmode="decimal" step="0.5" placeholder="${ctx.unitLabel()}" ${logged ? `value="${logged.weight == null ? '' : sessionWeightDisplay(logged.weight)}" disabled` : ''}>
           <button class="session-log-btn ${logged ? 'done' : ''}" data-log-emom="${stepIndex}" type="button" ${logged ? 'disabled' : ''}>${logged ? 'Done' : 'Log'}</button>
         </div>
+        ${instructionsHtml}
       </div>`;
     }).join('');
     const nextSlot = schedule[slot.index + 1];
@@ -371,7 +384,8 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       <div class="emom-steps">${steps}</div>
       <div class="emom-next-card"><span>Next up</span><strong>${nextStep ? html(nextStep.exerciseName || nextStep.exerciseSlug) : 'Finish session'}</strong><small>${nextSlot ? `Round ${nextSlot.roundIndex + 1} · ${nextSlot.durationSec}s interval` : 'Workout complete'}</small></div>
     </div>`;
-    footer.innerHTML = `<button class="session-prev-btn" id="emom-prev" type="button" ${slot.index === 0 && position.elapsedInSlotSec <= 3 ? 'disabled' : ''}>Previous</button><button class="session-next-btn emom-pause-btn" id="emom-pause" type="button">${paused ? 'Resume' : 'Pause'}</button><button class="session-next-btn" id="emom-next" type="button">Next</button>`;
+    footer.classList.add('emom-live-controls');
+    footer.innerHTML = `<button class="emom-pause-btn" id="emom-pause" type="button" aria-label="${paused ? 'Resume EMOM' : 'Pause EMOM'}" title="${paused ? 'Resume' : 'Pause'}">${paused ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>' : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>'}</button><button class="emom-finish-action" id="finish-session" type="button">Finish early</button>`;
     root.querySelectorAll<HTMLButtonElement>('[data-log-emom]').forEach((button) => button.addEventListener('click', () => { void logEmomStep(slot, Number(button.dataset.logEmom), button); }));
     bindSessionControls();
   }
@@ -438,23 +452,6 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     emomPreviousSlotIndex = null;
     emomCompletionHandled = false;
     reconcileEmomClocks(now);
-  }
-
-  function moveEmomSlot(direction: -1 | 1): void {
-    const session = state.activeSession;
-    const blocks = activeEmomBlocks();
-    if (!session || !blocks.length) return;
-    const schedule = compileEmomBlocks(blocks);
-    const snapshot = emomClockSnapshot(emomClockState(session));
-    const current = schedule.find((slot) => snapshot.positionSec < slot.endsAtSec) || schedule.at(-1);
-    if (!current) return;
-    if (direction < 0) {
-      const targetIndex = snapshot.positionSec - current.startsAtSec > 3 ? current.index : Math.max(0, current.index - 1);
-      seekEmomTo(schedule[targetIndex].startsAtSec);
-    } else {
-      const next = schedule[current.index + 1];
-      seekEmomTo(next?.startsAtSec ?? emomDurationSec(schedule));
-    }
   }
 
   function shiftEmomRoundWindow(direction: -1 | 1): void {
@@ -545,6 +542,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   function renderSessionNav(exercises: SessionExercise[]): void {
     const nav = root.querySelector('#session-ex-nav');
     if (!nav) return;
+    root.querySelector('#session-footer')?.classList.remove('emom-live-controls');
     nav.classList.remove('emom-round-nav');
     nav.innerHTML = exercises.map((ex, i) => {
       const target = Number(ex.sets) || sessionSetCounts[ex.exerciseSlug] || 1;
@@ -893,12 +891,16 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     root.querySelectorAll<HTMLElement>('[data-rest-adjust]').forEach((button) => { button.onclick = () => adjustRest(Number(button.dataset.restAdjust) || 0); });
     root.querySelectorAll<HTMLElement>('[data-emom-seek]').forEach((button) => { button.onclick = () => seekEmomTo(Number(button.dataset.emomSeek) || 0); });
     root.querySelectorAll<HTMLElement>('[data-emom-window]').forEach((button) => { button.onclick = () => shiftEmomRoundWindow(Number(button.dataset.emomWindow) < 0 ? -1 : 1); });
-    const emomPreviousButton = root.querySelector<HTMLButtonElement>('#emom-prev');
-    if (emomPreviousButton) emomPreviousButton.onclick = () => moveEmomSlot(-1);
     const emomPauseButton = root.querySelector<HTMLButtonElement>('#emom-pause');
     if (emomPauseButton) emomPauseButton.onclick = toggleEmomPause;
-    const emomNextButton = root.querySelector<HTMLButtonElement>('#emom-next');
-    if (emomNextButton) emomNextButton.onclick = () => moveEmomSlot(1);
+    root.querySelectorAll<HTMLButtonElement>('[data-toggle-emom-instructions]').forEach((button) => { button.onclick = () => {
+      const key = button.dataset.toggleEmomInstructions || '';
+      const panel = button.closest<HTMLElement>('[data-emom-instructions]');
+      const open = !panel?.classList.contains('open');
+      panel?.classList.toggle('open', open);
+      button.setAttribute('aria-expanded', String(open));
+      if (open) emomExpandedInstructions.add(key); else emomExpandedInstructions.delete(key);
+    }; });
     root.querySelectorAll<HTMLElement>('[data-jump-ex]').forEach((button) => { button.onclick = () => {
       if (!state.activeSession) return;
       sessionExerciseIndex = Number(button.dataset.jumpEx) || 0;
