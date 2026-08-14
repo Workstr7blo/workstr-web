@@ -6,6 +6,7 @@ import { fetchCanonPrograms, type RelayProgram } from '../nostr/canon';
 import { publishWorkoutSummary } from '../nostr/share';
 import type { EmomBlock } from '../core/types';
 import { compileEmomBlocks, emomDurationSec, emomPosition, type EmomPosition, type EmomSlot } from '../features/train/emom';
+import { emomClockSnapshot, pauseEmomClock, resumeEmomClock, seekEmomClock, type EmomClockState } from '../features/train/emom-clock';
 import { CountdownCueGuard, playCountdownCue, unlockCountdownAudio } from '../features/train/countdown-audio';
 import type { ActiveSession, AppState, SessionExercise, SessionSetLog } from './state';
 import type { Signer } from '../signer/types';
@@ -55,6 +56,8 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   let emomPreviousPhase: EmomPosition['phase'] | null = null;
   let emomPreviousSlotIndex: number | null = null;
   let restCuePeriod = 0;
+  let emomCompletionHandled = false;
+  let emomPersistQueue: Promise<void> = Promise.resolve();
   const countdownCueGuard = new CountdownCueGuard();
   let sessionWakeLock: WakeLockSentinel | null = null;
   const sessionPreviousSets = new Map<string, SessionSetLog[]>();
@@ -173,8 +176,12 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     emomRenderKey = '';
     emomPreviousPhase = null;
     emomPreviousSlotIndex = null;
+    emomCompletionHandled = false;
     if (activeEmomBlocks().length) {
-      if (session.emomStartedAt) startEmomClockTimer(session);
+      if (session.emomStartedAt) {
+        if (emomClockState(session).runningSinceMs != null) startEmomClockTimer(session);
+        else reconcileEmomClocks();
+      }
       else {
         window.clearInterval(sessionElapsedTimer);
         updateSessionElapsed(session);
@@ -196,6 +203,32 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
 
   function effectiveSessionStartedAt(session: ActiveSession): string | null {
     return isEmomSession(session) ? session.emomStartedAt || null : session.startedAt || null;
+  }
+
+  function emomClockState(session: ActiveSession): EmomClockState {
+    const legacyRunningSince = session.emomRunningSince || (session.emomStartedAt && session.emomPositionSec == null ? session.emomStartedAt : undefined);
+    const runningSinceMs = legacyRunningSince ? new Date(legacyRunningSince).getTime() : null;
+    return {
+      positionSec: Number(session.emomPositionSec) || 0,
+      activeSec: Number(session.emomActiveSec) || 0,
+      runningSinceMs: runningSinceMs != null && Number.isFinite(runningSinceMs) ? runningSinceMs : null
+    };
+  }
+
+  function applyEmomClock(session: ActiveSession, clock: EmomClockState): void {
+    session.emomPositionSec = clock.positionSec;
+    session.emomActiveSec = clock.activeSec;
+    session.emomRunningSince = clock.runningSinceMs == null ? undefined : new Date(clock.runningSinceMs).toISOString();
+  }
+
+  function persistEmomClock(session: ActiveSession): void {
+    const id = session.id;
+    const positionSec = Number(session.emomPositionSec) || 0;
+    const activeSec = Number(session.emomActiveSec) || 0;
+    const runningSince = session.emomRunningSince;
+    emomPersistQueue = emomPersistQueue.then(async () => {
+      await state.store?.updateSessionEmomClock?.(id, positionSec, activeSec, runningSince);
+    });
   }
 
   function startSessionElapsedTimer(session: ActiveSession): void {
@@ -223,11 +256,22 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const blocks = activeEmomBlocks();
     if (!session || !blocks.length) return;
     const schedule = compileEmomBlocks(blocks);
-    const startedAt = session.emomStartedAt ? new Date(session.emomStartedAt).getTime() : null;
-    const position = emomPosition(schedule, startedAt, now);
+    const clock = emomClockSnapshot(emomClockState(session), now);
+    const position = session.emomStartedAt ? emomPosition(schedule, now - clock.positionSec * 1000, now) : emomPosition(schedule, null, now);
+    if (position.phase === 'complete' && clock.running && !emomCompletionHandled) {
+      emomCompletionHandled = true;
+      applyEmomClock(session, { positionSec: emomDurationSec(schedule), activeSec: clock.activeSec, runningSinceMs: null });
+      persistEmomClock(session);
+      window.clearInterval(emomTimer);
+    }
     cueEmomPosition(position);
     const countdown = root.querySelector('#emom-countdown');
     if (countdown) countdown.textContent = String(position.secondsRemaining);
+    const ring = root.querySelector<SVGCircleElement>('#emom-ring-fg');
+    if (ring && position.slot) {
+      const circumference = 339.3;
+      ring.style.strokeDashoffset = String(circumference * (1 - position.secondsRemaining / position.slot.durationSec));
+    }
     const progress = root.querySelector<HTMLElement>('#session-progress-fill');
     if (progress) {
       const completed = position.phase === 'complete' ? schedule.length : position.slot?.index || 0;
@@ -272,22 +316,31 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     }
     if (position.phase === 'complete' || !position.slot) {
       meta.textContent = 'EMOM complete';
+      nav.innerHTML = schedule.map((candidate) => `<button class="session-ex-dot done" data-emom-seek="${candidate.startsAtSec}" type="button" title="Return to interval ${candidate.index + 1}">${candidate.index + 1}</button>`).join('');
       body.innerHTML = '<div class="emom-hero complete"><div class="emom-badge">Complete</div><div class="session-ex-name">EMOM finished</div><p>Review your logged work, then finish the session when you are ready.</p></div>';
-      footer.innerHTML = '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>';
+      footer.innerHTML = '<button class="session-prev-btn" id="emom-prev" type="button">Previous</button><button class="session-finish-btn" id="finish-session" type="button">Finish session</button>';
       bindSessionControls();
       return;
     }
     const slot = position.slot;
     const block = blocks[slot.blockIndex];
-    meta.textContent = `${blocks.length > 1 ? `Section ${slot.blockIndex + 1} of ${blocks.length} · ` : ''}EMOM · Round ${slot.roundIndex + 1} of ${block.rounds} · Interval ${slot.intervalIndex + 1} of ${block.intervals.length}`;
+    const paused = emomClockState(session).runningSinceMs == null;
+    meta.textContent = `${paused ? 'Paused · ' : ''}${blocks.length > 1 ? `Section ${slot.blockIndex + 1} of ${blocks.length} · ` : ''}Round ${slot.roundIndex + 1} of ${block.rounds} · Interval ${slot.intervalIndex + 1} of ${block.intervals.length}`;
+    nav.innerHTML = schedule.map((candidate) => {
+      const cls = candidate.index === slot.index ? 'current' : candidate.index < slot.index ? 'done' : '';
+      return `<button class="session-ex-dot ${cls}" data-emom-seek="${candidate.startsAtSec}" type="button" title="Section ${candidate.blockIndex + 1}, round ${candidate.roundIndex + 1}">${candidate.index + 1}</button>`;
+    }).join('');
     const steps = slot.steps.map((step, stepIndex) => {
       const exercise = session.exercises.find((candidate) => candidate.exerciseSlug === step.exerciseSlug);
       const logged = session.sets.find((set) => set.blockIndex === slot.blockIndex && set.roundIndex === slot.roundIndex && set.intervalIndex === slot.intervalIndex && set.stepIndex === stepIndex);
       const hasUntimedSteps = slot.steps.some((candidate) => !Number(candidate.targetDurationSec));
       const active = position.activeStepIndex === stepIndex || (position.activeStepIndex == null && hasUntimedSteps);
       const target = [step.targetDurationSec ? `${step.targetDurationSec}s` : '', step.targetReps ? `${html(step.targetReps)} reps` : ''].filter(Boolean).join(' · ');
-      return `<div class="emom-step ${active ? 'active' : ''} ${logged ? 'done' : ''}" data-emom-step="${stepIndex}">
-        <div class="emom-step-head"><span>${stepIndex + 1}</span><div><strong>${html(step.exerciseName || exercise?.exerciseName || step.exerciseSlug)}</strong><small>${target || 'Open target'}</small></div></div>
+      const name = step.exerciseName || exercise?.exerciseName || step.exerciseSlug;
+      return `<div class="emom-step emom-workout-card ${active ? 'active' : ''} ${logged ? 'done' : ''}" data-emom-step="${stepIndex}">
+        ${exercise?.imageUrl ? `<img class="session-ex-image" src="${html(exercise.imageUrl)}" alt="${html(name)}">` : ''}
+        <div class="session-ex-name">${html(name)}</div>
+        <div class="session-ex-target"><b>${target || 'Open target'}</b><span class="dot"></span><span>Every ${slot.durationSec}s</span></div>
         <div class="emom-log-row">
           <input class="session-set-input" data-emom-reps type="number" inputmode="numeric" placeholder="actual reps" ${logged ? `value="${logged.reps ?? ''}" disabled` : ''}>
           <input class="session-set-input" data-emom-weight type="number" inputmode="decimal" step="0.5" placeholder="${ctx.unitLabel()}" ${logged ? `value="${logged.weight == null ? '' : sessionWeightDisplay(logged.weight)}" disabled` : ''}>
@@ -295,8 +348,18 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
         </div>
       </div>`;
     }).join('');
-    body.innerHTML = `<div class="emom-clock"><div class="emom-badge">EMOM</div><div class="emom-countdown" id="emom-countdown">${position.secondsRemaining}</div><div class="emom-caption">seconds left</div></div><div class="emom-steps">${steps}</div>`;
-    footer.innerHTML = `<div class="emom-next">${slot.index + 1} / ${schedule.length} intervals</div><button class="session-finish-btn" id="finish-session" type="button">Finish early</button>`;
+    const nextSlot = schedule[slot.index + 1];
+    const nextStep = nextSlot?.steps[0];
+    body.innerHTML = `<div class="emom-live-layout">
+      <div class="emom-timer-panel ${paused ? 'paused' : ''}">
+        <div class="emom-badge">${paused ? 'Paused' : 'EMOM'}</div>
+        <div class="rest-timer-wrap emom-timer-wrap"><svg class="rest-ring" viewBox="0 0 120 120"><circle class="rest-ring-bg" cx="60" cy="60" r="54" stroke-width="8"/><circle id="emom-ring-fg" class="rest-ring-fg" cx="60" cy="60" r="54" stroke-width="8" stroke-dasharray="339.3" stroke-dashoffset="${339.3 * (1 - position.secondsRemaining / slot.durationSec)}"/></svg><div class="emom-countdown" id="emom-countdown">${position.secondsRemaining}</div></div>
+        <div class="emom-caption">seconds left · interval ${slot.index + 1} of ${schedule.length}</div>
+      </div>
+      <div class="emom-steps">${steps}</div>
+      <div class="emom-next-card"><span>Next up</span><strong>${nextStep ? html(nextStep.exerciseName || nextStep.exerciseSlug) : 'Finish session'}</strong><small>${nextSlot ? `Round ${nextSlot.roundIndex + 1} · ${nextSlot.durationSec}s interval` : 'Workout complete'}</small></div>
+    </div>`;
+    footer.innerHTML = `<button class="session-prev-btn" id="emom-prev" type="button" ${slot.index === 0 && position.elapsedInSlotSec <= 3 ? 'disabled' : ''}>Previous</button><button class="session-next-btn emom-pause-btn" id="emom-pause" type="button">${paused ? 'Resume' : 'Pause'}</button><button class="session-next-btn" id="emom-next" type="button">Next</button>`;
     root.querySelectorAll<HTMLButtonElement>('[data-log-emom]').forEach((button) => button.addEventListener('click', () => { void logEmomStep(slot, Number(button.dataset.logEmom), button); }));
     bindSessionControls();
   }
@@ -306,12 +369,63 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const startedAt = new Date().toISOString();
     state.activeSession.emomStartedAt = startedAt;
     state.activeSession.startedAt = startedAt;
-    const persisted = state.store?.startSessionEmom(state.activeSession.id, startedAt);
+    state.activeSession.emomPositionSec = 0;
+    state.activeSession.emomActiveSec = 0;
+    state.activeSession.emomRunningSince = startedAt;
+    emomPersistQueue = state.store?.startSessionEmom(state.activeSession.id, startedAt) || Promise.resolve();
     emomRenderKey = '';
     emomPreviousPhase = null;
     emomPreviousSlotIndex = null;
+    emomCompletionHandled = false;
     startEmomClockTimer(state.activeSession);
-    if (persisted) await persisted;
+    await emomPersistQueue;
+  }
+
+  function toggleEmomPause(): void {
+    const session = state.activeSession;
+    if (!session?.emomStartedAt) return;
+    const now = Date.now();
+    const current = emomClockState(session);
+    const next = current.runningSinceMs == null ? resumeEmomClock(current, now) : pauseEmomClock(current, now);
+    applyEmomClock(session, next);
+    persistEmomClock(session);
+    emomRenderKey = '';
+    if (next.runningSinceMs == null) {
+      window.clearInterval(emomTimer);
+      reconcileEmomClocks(now);
+    } else {
+      startEmomClockTimer(session);
+    }
+  }
+
+  function seekEmomTo(positionSec: number): void {
+    const session = state.activeSession;
+    if (!session?.emomStartedAt) return;
+    const now = Date.now();
+    applyEmomClock(session, seekEmomClock(emomClockState(session), positionSec, now));
+    persistEmomClock(session);
+    emomRenderKey = '';
+    emomPreviousPhase = null;
+    emomPreviousSlotIndex = null;
+    emomCompletionHandled = false;
+    reconcileEmomClocks(now);
+  }
+
+  function moveEmomSlot(direction: -1 | 1): void {
+    const session = state.activeSession;
+    const blocks = activeEmomBlocks();
+    if (!session || !blocks.length) return;
+    const schedule = compileEmomBlocks(blocks);
+    const snapshot = emomClockSnapshot(emomClockState(session));
+    const current = schedule.find((slot) => snapshot.positionSec < slot.endsAtSec) || schedule.at(-1);
+    if (!current) return;
+    if (direction < 0) {
+      const targetIndex = snapshot.positionSec - current.startsAtSec > 3 ? current.index : Math.max(0, current.index - 1);
+      seekEmomTo(schedule[targetIndex].startsAtSec);
+    } else {
+      const next = schedule[current.index + 1];
+      seekEmomTo(next?.startsAtSec ?? emomDurationSec(schedule));
+    }
   }
 
   async function logEmomStep(slot: EmomSlot, stepIndex: number, button: HTMLButtonElement): Promise<void> {
@@ -368,7 +482,9 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (!el) return;
     const startedAt = effectiveSessionStartedAt(session);
     if (!startedAt) { el.textContent = '00:00'; return; }
-    const seconds = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
+    const seconds = isEmomSession(session)
+      ? Math.max(0, Math.floor(emomClockSnapshot(emomClockState(session), now).activeSec))
+      : Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
     const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), sec = seconds % 60;
     el.textContent = h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   }
@@ -606,6 +722,11 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
 
   async function finishActiveSession(): Promise<void> {
     if (!state.activeSession) return;
+    if (isEmomSession(state.activeSession) && state.activeSession.emomStartedAt) {
+      applyEmomClock(state.activeSession, pauseEmomClock(emomClockState(state.activeSession)));
+      persistEmomClock(state.activeSession);
+      await emomPersistQueue;
+    }
     state.activeSession.finishedAt = new Date().toISOString();
     if (state.store) await state.store.finishSession(state.activeSession.id, state.activeSession.finishedAt);
     const finished = state.activeSession;
@@ -691,7 +812,9 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   function sessionDurationLabel(session: ActiveSession): string {
     const startedAt = effectiveSessionStartedAt(session);
     if (!startedAt || !session.finishedAt) return '—';
-    const sec = Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(startedAt).getTime()) / 1000));
+    const sec = isEmomSession(session) && session.emomActiveSec != null
+      ? Math.max(0, Math.round(session.emomActiveSec))
+      : Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(startedAt).getTime()) / 1000));
     const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
     if (h > 0) return `${h}h ${m}m`;
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
@@ -731,6 +854,13 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const restSkipButton = root.querySelector<HTMLButtonElement>('#rest-skip');
     if (restSkipButton) restSkipButton.onclick = skipSessionRest;
     root.querySelectorAll<HTMLElement>('[data-rest-adjust]').forEach((button) => { button.onclick = () => adjustRest(Number(button.dataset.restAdjust) || 0); });
+    root.querySelectorAll<HTMLElement>('[data-emom-seek]').forEach((button) => { button.onclick = () => seekEmomTo(Number(button.dataset.emomSeek) || 0); });
+    const emomPreviousButton = root.querySelector<HTMLButtonElement>('#emom-prev');
+    if (emomPreviousButton) emomPreviousButton.onclick = () => moveEmomSlot(-1);
+    const emomPauseButton = root.querySelector<HTMLButtonElement>('#emom-pause');
+    if (emomPauseButton) emomPauseButton.onclick = toggleEmomPause;
+    const emomNextButton = root.querySelector<HTMLButtonElement>('#emom-next');
+    if (emomNextButton) emomNextButton.onclick = () => moveEmomSlot(1);
     root.querySelectorAll<HTMLElement>('[data-jump-ex]').forEach((button) => { button.onclick = () => {
       if (!state.activeSession) return;
       sessionExerciseIndex = Number(button.dataset.jumpEx) || 0;

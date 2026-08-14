@@ -857,6 +857,9 @@ export function renderShell(root: HTMLElement): void {
       exercises,
       blocks: session.blocks,
       emomStartedAt: session.emom_started_at,
+      emomPositionSec: session.emom_position_sec,
+      emomActiveSec: session.emom_active_sec,
+      emomRunningSince: session.emom_running_since || (session.emom_started_at && session.emom_position_sec == null ? session.emom_started_at : undefined),
       sets: sets.map((set) => ({
         exerciseSlug: set.exercise_slug || String(set.exercise_id || ''),
         exerciseName: set.exercise_name,

@@ -25,17 +25,19 @@ function makeState(store: WorkstrStore): AppState {
   };
 }
 
-function fakeStore(): { store: WorkstrStore; sets: unknown[]; finished: number[]; emomStarts: Array<{ id: number; startedAt: string }> } {
+function fakeStore(): { store: WorkstrStore; sets: unknown[]; finished: number[]; emomStarts: Array<{ id: number; startedAt: string }>; clockUpdates: Array<{ positionSec: number; activeSec: number; runningSince?: string }> } {
   const sets: unknown[] = [];
   const finished: number[] = [];
   const emomStarts: Array<{ id: number; startedAt: string }> = [];
+  const clockUpdates: Array<{ positionSec: number; activeSec: number; runningSince?: string }> = [];
   const store = {
     createSession: async () => 1,
     addSessionSet: async (set: unknown) => { sets.push(set); return sets.length; },
     startSessionEmom: async (id: number, startedAt: string) => { emomStarts.push({ id, startedAt }); },
+    updateSessionEmomClock: async (_id: number, positionSec: number, activeSec: number, runningSince?: string) => { clockUpdates.push({ positionSec, activeSec, runningSince }); },
     finishSession: async (id: number) => { finished.push(id); }
   } as unknown as WorkstrStore;
-  return { store, sets, finished, emomStarts };
+  return { store, sets, finished, emomStarts, clockUpdates };
 }
 
 function makeContext(root: HTMLElement, state: AppState): SessionRunnerContext {
@@ -84,6 +86,7 @@ describe('session runner', () => {
   let store: WorkstrStore;
   let sets: unknown[];
   let emomStarts: Array<{ id: number; startedAt: string }>;
+  let clockUpdates: Array<{ positionSec: number; activeSec: number; runningSince?: string }>;
   let runner: ReturnType<typeof createSessionRunner>;
 
   beforeEach(() => {
@@ -93,6 +96,7 @@ describe('session runner', () => {
     store = fake.store;
     sets = fake.sets;
     emomStarts = fake.emomStarts;
+    clockUpdates = fake.clockUpdates;
     state = makeState(store);
     root.innerHTML = shellMarkup(state);
     runner = createSessionRunner(makeContext(root, state));
@@ -206,6 +210,34 @@ describe('session runner', () => {
     };
     await runner.openSessionOverlay(state.activeSession);
     expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:30');
+  });
+
+  it('pauses, resumes, and moves between EMOM intervals without changing active time', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
+    await runner.startTrainingSession(emomProgram());
+    (root.querySelector('#emom-start') as HTMLButtonElement).click();
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(root.querySelector('#emom-countdown')?.textContent).toBe('55');
+
+    (root.querySelector('#emom-pause') as HTMLButtonElement).click();
+    expect(root.querySelector('#emom-pause')?.textContent).toBe('Resume');
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:05');
+    expect(root.querySelector('#emom-countdown')?.textContent).toBe('55');
+
+    (root.querySelector('#emom-pause') as HTMLButtonElement).click();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:07');
+    expect(root.querySelector('#emom-countdown')?.textContent).toBe('53');
+
+    (root.querySelector('#emom-next') as HTMLButtonElement).click();
+    expect(root.querySelector('#emom-countdown')?.textContent).toBe('60');
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:07');
+    (root.querySelector('#emom-prev') as HTMLButtonElement).click();
+    expect(root.querySelector('#emom-countdown')?.textContent).toBe('60');
+    await vi.waitFor(() => expect(clockUpdates.length).toBeGreaterThanOrEqual(4));
   });
 });
 

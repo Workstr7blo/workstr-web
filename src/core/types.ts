@@ -127,6 +127,9 @@ export interface Session {
   exercises?: StoredSessionExercise[];
   blocks?: TrainingBlock[];
   emom_started_at?: ISODateTime;
+  emom_position_sec?: number;
+  emom_active_sec?: number;
+  emom_running_since?: ISODateTime;
 }
 
 export interface SessionSet {

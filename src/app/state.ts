@@ -45,6 +45,9 @@ export interface ActiveSession {
   exercises: SessionExercise[];
   blocks?: TrainingBlock[];
   emomStartedAt?: string;
+  emomPositionSec?: number;
+  emomActiveSec?: number;
+  emomRunningSince?: string;
   sets: SessionSetLog[];
 }
 

@@ -8,7 +8,9 @@ import { displayWeightKg, type WeightUnit } from '../core/units';
 
 function sessionDuration(session: ActiveSession): string {
   if (!session.startedAt || !session.finishedAt) return '';
-  const sec = Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(session.startedAt).getTime()) / 1000));
+  const sec = session.blocks?.some((block) => block.type === 'emom') && session.emomActiveSec != null
+    ? Math.max(0, Math.round(session.emomActiveSec))
+    : Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(session.startedAt).getTime()) / 1000));
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;

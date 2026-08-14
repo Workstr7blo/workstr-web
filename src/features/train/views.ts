@@ -11,7 +11,9 @@ export function workoutVolume(session: ActiveSession): number {
 
 export function sessionDuration(session: ActiveSession): string {
   if (!session.startedAt || !session.finishedAt) return '';
-  const min = Math.round((new Date(session.finishedAt).getTime() - new Date(session.startedAt).getTime()) / 60000);
+  const min = session.blocks?.some((block) => block.type === 'emom') && session.emomActiveSec != null
+    ? Math.round(session.emomActiveSec / 60)
+    : Math.round((new Date(session.finishedAt).getTime() - new Date(session.startedAt).getTime()) / 60000);
   if (!Number.isFinite(min) || min <= 0) return '';
   return min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`;
 }
