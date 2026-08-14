@@ -161,6 +161,7 @@ describe('session runner', () => {
     const createdAt = state.activeSession?.startedAt;
     expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:00');
 
+    await vi.advanceTimersByTimeAsync(250);
     vi.setSystemTime(new Date('2026-08-14T12:02:00Z'));
     expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:00');
     (root.querySelector('#emom-start') as HTMLButtonElement).click();
@@ -171,8 +172,12 @@ describe('session runner', () => {
     expect(state.activeSession?.emomStartedAt).toBe(state.activeSession?.startedAt);
     expect(emomStarts).toEqual([{ id: 1, startedAt: '2026-08-14T12:02:00.000Z' }]);
 
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:01');
+    expect(root.querySelector('#emom-countdown')?.textContent).toBe('59');
+    await vi.advanceTimersByTimeAsync(4_000);
     expect(root.querySelector('#session-elapsed')?.textContent).toBe('00:05');
+    expect(root.querySelector('#emom-countdown')?.textContent).toBe('55');
   });
 
   it('resumes an active EMOM using its persisted EMOM start time', async () => {

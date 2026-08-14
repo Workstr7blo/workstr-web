@@ -162,22 +162,26 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (document.visibilityState !== 'visible') return;
     if (state.activeSession && root.querySelector('#session-overlay')?.classList.contains('open')) void requestSessionWakeLock();
     if (sessionRestEndsAt) reconcileSessionRest();
-    if (activeEmomBlocks().length) reconcileEmom();
+    if (activeEmomBlocks().length) reconcileEmomClocks();
   });
 
   async function openSessionOverlay(session: ActiveSession): Promise<void> {
     root.querySelector('#session-overlay')?.classList.add('open');
     void requestSessionWakeLock();
-    startSessionElapsedTimer(session);
     if (!Object.keys(sessionSetCounts).length) sessionSetCounts = setCountsFromSession(session);
     window.clearInterval(emomTimer);
     emomRenderKey = '';
     emomPreviousPhase = null;
     emomPreviousSlotIndex = null;
     if (activeEmomBlocks().length) {
-      reconcileEmom();
-      emomTimer = window.setInterval(reconcileEmom, 1000);
+      if (session.emomStartedAt) startEmomClockTimer(session);
+      else {
+        window.clearInterval(sessionElapsedTimer);
+        updateSessionElapsed(session);
+        reconcileEmom();
+      }
     } else {
+      startSessionElapsedTimer(session);
       await renderSessionExercise(session);
     }
   }
@@ -201,13 +205,26 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     sessionElapsedTimer = window.setInterval(() => { if (state.activeSession) updateSessionElapsed(state.activeSession); }, 1000);
   }
 
-  function reconcileEmom(): void {
+  function reconcileEmomClocks(now = Date.now()): void {
+    if (!state.activeSession) return;
+    updateSessionElapsed(state.activeSession, now);
+    reconcileEmom(now);
+  }
+
+  function startEmomClockTimer(session: ActiveSession): void {
+    window.clearInterval(sessionElapsedTimer);
+    window.clearInterval(emomTimer);
+    reconcileEmomClocks();
+    emomTimer = window.setInterval(() => reconcileEmomClocks(), 1000);
+  }
+
+  function reconcileEmom(now = Date.now()): void {
     const session = state.activeSession;
     const blocks = activeEmomBlocks();
     if (!session || !blocks.length) return;
     const schedule = compileEmomBlocks(blocks);
     const startedAt = session.emomStartedAt ? new Date(session.emomStartedAt).getTime() : null;
-    const position = emomPosition(schedule, startedAt);
+    const position = emomPosition(schedule, startedAt, now);
     cueEmomPosition(position);
     const countdown = root.querySelector('#emom-countdown');
     if (countdown) countdown.textContent = String(position.secondsRemaining);
@@ -289,12 +306,11 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const startedAt = new Date().toISOString();
     state.activeSession.emomStartedAt = startedAt;
     state.activeSession.startedAt = startedAt;
-    startSessionElapsedTimer(state.activeSession);
     const persisted = state.store?.startSessionEmom(state.activeSession.id, startedAt);
     emomRenderKey = '';
     emomPreviousPhase = null;
     emomPreviousSlotIndex = null;
-    reconcileEmom();
+    startEmomClockTimer(state.activeSession);
     if (persisted) await persisted;
   }
 
@@ -347,12 +363,12 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     reconcileEmom();
   }
 
-  function updateSessionElapsed(session: ActiveSession): void {
+  function updateSessionElapsed(session: ActiveSession, now = Date.now()): void {
     const el = root.querySelector('#session-elapsed');
     if (!el) return;
     const startedAt = effectiveSessionStartedAt(session);
     if (!startedAt) { el.textContent = '00:00'; return; }
-    const seconds = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
+    const seconds = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
     const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), sec = seconds % 60;
     el.textContent = h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   }
