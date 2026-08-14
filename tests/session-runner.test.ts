@@ -154,6 +154,17 @@ describe('session runner', () => {
     expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(false);
   });
 
+  it('asks for end confirmation only once after repeated EMOM renders', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await runner.startTrainingSession(emomProgram());
+    (root.querySelector('#emom-start') as HTMLButtonElement).click();
+    await tick();
+    (root.querySelector('#session-close') as HTMLButtonElement).click();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(state.activeSession).toBeTruthy();
+    confirm.mockRestore();
+  });
+
   it('keeps elapsed time at zero until EMOM starts, then aligns both clocks', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));

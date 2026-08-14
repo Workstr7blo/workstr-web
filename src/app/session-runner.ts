@@ -726,26 +726,30 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   }
 
   function bindSessionControls(): void {
-    root.querySelector('#session-close')?.addEventListener('click', () => { void cancelActiveSession(); });
-    root.querySelector('#rest-skip')?.addEventListener('click', skipSessionRest);
-    root.querySelectorAll<HTMLElement>('[data-rest-adjust]').forEach((button) => button.addEventListener('click', () => adjustRest(Number(button.dataset.restAdjust) || 0)));
-    root.querySelectorAll<HTMLElement>('[data-jump-ex]').forEach((button) => button.addEventListener('click', () => {
+    const closeButton = root.querySelector<HTMLButtonElement>('#session-close');
+    if (closeButton) closeButton.onclick = () => { void cancelActiveSession(); };
+    const restSkipButton = root.querySelector<HTMLButtonElement>('#rest-skip');
+    if (restSkipButton) restSkipButton.onclick = skipSessionRest;
+    root.querySelectorAll<HTMLElement>('[data-rest-adjust]').forEach((button) => { button.onclick = () => adjustRest(Number(button.dataset.restAdjust) || 0); });
+    root.querySelectorAll<HTMLElement>('[data-jump-ex]').forEach((button) => { button.onclick = () => {
       if (!state.activeSession) return;
       sessionExerciseIndex = Number(button.dataset.jumpEx) || 0;
       void renderSessionExercise(state.activeSession);
-    }));
-    root.querySelectorAll<HTMLElement>('[data-session-log]').forEach((button) => button.addEventListener('click', () => {
+    }; });
+    root.querySelectorAll<HTMLElement>('[data-session-log]').forEach((button) => { button.onclick = () => {
       unlockCountdownAudio();
       void logSessionSet(button.dataset.sessionLog || '', Number(button.dataset.setIndex) || 0, Number(button.dataset.rest) || 90);
-    }));
-    root.querySelectorAll<HTMLElement>('[data-add-session-set]').forEach((button) => button.addEventListener('click', () => {
+    }; });
+    root.querySelectorAll<HTMLElement>('[data-add-session-set]').forEach((button) => { button.onclick = () => {
       if (!state.activeSession) return;
       const slug = button.dataset.addSessionSet || '';
       sessionSetCounts[slug] = (sessionSetCounts[slug] || 0) + 1;
       void renderSessionExercise(state.activeSession);
-    }));
-    root.querySelector('#finish-session')?.addEventListener('click', () => { void finishActiveSession(); });
-    root.querySelector('[data-toggle-instructions]')?.addEventListener('click', () => root.querySelector('#session-instructions')?.classList.toggle('open'));
+    }; });
+    const finishButton = root.querySelector<HTMLButtonElement>('#finish-session');
+    if (finishButton) finishButton.onclick = () => { void finishActiveSession(); };
+    const instructionsButton = root.querySelector<HTMLElement>('[data-toggle-instructions]');
+    if (instructionsButton) instructionsButton.onclick = () => root.querySelector('#session-instructions')?.classList.toggle('open');
   }
 
   return { startTrainingSession, openSessionOverlay, publishSessionSummary, bindSessionControls };
