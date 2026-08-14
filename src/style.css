@@ -122,6 +122,13 @@
 .emom-timer-panel.paused { opacity: .78; }
 .emom-timer-wrap, .emom-timer-wrap .rest-ring { width: 112px; height: 112px; }
 .emom-timer-wrap .emom-countdown { position: relative; margin: 0; font-size: 42px; letter-spacing: -.05em; }
+.emom-work-ring-bg, .emom-work-ring-fg { fill: none; transform: rotate(-90deg); transform-origin: 50% 50%; }
+.emom-work-ring-bg { stroke: rgba(247,147,26,.14); }
+.emom-work-ring-fg { stroke: var(--bitcoin-gold); stroke-linecap: round; transition: stroke-dashoffset .25s linear, stroke .2s ease; }
+.emom-timer-panel.recovery .emom-work-ring-bg { stroke: rgba(54,224,160,.13); }
+.emom-timer-panel.recovery .emom-work-ring-fg { stroke: var(--success-green); }
+.emom-phase-label { color: var(--purple-2); font: 900 11px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.emom-timer-panel.recovery .emom-phase-label { color: var(--success-green); }
 .emom-step.emom-workout-card { opacity: .72; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .emom-step.emom-workout-card.active { opacity: 1; border: 0; background: transparent; }
 .emom-step.emom-workout-card.done { background: transparent; }

@@ -279,12 +279,20 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
       window.clearInterval(emomTimer);
     }
     cueEmomPosition(position);
+    const timerPhase = position.slot ? emomWorkTimerPhase(position.slot, position.elapsedInSlotSec) : null;
     const countdown = root.querySelector('#emom-countdown');
-    if (countdown) countdown.textContent = String(position.secondsRemaining);
+    if (countdown) countdown.textContent = String(timerPhase?.secondsRemaining ?? position.secondsRemaining);
+    const intervalCountdown = root.querySelector('#emom-interval-countdown');
+    if (intervalCountdown) intervalCountdown.textContent = String(position.secondsRemaining);
     const ring = root.querySelector<SVGCircleElement>('#emom-ring-fg');
     if (ring && position.slot) {
       const circumference = 339.3;
       ring.style.strokeDashoffset = String(circumference * (1 - position.secondsRemaining / position.slot.durationSec));
+    }
+    const workRing = root.querySelector<SVGCircleElement>('#emom-work-ring-fg');
+    if (workRing && timerPhase) {
+      const circumference = 263.9;
+      workRing.style.strokeDashoffset = String(circumference * (1 - timerPhase.secondsRemaining / timerPhase.durationSec));
     }
     const progress = root.querySelector<HTMLElement>('#session-progress-fill');
     if (progress) {
@@ -295,6 +303,22 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (key === emomRenderKey) return;
     emomRenderKey = key;
     renderEmomSession(blocks, schedule, position);
+  }
+
+  function emomWorkTimerPhase(slot: EmomSlot, elapsedInSlotSec: number): { mode: 'work' | 'recovery'; secondsRemaining: number; durationSec: number; stepIndex: number | null } | null {
+    if (!slot.steps.length || !slot.steps.every((step) => Number(step.targetDurationSec) > 0)) return null;
+    let startsAtSec = 0;
+    for (let stepIndex = 0; stepIndex < slot.steps.length; stepIndex += 1) {
+      const durationSec = Math.max(1, Math.floor(Number(slot.steps[stepIndex].targetDurationSec)));
+      const endsAtSec = startsAtSec + durationSec;
+      if (elapsedInSlotSec < endsAtSec) {
+        return { mode: 'work', secondsRemaining: Math.max(0, Math.ceil(endsAtSec - elapsedInSlotSec)), durationSec, stepIndex };
+      }
+      startsAtSec = endsAtSec;
+    }
+    const durationSec = Math.max(0, slot.durationSec - startsAtSec);
+    if (!durationSec) return null;
+    return { mode: 'recovery', secondsRemaining: Math.max(0, Math.ceil(slot.durationSec - elapsedInSlotSec)), durationSec, stepIndex: null };
   }
 
   function cueEmomPosition(position: EmomPosition): void {
@@ -342,6 +366,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const slot = position.slot;
     const block = blocks[slot.blockIndex];
     const paused = emomClockState(session).runningSinceMs == null;
+    const timerPhase = emomWorkTimerPhase(slot, position.elapsedInSlotSec);
     meta.textContent = `${paused ? 'Paused · ' : ''}${blocks.length > 1 ? `Section ${slot.blockIndex + 1} of ${blocks.length} · ` : ''}Round ${slot.roundIndex + 1} of ${block.rounds} · Interval ${slot.intervalIndex + 1} of ${block.intervals.length}`;
     nav.innerHTML = emomRoundNav(schedule, slot, false);
     const steps = slot.steps.map((step, stepIndex) => {
@@ -376,10 +401,11 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const nextSlot = schedule[slot.index + 1];
     const nextStep = nextSlot?.steps[0];
     body.innerHTML = `<div class="emom-live-layout">
-      <div class="emom-timer-panel ${paused ? 'paused' : ''}">
+      <div class="emom-timer-panel ${paused ? 'paused' : ''} ${timerPhase ? `has-work-timer ${timerPhase.mode}` : ''}">
         <div class="emom-badge">${paused ? 'Paused' : 'EMOM'}</div>
-        <div class="rest-timer-wrap emom-timer-wrap"><svg class="rest-ring" viewBox="0 0 120 120"><circle class="rest-ring-bg" cx="60" cy="60" r="54" stroke-width="8"/><circle id="emom-ring-fg" class="rest-ring-fg" cx="60" cy="60" r="54" stroke-width="8" stroke-dasharray="339.3" stroke-dashoffset="${339.3 * (1 - position.secondsRemaining / slot.durationSec)}"/></svg><div class="emom-countdown" id="emom-countdown">${position.secondsRemaining}</div></div>
-        <div class="emom-caption">seconds left · interval ${slot.index + 1} of ${schedule.length}</div>
+        <div class="rest-timer-wrap emom-timer-wrap"><svg class="rest-ring" viewBox="0 0 120 120"><circle class="rest-ring-bg" cx="60" cy="60" r="54" stroke-width="8"/><circle id="emom-ring-fg" class="rest-ring-fg" cx="60" cy="60" r="54" stroke-width="8" stroke-dasharray="339.3" stroke-dashoffset="${339.3 * (1 - position.secondsRemaining / slot.durationSec)}"/>${timerPhase ? `<circle class="emom-work-ring-bg" cx="60" cy="60" r="42" stroke-width="6"/><circle id="emom-work-ring-fg" class="emom-work-ring-fg" cx="60" cy="60" r="42" stroke-width="6" stroke-dasharray="263.9" stroke-dashoffset="${263.9 * (1 - timerPhase.secondsRemaining / timerPhase.durationSec)}"/>` : ''}</svg><div class="emom-countdown" id="emom-countdown">${timerPhase?.secondsRemaining ?? position.secondsRemaining}</div></div>
+        <div class="emom-phase-label">${timerPhase ? timerPhase.mode === 'work' ? `Work · ${html(slot.steps[timerPhase.stepIndex ?? 0]?.exerciseName || slot.steps[timerPhase.stepIndex ?? 0]?.exerciseSlug || 'Exercise')}` : 'Recover' : 'Interval'}</div>
+        <div class="emom-caption"><span id="emom-interval-countdown">${position.secondsRemaining}</span>s interval left · ${slot.index + 1} of ${schedule.length}</div>
       </div>
       <div class="emom-steps">${steps}</div>
       <div class="emom-next-card"><span>Next up</span><strong>${nextStep ? html(nextStep.exerciseName || nextStep.exerciseSlug) : 'Finish session'}</strong><small>${nextSlot ? `Round ${nextSlot.roundIndex + 1} · ${nextSlot.durationSec}s interval` : 'Workout complete'}</small></div>
