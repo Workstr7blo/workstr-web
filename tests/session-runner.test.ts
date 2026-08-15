@@ -4,6 +4,7 @@ import { shellMarkup } from '../src/app/layout';
 import type { AppState } from '../src/app/state';
 import type { RelayProgram } from '../src/nostr/canon';
 import type { WorkstrStore } from '../src/db/store';
+import { sessionDetail } from '../src/features/train/views';
 
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -164,6 +165,21 @@ describe('session runner', () => {
       expect.objectContaining({ exercise_slug: 'bench-press', block_index: 0, round_index: 0, step_index: 0 }),
       expect.objectContaining({ exercise_slug: 'barbell-row', block_index: 0, round_index: 0, step_index: 1 })
     ]);
+  });
+
+  it('keeps superset identity visible in completed-session history', () => {
+    const program = supersetProgram();
+    const history = sessionDetail({
+      id: 1, sheetName: program.name, startedAt: '2026-08-15T10:00:00Z', finishedAt: '2026-08-15T10:10:00Z',
+      exercises: [
+        { exerciseSlug: 'bench-press', exerciseName: 'Bench Press', sets: 2, reps: '8', restSec: 60 },
+        { exerciseSlug: 'barbell-row', exerciseName: 'Barbell Row', sets: 2, reps: '10', restSec: 60 }
+      ],
+      blocks: program.blocks,
+      sets: [{ exerciseSlug: 'bench-press', exerciseName: 'Bench Press', setNumber: 1, reps: 8, weight: 20, blockIndex: 0, roundIndex: 0, stepIndex: 0, done: true, completedAt: '2026-08-15T10:01:00Z' }]
+    }, 'kg');
+    expect(history).toContain('Bench Press');
+    expect(history).toContain('Superset 1');
   });
 
   it('finishes the session and opens the recap modal', async () => {

@@ -14,9 +14,21 @@ a behavior.
 ```bash
 npm install
 npm run dev
+npm run modules
 npm test
 npm run build
+npm run check
 ```
+
+`npm run modules` performs the fast architecture check configured in
+`scripts/module-policy.json`: documented paths, module-size growth, generic filenames,
+and cross-feature imports are enforced; documentation/test matching and broad imports
+are reported as non-blocking warnings. Existing oversized modules may shrink or stay
+stable but cannot grow past their recorded baseline.
+
+Run `npm run check` before handoff or review. It runs the module check, the test suite,
+and the production TypeScript/Vite build. `.github/workflows/check.yml` runs the same
+command for pull requests and pushes to `main`, `feature/**`, and `fix/**` branches.
 
 ## Phase 0 target
 

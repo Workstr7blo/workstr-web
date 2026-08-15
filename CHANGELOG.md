@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Live supersets.** Normal programs can pair consecutive exercises into grouped
+  rounds. The live runner advances through every movement before starting round rest,
+  stores block/round/step coordinates with each set, and labels supersets in history.
 - **EMOM program blocks.** Programs can define rounds of one or more timed intervals,
   including several duration-based exercises inside the same interval. The live runner
   reconciles from wall-clock time, restores unfinished EMOM sessions, and logs actual

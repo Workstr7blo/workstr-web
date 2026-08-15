@@ -26,6 +26,7 @@ or set updates would make full-root rendering inappropriate.
 | Boot and application coordination | `src/main.ts`, `src/app/shell.ts` | `src/app/state.ts`, `src/app/layout.ts` | `tests/shell.test.ts` |
 | Top-level navigation and page markup | `src/app/layout.ts` | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
+| Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
 | Programs and program builder | `src/features/sheets/views.ts` | shell program handlers, `src/db/store.ts`, `src/nostr/programImport.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/programImport.test.ts` |
 | Live-session orchestration | `src/app/session-runner.ts` | the applicable controller/view below | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | Standard live workout | `src/features/train/standard-session-controller.ts` | `standard-session-view.ts`, `rest-timer.ts`, `session-logic.ts` | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
@@ -160,3 +161,20 @@ targets, or muscle metadata solely from the current exercise library.
 
 Update this map when files move, responsibilities split, or the persistence/data flow
 changes. A stale map costs more agent context than no map.
+
+## Automated drift check
+
+Run `npm run modules` for the fast structural check or `npm run check` for the full
+module/test/build validation. `scripts/check-modules.mjs` reads
+`scripts/module-policy.json` and enforces only deterministic boundaries:
+
+- every repository path written in backticks in this file must exist;
+- modules over 400 lines must be within an explicit existing-debt baseline;
+- a baseline module may not grow and must leave the baseline after shrinking to 400;
+- feature directories may not directly import different feature directories;
+- generic module buckets such as `utils.ts` are rejected.
+
+Documentation coverage, likely test coverage, modules approaching 400 lines, and broad
+import surfaces are warnings because those checks are heuristic. The script protects
+this map from structural drift; it does not generate or replace the architectural
+meaning in this file.

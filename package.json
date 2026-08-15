@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
+    "check": "npm run modules && npm test && npm run build",
     "preview": "vite preview --host 0.0.0.0",
+    "modules": "node scripts/check-modules.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
