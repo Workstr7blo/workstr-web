@@ -39,9 +39,16 @@ describe('countdown audio playback', () => {
     const resume = new Promise<void>((resolve) => { releaseResume = resolve; });
     const frequencies: number[] = [];
     const stopTimes: number[] = [];
+    const silentStarts: number[] = [];
     const context = {
-      state: 'suspended', currentTime: 10, destination: {},
+      state: 'suspended', currentTime: 10, sampleRate: 48_000, destination: {},
       resume: vi.fn(() => resume.then(() => { context.state = 'running'; })),
+      createBuffer: vi.fn(() => ({})),
+      createBufferSource: () => ({
+        buffer: null,
+        connect: vi.fn(),
+        start: (time: number) => silentStarts.push(time)
+      }),
       createOscillator: () => ({
         type: 'sine',
         frequency: { setValueAtTime: (value: number) => frequencies.push(value) },
@@ -57,11 +64,29 @@ describe('countdown audio playback', () => {
     });
     const audio = await import('../src/features/train/countdown-audio');
     audio.unlockCountdownAudio();
+    expect(silentStarts).toEqual([0]);
     audio.playCountdownCue('short');
     audio.playCountdownCue('final');
     releaseResume?.();
     await resume;
     await vi.waitFor(() => expect(frequencies).toEqual([1175]));
     expect(stopTimes).toEqual([10.65]);
+  });
+
+  it('uses the prefixed AudioContext constructor when WebKit requires it', async () => {
+    const silentStart = vi.fn();
+    const context = {
+      state: 'running', currentTime: 0, sampleRate: 44_100, destination: {},
+      resume: vi.fn(),
+      createBuffer: vi.fn(() => ({})),
+      createBufferSource: () => ({ buffer: null, connect: vi.fn(), start: silentStart })
+    };
+    vi.stubGlobal('AudioContext', undefined);
+    vi.stubGlobal('webkitAudioContext', class MockWebkitAudioContext {
+      constructor() { return context; }
+    });
+    const audio = await import('../src/features/train/countdown-audio');
+    audio.unlockCountdownAudio();
+    expect(silentStart).toHaveBeenCalledWith(0);
   });
 });

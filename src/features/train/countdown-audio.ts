@@ -27,6 +27,24 @@ let audioContext: AudioContext | null = null;
 let pendingCue: CountdownCue | null = null;
 let resumePending: Promise<void> | null = null;
 
+type AudioContextConstructor = new () => AudioContext;
+
+function audioContextConstructor(): AudioContextConstructor | undefined {
+  const audioGlobal = globalThis as typeof globalThis & { webkitAudioContext?: AudioContextConstructor };
+  return audioGlobal.AudioContext || audioGlobal.webkitAudioContext;
+}
+
+// Starting a silent source inside the click handler is what actually consumes
+// WebKit's user activation. Creating or resuming the context alone can report
+// `running` while later timer-driven oscillators remain inaudible.
+function primeAudioContext(): void {
+  if (!audioContext) return;
+  const source = audioContext.createBufferSource();
+  source.buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate || 22_050);
+  source.connect(audioContext.destination);
+  source.start(0);
+}
+
 function playTone(cue: CountdownCue): void {
   if (!audioContext || audioContext.state !== 'running') return;
   const now = audioContext.currentTime;
@@ -60,10 +78,12 @@ function resumeAudioContext(): void {
 }
 
 export function unlockCountdownAudio(): void {
-  if (typeof AudioContext === 'undefined') return;
+  const AudioContextCtor = audioContextConstructor();
+  if (!AudioContextCtor) return;
   try {
-    audioContext ||= new AudioContext();
+    if (!audioContext || audioContext.state === 'closed') audioContext = new AudioContextCtor();
     resumeAudioContext();
+    primeAudioContext();
   } catch { /* Audio cues are an optional enhancement. */ }
 }
 
