@@ -6,8 +6,21 @@ import { fetchCanonPrograms, type RelayProgram } from '../nostr/canon';
 import { publishWorkoutSummary } from '../nostr/share';
 import type { EmomBlock } from '../core/types';
 import { compileEmomBlocks, emomDurationSec, emomPosition, type EmomPosition, type EmomSlot } from '../features/train/emom';
-import { emomClockSnapshot, pauseEmomClock, resumeEmomClock, seekEmomClock, type EmomClockState } from '../features/train/emom-clock';
+import { emomClockSnapshot, pauseEmomClock, resumeEmomClock, seekEmomClock } from '../features/train/emom-clock';
 import { CountdownCueGuard, playCountdownCue, unlockCountdownAudio } from '../features/train/countdown-audio';
+import {
+  activeEmomBlocks as sessionEmomBlocks,
+  durationLabel,
+  effectiveSessionStartedAt,
+  emomTimerPhase,
+  exerciseSlugSignature,
+  isEmomSession,
+  readEmomClock,
+  restSecondsRemaining,
+  sessionDurationSeconds,
+  sessionSetCounts as computeSessionSetCounts,
+  writeEmomClock
+} from '../features/train/session-logic';
 import type { ActiveSession, AppState, SessionExercise, SessionSetLog } from './state';
 import type { Signer } from '../signer/types';
 
@@ -36,9 +49,7 @@ export interface SessionRunner {
   bindSessionControls(): void;
 }
 
-export function restSecondsRemaining(endsAt: number, now = Date.now()): number {
-  return Math.max(0, Math.ceil((endsAt - now) / 1000));
-}
+export { restSecondsRemaining } from '../features/train/session-logic';
 
 export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   const { state, root } = ctx;
@@ -93,21 +104,8 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
 
   function getSessionExercises(session: ActiveSession): SessionExercise[] { return session.exercises; }
 
-  function setCountsFromSession(session: ActiveSession): Record<string, number> {
-    const counts: Record<string, number> = {};
-    getSessionExercises(session).forEach((ex) => {
-      const logged = session.sets.filter((set) => set.exerciseSlug === ex.exerciseSlug).length;
-      counts[ex.exerciseSlug] = Math.max(Number(ex.sets) || 1, logged || 1);
-    });
-    return counts;
-  }
-
   function normalizedProgramName(name: string): string {
     return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
-  }
-
-  function exerciseSlugSignature(exercises: SessionExercise[]): string {
-    return [...new Set(exercises.map((ex) => ex.exerciseSlug).filter(Boolean))].sort().join('|');
   }
 
   function findSessionProgramMap(session: ActiveSession, programs: RelayProgram[]): string {
@@ -150,7 +148,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     const sessionId = state.store ? await state.store.createSession({ sheet_name: program.name || 'Freestyle', started_at: startedAt, summary_image_url: program.muscleMapUrl || '', exercises, blocks }) : Date.now();
     state.activeSession = { id: sessionId, sheetName: program.name || 'Freestyle', startedAt, summaryImageUrl: program.muscleMapUrl || '', exercises, blocks, sets: [] };
     sessionExerciseIndex = 0;
-    sessionSetCounts = setCountsFromSession(state.activeSession);
+    sessionSetCounts = computeSessionSetCounts(state.activeSession);
     await openSessionOverlay(state.activeSession);
   }
 
@@ -176,7 +174,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   async function openSessionOverlay(session: ActiveSession): Promise<void> {
     root.querySelector('#session-overlay')?.classList.add('open');
     void requestSessionWakeLock();
-    if (!Object.keys(sessionSetCounts).length) sessionSetCounts = setCountsFromSession(session);
+    if (!Object.keys(sessionSetCounts).length) sessionSetCounts = computeSessionSetCounts(session);
     window.clearInterval(emomTimer);
     emomRenderKey = '';
     emomPreviousPhase = null;
@@ -203,32 +201,11 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   }
 
   function activeEmomBlocks(): EmomBlock[] {
-    return (state.activeSession?.blocks || []).filter((candidate): candidate is EmomBlock => candidate.type === 'emom');
+    return sessionEmomBlocks(state.activeSession);
   }
 
-  function isEmomSession(session: ActiveSession): boolean {
-    return (session.blocks || []).some((candidate) => candidate.type === 'emom');
-  }
-
-  function effectiveSessionStartedAt(session: ActiveSession): string | null {
-    return isEmomSession(session) ? session.emomStartedAt || null : session.startedAt || null;
-  }
-
-  function emomClockState(session: ActiveSession): EmomClockState {
-    const legacyRunningSince = session.emomRunningSince || (session.emomStartedAt && session.emomPositionSec == null ? session.emomStartedAt : undefined);
-    const runningSinceMs = legacyRunningSince ? new Date(legacyRunningSince).getTime() : null;
-    return {
-      positionSec: Number(session.emomPositionSec) || 0,
-      activeSec: Number(session.emomActiveSec) || 0,
-      runningSinceMs: runningSinceMs != null && Number.isFinite(runningSinceMs) ? runningSinceMs : null
-    };
-  }
-
-  function applyEmomClock(session: ActiveSession, clock: EmomClockState): void {
-    session.emomPositionSec = clock.positionSec;
-    session.emomActiveSec = clock.activeSec;
-    session.emomRunningSince = clock.runningSinceMs == null ? undefined : new Date(clock.runningSinceMs).toISOString();
-  }
+  const emomClockState = readEmomClock;
+  const applyEmomClock = writeEmomClock;
 
   function persistEmomClock(session: ActiveSession): void {
     const id = session.id;
@@ -305,21 +282,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     renderEmomSession(blocks, schedule, position);
   }
 
-  function emomWorkTimerPhase(slot: EmomSlot, elapsedInSlotSec: number): { mode: 'work' | 'recovery'; secondsRemaining: number; durationSec: number; stepIndex: number | null } | null {
-    if (!slot.steps.length || !slot.steps.every((step) => Number(step.targetDurationSec) > 0)) return null;
-    let startsAtSec = 0;
-    for (let stepIndex = 0; stepIndex < slot.steps.length; stepIndex += 1) {
-      const durationSec = Math.max(1, Math.floor(Number(slot.steps[stepIndex].targetDurationSec)));
-      const endsAtSec = startsAtSec + durationSec;
-      if (elapsedInSlotSec < endsAtSec) {
-        return { mode: 'work', secondsRemaining: Math.max(0, Math.ceil(endsAtSec - elapsedInSlotSec)), durationSec, stepIndex };
-      }
-      startsAtSec = endsAtSec;
-    }
-    const durationSec = Math.max(0, slot.durationSec - startsAtSec);
-    if (!durationSec) return null;
-    return { mode: 'recovery', secondsRemaining: Math.max(0, Math.ceil(slot.durationSec - elapsedInSlotSec)), durationSec, stepIndex: null };
-  }
+  const emomWorkTimerPhase = emomTimerPhase;
 
   function cueEmomPosition(position: EmomPosition): void {
     const slotIndex = position.slot?.index ?? null;
@@ -871,14 +834,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   }
 
   function sessionDurationLabel(session: ActiveSession): string {
-    const startedAt = effectiveSessionStartedAt(session);
-    if (!startedAt || !session.finishedAt) return '—';
-    const sec = isEmomSession(session) && session.emomActiveSec != null
-      ? Math.max(0, Math.round(session.emomActiveSec))
-      : Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(startedAt).getTime()) / 1000));
-    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
-    if (h > 0) return `${h}h ${m}m`;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+    return durationLabel(sessionDurationSeconds(session));
   }
 
   function renderFinished(session: ActiveSession): void {

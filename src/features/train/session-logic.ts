@@ -1,0 +1,90 @@
+import type { EmomBlock } from '../../core/types';
+import type { ActiveSession, SessionExercise } from '../../app/state';
+import type { EmomClockState } from './emom-clock';
+import type { EmomSlot } from './emom';
+
+export interface EmomTimerPhase {
+  mode: 'work' | 'recovery';
+  secondsRemaining: number;
+  durationSec: number;
+  stepIndex: number | null;
+}
+
+export function restSecondsRemaining(endsAt: number, now = Date.now()): number {
+  return Math.max(0, Math.ceil((endsAt - now) / 1000));
+}
+
+export function sessionSetCounts(session: ActiveSession): Record<string, number> {
+  const counts: Record<string, number> = {};
+  session.exercises.forEach((exercise) => {
+    const logged = session.sets.filter((set) => set.exerciseSlug === exercise.exerciseSlug).length;
+    counts[exercise.exerciseSlug] = Math.max(Number(exercise.sets) || 1, logged || 1);
+  });
+  return counts;
+}
+
+export function exerciseSlugSignature(exercises: SessionExercise[]): string {
+  return [...new Set(exercises.map((exercise) => exercise.exerciseSlug).filter(Boolean))].sort().join('|');
+}
+
+export function activeEmomBlocks(session: ActiveSession | null): EmomBlock[] {
+  return (session?.blocks || []).filter((block): block is EmomBlock => block.type === 'emom');
+}
+
+export function isEmomSession(session: ActiveSession): boolean {
+  return activeEmomBlocks(session).length > 0;
+}
+
+export function effectiveSessionStartedAt(session: ActiveSession): string | null {
+  return isEmomSession(session) ? session.emomStartedAt || null : session.startedAt || null;
+}
+
+export function readEmomClock(session: ActiveSession): EmomClockState {
+  const legacyRunningSince = session.emomRunningSince
+    || (session.emomStartedAt && session.emomPositionSec == null ? session.emomStartedAt : undefined);
+  const runningSinceMs = legacyRunningSince ? new Date(legacyRunningSince).getTime() : null;
+  return {
+    positionSec: Number(session.emomPositionSec) || 0,
+    activeSec: Number(session.emomActiveSec) || 0,
+    runningSinceMs: runningSinceMs != null && Number.isFinite(runningSinceMs) ? runningSinceMs : null
+  };
+}
+
+export function writeEmomClock(session: ActiveSession, clock: EmomClockState): void {
+  session.emomPositionSec = clock.positionSec;
+  session.emomActiveSec = clock.activeSec;
+  session.emomRunningSince = clock.runningSinceMs == null ? undefined : new Date(clock.runningSinceMs).toISOString();
+}
+
+export function emomTimerPhase(slot: EmomSlot, elapsedInSlotSec: number): EmomTimerPhase | null {
+  if (!slot.steps.length || !slot.steps.every((step) => Number(step.targetDurationSec) > 0)) return null;
+  let startsAtSec = 0;
+  for (let stepIndex = 0; stepIndex < slot.steps.length; stepIndex += 1) {
+    const durationSec = Math.max(1, Math.floor(Number(slot.steps[stepIndex].targetDurationSec)));
+    const endsAtSec = startsAtSec + durationSec;
+    if (elapsedInSlotSec < endsAtSec) {
+      return { mode: 'work', secondsRemaining: Math.max(0, Math.ceil(endsAtSec - elapsedInSlotSec)), durationSec, stepIndex };
+    }
+    startsAtSec = endsAtSec;
+  }
+  const durationSec = Math.max(0, slot.durationSec - startsAtSec);
+  if (!durationSec) return null;
+  return { mode: 'recovery', secondsRemaining: Math.max(0, Math.ceil(slot.durationSec - elapsedInSlotSec)), durationSec, stepIndex: null };
+}
+
+export function sessionDurationSeconds(session: ActiveSession): number | null {
+  const startedAt = effectiveSessionStartedAt(session);
+  if (!startedAt || !session.finishedAt) return null;
+  return isEmomSession(session) && session.emomActiveSec != null
+    ? Math.max(0, Math.round(session.emomActiveSec))
+    : Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(startedAt).getTime()) / 1000));
+}
+
+export function durationLabel(seconds: number | null): string {
+  if (seconds == null) return '—';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`;
+}
