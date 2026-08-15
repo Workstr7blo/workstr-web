@@ -62,12 +62,16 @@ export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPubli
     byEx.get(set.exerciseSlug)!.push(set);
   }
   const exName = (slug: string) => sessionExercises(session).find((member) => member.exerciseSlug === slug)?.exerciseName || slug;
+  const supersetFor = (slug: string) => (session.blocks || [])
+    .map((block, index) => ({ block, index }))
+    .find(({ block }) => block.type === 'straight' && block.steps.length > 1 && block.steps.some((step) => step.exerciseSlug === slug));
   const rows = [...byEx.entries()].map(([slug, sets]) => {
+    const superset = supersetFor(slug);
     const pills = [...sets].sort((a, b) => a.setNumber - b.setNumber).map((set) =>
       `<span class="set-pill">${set.reps ?? '?'}${set.weight != null ? ` × ${html(formatWeightKg(set.weight, unit))}` : ''}</span>`
     ).join('');
     return `<div class="session-detail-ex">
-      <div class="session-detail-ex-name">${html(exName(slug))}</div>
+      <div class="session-detail-ex-name">${html(exName(slug))}${superset ? ` <span class="session-superset-badge">Superset ${superset.index + 1}</span>` : ''}</div>
       <div class="session-detail-sets">${pills}</div>
     </div>`;
   }).join('');

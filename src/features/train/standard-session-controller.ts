@@ -3,7 +3,7 @@ import { html } from '../../app/format';
 import { normalizeWeightUnit, storeWeightInput } from '../../core/units';
 import { CountdownCueGuard, unlockCountdownAudio } from './countdown-audio';
 import { RestTimer } from './rest-timer';
-import { sessionSetCounts } from './session-logic';
+import { sessionSetCounts, supersetTransition } from './session-logic';
 import { renderStandardSessionView, updateStandardSessionProgress } from './standard-session-view';
 
 export interface StandardSessionControllerContext {
@@ -21,12 +21,16 @@ export class StandardSessionController {
   private setCounts: Record<string, number> = {};
   private readonly previousSets = new Map<string, SessionSetLog[]>();
   private readonly rest: RestTimer;
+  private restAdvanceIndex: number | null = null;
 
   constructor(private readonly ctx: StandardSessionControllerContext) {
     this.rest = new RestTimer(ctx.root, ctx.cueGuard, (autoAdvance) => {
       const session = ctx.state.activeSession;
-      if (!autoAdvance || !session || this.exerciseIndex >= session.exercises.length - 1) return;
-      this.exerciseIndex += 1;
+      if (!autoAdvance || !session) return;
+      const nextIndex = this.restAdvanceIndex ?? this.exerciseIndex + 1;
+      this.restAdvanceIndex = null;
+      if (nextIndex < 0 || nextIndex >= session.exercises.length) return;
+      this.exerciseIndex = nextIndex;
       void this.render(session);
     });
   }
@@ -75,6 +79,7 @@ export class StandardSessionController {
     this.exerciseIndex = 0;
     this.setCounts = {};
     this.previousSets.clear();
+    this.restAdvanceIndex = null;
   }
 
   private loggedSetCount(session: ActiveSession, slug: string): number {
@@ -101,7 +106,7 @@ export class StandardSessionController {
         formatSetHint: (set) => this.formatSetHint(set),
         suggestedSetHint: (set, reps) => this.suggestedSetHint(set, reps),
         unitLabel: this.ctx.unitLabel,
-        loggedSetCount: (slug) => this.loggedSetCount(session, slug),
+        loggedSetCount: (slug) => this.loggedSetCount(session, slug), superset: null,
         bindControls: () => this.bindControls()
       });
       return;
@@ -118,6 +123,7 @@ export class StandardSessionController {
       suggestedSetHint: (set, reps) => this.suggestedSetHint(set, reps),
       unitLabel: this.ctx.unitLabel,
       loggedSetCount: (slug) => this.loggedSetCount(session, slug),
+      superset: supersetTransition(session, exercise.exerciseSlug, logged.length + 1),
       bindControls: () => this.bindControls()
     });
     updateStandardSessionProgress(this.ctx.root, session, this.progress(session));
@@ -141,13 +147,16 @@ export class StandardSessionController {
     const weight = weightRaw === '' ? null : storeWeightInput(weightRaw, normalizeWeightUnit(this.ctx.state.settings.unit));
     if (logButton) { logButton.disabled = true; logButton.textContent = '···'; }
     const exercise = session.exercises.find((candidate) => candidate.exerciseSlug === slug);
+    const transition = supersetTransition(session, slug, setIndex + 1);
     const loggedSet: SessionSetLog = {
       exerciseSlug: slug, exerciseName: exercise?.exerciseName, setNumber: setIndex + 1,
-      reps, weight, done: true, completedAt: new Date().toISOString()
+      reps, weight, done: true, completedAt: new Date().toISOString(),
+      blockIndex: transition?.blockIndex, roundIndex: transition?.roundIndex, stepIndex: transition?.stepIndex
     };
     await this.ctx.state.store?.addSessionSet({
       session_id: session.id, exercise_slug: slug, exercise_name: exercise?.exerciseName || slug,
-      set_number: setIndex + 1, reps, weight_kg: weight, completed_at: loggedSet.completedAt
+      set_number: setIndex + 1, reps, weight_kg: weight, completed_at: loggedSet.completedAt,
+      block_index: transition?.blockIndex, round_index: transition?.roundIndex, step_index: transition?.stepIndex
     });
     session.sets.push(loggedSet);
     if (repsInput) repsInput.disabled = true;
@@ -165,6 +174,20 @@ export class StandardSessionController {
       if (nextWeight && !nextWeight.value && weightRaw !== '') nextWeight.value = weightRaw;
     }
     updateStandardSessionProgress(this.ctx.root, session, this.progress(session));
+    if (transition?.nextExerciseSlug) {
+      const nextIndex = session.exercises.findIndex((candidate) => candidate.exerciseSlug === transition.nextExerciseSlug);
+      if (nextIndex >= 0 && !transition.roundComplete) {
+        this.exerciseIndex = nextIndex;
+        await this.render(session);
+        return;
+      }
+      if (nextIndex >= 0) {
+        this.restAdvanceIndex = nextIndex;
+        const next = session.exercises[nextIndex];
+        this.rest.start(transition.restAfterRoundSec, true, next.exerciseName || next.exerciseSlug);
+        return;
+      }
+    }
     const allDone = this.loggedSetCount(session, slug) >= (this.setCounts[slug] || 1);
     const next = allDone ? session.exercises[this.exerciseIndex + 1] : null;
     this.rest.start(restSeconds, allDone, next?.exerciseName || next?.exerciseSlug || '');

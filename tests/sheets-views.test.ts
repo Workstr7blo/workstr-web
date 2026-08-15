@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   estimateProgramMin, resolveProgramExercise, programExerciseName, inferProgramMuscle,
-  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, programBody, emomBlockFromBuilder, emomBlocksFromBuilder
+  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, programBody, emomBlockFromBuilder, emomBlocksFromBuilder, straightBlocksFromBuilder
 } from '../src/features/sheets/views';
 import type { Exercise } from '../src/core/types';
 import type { RelayProgram, RelayProgramExercise } from '../src/nostr/canon';
@@ -36,6 +36,21 @@ describe('estimateProgramMin', () => {
   });
   it('honours the rest alias field', () => {
     expect(estimateProgramMin([member({ sets: 2, rest: 30 })])).toBe(120);
+  });
+});
+
+describe('straightBlocksFromBuilder', () => {
+  it('turns linked normal rows into a reusable superset block', () => {
+    const base = { muscleGroup: 'Chest', imageUrl: '', sets: 3, reps: '10', restSec: 75, weight: null, notes: '', sectionIndex: 0, intervalIndex: 0, durationSec: 0 };
+    const blocks = straightBlocksFromBuilder([
+      { ...base, exerciseSlug: 'bench', exerciseName: 'Bench Press' },
+      { ...base, exerciseSlug: 'row', exerciseName: 'Row', reps: '12', supersetWithPrevious: true },
+      { ...base, exerciseSlug: 'squat', exerciseName: 'Squat' }
+    ]);
+    expect(blocks).toEqual([expect.objectContaining({
+      type: 'straight', rounds: 3, restAfterRoundSec: 75,
+      steps: [expect.objectContaining({ exerciseSlug: 'bench', targetReps: '10' }), expect.objectContaining({ exerciseSlug: 'row', targetReps: '12' })]
+    })]);
   });
 });
 

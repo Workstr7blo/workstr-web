@@ -25,6 +25,7 @@ dist-ssr
 
 .claude/
 CLAUDE.md
+AGENTS.md
 
 # stamped by CI at build time, never committed
 VERSION

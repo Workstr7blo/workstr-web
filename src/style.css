@@ -258,3 +258,31 @@
   cursor: pointer;
 }
 .equip-option input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--sovereign-purple); }
+.wex-superset-toggle {
+  margin-top: 9px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: 700 10px/1 ui-monospace, monospace;
+  cursor: pointer;
+}
+
+.wex-superset-toggle.active,
+.session-superset-badge {
+  border-color: rgba(168, 85, 247, .55);
+  background: rgba(168, 85, 247, .14);
+  color: var(--purple-2);
+}
+
+.session-superset-badge {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 4px 7px;
+  border: 1px solid rgba(168, 85, 247, .55);
+  border-radius: 999px;
+  font: 700 9px/1 ui-monospace, monospace;
+  text-transform: uppercase;
+  vertical-align: middle;
+}

@@ -9,6 +9,7 @@ import {
   restSecondsRemaining,
   sessionDurationSeconds,
   sessionSetCounts,
+  supersetTransition,
   writeEmomClock
 } from '../src/features/train/session-logic';
 
@@ -41,6 +42,14 @@ function slot(durationSec: number, targetDurations: number[]): EmomSlot {
 }
 
 describe('session runner pure logic', () => {
+  it('advances through a superset and rests only after each round', () => {
+    const active = session({ blocks: [{ type: 'straight', rounds: 2, restAfterRoundSec: 60, steps: [
+      { exerciseSlug: 'squat' }, { exerciseSlug: 'row' }
+    ] }] });
+    expect(supersetTransition(active, 'squat', 1)).toMatchObject({ roundIndex: 0, stepIndex: 0, nextExerciseSlug: 'row', roundComplete: false, restAfterRoundSec: 0 });
+    expect(supersetTransition(active, 'row', 1)).toMatchObject({ roundIndex: 0, stepIndex: 1, nextExerciseSlug: 'squat', roundComplete: true, restAfterRoundSec: 60 });
+    expect(supersetTransition(active, 'row', 2)).toMatchObject({ roundIndex: 1, stepIndex: 1, nextExerciseSlug: null, supersetComplete: true });
+  });
   it('reconciles rest time against a wall-clock deadline', () => {
     expect(restSecondsRemaining(10_500, 8_000)).toBe(3);
     expect(restSecondsRemaining(7_000, 8_000)).toBe(0);

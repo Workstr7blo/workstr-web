@@ -1,5 +1,6 @@
 import { html } from '../../app/format';
 import type { ActiveSession, SessionSetLog } from '../../app/state';
+import type { SupersetTransition } from './session-logic';
 
 export interface StandardSessionViewInput {
   root: HTMLElement;
@@ -12,6 +13,7 @@ export interface StandardSessionViewInput {
   suggestedSetHint(set: SessionSetLog, targetReps: string): string;
   unitLabel(): string;
   loggedSetCount(slug: string): number;
+  superset: SupersetTransition | null;
   bindControls(): void;
 }
 
@@ -78,13 +80,16 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
     <div class="session-instructions-body">${instructions.map((step, index) => `<div class="session-instructions-step"><b>${index + 1}</b>${html(step)}</div>`).join('')}</div>
   </div>` : '';
   title.textContent = session.sheetName || 'Freestyle';
-  meta.textContent = `Exercise ${exerciseIndex + 1} of ${exercises.length}`;
+  meta.textContent = input.superset
+    ? `Superset · Round ${input.superset.roundIndex + 1} of ${input.superset.rounds} · Move ${input.superset.stepIndex + 1} of ${input.superset.stepCount}`
+    : `Exercise ${exerciseIndex + 1} of ${exercises.length}`;
   body.innerHTML = `${exercise.imageUrl ? `<img class="session-ex-image" src="${html(exercise.imageUrl)}" alt="${html(name)}" loading="eager" onerror="this.classList.add('placeholder');this.removeAttribute('src');this.textContent='No exercise image'">` : '<div class="session-ex-image placeholder">No exercise image</div>'}
     <div class="session-ex-name">${html(name)}</div>
     <div class="session-ex-target"><b>${targetSets}</b> sets <span class="dot"></span> <b>${html(targetReps || 'free')}</b> reps <span class="dot"></span> <b>${restSec}s</b> rest</div>
     <div class="session-sets">${rows}</div>
     <button class="session-add-set" data-add-session-set="${html(slug)}" type="button">+ Add set</button>${instructionsMarkup}`;
   const isLast = exerciseIndex >= exercises.length - 1;
-  footer.innerHTML = `${exerciseIndex > 0 ? `<button class="session-prev-btn" data-jump-ex="${exerciseIndex - 1}" type="button">Prev</button>` : ''}${isLast ? '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>' : `<button class="session-next-btn" data-jump-ex="${exerciseIndex + 1}" type="button">Next</button>`}`;
+  const nextLabel = input.superset && !input.superset.roundComplete ? 'Next move' : 'Next';
+  footer.innerHTML = `${exerciseIndex > 0 ? `<button class="session-prev-btn" data-jump-ex="${exerciseIndex - 1}" type="button">Prev</button>` : ''}${isLast ? '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>' : `<button class="session-next-btn" data-jump-ex="${exerciseIndex + 1}" type="button">${nextLabel}</button>`}`;
   input.bindControls();
 }

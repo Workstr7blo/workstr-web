@@ -1,5 +1,5 @@
 import { canonMuscle } from '../../core/muscles';
-import type { EmomBlock, Exercise } from '../../core/types';
+import type { EmomBlock, Exercise, StraightBlock } from '../../core/types';
 import { displayWeightKg, normalizeWeightUnit } from '../../core/units';
 import type { SheetWithExercises } from '../../db/store';
 import type { RelayProgram } from '../../nostr/canon';
@@ -8,7 +8,7 @@ import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 
-export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; sectionIndex: number; intervalIndex: number; durationSec: number }
+export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; sectionIndex: number; intervalIndex: number; durationSec: number; supersetWithPrevious?: boolean }
 
 export interface BuilderEmomSection { rounds: number; intervalSec: number }
 
@@ -42,6 +42,26 @@ export function emomBlocksFromBuilder(rows: BuilderRow[], sections: BuilderEmomS
   return sections.map((section, sectionIndex) => emomBlockFromBuilder(
     rows.filter((row) => (row.sectionIndex || 0) === sectionIndex), section.rounds, section.intervalSec
   )).filter((block) => block.intervals.length);
+}
+
+export function straightBlocksFromBuilder(rows: BuilderRow[]): StraightBlock[] {
+  const groups: BuilderRow[][] = [];
+  for (const row of rows) {
+    if (row.supersetWithPrevious && groups.length) groups.at(-1)!.push(row);
+    else groups.push([row]);
+  }
+  return groups.filter((group) => group.length > 1).map((group) => ({
+    type: 'straight',
+    rounds: Math.max(1, ...group.map((row) => Math.floor(Number(row.sets) || 1))),
+    steps: group.map((row) => ({
+      exerciseSlug: row.exerciseSlug,
+      exerciseName: row.exerciseName,
+      targetReps: row.reps || undefined,
+      weight: row.weight,
+      notes: row.notes || undefined
+    })),
+    restAfterRoundSec: Math.max(0, Number(group.at(-1)?.restSec) || 0)
+  }));
 }
 
 export function estimateProgramMin(exercises: RelayProgram['exercises'], blocks?: RelayProgram['blocks']): number {
@@ -173,10 +193,12 @@ export function programCard(program: RelayProgram, state: AppState): string {
   const time = formatMinutes(estimateProgramMin(program.exercises, program.blocks));
   const emomBlocks = program.blocks?.filter((block) => block.type === 'emom') || [];
   const emom = emomBlocks[0];
+  const supersetCount = program.blocks?.filter((block) => block.type === 'straight' && block.steps.length > 1).length || 0;
   const groups = programGroups(program, state.exercises);
   const map = programMuscleMap(program, state.exercises);
   const emomLabel = emomBlocks.length > 1 ? `EMOM · ${emomBlocks.length} sections` : emom ? `EMOM · ${emom.rounds} rounds` : '';
-  const meta = [emomLabel || `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
+  const trainingLabel = emomLabel || [supersetCount ? `${supersetCount} superset${supersetCount === 1 ? '' : 's'}` : '', `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+  const meta = [trainingLabel, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
   const tagPills = (program.tags || []).length ? `<div class="program-tags">${program.tags.map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('')}</div>` : '';
   const isExpanded = state.expandedProgramAddress === program.address;
   const statusCls = isLocalProgram(program) ? 'local' : 'published';
@@ -200,6 +222,8 @@ export function programBody(program: RelayProgram, state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   const emomBlocks = program.blocks?.filter((block) => block.type === 'emom') || [];
   const emomSummary = emomBlocks.length ? `<div class="emom-program-summary"><strong>${emomBlocks.length} EMOM section${emomBlocks.length === 1 ? '' : 's'} · ${formatMinutes(estimateProgramMin([], emomBlocks))}</strong>${emomBlocks.map((block, index) => `<span>Section ${index + 1}: ${block.rounds} round${block.rounds === 1 ? '' : 's'} · ${formatMinutes(block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0))}</span>`).join('')}</div>` : '';
+  const supersets = program.blocks?.filter((block): block is StraightBlock => block.type === 'straight' && block.steps.length > 1) || [];
+  const supersetSummary = supersets.length ? `<div class="emom-program-summary"><strong>${supersets.length} superset${supersets.length === 1 ? '' : 's'}</strong>${supersets.map((block, index) => `<span>Superset ${index + 1}: ${block.steps.map((step) => html(step.exerciseName || step.exerciseSlug)).join(' + ')} · ${block.rounds} rounds</span>`).join('')}</div>` : '';
   const exHtml = program.exercises.length ? program.exercises.map((member, index) => {
     const full = resolveProgramExercise(member, state.exercises);
     const name = programExerciseName(member, full);
@@ -239,7 +263,7 @@ export function programBody(program: RelayProgram, state: AppState): string {
     : importState === 'in-library'
       ? '<button class="button ghost small" type="button" disabled>In library</button>'
       : `<button class="button ${importState === 'update' ? 'gold' : 'primary'} small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>`;
-  return `${emomSummary}<div class="wk-ex-list">${exHtml}</div>
+  return `${emomSummary}${supersetSummary}<div class="wk-ex-list">${exHtml}</div>
     <div class="workout-card-actions">
       ${actions}
     </div>`;

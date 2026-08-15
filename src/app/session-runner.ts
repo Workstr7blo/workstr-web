@@ -74,7 +74,8 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
         exerciseName: name,
         muscleGroup: programMuscleLabel(member.muscleGroup || full?.muscle_group || inferProgramMuscle(name)),
         imageUrl: member.imageUrl || full?.image_url,
-        sets: Number(member.sets) || Number(full?.default_sets) || 3,
+        sets: program.blocks?.find((block) => block.type === 'straight' && block.steps.some((step) => step.exerciseSlug === (full?.slug || slugify(name))))?.rounds
+          || Number(member.sets) || Number(full?.default_sets) || 3,
         reps: String(member.reps || full?.default_reps || '8-12'),
         restSec: Number(member.restSec || member.rest || full?.default_rest) || 90,
         weight: member.weight ?? null,

@@ -9,7 +9,7 @@ import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData }
 import { downloadExport, parseExport } from '../db/export';
 import { applyStarterSeed } from '../db/seed';
 import { fetchMonthlyZapReceipts } from '../nostr/zaps';
-import type { Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
+import type { Exercise, Session, SessionSet, StraightBlock, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
@@ -23,7 +23,7 @@ import { paintBodyMapSvg } from './bodymap';
 import { discoverImportable, discoverImportState } from '../features/discover/views';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
 import { getQuickWorkout } from '../features/recovery/quickWorkout';
-import { emomBlocksFromBuilder, sheetToProgram, type BuilderState } from '../features/sheets/views';
+import { emomBlocksFromBuilder, sheetToProgram, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
@@ -311,6 +311,7 @@ export function renderShell(root: HTMLElement): void {
     // Programs are built from the user's library only, never the relay catalog.
     const library = await state.store.listExercises();
     const emomBlocks = sheet?.blocks?.filter((block) => block.type === 'emom') || [];
+    const straightBlocks = sheet?.blocks?.filter((block): block is StraightBlock => block.type === 'straight' && block.steps.length > 1) || [];
     const emomRows = emomBlocks.flatMap((emom, sectionIndex) => emom.intervals.flatMap((interval, intervalIndex) => interval.steps.map((step) => {
       const row = sheet?.exercises.find((candidate) => candidate.exercise_slug === step.exerciseSlug);
       const exercise = library.find((candidate) => candidate.slug === step.exerciseSlug);
@@ -351,7 +352,8 @@ export function renderShell(root: HTMLElement): void {
             notes: row.notes || '',
             sectionIndex: 0,
             intervalIndex: 0,
-            durationSec: 0
+            durationSec: 0,
+            supersetWithPrevious: straightBlocks.some((block) => block.steps.findIndex((step) => step.exerciseSlug === row.exercise_slug) > 0)
           }))
         : []
     };
@@ -497,6 +499,15 @@ export function renderShell(root: HTMLElement): void {
         return;
       }
       if (target.dataset.rm != null) { current.rows.splice(Number(target.dataset.rm), 1); renderBuilderRows(); renderPicker(); return; }
+      if (target.dataset.toggleSuperset != null) {
+        const index = Number(target.dataset.toggleSuperset);
+        if (index > 0 && current.rows[index]) {
+          current.rows[index].supersetWithPrevious = !current.rows[index].supersetWithPrevious;
+          if (current.rows[index].supersetWithPrevious) current.rows[index].sets = current.rows[index - 1].sets;
+          renderBuilderRows();
+        }
+        return;
+      }
       if (target.dataset.removeSection != null) {
         const removed = Number(target.dataset.removeSection);
         current.emomSections.splice(removed, 1);
@@ -524,7 +535,8 @@ export function renderShell(root: HTMLElement): void {
       if (!state.store || !builder) return;
       const name = builder.name.trim();
       if (!name) { toast('name is required', 'bad'); return; }
-      const blocks = builder.mode === 'emom' ? emomBlocksFromBuilder(builder.rows, builder.emomSections) : undefined;
+      const normalBlocks = builder.mode === 'normal' ? straightBlocksFromBuilder(builder.rows) : [];
+      const blocks = builder.mode === 'emom' ? emomBlocksFromBuilder(builder.rows, builder.emomSections) : normalBlocks.length ? normalBlocks : undefined;
       if (builder.mode === 'emom') {
         if (!blocks?.length) { toast('Add an exercise to an EMOM section', 'bad'); return; }
         const invalid = blocks.some((block) => block.type === 'emom' && block.intervals.some((interval) => interval.steps.reduce((sum, step) => sum + (Number(step.targetDurationSec) || 0), 0) > interval.durationSec));
@@ -541,7 +553,9 @@ export function renderShell(root: HTMLElement): void {
           exercise_name: row.exerciseName,
           muscle_group: row.muscleGroup,
           image_url: row.imageUrl,
-          sets: current.mode === 'emom' ? current.emomSections[row.sectionIndex]?.rounds || 1 : row.sets,
+          sets: current.mode === 'emom'
+            ? current.emomSections[row.sectionIndex]?.rounds || 1
+            : normalBlocks.find((block) => block.steps.some((step) => step.exerciseSlug === row.exerciseSlug))?.rounds || row.sets,
           reps: row.reps,
           rest: row.restSec,
           weight: row.weight,
@@ -600,6 +614,7 @@ export function renderShell(root: HTMLElement): void {
             <div class="wex-param-group"><div class="wex-param-label">${unit}</div><input class="wex-param-input" type="number" min="0" step="0.5" data-f="weight" placeholder="—" value="${row.weight != null ? displayWeightKg(row.weight, unit) : ''}"></div>
             <div class="wex-param-group"><div class="wex-param-label">Rest</div><input class="wex-param-input" type="number" min="0" step="5" data-f="restSec" value="${row.restSec}"></div>
           </div>
+          ${index > 0 ? `<button class="wex-superset-toggle ${row.supersetWithPrevious ? 'active' : ''}" type="button" data-toggle-superset="${index}" aria-pressed="${row.supersetWithPrevious ? 'true' : 'false'}">${row.supersetWithPrevious ? 'Linked in superset' : 'Pair with previous'}</button>` : ''}
         </div>
         <button class="wex-remove" type="button" data-rm="${index}" title="Remove">✕</button>
       </div>`;

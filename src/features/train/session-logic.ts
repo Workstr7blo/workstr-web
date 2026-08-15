@@ -1,4 +1,4 @@
-import type { EmomBlock } from '../../core/types';
+import type { EmomBlock, StraightBlock } from '../../core/types';
 import type { ActiveSession, SessionExercise } from '../../app/state';
 import type { EmomClockState } from './emom-clock';
 import type { EmomSlot } from './emom';
@@ -8,6 +8,41 @@ export interface EmomTimerPhase {
   secondsRemaining: number;
   durationSec: number;
   stepIndex: number | null;
+}
+
+export interface SupersetTransition {
+  blockIndex: number;
+  roundIndex: number;
+  stepIndex: number;
+  stepCount: number;
+  rounds: number;
+  nextExerciseSlug: string | null;
+  restAfterRoundSec: number;
+  roundComplete: boolean;
+  supersetComplete: boolean;
+}
+
+export function activeSupersetBlocks(session: ActiveSession): Array<{ block: StraightBlock; blockIndex: number }> {
+  return (session.blocks || []).flatMap((block, blockIndex) =>
+    block.type === 'straight' && block.steps.length > 1 ? [{ block, blockIndex }] : []
+  );
+}
+
+export function supersetTransition(session: ActiveSession, exerciseSlug: string, setNumber: number): SupersetTransition | null {
+  for (const { block, blockIndex } of activeSupersetBlocks(session)) {
+    const stepIndex = block.steps.findIndex((step) => step.exerciseSlug === exerciseSlug);
+    if (stepIndex < 0) continue;
+    const roundIndex = Math.max(0, Math.min(block.rounds - 1, Math.floor(Number(setNumber) || 1) - 1));
+    const roundComplete = stepIndex === block.steps.length - 1;
+    const supersetComplete = roundComplete && roundIndex === block.rounds - 1;
+    return {
+      blockIndex, roundIndex, stepIndex, stepCount: block.steps.length, rounds: block.rounds,
+      nextExerciseSlug: supersetComplete ? null : block.steps[roundComplete ? 0 : stepIndex + 1]?.exerciseSlug || null,
+      restAfterRoundSec: roundComplete ? Math.max(0, Number(block.restAfterRoundSec) || 0) : 0,
+      roundComplete, supersetComplete
+    };
+  }
+  return null;
 }
 
 export function restSecondsRemaining(endsAt: number, now = Date.now()): number {

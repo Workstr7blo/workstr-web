@@ -80,6 +80,21 @@ function emomProgram(): RelayProgram {
   };
 }
 
+function supersetProgram(): RelayProgram {
+  return {
+    ...oneExerciseProgram(),
+    name: 'Push Pull',
+    exercises: [
+      { address: '', name: 'Bench Press', sets: 2, reps: '8', restSec: 60 },
+      { address: '', name: 'Barbell Row', sets: 2, reps: '10', restSec: 60 }
+    ],
+    blocks: [{ type: 'straight', rounds: 2, restAfterRoundSec: 60, steps: [
+      { exerciseSlug: 'bench-press', exerciseName: 'Bench Press', targetReps: '8' },
+      { exerciseSlug: 'barbell-row', exerciseName: 'Barbell Row', targetReps: '10' }
+    ] }]
+  };
+}
+
 describe('session runner', () => {
   let root: HTMLElement;
   let state: AppState;
@@ -131,6 +146,24 @@ describe('session runner', () => {
     expect(sets.length).toBe(1);
     expect(state.activeSession?.sets.length).toBe(1);
     expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(true);
+  });
+
+  it('moves through a superset before resting and stores transition coordinates', async () => {
+    await runner.startTrainingSession(supersetProgram());
+    expect(root.querySelector('#session-meta')?.textContent).toContain('Move 1 of 2');
+    (root.querySelector('[data-session-reps="0"]') as HTMLInputElement).value = '8';
+    (root.querySelector('[data-set-log-btn="0"]') as HTMLButtonElement).click();
+    await tick();
+    expect(root.querySelector('#session-body')?.textContent).toContain('Barbell Row');
+    expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(false);
+    (root.querySelector('[data-session-reps="0"]') as HTMLInputElement).value = '10';
+    (root.querySelector('[data-set-log-btn="0"]') as HTMLButtonElement).click();
+    await tick();
+    expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(true);
+    expect(sets).toEqual([
+      expect.objectContaining({ exercise_slug: 'bench-press', block_index: 0, round_index: 0, step_index: 0 }),
+      expect.objectContaining({ exercise_slug: 'barbell-row', block_index: 0, round_index: 0, step_index: 1 })
+    ]);
   });
 
   it('finishes the session and opens the recap modal', async () => {
