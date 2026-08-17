@@ -26,9 +26,10 @@ function makeState(store: WorkstrStore): AppState {
   };
 }
 
-function fakeStore(): { store: WorkstrStore; sets: unknown[]; finished: number[]; emomStarts: Array<{ id: number; startedAt: string }>; clockUpdates: Array<{ positionSec: number; activeSec: number; runningSince?: string }> } {
+function fakeStore(): { store: WorkstrStore; sets: unknown[]; finished: number[]; deleted: number[]; emomStarts: Array<{ id: number; startedAt: string }>; clockUpdates: Array<{ positionSec: number; activeSec: number; runningSince?: string }> } {
   const sets: unknown[] = [];
   const finished: number[] = [];
+  const deleted: number[] = [];
   const emomStarts: Array<{ id: number; startedAt: string }> = [];
   const clockUpdates: Array<{ positionSec: number; activeSec: number; runningSince?: string }> = [];
   const store = {
@@ -36,9 +37,10 @@ function fakeStore(): { store: WorkstrStore; sets: unknown[]; finished: number[]
     addSessionSet: async (set: unknown) => { sets.push(set); return sets.length; },
     startSessionEmom: async (id: number, startedAt: string) => { emomStarts.push({ id, startedAt }); },
     updateSessionEmomClock: async (_id: number, positionSec: number, activeSec: number, runningSince?: string) => { clockUpdates.push({ positionSec, activeSec, runningSince }); },
-    finishSession: async (id: number) => { finished.push(id); }
+    finishSession: async (id: number) => { finished.push(id); },
+    deleteSession: async (id: number) => { deleted.push(id); }
   } as unknown as WorkstrStore;
-  return { store, sets, finished, emomStarts, clockUpdates };
+  return { store, sets, finished, deleted, emomStarts, clockUpdates };
 }
 
 function makeContext(root: HTMLElement, state: AppState): SessionRunnerContext {
@@ -101,6 +103,8 @@ describe('session runner', () => {
   let state: AppState;
   let store: WorkstrStore;
   let sets: unknown[];
+  let finished: number[];
+  let deleted: number[];
   let emomStarts: Array<{ id: number; startedAt: string }>;
   let clockUpdates: Array<{ positionSec: number; activeSec: number; runningSince?: string }>;
   let runner: ReturnType<typeof createSessionRunner>;
@@ -111,6 +115,8 @@ describe('session runner', () => {
     const fake = fakeStore();
     store = fake.store;
     sets = fake.sets;
+    finished = fake.finished;
+    deleted = fake.deleted;
     emomStarts = fake.emomStarts;
     clockUpdates = fake.clockUpdates;
     state = makeState(store);
@@ -147,6 +153,39 @@ describe('session runner', () => {
     expect(sets.length).toBe(1);
     expect(state.activeSession?.sets.length).toBe(1);
     expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(true);
+  });
+
+  it('restores logged normal-session sets and leaves the next set actionable', async () => {
+    const program = oneExerciseProgram();
+    state.activeSession = {
+      id: 7, sheetName: program.name, startedAt: '2026-08-14T12:00:00.000Z',
+      exercises: [{ exerciseSlug: 'bench-press', exerciseName: 'Bench Press', sets: 2, reps: '8', restSec: 60 }],
+      sets: [{ exerciseSlug: 'bench-press', exerciseName: 'Bench Press', setNumber: 1, reps: 8, weight: 20, done: true, completedAt: '2026-08-14T12:01:00.000Z' }]
+    };
+
+    await runner.openSessionOverlay(state.activeSession);
+
+    expect(root.querySelector('[data-set-log-btn="0"]')?.textContent).toBe('Done');
+    expect((root.querySelector('[data-set-log-btn="1"]') as HTMLButtonElement).disabled).toBe(false);
+    (root.querySelector('[data-session-reps="1"]') as HTMLInputElement).value = '8';
+    (root.querySelector('[data-set-log-btn="1"]') as HTMLButtonElement).click();
+    await tick();
+    expect(sets[0]).toMatchObject({ session_id: 7, exercise_slug: 'bench-press', set_number: 2 });
+  });
+
+  it('reconciles and dismisses an active rest timer after its deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
+    await runner.startTrainingSession(oneExerciseProgram());
+    (root.querySelector('[data-session-reps="0"]') as HTMLInputElement).value = '8';
+    (root.querySelector('[data-set-log-btn="0"]') as HTMLButtonElement).click();
+    await Promise.resolve();
+    expect(root.querySelector('#session-rest-val')?.textContent).toBe('60');
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(root.querySelector('#session-rest-val')?.textContent).toBe('0');
+    expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(false);
   });
 
   it('moves through a superset before resting and stores transition coordinates', async () => {
@@ -186,10 +225,29 @@ describe('session runner', () => {
     await runner.startTrainingSession(oneExerciseProgram());
     (root.querySelector('#finish-session') as HTMLButtonElement).click();
     await tick();
+    expect(finished).toEqual([1]);
     expect(state.activeSession).toBeNull();
     expect(root.querySelector('#modal')?.classList.contains('open')).toBe(true);
     expect(root.querySelector('#modal-content')?.textContent).toContain('recap');
     expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(false);
+  });
+
+  it('keeps a session when cancel is dismissed and deletes it when confirmed', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    await runner.startTrainingSession(oneExerciseProgram());
+
+    (root.querySelector('#session-close') as HTMLButtonElement).click();
+    await tick();
+    expect(state.activeSession?.id).toBe(1);
+    expect(deleted).toEqual([]);
+    expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(true);
+
+    (root.querySelector('#session-close') as HTMLButtonElement).click();
+    await tick();
+    expect(deleted).toEqual([1]);
+    expect(state.activeSession).toBeNull();
+    expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(false);
+    confirm.mockRestore();
   });
 
   it('starts an EMOM clock and logs actual reps without opening normal rest', async () => {
