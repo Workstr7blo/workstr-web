@@ -49,7 +49,7 @@ export interface Exercise {
   default_sets?: number;
   default_reps?: number | string;
   default_rest?: number;
-  source_type: 'manual' | 'imported' | 'premium' | 'bundle' | 'nostr' | 'ai';
+  source_type: 'manual' | 'imported' | 'bundle' | 'nostr' | 'ai';
   status: 'active' | 'deleted';
   nostr_event_id?: string;
   nostr_pubkey?: string;
@@ -177,7 +177,7 @@ export interface CanonCache {
 export interface WorkstrSettings {
   unit: WeightUnit;
   publicRelays: string[];
-  paidRelay?: string;
+  workstrRelay?: string;
   signerType?: 'nip07' | 'nip46' | 'idenstr';
   syncCursor?: number;
   // Highest starter-seed version applied to this namespace; see db/seed.ts.

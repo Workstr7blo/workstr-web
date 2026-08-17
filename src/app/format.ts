@@ -53,11 +53,11 @@ export const difficultyBadgeClass = (difficulty?: string): string =>
   ({ beginner: 'diff-beginner', intermediate: 'diff-intermediate', advanced: 'diff-advanced', 'beast mode': 'diff-beast', 'beast-mode': 'diff-beast' } as Record<string, string>)[String(difficulty || '').trim().toLowerCase()] || 'diff-unknown';
 
 // User-facing source badge: anything from the official catalog (imported,
-// legacy bundle rows, premium) is labeled "Workstr"; "canon" stays code-only.
+// legacy bundle rows) is labeled "Workstr"; "canon" stays code-only.
 export function exerciseSourceLabel(exercise: Exercise): string {
   const source = exercise.source_type;
   if (source === 'ai') return 'ai';
-  if (source === 'nostr' || source === 'imported' || source === 'bundle' || source === 'premium') return 'Workstr';
+  if (source === 'nostr' || source === 'imported' || source === 'bundle') return 'Workstr';
   return 'manual';
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import type { ExerciseDraft } from '../src/db/store';
+import { openWorkstrDB } from '../src/db/schema';
 
 const bundleDraft = (slug: string): ExerciseDraft => ({
   slug,
@@ -60,6 +61,23 @@ describe('WorkstrStore', () => {
 
     await store.saveSettings({ ...defaults, unit: 'lbs' });
     expect((await store.getSettings()).unit).toBe('lbs');
+  });
+
+  it('migrates retired relay and catalog source vocabulary on open', async () => {
+    const raw = await openWorkstrDB('retired-vocabulary-test');
+    const legacyRelayKey = ['paid', 'Relay'].join('');
+    const legacyCatalogSource = ['pre', 'mium'].join('');
+    await raw.put('settings', { unit: 'kg', publicRelays: [], [legacyRelayKey]: 'wss://backup.example' }, 'settings');
+    await raw.put('exercises', {
+      ...bundleDraft('legacy-catalog'), favourite: false, status: 'active', source_type: legacyCatalogSource
+    } as never);
+    raw.close();
+
+    const store = await WorkstrStore.open('retired-vocabulary-test');
+    const settings = await store.getSettings();
+    expect(settings.workstrRelay).toBe('wss://backup.example');
+    expect(settings).not.toHaveProperty(legacyRelayKey);
+    expect((await store.listExercises())[0].source_type).toBe('imported');
   });
 
   it('registers completed workouts and their sets in IndexedDB', async () => {

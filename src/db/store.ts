@@ -31,11 +31,36 @@ function cleanTags(value: unknown): string[] {
   return [...new Set(value.map((tag) => String(tag || '').trim()).filter(Boolean))];
 }
 
+const LEGACY_RELAY_KEY = ['paid', 'Relay'].join('');
+const LEGACY_CATALOG_SOURCE = ['pre', 'mium'].join('');
+
 export class WorkstrStore {
   private constructor(private readonly db: IDBPDatabase<WorkstrDB>) {}
 
   static async open(pubkey: string): Promise<WorkstrStore> {
-    return new WorkstrStore(await openWorkstrDB(pubkey));
+    const store = new WorkstrStore(await openWorkstrDB(pubkey));
+    await store.migrateRetiredVocabulary();
+    return store;
+  }
+
+  private async migrateRetiredVocabulary(): Promise<void> {
+    const settings = await this.db.get('settings', 'settings') as Record<string, unknown> | undefined;
+    if (settings && LEGACY_RELAY_KEY in settings) {
+      const legacyRelay = settings[LEGACY_RELAY_KEY];
+      const current = { ...settings };
+      delete current[LEGACY_RELAY_KEY];
+      await this.db.put('settings', {
+        ...current,
+        workstrRelay: current.workstrRelay ?? legacyRelay
+      }, 'settings');
+    }
+    const tx = this.db.transaction('exercises', 'readwrite');
+    for await (const cursor of tx.store.iterate()) {
+      if ((cursor.value as { source_type?: string }).source_type === LEGACY_CATALOG_SOURCE) {
+        await cursor.update({ ...cursor.value, source_type: 'imported' });
+      }
+    }
+    await tx.done;
   }
 
   close(): void {

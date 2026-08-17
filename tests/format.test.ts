@@ -63,7 +63,7 @@ describe('difficultyBadgeClass', () => {
 describe('exerciseSourceLabel', () => {
   it('labels catalog sources as Workstr, ai as ai, else manual', () => {
     expect(exerciseSourceLabel(ex({ source_type: 'ai' }))).toBe('ai');
-    for (const s of ['nostr', 'imported', 'bundle', 'premium'] as const) {
+    for (const s of ['nostr', 'imported', 'bundle'] as const) {
       expect(exerciseSourceLabel(ex({ source_type: s }))).toBe('Workstr');
     }
     expect(exerciseSourceLabel(ex({ source_type: 'manual' }))).toBe('manual');

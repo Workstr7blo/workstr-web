@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Retired relay and catalog-source names are migrated to current Workstr vocabulary
+  when an existing local database opens.
+
 ### Added
 
 - **Live supersets.** Normal programs can pair consecutive exercises into grouped

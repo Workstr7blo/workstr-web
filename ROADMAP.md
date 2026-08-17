@@ -96,8 +96,8 @@ Small, mechanical, and worth its own tag so it does not ride along with features
 1. ~~`app/shell.ts` extraction pass~~ — reduced from 1,291 to under 400 lines by
    extracting program builder, catalog/library, identity/adoption,
    preferences/history/recovery, and session-persistence controllers.
-2. Rename `settings.paidRelay` → `workstrRelay`; drop the `'premium'` variant from
-   `source_type`. Both are vocabulary the funding model retired.
+2. ~~Rename retired relay/source vocabulary~~ — stored legacy settings and catalog rows
+   migrate to `workstrRelay` and `imported` when the namespace opens.
 3. Drop the unused `plan` object store at a schema migration.
 
 ## v2.0-alpha — Encrypted backup private alpha
