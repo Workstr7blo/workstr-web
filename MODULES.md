@@ -24,20 +24,24 @@ or set updates would make full-root rendering inappropriate.
 | Concern | Start here | Usually read next | Tests |
 |---|---|---|---|
 | Boot and application coordination | `src/main.ts`, `src/app/shell.ts` | `src/app/state.ts`, `src/app/layout.ts` | `tests/shell.test.ts` |
+| Identity, signer connection, and adoption | `src/app/identity-controller.ts` | `src/signer/types.ts`, `src/db/adopt.ts` | `tests/shell.test.ts`, `tests/adopt.test.ts`, browser verification |
+| Catalog/library actions and cache | `src/app/catalog-controller.ts` | `src/nostr/canon.ts`, `src/nostr/programImport.ts`, `src/db/store.ts` | `tests/discover.test.ts`, `tests/programImport.test.ts`, browser verification |
+| Preferences, recovery, history actions, and backup controls | `src/app/preferences-controller.ts` | `src/db/export.ts`, recovery modules, `src/nostr/zaps.ts` | feature tests, `tests/export.test.ts`, browser verification |
+| Stored/live session adaptation | `src/app/session-persistence.ts` | `src/db/store.ts`, `src/app/state.ts` | `tests/session-runner.test.ts`, `tests/store.test.ts` |
 | Top-level navigation and page markup | `src/app/layout.ts` | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
-| Programs and program builder | `src/features/sheets/views.ts` | shell program handlers, `src/db/store.ts`, `src/nostr/programImport.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/programImport.test.ts` |
+| Programs and program builder | `src/app/program-builder.ts`, `src/features/sheets/views.ts` | `src/db/store.ts`, `src/nostr/programImport.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/programImport.test.ts`, browser verification |
 | Live-session orchestration | `src/app/session-runner.ts` | the applicable controller/view below | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | Standard live workout | `src/features/train/standard-session-controller.ts` | `standard-session-view.ts`, `rest-timer.ts`, `session-logic.ts` | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | EMOM live workout | `src/features/train/emom-session-controller.ts` | `emom-session-view.ts`, `emom.ts`, `emom-clock.ts`, `session-logic.ts` | `tests/emom.test.ts`, `tests/emom-clock.test.ts`, `tests/session-runner.test.ts` |
 | Rest timer and countdown audio | `src/features/train/rest-timer.ts`, `countdown-audio.ts` | `session-logic.ts` | `tests/countdown-audio.test.ts`, `tests/session-logic.test.ts` |
 | Finish/review and publish-session coordination | `src/features/train/session-summary.ts` | `src/nostr/share.ts`, `src/app/session-runner.ts` | `tests/session-runner.test.ts`, `tests/share.test.ts` |
-| Workout History | `src/features/train/views.ts` | history handlers/loaders in `src/app/shell.ts`, `src/app/state.ts` | currently covered indirectly by shell/session/stats tests; add focused history tests with history work |
+| Workout History | `src/features/train/views.ts` | `src/app/preferences-controller.ts`, `src/app/session-persistence.ts`, `src/app/state.ts` | currently covered indirectly by shell/session/stats tests; add focused history tests with history work |
 | Training statistics and PRs | `src/features/progress/stats.ts` | `src/features/progress/views.ts` | `tests/stats.test.ts`, `tests/progress-views.test.ts` |
 | Body-weight UI and calculations | `src/features/progress/views.ts` | `src/db/store.ts`, `src/core/units.ts` | `tests/progress-views.test.ts`, `tests/store.test.ts` |
 | Recovery calculation and body map | `src/features/recovery/recovery.ts` | `views.ts`, `src/app/bodymap.ts`, `src/core/muscles.ts` | `tests/recovery.test.ts` |
-| Quick Workout generation | `src/features/recovery/quickWorkout.ts` | recovery module, shell Quick Workout handlers | `tests/recovery.test.ts`, relevant shell/session tests |
+| Quick Workout generation | `src/features/recovery/quickWorkout.ts` | recovery module, `src/app/preferences-controller.ts` | `tests/recovery.test.ts`, relevant shell/session tests |
 | Exercise library UI | `src/features/library/views.ts` | shell library handlers, `src/app/format.ts`, `src/db/store.ts` | `tests/equipment-views.test.ts`, `tests/shell.test.ts`, `tests/store.test.ts` |
 | Discover exercise/program UI | `src/features/discover/views.ts` | `src/nostr/canon.ts`, `programImport.ts`, shell import handlers | `tests/discover.test.ts`, `tests/canon.test.ts`, `tests/programImport.test.ts` |
 | Catalog event parsing/fetch/cache | `src/nostr/canon.ts` | `src/nostr/pool.ts`, `src/core/types.ts` | `tests/canon.test.ts` |
@@ -58,9 +62,18 @@ or set updates would make full-root rendering inappropriate.
 
 ### App composition
 
-- `src/app/shell.ts` initializes stores and signers, loads data, owns global event
-  binding, coordinates imports/forms/settings, and adapts stored sessions into
-  `ActiveSession`. It is legacy-large and scheduled for extraction.
+- `src/app/shell.ts` initializes state and namespaces, renders the root, binds global
+  navigation, and composes focused controllers. Feature-specific workflows live behind
+  controller interfaces and the shell is below the 400-line target.
+- `src/app/program-builder.ts` owns program-builder modal state, exercise selection,
+  normal/superset and EMOM prescriptions, row ordering, validation, and persistence.
+- `src/app/catalog-controller.ts` owns catalog refresh/cache/profile loading and local
+  library import, update, deletion, favorite, and detail actions.
+- `src/app/identity-controller.ts` owns signer connection, adoption choices, sign-out,
+  and the NIP-46 connection modal lifecycle.
+- `src/app/preferences-controller.ts` owns settings persistence, body/history actions,
+  backup controls, support funding refresh, and Quick Workout/recovery handlers.
+- `src/app/session-persistence.ts` adapts stored session rows into live/history state.
 - `src/app/layout.ts` composes top-level pages from feature view functions. It does not
   persist data.
 - `src/app/state.ts` defines render/session state and cross-feature session helpers.

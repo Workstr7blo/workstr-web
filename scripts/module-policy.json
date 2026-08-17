@@ -3,7 +3,6 @@
   "warningAt": 350,
   "importWarningAt": 12,
   "oversizedBaseline": {
-    "src/app/shell.ts": 1291,
     "src/nostr/canon.ts": 403
   },
   "genericFilenames": [

@@ -155,10 +155,9 @@ rules out open exercise publishing does not apply the same way.
   event is re-queried to confirm before the UI claims success.
 - **Modularity**: no file > ~400 lines; no module imports more than 3 sibling modules.
   (Lesson from the predecessor project: a monolithic `index.html` is unmaintainable
-  and expensive to feed to AI tools.) **This is a target being worked toward, not a
-  satisfied constraint** — `app/shell.ts` (~1,090 lines) and `app/session-runner.ts`
-  (~520) are over it today. Both are scheduled for extraction; the rule binds every new
-  file and every file touched, and neither of those two may grow.
+  and expensive to feed to AI tools.) The app shell and live runner now satisfy the
+  size target through focused controllers; the rule continues to bind every new and
+  modified module.
 
 ### 5.3 Stack
 
@@ -547,8 +546,13 @@ src/
                        #   request UI; paid relay invoicing lands here only if the
                        #   Section 11 fallback fires.
   app/
-    shell.ts           # root render, navigation, settings, modals  [over the line limit]
-    session-runner.ts  # live session state machine                 [over the line limit]
+    shell.ts           # root state, namespace boot, navigation, controller composition
+    catalog-controller.ts      # catalog cache/profile and library actions
+    identity-controller.ts     # signer connection, adoption, sign-out
+    preferences-controller.ts  # settings, history/body, backup, recovery handlers
+    program-builder.ts         # normal/superset/EMOM program-builder lifecycle
+    session-persistence.ts     # stored session → active/history adaptation
+    session-runner.ts          # live-session coordinator
     state.ts           # AppState shape, view/subview union, active-session types
     layout.ts          # page chrome
     format.ts          # shared HTML helpers, filters, author pills
@@ -574,9 +578,8 @@ Coding rules for AI efficiency:
 4. Port, don't reinvent: the self-hosted repo's `store.js` and the tag mappings in
    `idenstr.js` are the reference semantics. Translating a known spec is cheaper and
    safer than re-deriving one.
-5. `app/shell.ts` and `app/session-runner.ts` are over the 400-line rule and are being
-   extracted incrementally (Section 5.2). New work goes into new modules; neither file
-   may grow.
+5. Keep `app/shell.ts` and `app/session-runner.ts` as focused coordinators. New feature
+   workflows go into the controller or feature module that owns the behavior.
 
 ---
 

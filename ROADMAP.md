@@ -93,7 +93,9 @@ Feature first, refactor second — the mode is what exposes the real seam in the
 
 Small, mechanical, and worth its own tag so it does not ride along with features.
 
-1. `app/shell.ts` extraction pass (~1,090 lines → under 400).
+1. ~~`app/shell.ts` extraction pass~~ — reduced from 1,291 to under 400 lines by
+   extracting program builder, catalog/library, identity/adoption,
+   preferences/history/recovery, and session-persistence controllers.
 2. Rename `settings.paidRelay` → `workstrRelay`; drop the `'premium'` variant from
    `source_type`. Both are vocabulary the funding model retired.
 3. Drop the unused `plan` object store at a schema migration.
@@ -179,5 +181,5 @@ Not a milestone and not scheduled. Built only if the funding trigger in `instruc
 - `render()` rebuilds the whole root on every state change (54 call sites). Fine at
   current DOM size; the session runner's in-place patching is the pattern to copy if
   lists get janky.
-- `app/shell.ts` (~1,090 lines) and `app/session-runner.ts` (~520) are over the 400-line
-  rule. v1.1 addresses the runner, v1.2 the shell. Neither may grow in the meantime.
+- The app shell and live runner are divided into focused coordinators, controllers,
+  views, timing, persistence, and summary modules; neither remains oversized.
