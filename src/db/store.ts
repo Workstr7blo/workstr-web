@@ -212,12 +212,12 @@ export class WorkstrStore {
     await this.db.put('sessions', { ...session, finished_at: finishedAt });
   }
 
-  async startSessionEmom(id: number, startedAt: string): Promise<void> {
+  async startSessionEmom(id: number, startedAt: string, keepStartedAt = false): Promise<void> {
     const session = await this.db.get('sessions', id);
     if (!session) return;
     await this.db.put('sessions', {
       ...session,
-      started_at: startedAt,
+      started_at: keepStartedAt ? session.started_at : startedAt,
       emom_started_at: startedAt,
       emom_position_sec: 0,
       emom_active_sec: 0,

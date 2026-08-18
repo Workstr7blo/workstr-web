@@ -31,7 +31,7 @@ or set updates would make full-root rendering inappropriate.
 | Top-level navigation and page markup | `src/app/layout.ts` | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
-| Programs and program builder | `src/app/program-builder.ts`, `src/features/sheets/views.ts` | `src/db/store.ts`, `src/nostr/programImport.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/programImport.test.ts`, browser verification |
+| Programs and program builder | `src/app/program-builder.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts` | `src/db/store.ts`, `src/nostr/programImport.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, browser verification |
 | Live-session orchestration | `src/app/session-runner.ts` | the applicable controller/view below | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | Standard live workout | `src/features/train/standard-session-controller.ts` | `standard-session-view.ts`, `rest-timer.ts`, `session-logic.ts` | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | EMOM live workout | `src/features/train/emom-session-controller.ts` | `emom-session-view.ts`, `emom.ts`, `emom-clock.ts`, `session-logic.ts` | `tests/emom.test.ts`, `tests/emom-clock.test.ts`, `tests/session-runner.test.ts` |
@@ -67,6 +67,9 @@ or set updates would make full-root rendering inappropriate.
   controller interfaces and the shell is below the 400-line target.
 - `src/app/program-builder.ts` owns program-builder modal state, exercise selection,
   normal/superset and EMOM prescriptions, row ordering, validation, and persistence.
+- `src/features/sheets/builder-views.ts` renders the builder's row and EMOM-section
+  markup from `BuilderState`. It is pure markup; all builder state lives in the
+  controller above.
 - `src/app/catalog-controller.ts` owns catalog refresh/cache/profile loading and local
   library import, update, deletion, favorite, and detail actions.
 - `src/app/identity-controller.ts` owns signer connection, adoption choices, sign-out,

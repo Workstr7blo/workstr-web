@@ -5,10 +5,14 @@ import {
   durationLabel,
   effectiveSessionStartedAt,
   emomTimerPhase,
+  isMixedSession,
+  preEmomElapsedSec,
   readEmomClock,
   restSecondsRemaining,
   sessionDurationSeconds,
   sessionSetCounts,
+  standardSessionExercises,
+  standardWorkComplete,
   supersetTransition,
   writeEmomClock
 } from '../src/features/train/session-logic';
@@ -62,6 +66,25 @@ describe('session runner pure logic', () => {
     expect(sessionSetCounts(resumed)).toEqual({ squat: 4 });
   });
 
+  it('keeps mixed-program standard work separate from EMOM-only moves', () => {
+    const mixed = session({
+      exercises: [
+        { exerciseSlug: 'push-up', exerciseName: 'Push Up', sets: 2, reps: '15', restSec: 30 },
+        { exerciseSlug: 'superman', exerciseName: 'Superman', sets: 2, reps: '15', restSec: 30 },
+        { exerciseSlug: 'sit-up', exerciseName: 'Sit Up', sets: 3, reps: '', restSec: 60 }
+      ],
+      blocks: [{ type: 'emom', rounds: 3, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'sit-up', targetDurationSec: 40 }] }] }]
+    });
+    expect(standardSessionExercises(mixed).map((exercise) => exercise.exerciseSlug)).toEqual(['push-up', 'superman']);
+    expect(sessionSetCounts(mixed)).toEqual({ 'push-up': 2, superman: 2 });
+    expect(effectiveSessionStartedAt(mixed)).toBe(mixed.startedAt);
+    expect(standardWorkComplete(mixed)).toBe(false);
+    mixed.sets = ['push-up', 'push-up', 'superman', 'superman'].map((exerciseSlug, index) => ({
+      exerciseSlug, setNumber: (index % 2) + 1, reps: 15, weight: null, done: true, completedAt: ''
+    }));
+    expect(standardWorkComplete(mixed)).toBe(true);
+  });
+
   it('separates timed EMOM work from recovery', () => {
     const timed = slot(60, [20, 15]);
     expect(emomTimerPhase(timed, 5)).toMatchObject({ mode: 'work', secondsRemaining: 15, stepIndex: 0 });
@@ -93,5 +116,34 @@ describe('session runner pure logic', () => {
       finishedAt: '2026-08-15T11:00:00.000Z'
     });
     expect(durationLabel(sessionDurationSeconds(emom))).toBe('1m 15s');
+  });
+
+  it('keeps the strength half of a mixed session in the clock', () => {
+    const mixed = session({
+      exercises: [
+        { exerciseSlug: 'push-up', exerciseName: 'Push Up', sets: 2, reps: '15', restSec: 30 },
+        { exerciseSlug: 'sit-up', exerciseName: 'Sit Up', sets: 3, reps: '', restSec: 60 }
+      ],
+      blocks: [{ type: 'emom', rounds: 3, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'sit-up', targetDurationSec: 40 }] }] }],
+      startedAt: '2026-08-15T10:00:00.000Z',
+      emomStartedAt: '2026-08-15T10:05:00.000Z',
+      emomActiveSec: 75,
+      finishedAt: '2026-08-15T11:00:00.000Z'
+    });
+    expect(isMixedSession(mixed)).toBe(true);
+    // The overlay clock stays on the real start, not the moment the EMOM took over.
+    expect(effectiveSessionStartedAt(mixed)).toBe('2026-08-15T10:00:00.000Z');
+    expect(preEmomElapsedSec(mixed)).toBe(300);
+    // 5 min of strength + 75s of EMOM active time.
+    expect(durationLabel(sessionDurationSeconds(mixed))).toBe('6m 15s');
+  });
+
+  it('treats an EMOM block with no steps as pure EMOM', () => {
+    const emom = session({
+      blocks: [{ type: 'emom', rounds: 1, intervals: [{ durationSec: 60, steps: [] }] }],
+      emomStartedAt: '2026-08-15T10:05:00.000Z'
+    });
+    expect(isMixedSession(emom)).toBe(false);
+    expect(preEmomElapsedSec(emom)).toBe(0);
   });
 });

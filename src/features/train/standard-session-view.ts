@@ -1,10 +1,11 @@
 import { html } from '../../app/format';
-import type { ActiveSession, SessionSetLog } from '../../app/state';
+import type { ActiveSession, SessionExercise, SessionSetLog } from '../../app/state';
 import type { SupersetTransition } from './session-logic';
 
 export interface StandardSessionViewInput {
   root: HTMLElement;
   session: ActiveSession;
+  exercises: SessionExercise[];
   exerciseIndex: number;
   setCounts: Record<string, number>;
   previousSets: SessionSetLog[];
@@ -14,6 +15,7 @@ export interface StandardSessionViewInput {
   unitLabel(): string;
   loggedSetCount(slug: string): number;
   superset: SupersetTransition | null;
+  startEmom?: boolean;
   bindControls(): void;
 }
 
@@ -24,7 +26,7 @@ export function updateStandardSessionProgress(root: HTMLElement, session: Active
 
 export function renderStandardSessionView(input: StandardSessionViewInput): void {
   const { root, session, exerciseIndex, setCounts } = input;
-  const exercises = session.exercises;
+  const exercises = input.exercises;
   const title = root.querySelector('#session-title');
   const meta = root.querySelector('#session-meta');
   const nav = root.querySelector('#session-ex-nav');
@@ -90,6 +92,11 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
     <button class="session-add-set" data-add-session-set="${html(slug)}" type="button">+ Add set</button>${instructionsMarkup}`;
   const isLast = exerciseIndex >= exercises.length - 1;
   const nextLabel = input.superset && !input.superset.roundComplete ? 'Next move' : 'Next';
-  footer.innerHTML = `${exerciseIndex > 0 ? `<button class="session-prev-btn" data-jump-ex="${exerciseIndex - 1}" type="button">Prev</button>` : ''}${isLast ? '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>' : `<button class="session-next-btn" data-jump-ex="${exerciseIndex + 1}" type="button">${nextLabel}</button>`}`;
+  const prev = exerciseIndex > 0 ? `<button class="session-prev-btn" data-jump-ex="${exerciseIndex - 1}" type="button">Prev</button>` : '';
+  const startEmom = input.startEmom ? '<button class="session-emom-btn" id="start-emom-section" type="button">Start EMOM</button>' : '';
+  const advance = isLast
+    ? '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>'
+    : `<button class="session-next-btn" data-jump-ex="${exerciseIndex + 1}" type="button">${nextLabel}</button>`;
+  footer.innerHTML = `${prev}${startEmom}${advance}`;
   input.bindControls();
 }

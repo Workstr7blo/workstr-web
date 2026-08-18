@@ -49,29 +49,74 @@ export function restSecondsRemaining(endsAt: number, now = Date.now()): number {
   return Math.max(0, Math.ceil((endsAt - now) / 1000));
 }
 
+export function activeEmomBlocks(session: ActiveSession | null): EmomBlock[] {
+  return (session?.blocks || []).filter((block): block is EmomBlock => block.type === 'emom');
+}
+
+function emomExerciseSlugs(session: ActiveSession | null): Set<string> {
+  return new Set(activeEmomBlocks(session).flatMap((block) =>
+    block.intervals.flatMap((interval) => interval.steps.map((step) => step.exerciseSlug).filter(Boolean))
+  ));
+}
+
+function straightExerciseSlugs(session: ActiveSession | null): Set<string> {
+  return new Set((session?.blocks || []).flatMap((block) =>
+    block.type === 'straight' ? block.steps.map((step) => step.exerciseSlug).filter(Boolean) : []
+  ));
+}
+
+export function standardSessionExercises(session: ActiveSession): SessionExercise[] {
+  const emomSlugs = emomExerciseSlugs(session);
+  if (!emomSlugs.size) return session.exercises;
+  const straightSlugs = straightExerciseSlugs(session);
+  return session.exercises.filter((exercise) => !emomSlugs.has(exercise.exerciseSlug) || straightSlugs.has(exercise.exerciseSlug));
+}
+
 export function sessionSetCounts(session: ActiveSession): Record<string, number> {
   const counts: Record<string, number> = {};
-  session.exercises.forEach((exercise) => {
+  standardSessionExercises(session).forEach((exercise) => {
     const logged = session.sets.filter((set) => set.exerciseSlug === exercise.exerciseSlug).length;
     counts[exercise.exerciseSlug] = Math.max(Number(exercise.sets) || 1, logged || 1);
   });
   return counts;
 }
 
-export function exerciseSlugSignature(exercises: SessionExercise[]): string {
-  return [...new Set(exercises.map((exercise) => exercise.exerciseSlug).filter(Boolean))].sort().join('|');
+export function standardWorkComplete(session: ActiveSession): boolean {
+  const exercises = standardSessionExercises(session);
+  return exercises.length > 0 && exercises.every((exercise) => {
+    const target = Number(exercise.sets) || 1;
+    return session.sets.filter((set) => set.exerciseSlug === exercise.exerciseSlug && set.done).length >= target;
+  });
 }
 
-export function activeEmomBlocks(session: ActiveSession | null): EmomBlock[] {
-  return (session?.blocks || []).filter((block): block is EmomBlock => block.type === 'emom');
+export function exerciseSlugSignature(exercises: SessionExercise[]): string {
+  return [...new Set(exercises.map((exercise) => exercise.exerciseSlug).filter(Boolean))].sort().join('|');
 }
 
 export function isEmomSession(session: ActiveSession): boolean {
   return activeEmomBlocks(session).length > 0;
 }
 
+// Mixed means both halves carry work. An EMOM block that declares no steps claims nothing,
+// so the session stays pure EMOM and keeps the EMOM-only clock behaviour.
+export function isMixedSession(session: ActiveSession): boolean {
+  return emomExerciseSlugs(session).size > 0 && standardSessionExercises(session).length > 0;
+}
+
+// Wall-clock seconds the strength section ran before the EMOM clock took over. Pure EMOM
+// sessions restart startedAt when the clock starts, so this is zero for them by definition.
+export function preEmomElapsedSec(session: ActiveSession): number {
+  if (!session.emomStartedAt || !session.startedAt || !isMixedSession(session)) return 0;
+  const start = new Date(session.startedAt).getTime();
+  const emomStart = new Date(session.emomStartedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(emomStart)) return 0;
+  return Math.max(0, Math.round((emomStart - start) / 1000));
+}
+
 export function effectiveSessionStartedAt(session: ActiveSession): string | null {
-  return isEmomSession(session) ? session.emomStartedAt || null : session.startedAt || null;
+  return isEmomSession(session) && session.emomStartedAt && !isMixedSession(session)
+    ? session.emomStartedAt
+    : session.startedAt || null;
 }
 
 export function readEmomClock(session: ActiveSession): EmomClockState {
@@ -110,8 +155,8 @@ export function emomTimerPhase(slot: EmomSlot, elapsedInSlotSec: number): EmomTi
 export function sessionDurationSeconds(session: ActiveSession): number | null {
   const startedAt = effectiveSessionStartedAt(session);
   if (!startedAt || !session.finishedAt) return null;
-  return isEmomSession(session) && session.emomActiveSec != null
-    ? Math.max(0, Math.round(session.emomActiveSec))
+  return isEmomSession(session) && session.emomStartedAt && session.emomActiveSec != null
+    ? Math.max(0, Math.round(session.emomActiveSec) + preEmomElapsedSec(session))
     : Math.max(0, Math.round((new Date(session.finishedAt).getTime() - new Date(startedAt).getTime()) / 1000));
 }
 
