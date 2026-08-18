@@ -83,6 +83,22 @@ function emomProgram(): RelayProgram {
   };
 }
 
+function mixedProgram(): RelayProgram {
+  return {
+    ...oneExerciseProgram(),
+    name: 'Strength then EMOM',
+    exercises: [
+      { address: '', name: 'Bench Press', sets: 2, reps: '8', restSec: 60 },
+      { address: '', name: 'Sit Up', sets: 3, reps: '', restSec: 60 }
+    ],
+    blocks: [{
+      type: 'emom', rounds: 2, intervals: [{ durationSec: 60, steps: [
+        { exerciseSlug: 'sit-up', exerciseName: 'Sit Up', targetDurationSec: 20 }
+      ] }]
+    }]
+  };
+}
+
 function supersetProgram(): RelayProgram {
   return {
     ...oneExerciseProgram(),
@@ -265,6 +281,49 @@ describe('session runner', () => {
     expect(sets).toHaveLength(1);
     expect(sets[0]).toMatchObject({ reps: 9, duration_sec: 20, round_index: 0, interval_index: 0, step_index: 0 });
     expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(false);
+  });
+
+  it('runs the strength half of a mixed program before opening the EMOM timer', async () => {
+    await runner.startTrainingSession(mixedProgram());
+    expect(root.querySelector('#session-body')?.textContent).toContain('Bench Press');
+    expect(root.querySelector('#session-body')?.textContent).not.toContain('Sit Up');
+    expect(root.querySelector('#emom-start')).toBeFalsy();
+    expect(root.querySelector('#start-emom-section')).toBeTruthy();
+    (root.querySelector('#start-emom-section') as HTMLButtonElement).click();
+    await tick();
+    expect(root.querySelector('#emom-start')).toBeTruthy();
+  });
+
+  it('lets a mixed session finish from the strength half without starting the EMOM', async () => {
+    await runner.startTrainingSession(mixedProgram());
+    (root.querySelector('#finish-session') as HTMLButtonElement).click();
+    await tick();
+    expect(finished).toEqual([1]);
+    expect(emomStarts).toHaveLength(0);
+    expect(state.activeSession).toBeNull();
+  });
+
+  it('carries the strength half into the elapsed clock once the EMOM starts', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
+    await runner.startTrainingSession(mixedProgram());
+    const startedAt = state.activeSession?.startedAt;
+    await vi.advanceTimersByTimeAsync(250);
+    vi.setSystemTime(new Date('2026-08-14T12:05:00Z'));
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('05:00');
+
+    (root.querySelector('#start-emom-section') as HTMLButtonElement).click();
+    await Promise.resolve();
+    (root.querySelector('#emom-start') as HTMLButtonElement).click();
+    await Promise.resolve();
+
+    // The EMOM clock restarts at zero, but the session keeps its original start.
+    expect(state.activeSession?.startedAt).toBe(startedAt);
+    expect(state.activeSession?.emomStartedAt).toBe('2026-08-14T12:05:01.000Z');
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('05:01');
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(root.querySelector('#session-elapsed')?.textContent).toBe('05:05');
   });
 
   it('switches a timed exercise ring from work to recovery while the interval continues', async () => {

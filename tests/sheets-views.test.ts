@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   estimateProgramMin, resolveProgramExercise, programExerciseName, inferProgramMuscle,
-  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, programBody, emomBlockFromBuilder, emomBlocksFromBuilder, straightBlocksFromBuilder
+  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, programBody, emomBlockFromBuilder, emomBlocksFromBuilder, straightBlocksFromBuilder, standardProgramExercises
 } from '../src/features/sheets/views';
 import type { Exercise } from '../src/core/types';
 import type { RelayProgram, RelayProgramExercise } from '../src/nostr/canon';
@@ -36,6 +36,35 @@ describe('estimateProgramMin', () => {
   });
   it('honours the rest alias field', () => {
     expect(estimateProgramMin([member({ sets: 2, rest: 30 })])).toBe(120);
+  });
+  it('counts EMOM sections alone when every member is EMOM work', () => {
+    const blocks: RelayProgram['blocks'] = [
+      { type: 'emom', rounds: 3, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'sit-up', exerciseName: 'Sit Up' }] }] }
+    ];
+    expect(estimateProgramMin([member({ name: 'Sit Up' })], blocks)).toBe(180);
+    expect(estimateProgramMin([member({ address: '33401:pk:workstr:exercise:sit-up' })], blocks)).toBe(180);
+  });
+  it('adds the strength half to the EMOM sections for a mixed program', () => {
+    const blocks: RelayProgram['blocks'] = [
+      { type: 'emom', rounds: 3, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'sit-up', exerciseName: 'Sit Up' }] }] }
+    ];
+    // 180s of EMOM + one 2-set member (2 * 45 + 1 * 60 = 150)
+    expect(estimateProgramMin([member({ name: 'Sit Up' }), member({ name: 'Bench', sets: 2, restSec: 60 })], blocks)).toBe(330);
+  });
+});
+
+describe('standardProgramExercises', () => {
+  const blocks: RelayProgram['blocks'] = [
+    { type: 'emom', rounds: 3, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'sit-up', exerciseName: 'Sit Up' }] }] },
+    { type: 'straight', rounds: 3, steps: [{ exerciseSlug: 'bench', exerciseName: 'Bench' }, { exerciseSlug: 'row', exerciseName: 'Row' }], restAfterRoundSec: 90 }
+  ];
+  it('drops EMOM-only members and keeps superset members', () => {
+    const members = [member({ name: 'Sit Up' }), member({ name: 'Bench' }), member({ name: 'Row' })];
+    expect(standardProgramExercises(members, blocks).map((entry) => entry.name)).toEqual(['Bench', 'Row']);
+  });
+  it('returns every member when the program has no EMOM section', () => {
+    const members = [member({ name: 'Bench' })];
+    expect(standardProgramExercises(members, [])).toEqual(members);
   });
 });
 

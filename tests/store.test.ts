@@ -121,4 +121,15 @@ describe('WorkstrStore', () => {
       emom_active_sec: 40
     });
   });
+
+  it('keeps the original start time when a mixed session hands over to its EMOM', async () => {
+    const store = await WorkstrStore.open('mixed-session-test-pubkey');
+    const blocks = [{ type: 'emom' as const, rounds: 3, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'sit-up', targetDurationSec: 40 }] }] }];
+    const sessionId = await store.createSession({ sheet_name: 'Mixed', started_at: '2026-01-01T00:00:00Z', blocks, exercises: [] });
+    await store.startSessionEmom(sessionId, '2026-01-01T00:12:00Z', true);
+    expect((await store.listSessions()).find((session) => session.id === sessionId)).toMatchObject({
+      started_at: '2026-01-01T00:00:00Z',
+      emom_started_at: '2026-01-01T00:12:00Z'
+    });
+  });
 });

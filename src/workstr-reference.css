@@ -530,10 +530,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .session-instructions-step b { color: var(--purple-2); font: 800 12px/1 ui-monospace, monospace; margin-right: 8px; }
 
 .session-footer { display: flex; gap: 10px; align-items: center; padding: 14px clamp(20px, 4vw, 34px) calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(188,151,255,.14); background: rgba(4,2,8,.74); backdrop-filter: blur(18px); }
-.session-next-btn, .session-finish-btn, .session-prev-btn { min-height: 58px; border-radius: 14px; padding: 0 18px; font: 900 13px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: transform .08s ease; }
-.session-next-btn:active, .session-finish-btn:active, .session-prev-btn:active { transform: translateY(1px) scale(.99); }
+.session-next-btn, .session-finish-btn, .session-prev-btn, .session-emom-btn { min-height: 58px; border-radius: 14px; padding: 0 18px; font: 900 13px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: transform .08s ease; }
+.session-next-btn:active, .session-finish-btn:active, .session-prev-btn:active, .session-emom-btn:active { transform: translateY(1px) scale(.99); }
 .session-next-btn { flex: 1; border: none; color: white; background: linear-gradient(135deg, var(--sovereign-purple), #4d1fd1); box-shadow: 0 0 30px rgba(124,60,255,.32); }
 .session-finish-btn { flex: 1; border: none; color: #04140d; background: linear-gradient(135deg, var(--success-green), #36e0a0); box-shadow: 0 0 30px rgba(0,208,132,.26); }
+.session-emom-btn { flex: 1; border: none; color: white; background: linear-gradient(135deg, var(--sovereign-purple), #4d1fd1); box-shadow: 0 0 30px rgba(124,60,255,.32); }
 .session-prev-btn { border: 1px solid var(--border); color: var(--text); background: rgba(255,255,255,.04); }
 .session-prev-btn:hover { border-color: var(--border-hot); }
 

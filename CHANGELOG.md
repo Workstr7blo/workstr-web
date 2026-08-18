@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Mixed program builder sections.** A program can now combine a normal strength
+  portion with EMOM sections, and EMOM sections can hold multiple movements in the same
+  interval for superset-style timed work.
 - **Live supersets.** Normal programs can pair consecutive exercises into grouped
   rounds. The live runner advances through every movement before starting round rest,
   stores block/round/step coordinates with each set, and labels supersets in history.
@@ -21,6 +24,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   including several duration-based exercises inside the same interval. The live runner
   reconciles from wall-clock time, restores unfinished EMOM sessions, and logs actual
   reps independently from prescribed work duration for training statistics.
+
+### Fixed
+
+- Mixed normal + EMOM programs now run the normal strength section before opening the
+  EMOM timer instead of treating the presence of any EMOM block as EMOM-only.
+- Starting the EMOM half of a mixed session no longer discards the strength half's start
+  time. The session clock continues from where the strength work left off instead of
+  resetting to zero, and finished-session duration counts both halves.
+- A mixed session can be finished from the strength half. The handoff moved to its own
+  "Start EMOM" button, which appears once every prescribed strength set is logged, so the
+  finish button always finishes.
+- Program cards estimate a mixed program as its strength section plus its EMOM sections,
+  and list the exercise and superset counts alongside the EMOM label rather than hiding
+  them behind it.
+- The program builder refuses to place one exercise in both the strength and EMOM halves,
+  which previously saved without complaint and then silently dropped the strength copy.
 
 ## [1.0.0] - 2026-08-11
 

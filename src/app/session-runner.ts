@@ -5,7 +5,7 @@ import { inferProgramMuscle, programExerciseName, resolveProgramExercise } from 
 import type { RelayProgram } from '../nostr/canon';
 import { emomClockSnapshot } from '../features/train/emom-clock';
 import { CountdownCueGuard } from '../features/train/countdown-audio';
-import { effectiveSessionStartedAt, isEmomSession, readEmomClock } from '../features/train/session-logic';
+import { effectiveSessionStartedAt, isEmomSession, preEmomElapsedSec, readEmomClock, standardSessionExercises } from '../features/train/session-logic';
 import type { ActiveSession, AppState, SessionExercise } from './state';
 import type { Signer } from '../signer/types';
 import { createSessionSummary } from '../features/train/session-summary';
@@ -43,6 +43,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   const { state, root } = ctx;
 
   let sessionElapsedTimer = 0;
+  let emomPhaseMounted = false;
   const countdownCueGuard = new CountdownCueGuard();
   const standard = new StandardSessionController({
     root, state, cueGuard: countdownCueGuard,
@@ -97,6 +98,20 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     await openSessionOverlay(state.activeSession);
   }
 
+  function shouldOpenEmom(session: ActiveSession): boolean {
+    return isEmomSession(session) && (session.emomStartedAt != null || standardSessionExercises(session).length === 0);
+  }
+
+  // Which half of a mixed session is mounted in the overlay. Derived state is not enough:
+  // between "Start EMOM" and the first tick of the clock the EMOM view is up while
+  // emomStartedAt is still null, and rebinding standard controls there kills its buttons.
+  function startEmomSection(session: ActiveSession): void {
+    emomPhaseMounted = true;
+    standard.stop();
+    window.clearInterval(sessionElapsedTimer);
+    emom.open(session);
+  }
+
   async function requestSessionWakeLock(): Promise<void> {
     if (sessionWakeLock || !('wakeLock' in navigator)) return;
     try {
@@ -113,13 +128,14 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (document.visibilityState !== 'visible') return;
     if (state.activeSession && root.querySelector('#session-overlay')?.classList.contains('open')) void requestSessionWakeLock();
     standard.reconcileRest();
-    if (emom.active) emom.reconcileClocks();
+    if (emomPhaseMounted && emom.active) emom.reconcileClocks();
   });
 
   async function openSessionOverlay(session: ActiveSession): Promise<void> {
     root.querySelector('#session-overlay')?.classList.add('open');
     void requestSessionWakeLock();
-    if (emom.active) {
+    emomPhaseMounted = shouldOpenEmom(session);
+    if (emomPhaseMounted) {
       window.clearInterval(sessionElapsedTimer);
       emom.open(session);
     } else {
@@ -140,8 +156,8 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (!el) return;
     const startedAt = effectiveSessionStartedAt(session);
     if (!startedAt) { el.textContent = '00:00'; return; }
-    const seconds = isEmomSession(session)
-      ? Math.max(0, Math.floor(emomClockSnapshot(readEmomClock(session), now).activeSec))
+    const seconds = isEmomSession(session) && session.emomStartedAt
+      ? Math.max(0, Math.floor(emomClockSnapshot(readEmomClock(session), now).activeSec) + preEmomElapsedSec(session))
       : Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
     const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), sec = seconds % 60;
     el.textContent = h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
@@ -172,6 +188,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   }
 
   function closeSessionOverlay(): void {
+    emomPhaseMounted = false;
     standard.stop();
     window.clearInterval(sessionElapsedTimer);
     emom.stop();
@@ -187,10 +204,15 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (closeButton) closeButton.onclick = () => { void cancelActiveSession(); };
     const finishButton = root.querySelector<HTMLButtonElement>('#finish-session');
     if (finishButton) finishButton.onclick = () => { void finishActiveSession(); };
+    const startEmomButton = root.querySelector<HTMLButtonElement>('#start-emom-section');
+    if (startEmomButton) startEmomButton.onclick = () => {
+      const session = state.activeSession;
+      if (session) startEmomSection(session);
+    };
   }
 
   function bindSessionControls(): void {
-    if (emom.active) { emom.bindControls(); return; }
+    if (emomPhaseMounted) { emom.bindControls(); return; }
     standard.bindControls();
   }
 

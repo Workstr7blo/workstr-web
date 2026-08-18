@@ -5,7 +5,7 @@ import { CountdownCueGuard, playCountdownCue, unlockCountdownAudio, type Countdo
 import { compileEmomBlocks, emomDurationSec, emomPosition, type EmomPosition, type EmomSlot } from './emom';
 import { emomClockSnapshot, pauseEmomClock, resumeEmomClock, seekEmomClock } from './emom-clock';
 import { renderEmomSessionView, updateEmomTimerView } from './emom-session-view';
-import { activeEmomBlocks, emomTimerPhase, readEmomClock, writeEmomClock } from './session-logic';
+import { activeEmomBlocks, emomTimerPhase, isMixedSession, readEmomClock, writeEmomClock } from './session-logic';
 
 export interface EmomSessionControllerContext {
   root: HTMLElement;
@@ -117,12 +117,14 @@ export class EmomSessionController {
     const session = this.ctx.state.activeSession;
     if (!session || !activeEmomBlocks(session).length) return;
     const startedAt = new Date().toISOString();
+    // A mixed session already ran its strength half, so keep the original startedAt.
+    const keepStartedAt = isMixedSession(session);
     session.emomStartedAt = startedAt;
-    session.startedAt = startedAt;
+    if (!keepStartedAt) session.startedAt = startedAt;
     session.emomPositionSec = 0;
     session.emomActiveSec = 0;
     session.emomRunningSince = startedAt;
-    this.persistQueue = this.ctx.state.store?.startSessionEmom(session.id, startedAt) || Promise.resolve();
+    this.persistQueue = this.ctx.state.store?.startSessionEmom(session.id, startedAt, keepStartedAt) || Promise.resolve();
     this.resetRenderState();
     this.startTimer();
     await this.persistQueue;

@@ -12,7 +12,7 @@ export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscle
 
 export interface BuilderEmomSection { rounds: number; intervalSec: number }
 
-export interface BuilderState { sheetId?: number; name: string; desc: string; difficulty: string; tags: string[]; mode: 'normal' | 'emom'; emomSections: BuilderEmomSection[]; rows: BuilderRow[]; library: Exercise[] }
+export interface BuilderState { sheetId?: number; name: string; desc: string; difficulty: string; tags: string[]; mode: 'normal' | 'emom' | 'mixed'; emomSections: BuilderEmomSection[]; rows: BuilderRow[]; library: Exercise[] }
 
 export function emomBlockFromBuilder(rows: BuilderRow[], rounds: number, intervalSec: number): EmomBlock {
   const byInterval = new Map<number, BuilderRow[]>();
@@ -64,12 +64,34 @@ export function straightBlocksFromBuilder(rows: BuilderRow[]): StraightBlock[] {
   }));
 }
 
+// Program members carry an address on relay programs and only a name on local sheets, so
+// match block steps on either. Both sides are lowercased because the two paths disagree on case.
+function stepKeys(steps: Array<{ exerciseSlug?: string; exerciseName?: string }>): string[] {
+  return steps.flatMap((step) => [step.exerciseSlug, step.exerciseName].filter(Boolean).map((key) => String(key).toLowerCase()));
+}
+
+function memberKeys(member: RelayProgram['exercises'][number]): string[] {
+  const slug = member.address ? member.address.split(':').pop() : '';
+  return [slug, member.name].filter(Boolean).map((key) => String(key).toLowerCase());
+}
+
+// The members that belong to the strength half of a program: everything the EMOM blocks do
+// not claim, plus superset members, which are strength work even when a slug repeats in an EMOM.
+export function standardProgramExercises(exercises: RelayProgram['exercises'], blocks?: RelayProgram['blocks']): RelayProgram['exercises'] {
+  const emomKeys = new Set((blocks || []).flatMap((block) => block.type === 'emom' ? stepKeys(block.intervals.flatMap((interval) => interval.steps)) : []));
+  if (!emomKeys.size) return exercises;
+  const straightKeys = new Set((blocks || []).flatMap((block) => block.type === 'straight' ? stepKeys(block.steps) : []));
+  return exercises.filter((member) => {
+    const keys = memberKeys(member);
+    return !keys.some((key) => emomKeys.has(key)) || keys.some((key) => straightKeys.has(key));
+  });
+}
+
 export function estimateProgramMin(exercises: RelayProgram['exercises'], blocks?: RelayProgram['blocks']): number {
   const emomSeconds = (blocks || []).reduce((total, block) => block.type === 'emom'
     ? total + block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0)
     : total, 0);
-  if (emomSeconds) return emomSeconds;
-  return exercises.reduce((total, exercise) => {
+  return emomSeconds + standardProgramExercises(exercises, blocks).reduce((total, exercise) => {
     const sets = Number(exercise.sets) || 3;
     const rest = Number(exercise.restSec || exercise.rest) || 90;
     return total + sets * 45 + Math.max(0, sets - 1) * rest;
@@ -189,7 +211,7 @@ export function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
 }
 
 export function programCard(program: RelayProgram, state: AppState): string {
-  const exerciseCount = program.exercises.length;
+  const exerciseCount = standardProgramExercises(program.exercises, program.blocks).length;
   const time = formatMinutes(estimateProgramMin(program.exercises, program.blocks));
   const emomBlocks = program.blocks?.filter((block) => block.type === 'emom') || [];
   const emom = emomBlocks[0];
@@ -197,7 +219,11 @@ export function programCard(program: RelayProgram, state: AppState): string {
   const groups = programGroups(program, state.exercises);
   const map = programMuscleMap(program, state.exercises);
   const emomLabel = emomBlocks.length > 1 ? `EMOM · ${emomBlocks.length} sections` : emom ? `EMOM · ${emom.rounds} rounds` : '';
-  const trainingLabel = emomLabel || [supersetCount ? `${supersetCount} superset${supersetCount === 1 ? '' : 's'}` : '', `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+  const trainingLabel = [
+    emomLabel,
+    supersetCount ? `${supersetCount} superset${supersetCount === 1 ? '' : 's'}` : '',
+    exerciseCount || !emomLabel ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}` : ''
+  ].filter(Boolean).join(' · ');
   const meta = [trainingLabel, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
   const tagPills = (program.tags || []).length ? `<div class="program-tags">${program.tags.map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('')}</div>` : '';
   const isExpanded = state.expandedProgramAddress === program.address;
