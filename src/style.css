@@ -376,3 +376,29 @@
   .history-card { padding: 9px 6px; }
   .history-card-value { font-size: 18px; }
 }
+
+/* History timeline: date groupings, the selected-day filter bar, and the disclosure that
+   keeps Delete out of the primary action row. */
+.history-count { margin: 2px 0 12px; color: var(--dim); font: 700 11px/1 ui-monospace, monospace; letter-spacing: .04em; }
+.history-group { margin-bottom: 18px; }
+.history-group-head { display: flex; align-items: baseline; gap: 9px; margin: 0 0 9px; }
+.history-group-head h4 { margin: 0; color: var(--purple-2); font: 800 11px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.history-group-count { color: var(--dim); font: 700 10px/1 ui-monospace, monospace; }
+.history-filter {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding: 11px 13px;
+  border: 1px solid rgba(0, 208, 132, .38); border-radius: 13px; background: rgba(0, 208, 132, .07);
+}
+.history-filter-text { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.history-filter-text b { font-size: 13px; }
+.history-filter-text span { color: var(--muted); font-size: 11px; }
+.session-danger { margin-top: 10px; }
+.session-danger > summary {
+  display: inline-block; padding: 5px 0; color: var(--dim); cursor: pointer;
+  font: 700 10px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase;
+  list-style: none;
+}
+.session-danger > summary::-webkit-details-marker { display: none; }
+.session-danger > summary::after { content: " ▾"; }
+.session-danger[open] > summary { color: var(--muted); }
+.session-danger[open] > summary::after { content: " ▴"; }
+.session-danger > .button { margin-top: 7px; }

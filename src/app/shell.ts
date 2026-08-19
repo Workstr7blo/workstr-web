@@ -317,6 +317,8 @@ export function renderShell(root: HTMLElement): void {
       state.history.selectedDate = state.history.selectedDate === key ? null : key;
       render();
     }));
+    const clearFilter = root.querySelector<HTMLButtonElement>('#history-clear-filter');
+    if (clearFilter) clearFilter.onclick = () => { state.history.selectedDate = null; render(); };
   }
 
   function toast(message: string, kind: 'ok' | 'bad' = 'ok'): void {
