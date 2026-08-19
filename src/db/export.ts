@@ -7,7 +7,7 @@ export const EXPORT_SCHEMA = 1;
 // as-is. `blobs` is deliberately excluded (cached image binaries, re-fetchable).
 const KEYED_STORES = ['exercises', 'sheets', 'sheet_exercises', 'sessions', 'session_sets', 'bodyweight', 'sync_queue'] as const;
 // Out-of-line key stores — export { key, value } pairs so the keys survive.
-const KV_STORES = ['plan', 'settings'] as const;
+const KV_STORES = ['settings'] as const;
 
 type KeyedStore = typeof KEYED_STORES[number];
 type KvStore = typeof KV_STORES[number];

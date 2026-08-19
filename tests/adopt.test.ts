@@ -67,7 +67,7 @@ describe('copyNamespace', () => {
     await src.logBody({ date: '2026-07-15', weight_kg: 80 });
     await src.saveSettings({ ...(await src.getSettings()), unit: 'lbs' });
     const rawSrc = await openWorkstrDB('t-copy-src');
-    await rawSrc.put('plan', { week: ['push'] }, 'current');
+    await rawSrc.put('settings', { note: 'keyed row' }, 'extra-key');
     rawSrc.close();
     src.close();
 
@@ -95,7 +95,8 @@ describe('copyNamespace', () => {
     expect((await copied.getSettings()).unit).toBe('lbs');
     copied.close();
     const rawDst = await openWorkstrDB('t-copy-dst');
-    expect(await rawDst.get('plan', 'current')).toEqual({ week: ['push'] });
+    // an out-of-line key survives the copy, not just the row it points at
+    expect(await rawDst.get('settings', 'extra-key')).toEqual({ note: 'keyed row' });
     rawDst.close();
   });
 });

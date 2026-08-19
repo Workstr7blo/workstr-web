@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { openDB } from 'idb';
 import { WorkstrStore } from '../src/db/store';
 import type { ExerciseDraft } from '../src/db/store';
-import { openWorkstrDB } from '../src/db/schema';
+import { DB_VERSION, dbName, openWorkstrDB } from '../src/db/schema';
 
 const bundleDraft = (slug: string): ExerciseDraft => ({
   slug,
@@ -78,6 +79,56 @@ describe('WorkstrStore', () => {
     expect(settings.workstrRelay).toBe('wss://backup.example');
     expect(settings).not.toHaveProperty(legacyRelayKey);
     expect((await store.listExercises())[0].source_type).toBe('imported');
+  });
+
+  it('drops the retired plan store when a v1 database upgrades, without losing user data', async () => {
+    const namespace = 'plan-migration-test';
+    // The v1 schema verbatim, so the upgrade runs against a database shaped like a real one.
+    const legacy = await openDB(dbName(namespace), 1, {
+      upgrade(db) {
+        const exercises = db.createObjectStore('exercises', { keyPath: 'id', autoIncrement: true });
+        exercises.createIndex('slug', 'slug', { unique: true });
+        exercises.createIndex('status', 'status');
+        const sheets = db.createObjectStore('sheets', { keyPath: 'id', autoIncrement: true });
+        sheets.createIndex('slug', 'slug', { unique: true });
+        const sheetExercises = db.createObjectStore('sheet_exercises', { keyPath: 'id', autoIncrement: true });
+        sheetExercises.createIndex('sheet_id', 'sheet_id');
+        const sessions = db.createObjectStore('sessions', { keyPath: 'id', autoIncrement: true });
+        sessions.createIndex('sheet_id', 'sheet_id');
+        sessions.createIndex('started_at', 'started_at');
+        const sets = db.createObjectStore('session_sets', { keyPath: 'id', autoIncrement: true });
+        sets.createIndex('session_id', 'session_id');
+        sets.createIndex('exercise_id', 'exercise_id');
+        db.createObjectStore('plan');
+        const bodyweight = db.createObjectStore('bodyweight', { keyPath: 'id', autoIncrement: true });
+        bodyweight.createIndex('date', 'date', { unique: true });
+        db.createObjectStore('settings');
+        db.createObjectStore('sync_queue', { keyPath: 'address' });
+        db.createObjectStore('blobs');
+      }
+    });
+    await legacy.put('plan', { note: 'leg day fri' }, 'default');
+    await legacy.put('sessions', { id: 1, sheet_name: 'Push Day', started_at: '2026-01-01T00:00:00Z' });
+    await legacy.put('bodyweight', { id: 1, date: '2026-01-01', weight_kg: 70 });
+    await legacy.put('settings', { unit: 'lbs', publicRelays: [] }, 'settings');
+    legacy.close();
+
+    const db = await openWorkstrDB(namespace);
+    expect(db.version).toBe(DB_VERSION);
+    expect(Array.from(db.objectStoreNames)).not.toContain('plan');
+    expect(await db.getAll('sessions')).toHaveLength(1);
+    expect(await db.getAll('bodyweight')).toHaveLength(1);
+    db.close();
+
+    const store = await WorkstrStore.open(namespace);
+    expect((await store.getSettings()).unit).toBe('lbs');
+  });
+
+  it('never creates the plan store in a fresh database', async () => {
+    const db = await openWorkstrDB('plan-free-test');
+    expect(db.version).toBe(DB_VERSION);
+    expect(Array.from(db.objectStoreNames)).not.toContain('plan');
+    db.close();
   });
 
   it('registers completed workouts and their sets in IndexedDB', async () => {

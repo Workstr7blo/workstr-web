@@ -28,7 +28,6 @@ export function sessionAddress(id: string): string {
   return recordAddress('session', id);
 }
 
-export const PLAN_ADDRESS = 'workstr:v1:plan';
 export const BODYWEIGHT_ADDRESS = 'workstr:v1:bodyweight';
 export const SETTINGS_ADDRESS = 'workstr:v1:settings';
 export const MANIFEST_ADDRESS = 'workstr:v1:manifest';

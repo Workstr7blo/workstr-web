@@ -52,13 +52,13 @@ deployed to the domain and tagged through v1.1.0 (2026-08-19).
 - **Release and support** — starter seed of three beginner programs, the zap-only support
   and funding panel, and the tag-triggered release pipeline. v0.9.0, v1.0.0 and v1.1.0 are
   tagged, released with build artifacts, and live on the domain.
-- **Delivery** — Pages workflow deploys `main` to the custom domain; 243 tests across 26
+- **Delivery** — Pages workflow deploys `main` to the custom domain; 258 tests across 26
   files, green.
 
 **Next**
 
-The one remaining v1.2 cleanup item, then v2.0-alpha encrypted backup. Nothing in v1 is
-still open.
+v1.2 is complete and awaiting a tag. Then v1.3 workout history, then v2.0-alpha encrypted
+backup. Nothing else in v1 is open.
 
 ---
 
@@ -104,16 +104,41 @@ the real seam in the runner.
 
 ## v1.2 — Cleanup and debt
 
-Small, mechanical, and meant to have its own tag. Items 1 and 2 landed on `main` before
-the v1.1 tag and so shipped inside v1.1.0 anyway; only item 3 is left, and it is a schema
-migration, so it sets the version bump for whatever tag carries it.
+Small, mechanical, and meant to have its own tag. All three items are done; items 1 and 2
+landed on `main` before the v1.1 tag and so shipped inside v1.1.0 anyway. Item 3 moves the
+IndexedDB version, so it sets the version bump for whatever tag carries it.
 
 1. ~~`app/shell.ts` extraction pass~~ — reduced from 1,291 to under 400 lines by
    extracting program builder, catalog/library, identity/adoption,
    preferences/history/recovery, and session-persistence controllers.
 2. ~~Rename retired relay/source vocabulary~~ — stored legacy settings and catalog rows
    migrate to `workstrRelay` and `imported` when the namespace opens. Shipped in v1.1.0.
-3. Drop the unused `plan` object store at a schema migration.
+3. ~~Drop the unused `plan` object store at a schema migration.~~ — done. Database
+   version 2 deletes the store on open and never creates it; no data moves, and export
+   files stay compatible in both directions.
+
+## v1.3 — Workout history
+
+Turn History from a newest-first archive into a training record that makes consistency
+visible and lets a finished session start the next one. Independent of v2: it reads the
+IndexedDB session snapshots that already exist, adds no object store and no network
+dependency, and stays usable offline and signed out. Sequence is fixed because each step
+consumes the one before it (epic: #37).
+
+1. Timezone-safe history model — local `YYYY-MM-DD` keys, month aggregation, weekly
+   consistency, rest-day counts, as pure tested logic.
+2. Monthly calendar and compact summary cards above the timeline.
+3. Date-driven, grouped session timeline fed by calendar selection.
+4. Repeat a completed workout from its stored snapshot, without mutating the original.
+5. Responsive, accessibility, timezone/DST, offline, and regression QA.
+
+Local calendar date is the user-facing unit throughout — never UTC slicing that moves a
+late-night workout to the next day. Full charts, volume, and 1RM stay in Statistics; this
+milestone does not duplicate them.
+
+**Done when:** current-month consistency is legible without opening a session, any workout
+is reachable from a date in two interactions, and a compatible past session can be
+repeated.
 
 ## v2.0-alpha — Encrypted backup private alpha
 

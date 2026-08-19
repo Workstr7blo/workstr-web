@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and work duration instead of the sets, reps and rest a timed step never had, and an
   exercise used in more than one EMOM section reports each section's own numbers.
 
+### Removed
+
+- **The vestigial `plan` object store is gone**, at an IndexedDB upgrade to database
+  version 2. It was created by version 1 and never read or written, so opening an existing
+  database simply drops it and new databases never create it — no data moves and nothing
+  is lost. Backups keep working in both directions: exports no longer carry a `plan`
+  section, and an older export file that still has one imports fine.
+
 ### Fixed
 
 - The countdown beeps now cover a timed EMOM step's own work phase. Cues followed the
