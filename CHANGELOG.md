@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Countdown beeps no longer go silent after the first EMOM round. When the device
+  interrupts the audio session mid-workout, the app now recovers instead of dropping
+  every later cue: an inaudible keep-alive source holds the audio session open through
+  the quiet part of each round, a resume that never completes can no longer latch audio
+  off for the rest of the session, and any touch inside a live session re-primes sound.
+  Settings reports the audio state next to the version.
+
 ## [1.1.0] - 2026-08-19
 
 ### Changed

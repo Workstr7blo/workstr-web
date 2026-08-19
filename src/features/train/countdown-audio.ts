@@ -26,6 +26,11 @@ export class CountdownCueGuard {
 let audioContext: AudioContext | null = null;
 let pendingCue: CountdownCue | null = null;
 let resumePending: Promise<void> | null = null;
+let keepAlive: AudioBufferSourceNode | null = null;
+
+// A resume() that never settles must not disable cues for the rest of the
+// workout, so the in-flight guard is dropped even if the promise hangs.
+const RESUME_LATCH_MS = 2_000;
 
 type AudioContextConstructor = new () => AudioContext;
 
@@ -45,6 +50,42 @@ function primeAudioContext(): void {
   source.start(0);
 }
 
+// WebKit interrupts a context that has gone quiet, and an EMOM is silent for
+// most of every round. An inaudible looping source keeps the audio session
+// alive between cues so round two is not the first casualty.
+function startKeepAlive(): void {
+  if (!audioContext || keepAlive) return;
+  const rate = audioContext.sampleRate || 22_050;
+  const source = audioContext.createBufferSource();
+  source.buffer = audioContext.createBuffer(1, Math.max(1, Math.floor(rate)), rate);
+  source.loop = true;
+  const gain = audioContext.createGain();
+  gain.gain.setValueAtTime(0, audioContext.currentTime);
+  source.connect(gain);
+  gain.connect(audioContext.destination);
+  source.start(0);
+  keepAlive = source;
+}
+
+// Recover from an interruption without a user gesture where the platform
+// allows it, and replay the cue that arrived while the context was down.
+function watchAudioContext(context: AudioContext): void {
+  if (typeof context.addEventListener !== 'function') return;
+  context.addEventListener('statechange', () => {
+    if (context !== audioContext) return;
+    if (context.state === 'running') {
+      resumePending = null;
+      startKeepAlive();
+      const cue = pendingCue;
+      pendingCue = null;
+      if (cue) playTone(cue);
+    } else {
+      keepAlive = null;
+      resumeAudioContext();
+    }
+  });
+}
+
 function playTone(cue: CountdownCue): void {
   if (!audioContext || audioContext.state !== 'running') return;
   const now = audioContext.currentTime;
@@ -60,31 +101,48 @@ function playTone(cue: CountdownCue): void {
   gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
   oscillator.connect(gain);
   gain.connect(audioContext.destination);
+  // Every cue builds two nodes; without this the graph grows for the whole session.
+  oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
   oscillator.start(now);
   oscillator.stop(now + duration);
 }
 
 function resumeAudioContext(): void {
   if (!audioContext || audioContext.state === 'running' || resumePending) return;
-  resumePending = audioContext.resume().then(() => {
+  const attempt = audioContext.resume().then(() => {
+    if (resumePending !== attempt) return;
     resumePending = null;
+    startKeepAlive();
     const cue = pendingCue;
     pendingCue = null;
     if (cue) playTone(cue);
   }).catch(() => {
+    if (resumePending !== attempt) return;
     resumePending = null;
     pendingCue = null;
   });
+  resumePending = attempt;
+  setTimeout(() => { if (resumePending === attempt) resumePending = null; }, RESUME_LATCH_MS);
 }
 
+// Safe to call on any user gesture during a session, not just the start button:
+// a real gesture is the only thing that reliably revives an interrupted context.
 export function unlockCountdownAudio(): void {
   const AudioContextCtor = audioContextConstructor();
   if (!AudioContextCtor) return;
   try {
-    if (!audioContext || audioContext.state === 'closed') audioContext = new AudioContextCtor();
+    if (!audioContext || audioContext.state === 'closed') {
+      audioContext = new AudioContextCtor();
+      watchAudioContext(audioContext);
+    }
     resumeAudioContext();
     primeAudioContext();
+    if (audioContext.state === 'running') startKeepAlive();
   } catch { /* Audio cues are an optional enhancement. */ }
+}
+
+export function countdownAudioState(): string {
+  return audioContext ? audioContext.state : 'not started';
 }
 
 export function playCountdownCue(cue: CountdownCue | null): void {
