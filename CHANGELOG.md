@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Shortened the History intro line. On a short phone screen it ran to seven lines and
+  pushed the calendar almost entirely below the fold; the calendar now leads on every
+  iPhone size, and fits above the fold outright from the iPhone 13 up.
+
 ## [1.3.0] - 2026-08-19
 
 ### Added

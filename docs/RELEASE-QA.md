@@ -196,6 +196,22 @@ covering normal, superset and EMOM shapes, a legacy row with no recorded exercis
 
 Zero uncaught page errors throughout.
 
+**iPhone device profiles** (Chromium with the real viewport, DPR and touch emulation —
+not a substitute for section 1, which still needs a physical device and Safari's engine):
+
+| Profile | Viewport | Result |
+|---|---|---|
+| iPhone SE | 320x568 | pass; 38px day targets, no overflow, tap-through to Repeat works |
+| iPhone 12 Mini | 375x629 | pass |
+| iPhone 13 | 390x664 | pass; whole calendar grid above the fold |
+| iPhone 14 Pro Max | 430x740 | pass |
+
+Checked per profile: no horizontal overflow, day and month-nav targets at least 24px,
+summary-card labels not clipped, month title on one line, tap to filter a day, tap to
+expand a card, tap to repeat opening a clean session, and the session footer inside the
+viewport. This pass is what caught the over-long History intro line burying the calendar
+below the fold on short screens.
+
 **Deliberately deferred** — non-goals in the v1.3 issues, not oversights:
 
 - Year or multi-year heatmap, and monthly recap (#43, #41).
