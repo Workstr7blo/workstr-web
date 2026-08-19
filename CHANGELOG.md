@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Mixed program details split into Strength and EMOM.** Opening a program that combines
+  both now shows each half under its own heading, in the order the session trains them,
+  with its own exercise count and time. Timed exercises are described by rounds, interval
+  and work duration instead of the sets, reps and rest a timed step never had, and an
+  exercise used in more than one EMOM section reports each section's own numbers.
+
 ### Fixed
+
+- The time on a program's EMOM summary counted only the EMOM half while the program card
+  counted the whole program, so a mixed program advertised two different durations. Both
+  now come from one estimate and agree.
 
 - Countdown beeps no longer go silent after the first EMOM round. When the device
   interrupts the audio session mid-workout, the app now recovers instead of dropping

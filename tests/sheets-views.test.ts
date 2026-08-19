@@ -228,3 +228,75 @@ describe('emomBlockFromBuilder', () => {
     expect(body).toContain('Section 2: 15 rounds · 15 min');
   });
 });
+
+describe('programBody mixed programs', () => {
+  const state = { exercises: [], settings: { unit: 'kg' }, sheets: [] } as unknown as AppState;
+  const mixed = () => prog({
+    exercises: [
+      member({ name: 'Bench Press', sets: 3, reps: '8', restSec: 90 }),
+      member({ name: 'Row', sets: 3, reps: '8', restSec: 90 }),
+      member({ name: 'Burpees', sets: 10, reps: '5' })
+    ],
+    blocks: [
+      { type: 'straight', rounds: 3, steps: [{ exerciseSlug: 'bench-press', exerciseName: 'Bench Press' }] },
+      { type: 'emom', rounds: 10, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'burpees', exerciseName: 'Burpees', targetReps: '5' }] }] }
+    ]
+  });
+
+  it('labels both halves and never contradicts the card total', () => {
+    const program = mixed();
+    const body = programBody(program, state);
+    const card = programCard(program, { ...state, expandedProgramAddress: null } as unknown as AppState);
+    // Strength: 2 exercises at 3 sets => 2 * (3*45 + 2*90) = 630s; EMOM: 10 * 60 = 600s.
+    expect(body).toContain('Strength · 2 exercises · 11 min');
+    expect(body).toContain('EMOM · 1 section · 10 min');
+    expect(estimateProgramMin(program.exercises, program.blocks)).toBe(1230);
+    expect(card).toContain('~21 min');
+  });
+
+  it('renders the strength half before the EMOM half', () => {
+    const body = programBody(mixed(), state);
+    expect(body.indexOf('Strength · 2 exercises')).toBeLessThan(body.indexOf('EMOM · 1 section'));
+    expect(body.indexOf('Bench Press')).toBeLessThan(body.indexOf('Burpees'));
+  });
+
+  it('describes timed members by rounds and interval rather than sets and rest', () => {
+    const body = programBody(mixed(), state);
+    expect(body).toContain('10 rounds · 60s');
+    expect(body).toContain('>Rounds</div>');
+    expect(body).toContain('>Interval</div>');
+    // The strength rows keep their own vocabulary.
+    expect(body).toContain('3 × 8');
+    expect(body).toContain('>Rest</div>');
+  });
+
+  it('gives an exercise repeated across sections each section\'s own numbers', () => {
+    const body = programBody(prog({
+      exercises: [member({ name: 'Burpees', sets: 10 }), member({ name: 'Burpees', sets: 15 })],
+      blocks: [
+        { type: 'emom', rounds: 10, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'burpees', exerciseName: 'Burpees', targetReps: '5' }] }] },
+        { type: 'emom', rounds: 15, intervals: [{ durationSec: 90, steps: [{ exerciseSlug: 'burpees', exerciseName: 'Burpees', targetDurationSec: 40 }] }] }
+      ]
+    }), state);
+    expect(body).toContain('10 rounds · 60s');
+    expect(body).toContain('15 rounds · 90s · 40s work');
+  });
+
+  it('leaves a pure EMOM program without strength headings', () => {
+    const body = programBody(prog({
+      exercises: [member({ name: 'Burpees', sets: 10, reps: '5' })],
+      blocks: [{ type: 'emom', rounds: 10, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'burpees', exerciseName: 'Burpees' }] }] }]
+    }), state);
+    expect(body).not.toContain('Strength ·');
+    expect(body).toContain('1 EMOM section · 10 min');
+  });
+
+  it('leaves a pure strength program without EMOM headings', () => {
+    const body = programBody(prog({
+      exercises: [member({ name: 'Bench Press', sets: 3, reps: '8', restSec: 90 })]
+    }), state);
+    expect(body).not.toContain('Strength ·');
+    expect(body).not.toContain('EMOM');
+    expect(body).toContain('3 × 8');
+  });
+});
