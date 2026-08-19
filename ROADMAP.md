@@ -29,8 +29,9 @@ Milestones are releases. A milestone is done when it is tagged and on the domain
 
 ## Where we are
 
-Three of the four Phase 1 pillars are shipped. The app is a complete offline tracker with
-a working Nostr read path and optional identity. It has never been released.
+All four Phase 1 pillars are shipped and the app is public. It is a complete offline
+tracker with a working Nostr read path, optional identity, and live training modes,
+deployed to the domain and tagged through v1.1.0 (2026-08-19).
 
 **Shipped**
 
@@ -45,35 +46,41 @@ a working Nostr read path and optional identity. It has never been released.
 - **Identity and sharing** — optional NIP-07 / NIP-46 sign-in from Settings, per-namespace
   database with never-merge adoption, `kind:1` workout summaries published to the write
   relay set with real acknowledgement checking.
-- **Delivery** — Pages workflow deploys `main` to the custom domain; 156 tests across 18
+- **Live training modes** — EMOM blocks, supersets, and mixed strength + EMOM programs in
+  the session runner, reconciled against wall-clock time on a session clock that runs
+  continuously across both halves.
+- **Release and support** — starter seed of three beginner programs, the zap-only support
+  and funding panel, and the tag-triggered release pipeline. v0.9.0, v1.0.0 and v1.1.0 are
+  tagged, released with build artifacts, and live on the domain.
+- **Delivery** — Pages workflow deploys `main` to the custom domain; 243 tests across 26
   files, green.
 
-**Not started**
+**Next**
 
-Starter seed, the support/donation surface, the release process itself, and everything in
-v2 and beyond.
+The one remaining v1.2 cleanup item, then v2.0-alpha encrypted backup. Nothing in v1 is
+still open.
 
 ---
 
 ## v1.0 — First public release
 
-The shortest path to something a stranger can use. Nothing here is new architecture.
+Released 2026-08-11 as v1.0.0. The shortest path to something a stranger can use. Nothing
+here was new architecture.
 
 1. ~~**Starter seed**~~ — done. Three beginner programs and their ten exercises, generated
    from the operator's signed catalog events by `scripts/generate-seed.mjs` and parsed
    through the same codecs as a Discover import. Backfill-only, once per account; seeded
    rows do not count as user data for adoption, and editing a starter program forks it.
-2. **Support surface** — implemented, with one v1 alignment pass remaining. App and
-   landing support must tell the same zap-only transparency story: zaps are the canonical
-   donation route because they produce public `kind:9735` receipts; plain Lightning and
-   on-chain BTC are not normal v1 donation paths. The funding panel reads verified zap
-   receipts against the published 85,000 sats monthly operating target; unreachable relays report
-   unknown, never zero.
-3. **Release plumbing** — mostly done for v0.9.0: `CHANGELOG.md`, tag-triggered release
-   workflow, and a GitHub Release exist. For v1.0, promote `[Unreleased]` to `1.0.0`, tag
-   after QA clears, and verify the release artifact/domain.
-4. **Release pass** — work `docs/RELEASE-QA.md` against the deployed site: real iPhone,
-   real signers, real relays. Blocking sections must be clear before the v1.0 tag.
+2. ~~**Support surface**~~ — done. App and landing tell the same zap-only transparency
+   story: zaps are the canonical donation route because they produce public `kind:9735`
+   receipts; plain Lightning and on-chain BTC are not normal v1 donation paths. The
+   funding panel reads verified zap receipts against the published 85,000 sats monthly
+   operating target; unreachable relays report unknown, never zero.
+3. ~~**Release plumbing**~~ — done. `CHANGELOG.md`, the tag-triggered release workflow,
+   and GitHub Releases carrying the built site as an artifact. Cutting a release is now
+   one pass: promote `[Unreleased]`, bump the package version, tag, push.
+4. ~~**Release pass**~~ — done. The mobile blockers found working `docs/RELEASE-QA.md`
+   against the deployed site were fixed before the v1.0 tag.
 
 **Done when:** a stranger installs from the domain, trains a real session with no network
 and no identity, and can support the project without leaving the app. Whether people
@@ -82,22 +89,30 @@ actually stick with it is measured after the tag, not before — see the two Pha
 
 ## v1.1 — Live-training modes
 
-Feature first, refactor second — the mode is what exposes the real seam in the runner.
+Released 2026-08-19 as v1.1.0. Feature first, refactor second — the mode is what exposed
+the real seam in the runner.
 
-1. EMOM set mode inside the session runner.
-2. Split the runner along the seams EMOM exposes.
-3. Supersets on top of the split structure.
-4. Test backfill for the remaining pure modules.
+1. ~~EMOM set mode inside the session runner.~~ — done. Block-based rounds, sequential
+   sections, a dual-ring work timer, restore of unfinished sessions, and actual reps
+   logged independently from prescribed work duration.
+2. ~~Split the runner along the seams EMOM exposes.~~ — done. Coordinators, controllers,
+   views, timing, persistence and summary modules; nothing left oversized.
+3. ~~Supersets on top of the split structure.~~ — done. Grouped rounds in normal programs,
+   several movements inside one EMOM interval, and block/round/step coordinates stored
+   with every set.
+4. ~~Test backfill for the remaining pure modules.~~ — done. 243 tests across 26 files.
 
 ## v1.2 — Cleanup and debt
 
-Small, mechanical, and worth its own tag so it does not ride along with features.
+Small, mechanical, and meant to have its own tag. Items 1 and 2 landed on `main` before
+the v1.1 tag and so shipped inside v1.1.0 anyway; only item 3 is left, and it is a schema
+migration, so it sets the version bump for whatever tag carries it.
 
 1. ~~`app/shell.ts` extraction pass~~ — reduced from 1,291 to under 400 lines by
    extracting program builder, catalog/library, identity/adoption,
    preferences/history/recovery, and session-persistence controllers.
 2. ~~Rename retired relay/source vocabulary~~ — stored legacy settings and catalog rows
-   migrate to `workstrRelay` and `imported` when the namespace opens.
+   migrate to `workstrRelay` and `imported` when the namespace opens. Shipped in v1.1.0.
 3. Drop the unused `plan` object store at a schema migration.
 
 ## v2.0-alpha — Encrypted backup private alpha
@@ -173,8 +188,8 @@ Not a milestone and not scheduled. Built only if the funding trigger in `instruc
   RIR, prompted per set or per exercise, and what consumes the number. Build the consumer
   before the input.
 - **The §11.4 threshold** — deliberately unset until v2 gives it a real denominator.
-- **This file is gitignored.** The accurate description of the project is untracked while
-  the committed one is the spec. Decide whether it ships with the repo.
+- ~~**Does this file ship with the repo?**~~ — settled by practice: it is tracked and
+  committed, so the accurate description of the project ships alongside the spec.
 
 ## Known debt
 
