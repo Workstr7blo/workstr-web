@@ -68,6 +68,9 @@ export interface AppState {
   exercises: Exercise[];
   programs: RelayProgram[];
   expandedSessionId: number | null;
+  // Calendar navigation is transient on purpose: month and day selection reset with the
+  // session rather than persisting as a setting. Null month means "the current month".
+  history: { monthKey: string | null; selectedDate: string | null };
   qw: { duration: number; exercises: QwExercise[]; pool: Record<string, QwExercise[]>; meta: string; visible: boolean };
   bodyEntries: BodyWeightEntry[];
   sheets: SheetWithExercises[];

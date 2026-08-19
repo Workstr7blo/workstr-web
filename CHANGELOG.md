@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A monthly workout calendar at the top of History.** Every day you trained is filled in,
+  graded by how many sets you completed, with a count when you trained more than once that
+  day. Move between months or jump back to the current one; picking a day selects it. Three
+  cards underneath say how many workouts you have done this month, how many weeks in a row
+  you have trained, and how long it has been since your last session. Every state reads
+  without relying on colour, each day carries its full date and workout count for screen
+  readers, and the grid fits a 320px phone without sideways scrolling.
+
 ### Fixed
 
 - The training streak now counts the days you actually trained. It derived each workout's
