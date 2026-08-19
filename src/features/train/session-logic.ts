@@ -1,7 +1,7 @@
 import type { EmomBlock, StraightBlock } from '../../core/types';
 import type { ActiveSession, SessionExercise } from '../../app/state';
 import type { EmomClockState } from './emom-clock';
-import type { EmomPosition, EmomSlot } from './emom';
+import { compileEmomBlocks, type EmomPosition, type EmomSlot } from './emom';
 
 export interface EmomTimerPhase {
   mode: 'work' | 'recovery';
@@ -87,6 +87,35 @@ export function standardWorkComplete(session: ActiveSession): boolean {
     const target = Number(exercise.sets) || 1;
     return session.sets.filter((set) => set.exerciseSlug === exercise.exerciseSlug && set.done).length >= target;
   });
+}
+
+// Progress across a mixed session has to span both sections. One prescribed strength set
+// and one EMOM interval each count as a single unit, so the bar keeps climbing through the
+// handoff instead of reading 100% while a whole EMOM block is still ahead.
+export interface SessionProgressUnits {
+  done: number;
+  total: number;
+}
+
+export function strengthProgressUnits(session: ActiveSession, setCounts?: Record<string, number>): SessionProgressUnits {
+  const counts = setCounts || sessionSetCounts(session);
+  let done = 0;
+  let total = 0;
+  standardSessionExercises(session).forEach((exercise) => {
+    const target = counts[exercise.exerciseSlug] || Number(exercise.sets) || 1;
+    total += target;
+    done += Math.min(session.sets.filter((set) => set.exerciseSlug === exercise.exerciseSlug && set.done).length, target);
+  });
+  return { done, total };
+}
+
+export function emomSlotCount(session: ActiveSession): number {
+  return compileEmomBlocks(activeEmomBlocks(session)).length;
+}
+
+export function sessionProgressPercent(strength: SessionProgressUnits, emom: SessionProgressUnits): number {
+  const total = strength.total + emom.total;
+  return total ? Math.round(((strength.done + emom.done) / total) * 100) : 0;
 }
 
 export function exerciseSlugSignature(exercises: SessionExercise[]): string {

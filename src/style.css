@@ -143,6 +143,11 @@
 .emom-pause-btn svg { width: 25px; height: 25px; fill: currentColor; }
 .emom-finish-action { position: absolute; right: clamp(20px, 4vw, 34px); padding: 8px 0; border: 0; color: var(--muted); background: transparent; box-shadow: none; font: 800 11px/1 ui-monospace, monospace; letter-spacing: .04em; }
 .emom-finish-action:hover { color: var(--text); background: transparent; }
+
+/* Leaving a mixed session before its EMOM section abandons work, so it is a quiet
+   exception next to the handoff, not a second primary button. Matches .emom-finish-action. */
+.session-finish-early { flex: 0 0 auto; min-height: 58px; padding: 8px 2px; border: 0; border-radius: 14px; color: var(--muted); background: transparent; box-shadow: none; font: 800 11px/1 ui-monospace, monospace; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+.session-finish-early:hover { color: var(--text); background: transparent; }
 .emom-workout-card .session-instructions { margin-top: 18px; }
 .emom-workout-card .session-instructions-toggle { width: 100%; border: 0; border-radius: 0; background: transparent; box-shadow: none; text-align: left; }
 .session-prev-btn:disabled { opacity: .38; cursor: default; }
