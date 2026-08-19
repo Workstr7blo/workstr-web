@@ -29,6 +29,11 @@ spends the afternoon re-testing them:
 - Sign-in from a seed-only profile adopts silently, with no conflict prompt.
 - Import-state resolution: seeded entries report "In library", republished ones "Update".
 - Recovery maths, stats, unit conversion, equipment matching, catalog parsing.
+- **History (v1.3):** local-date keying, month grids across year and leap-day boundaries,
+  active-week streaks, day grouping and selection, calendar markup and accessible names,
+  repeat-workout seeding and refusals, and the JSON round trip. The headless driver also
+  covers 320/390/768/1280 layouts, keyboard operation, offline, and deletion refresh.
+  The full suite is run under eight timezones (see below) — do not redo any of this by hand.
 
 ---
 
@@ -105,6 +110,26 @@ Path 1 (empty target) is automated. These two are not.
       moves it from "In library" to "Update"; applying the update does not clobber a
       locally edited copy.
 
+## 5b. Workout history (from v1.3)
+
+Automation covers the layout, the maths and the flow. These are the parts it cannot reach:
+a real thumb, a real screen reader, and a device whose clock is not the build machine's.
+
+- [ ] **Thumb targets.** On the iPhone, tap five different calendar days without mis-hitting
+      a neighbour. Cells are 38px on the narrowest supported layout — if they feel cramped
+      in the hand, that is a finding even though it passes the automated check.
+- [ ] **VoiceOver.** Swipe through the calendar. Each day announces its full date and either
+      its workout and set count or "no workout"; today announces as today; days with nothing
+      to open are skipped by the rotor rather than announced as empty buttons.
+- [ ] **A real late-night workout.** Train (or finish) a session after 23:00 local. It lands
+      on that day, not tomorrow, in both the calendar and the timeline heading.
+- [ ] **Travel.** Change the phone's timezone by more than a day boundary, reopen History,
+      and confirm no workout jumps to an adjacent date.
+- [ ] **Repeat on device.** Repeat a real completed workout: the exercises, order and
+      structure match, last time's weights are pre-filled, nothing shows as already logged,
+      and the source session in History is unchanged afterwards.
+- [ ] **Repeat an EMOM and a superset**, not just a straight-sets session.
+
 ## 6. Data safety
 
 - [ ] **Round trip.** Export JSON, clear site data, import. Library, programs, history and
@@ -133,6 +158,51 @@ Skip until the support screen ships.
 | Failures found | |
 | Tagged? | |
 
-**A release is blocked** by any failure in sections 1, 3, 4, 5 or 6. Section 2 failures on
-a non-primary browser are recorded, not blocking. Section 0 failing means stop and fix the
-deploy before testing anything else.
+**A release is blocked** by any failure in sections 1, 3, 4, 5, 5b or 6. Section 2 failures
+on a non-primary browser are recorded, not blocking. Section 0 failing means stop and fix
+the deploy before testing anything else.
+
+---
+
+## Automated evidence: v1.3 workout history
+
+Recorded so the next release can tell what was actually proven rather than assumed.
+
+**Suite.** 370 tests across 30 files, green under eight timezones spanning UTC+14 to
+UTC-11, including a 45-minute offset and southern-hemisphere DST:
+
+```bash
+for tz in UTC Pacific/Kiritimati Pacific/Niue America/New_York \
+          Europe/Berlin Australia/Sydney Asia/Kathmandu America/Santiago; do
+  TZ=$tz npx vitest run
+done
+```
+
+**Headless Chromium, production build**, against a fixture of 16 completed sessions
+covering normal, superset and EMOM shapes, a legacy row with no recorded exercises, a
+23:00 session, and a dense mid-month stretch:
+
+| Check | Result |
+|---|---|
+| No horizontal scroll at 320 / 390 / 768 / 1280 | pass; smallest touch target 38px at 320 |
+| Calendar day reachable and operable by keyboard | pass; `Enter` selects, focus outline solid |
+| States legible without colour | pass; dots, `aria-current`, disabled future days |
+| 23:00 workout stays on today | pass |
+| Multi-workout day expands with detail and repeat | pass; delete stays behind its disclosure |
+| Repeat opens a clean session | pass; 0 logged rows, elapsed `00:00` |
+| History and repeat work offline, signed out | pass; 14 days, 16 cards with the network cut |
+| Signed out blocks publish, never repeat | pass |
+| Deleting a session refreshes the calendar and cards | pass |
+
+Zero uncaught page errors throughout.
+
+**Deliberately deferred** — non-goals in the v1.3 issues, not oversights:
+
+- Year or multi-year heatmap, and monthly recap (#43, #41).
+- Free-text history search (#38).
+- Saving a repeated workout as a reusable Program, and automatic progressive overload (#42).
+- Virtualisation of long histories. A 600-session fixture renders one month and one day at
+  a time, so there is no measured evidence it is needed; #38 says not to do it without.
+- The "unfinished session already exists" guard on repeat is covered by unit test, not the
+  browser driver: the live-session overlay is fullscreen, so the path is not reachable by
+  ordinary navigation.

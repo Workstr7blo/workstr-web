@@ -300,7 +300,9 @@
    and days with nothing to open are dimmed and non-interactive. The grid is
    seven equal fractions so it fits a 320px installed PWA without scrolling.
    --------------------------------------------------------------------------- */
-.history-calendar { margin-bottom: 18px; }
+/* A calendar is a fixed-size instrument, not a fluid block: without a cap, seven equal
+   columns across a desktop panel grow into 144px squares holding a two-digit number. */
+.history-calendar { max-width: 520px; margin-bottom: 18px; }
 .history-cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .history-cal-title {
   flex: 1; min-width: 0; font: 800 15px/1.2 Inter, ui-sans-serif, sans-serif; letter-spacing: .01em;
