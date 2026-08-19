@@ -4,7 +4,7 @@ import { programMuscleLabel } from './format';
 import { inferProgramMuscle, programExerciseName, resolveProgramExercise } from '../features/sheets/views';
 import type { RelayProgram } from '../nostr/canon';
 import { emomClockSnapshot } from '../features/train/emom-clock';
-import { CountdownCueGuard } from '../features/train/countdown-audio';
+import { CountdownCueGuard, unlockCountdownAudio } from '../features/train/countdown-audio';
 import { effectiveSessionStartedAt, isEmomSession, preEmomElapsedSec, readEmomClock, standardSessionExercises } from '../features/train/session-logic';
 import type { ActiveSession, AppState, SessionExercise } from './state';
 import type { Signer } from '../signer/types';
@@ -124,9 +124,22 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (sessionWakeLock) { void sessionWakeLock.release(); sessionWakeLock = null; }
   }
 
+  // An interrupted audio context only reliably revives inside a user gesture, and
+  // the start button is long gone by round two. Any touch in the session will do.
+  root.addEventListener('pointerdown', (event) => {
+    if (!state.activeSession) return;
+    const overlay = root.querySelector('#session-overlay');
+    if (!overlay?.classList.contains('open')) return;
+    if (event.target instanceof Node && !overlay.contains(event.target)) return;
+    unlockCountdownAudio();
+  }, true);
+
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
-    if (state.activeSession && root.querySelector('#session-overlay')?.classList.contains('open')) void requestSessionWakeLock();
+    if (state.activeSession && root.querySelector('#session-overlay')?.classList.contains('open')) {
+      void requestSessionWakeLock();
+      unlockCountdownAudio();
+    }
     standard.reconcileRest();
     if (emomPhaseMounted && emom.active) emom.reconcileClocks();
   });

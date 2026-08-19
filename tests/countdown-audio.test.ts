@@ -79,7 +79,8 @@ describe('countdown audio playback', () => {
       state: 'running', currentTime: 0, sampleRate: 44_100, destination: {},
       resume: vi.fn(),
       createBuffer: vi.fn(() => ({})),
-      createBufferSource: () => ({ buffer: null, connect: vi.fn(), start: silentStart })
+      createBufferSource: () => ({ buffer: null, loop: false, connect: vi.fn(), start: silentStart }),
+      createGain: () => ({ gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() }, connect: vi.fn() })
     };
     vi.stubGlobal('AudioContext', undefined);
     vi.stubGlobal('webkitAudioContext', class MockWebkitAudioContext {
@@ -88,5 +89,70 @@ describe('countdown audio playback', () => {
     const audio = await import('../src/features/train/countdown-audio');
     audio.unlockCountdownAudio();
     expect(silentStart).toHaveBeenCalledWith(0);
+  });
+
+  function mockContext(state: string, resume: () => Promise<void>, frequencies: number[]) {
+    return {
+      state, currentTime: 5, sampleRate: 48_000, destination: {},
+      resume: vi.fn(resume),
+      createBuffer: vi.fn(() => ({})),
+      createBufferSource: () => ({ buffer: null, loop: false, connect: vi.fn(), start: vi.fn() }),
+      createOscillator: () => ({
+        type: 'sine',
+        frequency: { setValueAtTime: (value: number) => frequencies.push(value) },
+        connect: vi.fn(), start: vi.fn(), stop: vi.fn()
+      }),
+      createGain: () => ({
+        gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+        connect: vi.fn()
+      }),
+      addEventListener: vi.fn()
+    };
+  }
+
+  it('retries a resume that never settles instead of muting the rest of the session', async () => {
+    const frequencies: number[] = [];
+    const context = mockContext('suspended', () => new Promise<void>(() => {}), frequencies);
+    vi.stubGlobal('AudioContext', class MockAudioContext { constructor() { return context; } });
+    vi.useFakeTimers();
+    try {
+      const audio = await import('../src/features/train/countdown-audio');
+      audio.unlockCountdownAudio();
+      expect(context.resume).toHaveBeenCalledTimes(1);
+      // A cue arriving while the first attempt is in flight must not queue a second.
+      audio.playCountdownCue('short');
+      expect(context.resume).toHaveBeenCalledTimes(1);
+      // Once the hung attempt times out, later cues get a fresh attempt.
+      vi.advanceTimersByTime(2_000);
+      audio.playCountdownCue('short');
+      expect(context.resume).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('replays the final cue when the context recovers from an interruption', async () => {
+    const frequencies: number[] = [];
+    const listeners: Array<() => void> = [];
+    const context = mockContext('running', () => new Promise<void>(() => {}), frequencies);
+    context.addEventListener = vi.fn((name: string, listener: () => void) => {
+      if (name === 'statechange') listeners.push(listener);
+    }) as never;
+    vi.stubGlobal('AudioContext', class MockAudioContext { constructor() { return context; } });
+    const audio = await import('../src/features/train/countdown-audio');
+    audio.unlockCountdownAudio();
+    expect(audio.countdownAudioState()).toBe('running');
+
+    // WebKit interrupts the context mid-session; the round cue is dropped.
+    context.state = 'interrupted';
+    listeners.forEach((listener) => listener());
+    audio.playCountdownCue('final');
+    expect(frequencies).toEqual([]);
+    expect(audio.countdownAudioState()).toBe('interrupted');
+
+    // Recovery replays the cue rather than staying silent for every later round.
+    context.state = 'running';
+    listeners.forEach((listener) => listener());
+    expect(frequencies).toEqual([1175]);
   });
 });
