@@ -15,8 +15,8 @@ training sessions, planning, progress analytics, recovery suggestions — runs i
 browser. User data lives either in the browser (IndexedDB) in an initial phase, and additionally as
 **NIP-44-encrypted Nostr events on an authenticated relay** on a second phase.
 
-The operator hosts **no application backend**. The only server-side components are the
-relay (strfry) and a small allowlist service, both in Phase 2a. Donations need no backend
+The operator hosts **no application backend**. The only server-side component is the
+relay (strfry) with a write-policy plugin, in Phase 2a. Donations need no backend
 in v1 because the canonical funding rail is Nostr zaps: LNURL-pay creates the invoice,
 public zap receipts create the accounting trail (Section 11).
 
@@ -70,12 +70,14 @@ Rules that govern every technical decision:
    *physically impossible* client-side (cross-user shared state, work while the user's
    browser is closed, secrets, payment verification).
 2. **The relay is the cost center, not the paywall.** Free = local + public relays. The
-   operator's authenticated relay adds encrypted sync, retention, and media hosting — it
-   is what donations pay for. Access is still gated at the relay (NIP-42 + pubkey
-   allowlist), because a keyless public client cannot enforce anything. But the
-   *admission criterion* is a policy knob, not an architecture: open to anyone who asks
-   while capacity allows, paid-only if funding fails. The mechanism never changes; only
-   the rule that decides which rows get written to the allowlist file.
+   operator's relay adds encrypted backup and retention — it is what donations pay for.
+   Phase 2a has **no admission step at all**: any pubkey may back up, and turning the
+   auto-backup toggle on is the whole of it. What the relay enforces is a *write policy*
+   on content, not on identity — it accepts Workstr's own encrypted records and rejects
+   everything else, so it never becomes a general-purpose relay carrying other clients'
+   notes. Identity-based admission is a thing this design deliberately does not have; if
+   the Section 11 fallback ever fires it has to be *introduced* (Phase 2b), and that is a
+   real delta, not a config change.
 3. **Keys never touch the app.** All signing and NIP-44 encryption/decryption is
    delegated to the user's signer through a signer abstraction. The app never asks for,
    stores, or transmits an `nsec`. Pasting an nsec is not offered, ever.
@@ -120,7 +122,7 @@ Rules that govern every technical decision:
   - Support the project: zap the operator npub, with the app and landing page aligned
     around public zap receipts as the funding/accounting trail (Section 11).
 - **Workstr relay (Phase 2a)**: encrypted multi-device sync of all private data; retention
-  guarantee. Available to allowlisted pubkeys.
+  guarantee. Available to anyone who turns on auto-backup.
 
 **Deliberately not in the product** (each was specified, evaluated, and dropped — do not
 reintroduce without revisiting the reasoning):
@@ -185,11 +187,11 @@ rules out open exercise publishing does not apply the same way.
 | **NIP-07** | Browser-extension signer (`window.nostr`): `getPublicKey()`, `signEvent()`, `nip44.encrypt/decrypt`. Primary desktop login. |
 | **NIP-46** | Remote signer ("bunker"/Amber): same operations over an encrypted relay channel. Primary mobile login. Connect via `bunker://` URI or `nostrconnect://` QR. |
 | **NIP-44** | Versioned encryption used to encrypt **all private data events** to the user's *own* pubkey (self-encryption: conversation key of user↔user). |
-| **NIP-78 (kind 30078)** | Arbitrary app data, addressable-replaceable. Carrier for every private encrypted record (sessions, sheets, body-weight, settings, library overrides). `d` tag = record address (Section 7.3). Phase 2a. |
+| **NIP-78 (kind 30078)** | Arbitrary app data, addressable-replaceable. Carrier for every private encrypted record (sessions, sheets, body-weight, settings, library overrides). `d` tag = record address (Section 7.3). Because 30078 is a *shared* kind other apps also publish, the Workstr relay's write policy filters on the `workstr:v1:` `d` prefix as well as the kind. Phase 2a. |
 | **NIP-101e (kind 33401)** | Exercise template. **Read-only for the client**: the app imports these, it never authors them. Written only by the operator key. Tag layout as the self-hosted app emits it: `d`, `title`, `format`, `format_units`, `equipment`, `t` topics, Workstr's granular `workstr_muscle` tags, a `workstr_meta` JSON tag, and `imeta` for media. |
 | **NIP-101e (kind 33402)** | Workout template (program). References exercises via `a` tags: `33401:<pubkey>:<d>`. Read-only today; user-authored programs are a Phase 3 item. |
 | **kind 1** | Public workout summary note (social sharing). The only event type the client currently signs on the user's behalf. |
-| **NIP-42** | Relay AUTH. The Workstr relay requires AUTH and only accepts read/write from allowlisted pubkeys. Who lands on the allowlist is a policy decision (Section 11), not a protocol one. |
+| **NIP-42** | Relay AUTH. **Not used** — decision record. It was specified to enforce a pubkey allowlist, and to scope reads so a pubkey saw only its own records. Both jobs were dropped: backup is open to everyone, and open reads are acceptable because every payload is NIP-44 ciphertext. Event signatures already bind authorship, so the write policy can identify an author without AUTH. Reintroduce it only if reads must be scoped or admission returns (Phase 2b). |
 | **NIP-98** | HTTP Auth events (kind 27235). **Rejected for media upload** — built and removed: unreliable against the media host, and it inserted a second signer prompt mid-publish for no user-visible gain. Kept in this table as a decision record; if media hosting returns it is via Blossom on the operator's own host (Phase 3), re-evaluated from scratch. Still the right tool for authenticating a request to the operator's *own* endpoint (relay-access requests, Phase 2a). |
 | **NIP-19** | bech32 encoding (`npub`, `naddr`, `nevent`) for display and share links. |
 | **LNURL-pay / lud16** | The operator's Lightning address in `kind:0`, used as the LNURL-pay target behind zaps. It is payment plumbing, not a separate primary donation rail: v1 support copy steers users to Nostr zaps because zaps produce public receipts. |
@@ -200,10 +202,11 @@ rules out open exercise publishing does not apply the same way.
 *wallet* (payments). They are separate connections with separate permissions.
 
 **Terminology (used consistently from here on)**: a **supporter** is someone who has
-donated. An **allowlisted** pubkey is one the Workstr relay accepts. These are
-deliberately *not* the same set — under donation funding, allowlisting is granted on
-request while capacity allows, and supporting is voluntary. Do not use "subscriber",
-"paying user", or "premium" anywhere in the product or the code.
+donated. A **backup user** is someone who has turned auto-backup on. These are
+deliberately *not* the same set — backup is open to everyone and supporting is voluntary;
+neither one buys the other. Do not use "subscriber", "paying user", "premium",
+"allowlist", or "access request" anywhere in the product or the code — under this design
+there is nothing to be admitted to.
 
 ### 6.1 How the NIPs work together (flows)
 
@@ -235,8 +238,7 @@ request while capacity allows, and supporting is voluntary. Do not use "subscrib
 **Save (free, always)**
 1. User edits a sheet / logs a set / finishes a session.
 2. Store module writes to IndexedDB immediately. UI reads only from IndexedDB.
-3. If the user's pubkey is allowlisted on the Workstr relay, the record is queued for
-   encrypted sync (below).
+3. If auto-backup is on, the record is queued for encrypted sync (below).
 
 **Encrypted sync (phase 2)**
 1. Sync engine serializes the changed record to canonical JSON.
@@ -244,9 +246,8 @@ request while capacity allows, and supporting is voluntary. Do not use "subscrib
    user's key can decrypt.)
 3. Wrap in `kind:30078`, tags: `[["d", "<address>"], ["client", "workstr"]]`,
    `content = ciphertext`. `signer.signEvent(event)`.
-4. Publish to the Workstr relay. Relay demands NIP-42 AUTH; the app answers the AUTH
-   challenge with a signer-signed `kind:22242` event; relay checks the pubkey against
-   the allowlist.
+4. Publish to the Workstr relay. No AUTH step: the relay accepts any correctly signed
+   `kind:30078` whose `d` tag starts with `workstr:v1:`, and rejects everything else.
 5. On another device: REQ `{kinds:[30078], authors:[pubkey], since:<lastSync>}` →
    decrypt each event via `signer.nip44Decrypt` → merge into IndexedDB
    (last-write-wins on `updated_at`, per record).
@@ -326,22 +327,21 @@ other client can read it. Curation is a quality decision, not a lock (Section 11
    zap flow. In v2, Workstr can add custom in-app zaps: sign zap request, fetch invoice,
    pay via NWC, then verify the receipt before claiming success.
 
-**Get relay access (Phase 2a-alpha)**
-1. User asks for encrypted backup access from the app. The app sends a NIP-98-signed
-   request to the access endpoint. No payment and no manual operator approval are part of
-   the alpha admission path.
-2. The endpoint verifies the signature, checks that the pubkey is not blocked, and admits
-   the pubkey automatically while the private-alpha cap has room. Initial cap: **50
-   pubkeys**. Initial quota: **50 MB per pubkey**.
-3. The endpoint records the pubkey in the relay allowlist; strfry's NIP-42 policy uses
-   that allowlist for AUTH. Admin tooling may exist for debugging, blocking, and emergency
-   fixes, but normal onboarding is self-serve.
-4. Client retries relay AUTH → now accepted → sync engine activates. Access status is
-   queryable via `GET /api/status/<pubkey>`.
-5. Supporters above the recognition threshold may be allowlisted automatically later,
-   resolved from zap receipts — a convenience, not a price.
-6. *Only if the Section 11 fallback has fired:* new pubkeys go through the invoice flow
-   instead (Phase 2b), and the status response carries an expiry.
+**Turn on auto-backup (Phase 2a)**
+1. User flips the **Auto-backup** toggle in Settings → Backup. That is the entire
+   ceremony: no request, no approval, no waiting, no status screen.
+2. The toggle needs a signer, because records are NIP-44 encrypted to the user's own
+   pubkey and signed by it. Flipping it while signed out routes through sign-in first;
+   this is the one unavoidable step and it already exists.
+3. On first enable the client enqueues **everything already in IndexedDB** — every past
+   session, sheet, body-weight entry and synced setting — not just subsequent changes.
+   A toggle labelled backup that silently skips existing history is a lie.
+4. From then on the sync engine runs automatically: on app open, and after local changes,
+   with backoff on failure. A manual "sync now" exists as a fallback, not as the normal path.
+5. Flipping it off stops syncing and leaves both sides intact. It does not delete what is
+   already on the relay; a separate explicit action does that.
+6. *Only if the Section 11 fallback has fired:* admission control is introduced for new
+   pubkeys (Phase 2b). It does not exist before then.
 
 ### 6.2 Relay sets (there is more than one "public relays")
 
@@ -351,7 +351,7 @@ Three distinct sets, and conflating them causes real bugs:
 |---|---|---|
 | **Catalog relays** | Reading the operator-signed Workstr catalog | Small (about 3). Queried in parallel, results merged and deduped. More relays here buys nothing — the same signed events live on each. |
 | **Write relays** | Publishing the user's `kind:1` summaries | Broad (about a dozen). Reach is the goal: a summary is an advertisement, and relays reject or drop writes unpredictably. |
-| **Workstr relay** | Encrypted `kind:30078` sync (Phase 2a) | Exactly one, NIP-42 gated. Never mixed into either set above. |
+| **Workstr relay** | Encrypted `kind:30078` sync (Phase 2a) | Exactly one, write-policy filtered. Never mixed into either set above, and never published in the user's `kind:10002` relay list — it is a private destination this client writes to, not a relay the user announces. Advertising it would invite every other Nostr client to publish the user's notes there. |
 
 Both public sets ship as defaults and are user-editable in settings.
 
@@ -384,7 +384,7 @@ Consequences to design around:
 |---|---|---|---|
 | **Local** | IndexedDB, per namespace, per device | Everything: exercises, sheets, sessions, sets, body-weight, settings, catalog cache, caches of decrypted sync data | Everyone |
 | **Public relays** | Catalog relays for reads, write relays for shares (Section 6.2) | Inbound: the operator-signed `33401`/`33402` catalog. Outbound: only `kind:1` summaries the user explicitly shares. Plaintext by design. | Everyone |
-| **Workstr relay** | Operator's strfry (NIP-42 gated) | `kind:30078` NIP-44 ciphertext of all private records; also receives copies of the user's public events for retention | Allowlisted pubkeys |
+| **Workstr relay** | Operator's strfry (write-policy filtered) | `kind:30078` NIP-44 ciphertext of all private records, and nothing else | Anyone with auto-backup on |
 
 Note that the curated exercise library is **not** in that table: it is published to public
 relays like any other catalog (Section 10, Phase 2a). Locking curation behind the relay
@@ -528,7 +528,6 @@ src/
                        #   offline cache
     programImport.ts   # program import + dependency walk, import-state resolution
     share.ts           # kind:1 summary composition, publish, acknowledgement check
-    auth.ts            # [planned, Phase 2a] NIP-42 AUTH for the Workstr relay
     codecs30078.ts     # [planned, Phase 2a] 30078 encrypt/decrypt wrappers (uses signer)
   sync/
     engine.ts          # [stub] LWW comparison only. Phase 2a fills in queue, manifest
@@ -542,9 +541,12 @@ src/
                        #   (recovery.ts and quickWorkout.ts are pure)
     discover/          # catalog browse/import UI
     support/           # zap-first support UI, funding panel (reads kind:9735 receipts),
-                       #   and later NWC custom-zap flow. Phase 2a adds the relay-access
-                       #   request UI; paid relay invoicing lands here only if the
-                       #   Section 11 fallback fires.
+                       #   and later NWC custom-zap flow. Paid relay invoicing lands here
+                       #   only if the Section 11 fallback fires.
+    backup/            # [planned, Phase 2a] the auto-backup toggle and its status line,
+                       #   composed into the existing Settings → Backup panel next to
+                       #   JSON export/import. Backup is a data-durability control, not
+                       #   a funding one — it does not live in support/.
   app/
     shell.ts           # root state, namespace boot, navigation, controller composition
     catalog-controller.ts      # catalog cache/profile and library actions
@@ -623,7 +625,7 @@ or source-available — decide before first release, not after.
 Two valid options, identical architecture, trivially migratable (strfry's LMDB
 directory is portable; cutover is a DNS change):
 
-- **Option A — home server (validate for free):** strfry + payment glue in Docker,
+- **Option A — home server (validate for free):** strfry + write-policy plugin in Docker,
   network-namespaced behind a gluetun/WireGuard VPN container with a forwarded port.
   DNS `relay.workstr.example` → VPN exit IP. Note: consumer VPN providers commonly
   disallow forwarding low ports, so the relay listens on a high port —
@@ -720,21 +722,22 @@ operator hosting zero infrastructure.
 
 ### Phase 2a — The Workstr relay (donation-funded)
 
-**Goal:** encrypted sync/backup and retention for anyone who asks, funded by donations.
-No payment service is built in this phase.
+**Goal:** encrypted backup and retention for anyone who turns it on, funded by donations.
+No payment service and no admission service are built in this phase.
 
 Server side:
-1. **strfry** with NIP-42 AUTH required; write/read policy checks authenticated pubkeys
-   against the Workstr access allowlist. Reject non-admitted or blocked pubkeys.
-2. **Automatic alpha access glue** (the one custom service, small): `POST /api/access`
-   accepts a NIP-98-signed request and admits the pubkey automatically while the
-   private-alpha cap has room. Initial cap: **50 pubkeys**. Initial quota: **50 MB per
-   pubkey**. `GET /api/status/<pubkey>` reports access, quota, and alpha-cap state.
-   Admin tooling exists only for blocking, debugging, status checks, and emergency fixes;
-   it is not the normal onboarding path.
-3. **Capacity caps:** per-pubkey storage quota and a ceiling on admitted pubkeys. Free
-   self-serve access has no natural rate limit, so the limits are explicit from day one
-   (Section 13).
+1. **strfry** with a **write-policy plugin** and no AUTH. The policy accepts an event only
+   when its kind is `30078` *and* its `d` tag starts with `workstr:v1:`; everything else is
+   rejected, `kind:1` included. This is what stops the relay becoming a general-purpose
+   relay carrying other clients' notes, and it is the only thing that stops it — the relay
+   URL ships in public JavaScript and relay crawlers index it whether or not anyone
+   advertises it. Reads are open: payloads are NIP-44 ciphertext, and the `d` tags being
+   visible in the clear is an accepted trade (Section 13).
+2. **No access service.** There is no `POST /api/access`, no `GET /api/status`, no NIP-98
+   request, and no allowlist file. Deleted from this phase on purpose; see 4.2.
+3. **Abuse controls**, since neither payment nor admission is limiting anything: a
+   per-pubkey storage quota, a total storage ceiling with an alert, and a block list for
+   the individual bad actor. Explicit from day one (Section 13).
 4. **TLS + DNS:** Caddy (VPS, port 443) or DNS-01 certs + high port (home/VPN);
    `relay.workstr.example` DNS record; DDNS updater if home-hosted.
 5. **Backups:** nightly snapshot of strfry's LMDB directory off-machine
@@ -743,41 +746,50 @@ Server side:
    funding panel. Rule 3.4 is not optional.
 
 Client side:
-7. **Auth block:** `nostr/auth.ts` — NIP-42 challenge signing against the Workstr relay.
+7. **Toggle block:** `features/backup/` — the Auto-backup toggle and its status line,
+   composed into the existing Settings → Backup panel beside JSON export/import. Turning
+   it on backfills everything already in IndexedDB, then syncs automatically.
 8. **Sync block:** `sync/engine.ts` — 30078 encrypt/publish on change, manifest diff
    pull on login, LWW merge, lazy decryption (recent first), decrypted cache.
-9. **Access block:** extend `features/support/` with the request-access flow and status
-   display.
+9. *(No auth block and no access block — neither exists under this design.)*
 10. **Catalog growth:** the operator key keeps publishing the curated 33401/33402 catalog
     to **public relays**, readable by everyone including other Nostr clients. Authored
     and published from the self-hosted Workstr install. Target: from the launch set
     toward 50–100 exercises and 5–10 programs. Curation is the operator's job by design
     — see Section 6.1 on why exercise authoring is not opened up.
-11. Retention perk: allowlisted users' public events are also mirrored to the Workstr
-    relay.
+11. *(The retention perk is dropped.* Mirroring users' public events to the Workstr relay
+    is incompatible with the write policy in item 1, which rejects every kind but `30078`.
+    Retention now means the encrypted records only. Restoring the perk would mean widening
+    the policy, which is exactly what keeps other clients' notes off the relay.)
 
-**Exit criteria:** request access from a phone → allowlist updates without manual
-operator action → open laptop, log in, entire history appears after decryption. Funding
-panel shows real donations against a published real cost.
+**Exit criteria:** flip Auto-backup on from a phone → no operator action of any kind →
+open laptop, sign in, entire history appears after decryption. A `kind:1` publish attempt
+against the Workstr relay is rejected by the write policy. Funding panel shows real
+donations against a published real cost.
 
 ### Phase 2b — Paid access (fallback only, build nothing until triggered)
 
 Built **only** if the funding trigger in Section 11 fires. Scoped here so the fallback is
 a known, small delta rather than a redesign:
 
+0. **Admission control itself**, which 2a deliberately does not build: an allowlist the
+   policy plugin consults, and NIP-42 AUTH so the plugin knows who is connected rather
+   than only who signed each event. This is the honest cost of an open 2a — the fallback
+   is a larger delta than it would have been under an allowlisted design, and pretending
+   otherwise would make the trigger in 11.4 look cheaper to pull than it is.
 1. **Payment glue:** LNbits (or direct LND REST) connected to the operator's existing LND
    node over the private mesh; `POST /api/subscribe {pubkey, plan}` → invoice; on settle
-   → append pubkey + expiry to the same allowlist file, hot-reload the same policy
-   plugin; `GET /api/status/<pubkey>` gains an expiry field.
+   → append pubkey + expiry to the new allowlist file, hot-reload the policy plugin;
+   `GET /api/status/<pubkey>` reports access and expiry.
 2. Nightly job prunes expired pubkeys (grace period, e.g. 14 days, before their events
    stop being served).
 3. **Client:** invoice QR/copy, payment detection, renewal reminder — added to
-   `features/support/`, reusing the existing status display.
-4. Everyone allowlisted before the trigger date is grandfathered and never sees any of
-   this. Nothing on the "never gated" list in Section 11 moves.
+   `features/support/`, plus the access-status display that 2a never needed.
+4. Every pubkey holding backup data before the trigger date is grandfathered and never
+   sees any of this. Nothing on the "never gated" list in Section 11 moves.
 
-Note what is *not* in this list: the relay, AUTH, the allowlist file, the policy plugin,
-the sync engine, and the client status UI are all already built in 2a and unchanged. That
+Note what is *not* in this list: the relay, the write-policy plugin, the sync engine, and
+the backup toggle are all already built in 2a and unchanged. That
 is the point of rule 4.2.
 
 ### Phase 3 — Growth (optional, in rough order of value)
@@ -800,12 +812,13 @@ is the point of rule 4.2.
      merge them into one list: the catalog's whole value is that everything in it is
      signed by one curator.
    - Import stays a snapshot, with the same fork-on-edit provenance as catalog imports.
-4. **Blossom media server (optional)** on the relay host: image hosting for allowlisted
-   users. Re-open the media-upload question here, from scratch — NIP-98 against a third
+4. **Blossom media server (optional)** on the relay host: image hosting. Note it needs its
+   own answer to "who may upload", since Phase 2a's write policy gates content rather than
+   identity and a media endpoint cannot be gated the same way. Re-open the media-upload question here, from scratch — NIP-98 against a third
    party failed (Section 6), a self-hosted Blossom endpoint is a different problem.
 5. **NIP-47 (NWC)** wallet connect: one-tap in-app zaps.
 6. **Push notifications** for scheduled workouts (requires a small always-on push
-   service — allowlisted users only, since it has a genuine per-user cost).
+   service, which has a genuine per-user cost and so needs its own gating answer).
 7. **Coach platform:** third-party trainers publish programs on the relay, keeping their
    own zap/payment relationship with their followers (program-follow with updates;
    imports elsewhere remain snapshots). Builds directly on item 3. The operator's cut, if
@@ -882,7 +895,8 @@ to re-gate (11.5).
 If donations cover less than **`[X]`%** of the trailing 12-month infrastructure cost for
 **two consecutive quarters**, relay admission switches to paid for *new* pubkeys only:
 
-- Everyone already allowlisted is grandfathered, permanently.
+- Every pubkey already holding backup data on the relay is grandfathered, permanently.
+  With no allowlist there is no admission record, so the relay's own data is the roll.
 - Announced at least 30 days ahead, on Nostr and in the app.
 - Nothing in 11.3 moves; only Workstr-relay admission changes.
 - Pricing, if it happens: one plan, priced in sats through the operator's own LND (no
@@ -926,9 +940,10 @@ Recommended setup on a home server / VM:
    `tailscale serve 5173` → `https://<host>.<tailnet>.ts.net`, a real trusted cert,
    reachable from any personal device including iPhone, invisible to the internet.
 3. **Dev relay stack** (compose file in the repo, `dev/compose.yaml`): strfry with the
-   same NIP-42 policy plugin and the same allowlist glue, so the full
-   request→allowlist→sync loop is testable locally. If Phase 2b is ever built, add LNbits
-   against a regtest/testnet backend plus a fake-settle endpoint to the same compose file.
+   same write-policy plugin as production, so the full toggle→backfill→sync→restore loop
+   is testable locally, and so the policy's rejections are testable too — a `kind:1` and a
+   wrong-prefix `30078` must both bounce. If Phase 2b is ever built, add the allowlist glue
+   and LNbits against a regtest/testnet backend plus a fake-settle endpoint here.
 4. **Browser-surface verification.** Unit tests cover pure logic; they cannot catch a
    broken render, a dead button, or an IndexedDB migration that fails on a real origin.
    Drive the **production build** — not the dev server — in headless Chromium via
@@ -959,7 +974,7 @@ Recommended setup on a home server / VM:
    argument for the Workstr relay, but also a support-question generator.
 5. **Home-hosted relay fragility** (if Option A): residential uptime, VPN IP
    reputation, some networks block VPN ranges. Acceptable at launch; revisit when the
-   allowlist reaches its capacity ceiling.
+   relay approaches its total storage ceiling.
 6. **Addressable-event size limits.** Keep every 30078 under ~64 KB; per-session
    granularity guarantees this.
 7. **Legal/boring:** ToS + privacy page (short, honest: "we store ciphertext"), and local
@@ -971,9 +986,15 @@ Recommended setup on a home server / VM:
    Option A (home-hosted) is chosen so the relay survives at zero revenue, and no roadmap
    item may depend on donation income arriving. Treat any month that covers the bill as
    the success case, not the baseline.
-9. **Free relay access invites abuse.** Payment is an accidental rate limiter; removing it
-   removes the limiter. Per-pubkey storage quotas and a hard ceiling on allowlist size are
-   required from day one of Phase 2a, not added after the first abusive pubkey.
+9. **Open relay access invites abuse.** Payment is an accidental rate limiter and so is an
+   allowlist; this design has neither, so the write policy is the only limiter. Three
+   controls are required from day one of Phase 2a, not added after the first abusive
+   pubkey: the kind + `d`-prefix write filter, a per-pubkey storage quota, and a total
+   storage ceiling with an alert. A block list handles the individual bad actor. Note what
+   open signup costs: total storage is no longer bounded by a user cap, so the ceiling and
+   its alert are what stand between an abusive pubkey and the disk filling up. Organic
+   growth is not the worry — 30078 is addressable, so an honest user's footprint is capped
+   by their distinct `d` tags (Section 7.4) — deliberate abuse is.
 10. **Introducing a paywall later costs credibility.** Mitigated by publishing the trigger
     and the grandfather clause up front (11.4) — but a community that funded the project
     on "it stays free" will read any gate as a betrayal unless the condition was visible
@@ -1023,10 +1044,10 @@ kind cannot be satisfied before a release exists.
 - **Phase 1 — proven** (field evidence gathered *after* the tag; gates nothing, informs
   what comes next): 30 days of real training logged by real users with zero operator
   infrastructure, including at least one who never signed in.
-- **Phase 2a:** request access → auto-allowlist → cross-device restore, hands-off; LMDB
-  backups restorable; curated library fetchable by anyone from public relays; storage
-  quotas enforced; monthly cost published, and the 11.4 threshold set to a real number at
-  the same time.
+- **Phase 2a:** toggle auto-backup on → cross-device restore, hands-off; the write policy
+  rejects everything that is not a Workstr encrypted record; LMDB backups restorable;
+  curated library fetchable by anyone from public relays; storage quotas enforced; monthly
+  cost published, and the 11.4 threshold set to a real number at the same time.
 - **Phase 2b:** not done — not started. Done means the trigger in 11.4 fired, was
   announced 30 days ahead, and existing pubkeys were grandfathered without action.
 - **Phase 3:** each item ships independently; nothing in it blocks 1–2.

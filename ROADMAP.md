@@ -144,40 +144,47 @@ milestone does not duplicate them.
 Deferred on purpose, recorded in `docs/RELEASE-QA.md`: year heatmap, monthly recap,
 history search, save-a-repeat-as-a-program, progressive overload, and virtualisation.
 
-## v2.0-alpha — Encrypted backup private alpha
+## v2.0-alpha — Encrypted backup
 
-Automatic self-serve encrypted backup for up to 50 pubkeys. The client remains local-first:
-the sync engine is inert unless the user signs in, opts into encrypted backup, and receives
-relay access. Everything behaves exactly as it does today if the relay is unreachable or
-the user never enables it.
+One **Auto-backup** toggle in Settings, open to every pubkey. No allowlist, no access
+request, no cap, no NIP-42. The client remains local-first: the sync engine is inert until
+the toggle is on, and everything behaves exactly as it does today if the relay is
+unreachable or the user never enables it.
+
+The relay is already running. What it does not yet have is the write policy, and that
+policy is the whole security model: the relay accepts `kind:30078` events whose `d` tag
+starts with `workstr:v1:` and rejects everything else, so it never becomes a
+general-purpose relay carrying other clients' notes. Open reads are an accepted trade —
+payloads are ciphertext, `d` tags are not.
 
 Detailed execution plan: `docs/plans/v2-encrypted-backup-alpha.md`.
 
 **Server**
 
-1. strfry with NIP-42 auth and an allowlist policy.
-2. Self-serve signed access API with a 50-pubkey alpha cap; no payment and no manual
-   approval in the alpha path.
-3. Capacity caps — per-pubkey storage quota, blocked-pubkey handling, and a hard ceiling
-   on admitted pubkeys from day one.
-4. Off-machine nightly LMDB backups and a restore runbook before inviting alpha users.
-5. Publish the real monthly cost, and set the §11.4 threshold to a real number at the same
+1. strfry write policy — kind `30078` plus the `workstr:v1:` `d` prefix, everything else
+   rejected.
+2. Abuse controls — per-pubkey quota, total storage ceiling with an alert, block list.
+   With neither payment nor admission limiting anything, these are the only limiter.
+3. Off-machine nightly LMDB backups and a restore runbook. Hard gate before anyone but
+   the operator enables the toggle.
+4. Publish the real monthly cost, and set the §11.4 threshold to a real number at the same
    time. Do not launch without both.
 
 **Client**
 
-6. NWC/NIP-47 support flow for custom in-app zaps: amount/comment UI, zap request signing,
-   LNURL invoice fetch, NWC payment, receipt verification, and funding-panel refresh.
-7. Encrypted backup access UI in `features/support/`.
-8. `nostr/auth.ts` — NIP-42 challenge signing.
-9. `nostr/codecs30078.ts` — NIP-44 encrypted `kind:30078` private-record codecs.
-10. `sync/engine.ts` — write queue, manifest, tombstones, LWW merge, push, pull, and lazy
-   restore.
-11. Automatic non-blocking sync UX with pending count, last-sync state, retry, and manual
-    sync-now fallback.
+5. `nostr/codecs30078.ts` — NIP-44 encrypted `kind:30078` private-record codecs.
+6. `sync/engine.ts` — write queue, manifest, tombstones, LWW merge, push, pull, lazy
+   restore, and the first-run backfill that uploads existing history when the toggle is
+   first turned on.
+7. `features/backup/` — the Auto-backup toggle in the Settings → Backup panel, its status
+   line, and automatic non-blocking sync with retry and a manual sync-now fallback.
 
-**Done when:** phone → relay → laptop restore works after decryption, with no manual
-operator step and no plaintext private training data leaving the browser.
+**Done when:** phone toggles backup on → relay → laptop restore works after decryption,
+with no operator step at any point, no plaintext private training data leaving the
+browser, and a `kind:1` aimed at the Workstr relay bouncing off the write policy.
+
+Moved out of this milestone: NWC/NIP-47 custom in-app zaps (issue #26) is support work,
+not backup work, and ships independently.
 
 ## v3 — Growth
 
