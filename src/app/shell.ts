@@ -8,6 +8,7 @@ import { applyStarterSeed } from '../db/seed';
 import { fetchMonthlyZapReceipts } from '../nostr/zaps';
 import type { Exercise, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
+import { addMonths, dateKeyFromDate, isDateKey, monthKeyOf } from '../core/dates';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
@@ -59,7 +60,7 @@ async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<Rela
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -291,8 +292,31 @@ export function renderShell(root: HTMLElement): void {
       state.expandedSessionId = state.expandedSessionId === id ? null : id;
       render();
     }));
+    bindHistoryCalendar();
     preferences.bindRecoveryControls();
     preferences.bindBodyControls();
+  }
+
+  // Month navigation and day selection are transient view state, so both just mutate the
+  // history slice and rerender. "Today" clears the month override rather than pinning the
+  // current month, so the calendar keeps following the clock over a midnight boundary.
+  function bindHistoryCalendar(): void {
+    root.querySelectorAll<HTMLElement>('[data-history-month]').forEach((button) => button.addEventListener('click', () => {
+      const action = button.dataset.historyMonth;
+      const current = state.history.monthKey || monthKeyOf(dateKeyFromDate(new Date()));
+      if (action === 'today') {
+        state.history.monthKey = null;
+      } else {
+        state.history.monthKey = addMonths(current, action === 'next' ? 1 : -1);
+      }
+      render();
+    }));
+    root.querySelectorAll<HTMLElement>('[data-history-date]').forEach((button) => button.addEventListener('click', () => {
+      const key = button.dataset.historyDate || '';
+      if (!isDateKey(key)) return;
+      state.history.selectedDate = state.history.selectedDate === key ? null : key;
+      render();
+    }));
   }
 
   function toast(message: string, kind: 'ok' | 'bad' = 'ok'): void {

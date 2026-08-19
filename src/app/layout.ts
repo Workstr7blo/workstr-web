@@ -9,6 +9,7 @@ import { hasNip07 } from '../signer/nip07';
 import { libraryPanel } from '../features/library/views';
 import { discoverPanel } from '../features/discover/views';
 import { workoutHistory } from '../features/train/views';
+import { historyCalendarPanel } from '../features/train/history-calendar';
 import { bodyView, trainingStatsView } from '../features/progress/views';
 import { quickWorkoutPanel, recoveryView } from '../features/recovery/views';
 import { programCard, sheetToProgram } from '../features/sheets/views';
@@ -128,7 +129,7 @@ function workoutsView(state: AppState): string {
       <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost small" id="program-discover-refresh" type="button">Refresh</button></div><p class="section-help">Relay programs published by Workstr. Import a program to add a local copy to your Programs library before editing or running it.</p><div class="filter-bar"><input class="grow" id="program-discover-filter" placeholder="Search relay programs..." autocomplete="off" value="${html(state.programFilter)}" /></div><div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div><div class="program-list">${programs.map((program) => programCard(program, state)).join('') || '<div class="empty">No relay programs loaded yet. Tap Refresh.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
-      <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Every completed session, newest first. Expand one to see the exercises and sets you logged; delete it to remove it from your history and stats.</p>${workoutHistory(state)}</div>
+      <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Your training month at a glance, then every completed session below. Pick a filled day to jump to it; expand a session to see the exercises and sets you logged.</p>${historyCalendarPanel(state)}${workoutHistory(state)}</div>
     </div>
     <div class="sub-panel ${active === 'recovery' ? 'active' : ''}" id="sub-workouts-recovery">
       ${recoveryView(state)}
