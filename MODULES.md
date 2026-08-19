@@ -35,6 +35,7 @@ or set updates would make full-root rendering inappropriate.
 | Live-session orchestration | `src/app/session-runner.ts` | the applicable controller/view below, `src/features/train/repeat-workout.ts` | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | Repeat a completed workout | `src/features/train/repeat-workout.ts` | `src/app/session-runner.ts`, `src/features/train/views.ts` | `tests/repeat-workout.test.ts`, `tests/session-runner.test.ts` |
 | History release regressions (scale, JSON round trip, neighbouring features) | `tests/history-qa.test.ts` | `docs/RELEASE-QA.md` | `tests/history-qa.test.ts` |
+| Relay write policy (server-side, not the browser) | `relay/write-policy.mjs` | `relay/README.md`, `docs/plans/v2-encrypted-backup-alpha.md` | `tests/write-policy.test.ts` |
 | Standard live workout | `src/features/train/standard-session-controller.ts` | `standard-session-view.ts`, `rest-timer.ts`, `session-logic.ts` | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | EMOM live workout | `src/features/train/emom-session-controller.ts` | `emom-session-view.ts`, `emom.ts`, `emom-clock.ts`, `session-logic.ts` | `tests/emom.test.ts`, `tests/emom-clock.test.ts`, `tests/session-runner.test.ts` |
 | Rest timer and countdown audio | `src/features/train/rest-timer.ts`, `countdown-audio.ts` | `session-logic.ts` | `tests/countdown-audio.test.ts`, `tests/session-logic.test.ts` |
@@ -159,6 +160,18 @@ targets, or muscle metadata solely from the current exercise library.
   relay acknowledgement/verification before reporting success.
 - Local training must remain usable when every relay operation fails.
 
+### Relay-side policy (not client code)
+
+- `relay/write-policy.mjs` is the strfry write-policy plugin that runs on the relay host,
+  not in the browser. It is plain JavaScript because the relay host has no build step;
+  `relay/write-policy.d.mts` carries its type contract so the tests can import it.
+- Policy: accept `kind:30078` whose first `d` tag starts with `workstr:v1:`, reject
+  everything else. The relay is open — no allowlist, no NIP-42 — so this plugin is the
+  only control over what the relay stores.
+- It is stateless and per-event. Quotas, the storage ceiling, and the block list are
+  separate stateful concerns and are not here.
+- `relay/README.md` covers installation into `strfry.conf` and post-deploy verification.
+
 ## Styling and static assets
 
 - `src/style.css` contains Workstr Web-specific and live-runner overrides.
@@ -176,6 +189,7 @@ targets, or muscle metadata solely from the current exercise library.
 - `docs/instruction.md`: broad product/protocol specification, including future phases.
 - `docs/plans/`: detailed plans for unshipped milestones.
 - `docs/RELEASE-QA.md`: real-device release checklist.
+- `relay/README.md`: relay-side write policy, its rationale, and how to deploy it.
 - `CHANGELOG.md`: shipped and unreleased user-visible behavior.
 
 Update this map when files move, responsibilities split, or the persistence/data flow

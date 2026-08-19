@@ -115,7 +115,7 @@ for (const [sourcePath, baseline] of Object.entries(policy.oversizedBaseline)) {
   }
 }
 
-const repositoryPathPattern = /^(?:src|tests|public|docs|scripts|\.github)\//;
+const repositoryPathPattern = /^(?:src|tests|public|docs|scripts|relay|\.github)\//;
 for (const token of documentedTokens) {
   if (!repositoryPathPattern.test(token) || token.includes('*')) continue;
   if (!fs.existsSync(path.join(root, token))) errors.push(`MODULES.md: referenced path does not exist: ${token}`);
