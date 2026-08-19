@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without relying on colour, each day carries its full date and workout count for screen
   readers, and the grid fits a 320px phone without sideways scrolling.
 
+- **Repeat workout.** Any completed session can start the next one. Expand a workout in
+  History and tap Repeat workout: it rebuilds from what that session actually recorded, so
+  it still works after the original program was edited or deleted, and it carries normal,
+  superset and EMOM structure alike. The weight you finished each exercise on last time is
+  offered as the starting value; nothing counts as logged until you complete the set. The
+  original workout is never modified, and a session too old to hold what you trained says
+  so on a disabled button rather than starting something broken.
+
 ### Changed
 
 - **History is grouped by day and follows the calendar.** Completed sessions now sit under

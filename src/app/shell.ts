@@ -283,6 +283,10 @@ export function renderShell(root: HTMLElement): void {
     }));
     sessionRunner.bindSessionControls();
     root.querySelectorAll<HTMLElement>('[data-delete-session]').forEach((button) => button.addEventListener('click', () => { void preferences.deleteSession(Number(button.dataset.deleteSession)); }));
+    root.querySelectorAll<HTMLElement>('[data-repeat-session]').forEach((button) => button.addEventListener('click', () => {
+      const source = state.finishedSessions.find((item) => item.id === Number(button.dataset.repeatSession));
+      if (source) void sessionRunner.repeatSession(source);
+    }));
     root.querySelectorAll<HTMLButtonElement>('[data-publish-session]').forEach((button) => button.addEventListener('click', () => {
       const session = state.finishedSessions.find((item) => item.id === Number(button.dataset.publishSession));
       if (session) void sessionRunner.publishSessionSummary(session, button);

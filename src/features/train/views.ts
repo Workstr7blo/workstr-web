@@ -3,6 +3,7 @@ import type { Exercise } from '../../core/types';
 import { formatWeightKg, type WeightUnit } from '../../core/units';
 import { sessionExercises, type ActiveSession, type SessionSetLog } from '../../app/state';
 import { html } from '../../app/format';
+import { repeatBlockedReason } from './repeat-workout';
 
 export function workoutVolume(session: ActiveSession): number {
   return session.sets.filter((set) => set.done).reduce((total, set) => total + (Number(set.reps) || 0) * (Number(set.weight) || 0), 0);
@@ -54,6 +55,16 @@ export function publishSummaryButton(session: ActiveSession, canPublish: boolean
   return `<button class="button primary ${size}" data-publish-session="${session.id}">Publish summary</button>`;
 }
 
+// Repeating is the main thing you come to a finished workout to do, so it leads the action
+// row. A snapshot too old or too broken to rebuild says so on the disabled button instead
+// of failing once tapped.
+export function repeatWorkoutButton(session: ActiveSession): string {
+  const blocked = repeatBlockedReason(session);
+  return blocked
+    ? `<button class="button ghost small" disabled title="${html(blocked)}">Repeat workout</button>`
+    : `<button class="button primary small" data-repeat-session="${session.id}">Repeat workout</button>`;
+}
+
 export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPublish = false, publishing = false, publishingLabel = 'Waiting for signer...'): string {
   const byEx = new Map<string, SessionSetLog[]>();
   for (const set of session.sets.filter((item) => item.done)) {
@@ -77,6 +88,7 @@ export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPubli
   return `<div class="session-detail">
     ${rows || '<p class="empty" style="padding:6px 0 12px">No sets were logged in this session.</p>'}
     <div class="workout-card-actions">
+      ${repeatWorkoutButton(session)}
       ${publishSummaryButton(session, canPublish, publishing, 'small', publishingLabel)}
     </div>
     <!-- Deleting is destructive and rarely what you came for, so it sits behind a
