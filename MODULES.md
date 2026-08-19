@@ -37,7 +37,8 @@ or set updates would make full-root rendering inappropriate.
 | EMOM live workout | `src/features/train/emom-session-controller.ts` | `emom-session-view.ts`, `emom.ts`, `emom-clock.ts`, `session-logic.ts` | `tests/emom.test.ts`, `tests/emom-clock.test.ts`, `tests/session-runner.test.ts` |
 | Rest timer and countdown audio | `src/features/train/rest-timer.ts`, `countdown-audio.ts` | `session-logic.ts` | `tests/countdown-audio.test.ts`, `tests/session-logic.test.ts` |
 | Finish/review and publish-session coordination | `src/features/train/session-summary.ts` | `src/nostr/share.ts`, `src/app/session-runner.ts` | `tests/session-runner.test.ts`, `tests/share.test.ts` |
-| Workout History | `src/features/train/views.ts` | `src/app/preferences-controller.ts`, `src/app/session-persistence.ts`, `src/app/state.ts` | currently covered indirectly by shell/session/stats tests; add focused history tests with history work |
+| Workout History | `src/features/train/views.ts` | `src/features/train/history-model.ts`, `src/core/dates.ts`, `src/app/preferences-controller.ts`, `src/app/session-persistence.ts`, `src/app/state.ts` | `tests/history-model.test.ts`, `tests/dates.test.ts` |
+| Local calendar dates and consistency math | `src/core/dates.ts` | `src/features/train/history-model.ts`, `src/features/progress/stats.ts` | `tests/dates.test.ts`, `tests/history-model.test.ts` |
 | Training statistics and PRs | `src/features/progress/stats.ts` | `src/features/progress/views.ts` | `tests/stats.test.ts`, `tests/progress-views.test.ts` |
 | Body-weight UI and calculations | `src/features/progress/views.ts` | `src/db/store.ts`, `src/core/units.ts` | `tests/progress-views.test.ts`, `tests/store.test.ts` |
 | Recovery calculation and body map | `src/features/recovery/recovery.ts` | `views.ts`, `src/app/bodymap.ts`, `src/core/muscles.ts` | `tests/recovery.test.ts` |
