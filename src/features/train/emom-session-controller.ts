@@ -99,11 +99,12 @@ export class EmomSessionController {
     }
     const timerPhase = position.slot ? emomTimerPhase(position.slot, position.elapsedInSlotSec) : null;
     this.cues(position, timerPhase).forEach(playCountdownCue);
-    updateEmomTimerView(this.ctx.root, schedule, position, timerPhase);
+    updateEmomTimerView(this.ctx.root, session, schedule, position, timerPhase);
     if (!this.shouldRender(position)) return;
     renderEmomSessionView({
       root: this.ctx.root, session, blocks, schedule, position, timerPhase,
       paused: readEmomClock(session).runningSinceMs == null,
+      mixed: isMixedSession(session),
       expandedInstructions: this.expandedInstructions,
       roundNav: (slot, complete) => this.roundNav(schedule, slot, complete),
       weightDisplay: this.ctx.weightDisplay,

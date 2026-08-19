@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A mixed session now runs as one workout instead of two.** Finishing the strength half
+  no longer offers "Start EMOM" and "Finish session" as equal choices: the EMOM section
+  takes the advance slot as "Next: EMOM", and ending there is demoted to a quiet "Finish
+  early", matching the EMOM half's own early exit. Every strength card names its section
+  ("Strength · Exercise 2 of 3 · EMOM next") so reaching the last exercise never reads as
+  reaching the end, and the progress bar now spans both sections rather than filling to
+  100% while a whole EMOM block is still ahead.
+
 - **Mixed program details split into Strength and EMOM.** Opening a program that combines
   both now shows each half under its own heading, in the order the session trains them,
   with its own exercise count and time. Timed exercises are described by rounds, interval

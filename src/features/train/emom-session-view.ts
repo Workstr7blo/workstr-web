@@ -2,7 +2,7 @@ import { html } from '../../app/format';
 import type { ActiveSession } from '../../app/state';
 import type { EmomBlock } from '../../core/types';
 import { emomDurationSec, type EmomPosition, type EmomSlot } from './emom';
-import type { EmomTimerPhase } from './session-logic';
+import { sessionProgressPercent, strengthProgressUnits, type EmomTimerPhase } from './session-logic';
 
 export interface EmomSessionViewInput {
   root: HTMLElement;
@@ -12,6 +12,7 @@ export interface EmomSessionViewInput {
   position: EmomPosition;
   paused: boolean;
   timerPhase: EmomTimerPhase | null;
+  mixed: boolean;
   expandedInstructions: Set<string>;
   roundNav(current: EmomSlot, complete: boolean): string;
   weightDisplay(weight: number | string | null | undefined): string;
@@ -21,7 +22,7 @@ export interface EmomSessionViewInput {
   bindControls(): void;
 }
 
-export function updateEmomTimerView(root: HTMLElement, schedule: EmomSlot[], position: EmomPosition, timerPhase: EmomTimerPhase | null): void {
+export function updateEmomTimerView(root: HTMLElement, session: ActiveSession, schedule: EmomSlot[], position: EmomPosition, timerPhase: EmomTimerPhase | null): void {
   const countdown = root.querySelector('#emom-countdown');
   if (countdown) countdown.textContent = String(timerPhase?.secondsRemaining ?? position.secondsRemaining);
   const intervalCountdown = root.querySelector('#emom-interval-countdown');
@@ -33,7 +34,10 @@ export function updateEmomTimerView(root: HTMLElement, schedule: EmomSlot[], pos
   const progress = root.querySelector<HTMLElement>('#session-progress-fill');
   if (progress) {
     const completed = position.phase === 'complete' ? schedule.length : position.slot?.index || 0;
-    progress.style.width = schedule.length ? `${Math.round((completed / schedule.length) * 100)}%` : '0%';
+    // The strength half of a mixed session already earned its share of the bar, so the
+    // EMOM half continues from there rather than restarting the workout at zero.
+    const strength = strengthProgressUnits(session);
+    progress.style.width = `${sessionProgressPercent(strength, { done: completed, total: schedule.length })}%`;
   }
 }
 
@@ -51,7 +55,8 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
   nav.innerHTML = '';
   if (position.phase === 'pending') {
     meta.textContent = blocks.length > 1 ? `EMOM · ${blocks.length} sections · ${Math.ceil(emomDurationSec(schedule) / 60)} min` : `EMOM · ${blocks[0].rounds} round${blocks[0].rounds === 1 ? '' : 's'} · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}`;
-    body.innerHTML = `<div class="emom-hero"><div class="emom-badge">EMOM</div><div class="emom-countdown" id="emom-countdown">${position.secondsRemaining}</div><div class="emom-caption">seconds per first interval</div><p>The clock starts when you are ready. Actual reps are logged separately from each timed target.</p></div>`;
+    const lead = input.mixed ? 'Strength section done. The clock starts when you are ready.' : 'The clock starts when you are ready.';
+    body.innerHTML = `<div class="emom-hero"><div class="emom-badge">EMOM</div><div class="emom-countdown" id="emom-countdown">${position.secondsRemaining}</div><div class="emom-caption">seconds per first interval</div><p>${lead} Actual reps are logged separately from each timed target.</p></div>`;
     footer.innerHTML = '<button class="session-finish-btn" id="emom-start" type="button">Start EMOM</button>';
     root.querySelector('#emom-start')?.addEventListener('click', input.onStart);
     input.bindControls();
@@ -68,7 +73,8 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
   }
   const slot = position.slot;
   const block = blocks[slot.blockIndex];
-  meta.textContent = `${input.paused ? 'Paused · ' : ''}${blocks.length > 1 ? `Section ${slot.blockIndex + 1} of ${blocks.length} · ` : ''}Round ${slot.roundIndex + 1} of ${block.rounds} · Interval ${slot.intervalIndex + 1} of ${block.intervals.length}`;
+  // Name the section in a mixed workout, matching the "Strength · …" line the first half shows.
+  meta.textContent = `${input.paused ? 'Paused · ' : ''}${input.mixed ? 'EMOM · ' : ''}${blocks.length > 1 ? `Section ${slot.blockIndex + 1} of ${blocks.length} · ` : ''}Round ${slot.roundIndex + 1} of ${block.rounds} · Interval ${slot.intervalIndex + 1} of ${block.intervals.length}`;
   nav.innerHTML = input.roundNav(slot, false);
   const steps = slot.steps.map((step, stepIndex) => {
     const exercise = session.exercises.find((candidate) => candidate.exerciseSlug === step.exerciseSlug);

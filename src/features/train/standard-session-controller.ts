@@ -3,7 +3,7 @@ import { html } from '../../app/format';
 import { normalizeWeightUnit, storeWeightInput } from '../../core/units';
 import { CountdownCueGuard, unlockCountdownAudio } from './countdown-audio';
 import { RestTimer } from './rest-timer';
-import { isEmomSession, sessionSetCounts, standardSessionExercises, standardWorkComplete, supersetTransition } from './session-logic';
+import { emomSlotCount, isEmomSession, sessionProgressPercent, sessionSetCounts, standardSessionExercises, standardWorkComplete, strengthProgressUnits, supersetTransition } from './session-logic';
 import { renderStandardSessionView, updateStandardSessionProgress } from './standard-session-view';
 
 export interface StandardSessionControllerContext {
@@ -95,15 +95,10 @@ export class StandardSessionController {
     return this.exerciseIndex >= exercises.length - 1 || standardWorkComplete(session);
   }
 
+  // A pending EMOM section counts toward the bar, so finishing the strength half of a
+  // mixed session leaves the workout visibly unfinished instead of showing 100%.
   private progress(session: ActiveSession): number {
-    let total = 0;
-    let done = 0;
-    standardSessionExercises(session).forEach((exercise) => {
-      const target = this.setCounts[exercise.exerciseSlug] || Number(exercise.sets) || 1;
-      total += target;
-      done += Math.min(this.loggedSetCount(session, exercise.exerciseSlug), target);
-    });
-    return total ? Math.round((done / total) * 100) : 0;
+    return sessionProgressPercent(strengthProgressUnits(session, this.setCounts), { done: 0, total: emomSlotCount(session) });
   }
 
   private async render(session: ActiveSession): Promise<void> {
@@ -136,6 +131,7 @@ export class StandardSessionController {
       loggedSetCount: (slug) => this.loggedSetCount(session, slug),
       superset: supersetTransition(session, exercise.exerciseSlug, logged.length + 1),
       startEmom: this.canStartEmom(session, exercises),
+      emomPending: isEmomSession(session) && !session.emomStartedAt,
       bindControls: () => this.bindControls()
     });
     updateStandardSessionProgress(this.ctx.root, session, this.progress(session));

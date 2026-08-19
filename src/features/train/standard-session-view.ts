@@ -16,6 +16,7 @@ export interface StandardSessionViewInput {
   loggedSetCount(slug: string): number;
   superset: SupersetTransition | null;
   startEmom?: boolean;
+  emomPending?: boolean;
   bindControls(): void;
 }
 
@@ -82,9 +83,13 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
     <div class="session-instructions-body">${instructions.map((step, index) => `<div class="session-instructions-step"><b>${index + 1}</b>${html(step)}</div>`).join('')}</div>
   </div>` : '';
   title.textContent = session.sheetName || 'Freestyle';
+  // A mixed session names its section on every card, so reaching the last strength
+  // exercise never reads as reaching the end of the workout.
+  const sectionPrefix = input.emomPending ? 'Strength · ' : '';
+  const sectionSuffix = input.emomPending ? ' · EMOM next' : '';
   meta.textContent = input.superset
-    ? `Superset · Round ${input.superset.roundIndex + 1} of ${input.superset.rounds} · Move ${input.superset.stepIndex + 1} of ${input.superset.stepCount}`
-    : `Exercise ${exerciseIndex + 1} of ${exercises.length}`;
+    ? `${sectionPrefix}Superset · Round ${input.superset.roundIndex + 1} of ${input.superset.rounds} · Move ${input.superset.stepIndex + 1} of ${input.superset.stepCount}${sectionSuffix}`
+    : `${sectionPrefix}Exercise ${exerciseIndex + 1} of ${exercises.length}${sectionSuffix}`;
   body.innerHTML = `${exercise.imageUrl ? `<img class="session-ex-image" src="${html(exercise.imageUrl)}" alt="${html(name)}" loading="eager" onerror="this.classList.add('placeholder');this.removeAttribute('src');this.textContent='No exercise image'">` : '<div class="session-ex-image placeholder">No exercise image</div>'}
     <div class="session-ex-name">${html(name)}</div>
     <div class="session-ex-target"><b>${targetSets}</b> sets <span class="dot"></span> <b>${html(targetReps || 'free')}</b> reps <span class="dot"></span> <b>${restSec}s</b> rest</div>
@@ -93,10 +98,17 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   const isLast = exerciseIndex >= exercises.length - 1;
   const nextLabel = input.superset && !input.superset.roundComplete ? 'Next move' : 'Next';
   const prev = exerciseIndex > 0 ? `<button class="session-prev-btn" data-jump-ex="${exerciseIndex - 1}" type="button">Prev</button>` : '';
-  const startEmom = input.startEmom ? '<button class="session-emom-btn" id="start-emom-section" type="button">Start EMOM</button>' : '';
-  const advance = isLast
-    ? '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>'
-    : `<button class="session-next-btn" data-jump-ex="${exerciseIndex + 1}" type="button">${nextLabel}</button>`;
-  footer.innerHTML = `${prev}${startEmom}${advance}`;
+  // The EMOM section is the next page of the same workout, so on the last strength card it
+  // takes the advance slot outright. Offered early it is a shortcut, so it sits beside Next.
+  const handoffEarly = input.startEmom && !isLast ? '<button class="session-emom-btn" id="start-emom-section" type="button">Start EMOM</button>' : '';
+  const advance = input.startEmom && isLast
+    ? '<button class="session-emom-btn" id="start-emom-section" type="button">Next: EMOM</button>'
+    : isLast
+      ? '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>'
+      : `<button class="session-next-btn" data-jump-ex="${exerciseIndex + 1}" type="button">${nextLabel}</button>`;
+  // Stopping here abandons the EMOM section, so it is the exception rather than a peer of
+  // the handoff — same wording and weight as the EMOM half's own early exit.
+  const finishEarly = input.emomPending && isLast ? '<button class="session-finish-early" id="finish-session" type="button">Finish early</button>' : '';
+  footer.innerHTML = `${prev}${handoffEarly}${advance}${finishEarly}`;
   input.bindControls();
 }

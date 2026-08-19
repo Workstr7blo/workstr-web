@@ -294,6 +294,55 @@ describe('session runner', () => {
     expect(root.querySelector('#emom-start')).toBeTruthy();
   });
 
+  it('makes the EMOM section the advance step of a mixed session rather than a rival to finishing', async () => {
+    await runner.startTrainingSession(mixedProgram());
+    const handoff = root.querySelector('#start-emom-section') as HTMLButtonElement;
+    expect(handoff.textContent).toBe('Next: EMOM');
+    expect(root.querySelector('.session-finish-btn')).toBeFalsy();
+    const finish = root.querySelector('#finish-session') as HTMLButtonElement;
+    expect(finish.className).toContain('session-finish-early');
+    expect(finish.textContent).toBe('Finish early');
+    expect(root.querySelector('#session-meta')?.textContent).toBe('Strength · Exercise 1 of 1 · EMOM next');
+  });
+
+  it('keeps the terminal finish button on the last card of a session with no EMOM section', async () => {
+    await runner.startTrainingSession(oneExerciseProgram());
+    expect(root.querySelector('.session-finish-btn')?.textContent).toBe('Finish session');
+    expect(root.querySelector('.session-finish-early')).toBeFalsy();
+    expect(root.querySelector('#start-emom-section')).toBeFalsy();
+    expect(root.querySelector('#session-meta')?.textContent).toBe('Exercise 1 of 1');
+  });
+
+  it('names the EMOM section once a mixed session hands over to the clock', async () => {
+    await runner.startTrainingSession(mixedProgram());
+    (root.querySelector('#start-emom-section') as HTMLButtonElement).click();
+    await tick();
+    expect(root.querySelector('#session-body')?.textContent).toContain('Strength section done');
+    (root.querySelector('#emom-start') as HTMLButtonElement).click();
+    await tick();
+    expect(root.querySelector('#session-meta')?.textContent).toContain('EMOM · Round 1 of 2');
+  });
+
+  it('carries the progress bar across both sections of a mixed session', async () => {
+    await runner.startTrainingSession(mixedProgram());
+    const fill = root.querySelector('#session-progress-fill') as HTMLElement;
+    // Two strength sets plus two EMOM intervals: the strength half is worth half the bar.
+    (root.querySelector('[data-session-reps="0"]') as HTMLInputElement).value = '8';
+    (root.querySelector('[data-set-log-btn="0"]') as HTMLButtonElement).click();
+    await tick();
+    expect(fill.style.width).toBe('25%');
+    (root.querySelector('[data-session-reps="1"]') as HTMLInputElement).value = '8';
+    (root.querySelector('[data-set-log-btn="1"]') as HTMLButtonElement).click();
+    await tick();
+    expect(fill.style.width).toBe('50%');
+
+    (root.querySelector('#start-emom-section') as HTMLButtonElement).click();
+    await tick();
+    (root.querySelector('#emom-start') as HTMLButtonElement).click();
+    await tick();
+    expect(fill.style.width).toBe('50%');
+  });
+
   it('lets a mixed session finish from the strength half without starting the EMOM', async () => {
     await runner.startTrainingSession(mixedProgram());
     (root.querySelector('#finish-session') as HTMLButtonElement).click();
