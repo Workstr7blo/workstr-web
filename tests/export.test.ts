@@ -13,14 +13,13 @@ async function seed(namespace: string): Promise<void> {
   await db.put('session_sets', { id: 1, session_id: 1, exercise_slug: 'bench', set_number: 1, reps: 8, weight_kg: 60, completed_at: 'x' } as never);
   await db.put('bodyweight', { id: 1, date: '2026-01-01', weight_kg: 70 } as never);
   await db.put('sync_queue', { address: 'a:b:c', updated_at: 'x' } as never);
-  await db.put('plan', { note: 'leg day fri' } as never, 'default');
   await db.put('settings', { unit: 'kg' } as never, 'workstr');
   db.close();
 }
 
 async function wipe(namespace: string): Promise<void> {
   const db = await openWorkstrDB(namespace);
-  const names = ['exercises', 'sheets', 'sheet_exercises', 'sessions', 'session_sets', 'bodyweight', 'sync_queue', 'plan', 'settings'] as const;
+  const names = ['exercises', 'sheets', 'sheet_exercises', 'sessions', 'session_sets', 'bodyweight', 'sync_queue', 'settings'] as const;
   const tx = db.transaction(names, 'readwrite');
   await Promise.all(names.map((name) => tx.objectStore(name).clear()));
   await tx.done;
@@ -44,7 +43,8 @@ describe('export/import round-trip', () => {
     expect(dump.stores.exercises).toHaveLength(1);
     // Out-of-line stores keep their keys.
     expect(dump.stores.settings).toEqual([{ key: 'workstr', value: { unit: 'kg' } }]);
-    expect(dump.stores.plan).toEqual([{ key: 'default', value: { note: 'leg day fri' } }]);
+    // The retired `plan` store is not exported at all; an older file carrying one imports fine.
+    expect(dump.stores.plan).toBeUndefined();
 
     await wipe(ns);
     const empty = await openWorkstrDB(ns);

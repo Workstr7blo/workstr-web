@@ -226,8 +226,8 @@ request while capacity allows, and supporting is voluntary. Do not use "subscrib
    - Target namespace already holds data → ask the user, once, which side to keep.
    - **Namespaces are never merged.** Merging two histories without a sync protocol
      produces duplicates nobody can untangle; a copy-or-keep choice is comprehensible.
-4. "Has user data" means: any session, set, sheet, sheet row, body-weight entry, plan
-   row or blob, or any exercise the user favourited, deleted, or that did not come from
+4. "Has user data" means: any session, set, sheet, sheet row, body-weight entry or
+   blob, or any exercise the user favourited, deleted, or that did not come from
    the bundled seed. A namespace holding only untouched seed rows counts as empty, so
    signing in right after a clean install never triggers the prompt.
 5. Sign-out returns to the `local` namespace and leaves both databases intact.
@@ -420,8 +420,8 @@ SQLite columns to allow straight ports of store logic):
 - `session_sets`: id, session_id (index), exercise_id (index), exercise_slug,
   exercise_name, set_number, reps, weight_kg, rpe *(typed, never written — see 5.1)*,
   completed_at
-- `plan`: **vestigial.** The store is created; no feature reads or writes it. Kept so
-  the schema version does not need to move; delete it at the next migration.
+- `plan`: **removed at DB v2.** The store was created by v1 and never read or written.
+  Opening a v1 database drops it; new databases never create it.
 - `bodyweight`: id, date (unique index), weight_kg, notes
 - `settings`: key/value — unit preference, public relay list, Workstr relay URL, signer
   type, sync cursor, height, target weight, owned equipment, `canonCache`, and

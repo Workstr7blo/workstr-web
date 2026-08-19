@@ -7,7 +7,7 @@ export const LOCAL_NAMESPACE = 'local';
 // Stores whose records only exist through user action. `sheets` is checked
 // separately because the starter seed writes programs, and `sheet_exercises`
 // is not checked at all — a row cannot outlive its sheet.
-const USER_DATA_STORES = ['sessions', 'session_sets', 'bodyweight', 'plan', 'blobs'] as const;
+const USER_DATA_STORES = ['sessions', 'session_sets', 'bodyweight', 'blobs'] as const;
 
 // True when the namespace holds anything a user made (logged sessions, their
 // own or imported programs, body entries, imported exercises, or starter rows
@@ -42,7 +42,7 @@ export async function copyNamespace(from: string, to: string): Promise<void> {
       const tx = dst.transaction(store, 'readwrite');
       await tx.store.clear();
       for (let i = 0; i < values.length; i++) {
-        // out-of-line stores (plan, settings, blobs) need the key passed explicitly
+        // out-of-line stores (settings, blobs) need the key passed explicitly
         if (tx.store.keyPath) await tx.store.put(values[i] as never);
         else await tx.store.put(values[i] as never, keys[i]);
       }
