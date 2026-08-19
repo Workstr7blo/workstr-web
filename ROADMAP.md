@@ -31,7 +31,7 @@ Milestones are releases. A milestone is done when it is tagged and on the domain
 
 All four Phase 1 pillars are shipped and the app is public. It is a complete offline
 tracker with a working Nostr read path, optional identity, and live training modes,
-deployed to the domain and tagged through v1.1.0 (2026-08-19).
+deployed to the domain and tagged through v1.3.0 (2026-08-19).
 
 **Shipped**
 
@@ -49,16 +49,18 @@ deployed to the domain and tagged through v1.1.0 (2026-08-19).
 - **Live training modes** — EMOM blocks, supersets, and mixed strength + EMOM programs in
   the session runner, reconciled against wall-clock time on a session clock that runs
   continuously across both halves.
+- **Workout history** — a monthly calendar with consistency cards, a timeline grouped by
+  local day and driven by calendar selection, and Repeat workout rebuilding a past session
+  from its own snapshot.
 - **Release and support** — starter seed of three beginner programs, the zap-only support
   and funding panel, and the tag-triggered release pipeline. v0.9.0, v1.0.0 and v1.1.0 are
   tagged, released with build artifacts, and live on the domain.
-- **Delivery** — Pages workflow deploys `main` to the custom domain; 258 tests across 26
+- **Delivery** — Pages workflow deploys `main` to the custom domain; 370 tests across 30
   files, green.
 
 **Next**
 
-v1.2 is complete and awaiting a tag. Then v1.3 workout history, then v2.0-alpha encrypted
-backup. Nothing else in v1 is open.
+v2.0-alpha encrypted backup. Every v1 milestone is tagged and on the domain.
 
 ---
 
@@ -119,26 +121,28 @@ IndexedDB version, so it sets the version bump for whatever tag carries it.
 
 ## v1.3 — Workout history
 
-Turn History from a newest-first archive into a training record that makes consistency
-visible and lets a finished session start the next one. Independent of v2: it reads the
-IndexedDB session snapshots that already exist, adds no object store and no network
-dependency, and stays usable offline and signed out. Sequence is fixed because each step
-consumes the one before it (epic: #37).
+Released 2026-08-19 as v1.3.0. History became a training record rather than an archive,
+without an object store, a network dependency or an export schema change.
 
-1. Timezone-safe history model — local `YYYY-MM-DD` keys, month aggregation, weekly
-   consistency, rest-day counts, as pure tested logic.
-2. Monthly calendar and compact summary cards above the timeline.
-3. Date-driven, grouped session timeline fed by calendar selection.
-4. Repeat a completed workout from its stored snapshot, without mutating the original.
-5. Responsive, accessibility, timezone/DST, offline, and regression QA.
+1. ~~Timezone-safe history model~~ — done. `core/dates` owns the local calendar vocabulary
+   and `features/train/history-model` the aggregation. Day arithmetic goes through calendar
+   fields, so DST cannot shift a date; `computeStreak` moved onto the same vocabulary,
+   fixing a UTC-versus-local day-key bug it had carried from the self-hosted port.
+2. ~~Monthly calendar and compact summary cards~~ — done. Intensity by completed sets,
+   multi-session counts, and workouts/active weeks/rest days, all legible without colour.
+3. ~~Date-driven, grouped session timeline~~ — done. Today/Yesterday/dated headings, and a
+   selected day renders only that day. Delete moved behind a disclosure.
+4. ~~Repeat a completed workout~~ — done. Rebuilt from the session's own snapshot, so it
+   survives the source program being edited or deleted; the original is never mutated.
+5. ~~Responsive, accessibility, timezone and regression QA~~ — done. 370 tests under eight
+   timezones from UTC+14 to UTC-11, plus a headless pass at 320/390/768/1280.
 
 Local calendar date is the user-facing unit throughout — never UTC slicing that moves a
 late-night workout to the next day. Full charts, volume, and 1RM stay in Statistics; this
 milestone does not duplicate them.
 
-**Done when:** current-month consistency is legible without opening a session, any workout
-is reachable from a date in two interactions, and a compatible past session can be
-repeated.
+Deferred on purpose, recorded in `docs/RELEASE-QA.md`: year heatmap, monthly recap,
+history search, save-a-repeat-as-a-program, progressive overload, and virtualisation.
 
 ## v2.0-alpha — Encrypted backup private alpha
 

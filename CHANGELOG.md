@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-19
+
 ### Added
 
 - **A monthly workout calendar at the top of History.** Every day you trained is filled in,
@@ -201,7 +203,8 @@ Nostr read path; it is versioned here so releases are traceable while v1.0 is fi
 - Weights are stored canonically in kilograms; the display unit is a user preference.
 - `session_sets.rpe` exists in the schema but is never written — see `ROADMAP.md`.
 
-[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Workstr7blo/workstr-web/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Workstr7blo/workstr-web/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Workstr7blo/workstr-web/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Workstr7blo/workstr-web/releases/tag/v1.0.0
