@@ -1,4 +1,5 @@
 import type { Exercise } from '../../core/types';
+import { addDays, dateKeyFromDate, daysBetween, sessionDayKey } from '../../core/dates';
 import { completedSets, sessionExercises, type ActiveSession } from '../../app/state';
 
 // SQLite strftime('%Y-%W') equivalent: week of year 00-53, Monday-based,
@@ -12,20 +13,26 @@ export function sqliteWeek(iso: string): string {
   return `${year}-${String(week).padStart(2, '0')}`;
 }
 
-// Ported verbatim from self-hosted Workstr src/app/store.js computeStreak().
-export function computeStreak(sessions: ActiveSession[]): number {
-  const dates = [...new Set(sessions.filter((session) => session.finishedAt).map((session) => new Date(session.startedAt).toISOString().slice(0, 10)))].sort().reverse();
-  if (!dates.length) return 0;
-  const dayMs = 86400000;
-  const stripTime = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+// Consecutive local calendar days of training, ending today or yesterday.
+//
+// Ported from self-hosted Workstr src/app/store.js computeStreak(), now on the shared
+// local-date vocabulary in core/dates. The original sliced the day out of an ISO string in
+// UTC and then compared it against local midnights, so a late-evening or early-morning
+// workout could count against the wrong day, in either direction, depending on the device's
+// offset. History and Statistics now answer "which day was that?" the same way.
+export function computeStreak(sessions: ActiveSession[], now = new Date()): number {
+  const keys = [...new Set(sessions
+    .filter((session) => session.finishedAt)
+    .map((session) => sessionDayKey(session.finishedAt, session.startedAt))
+    .filter((key): key is string => key !== null))].sort().reverse();
+  if (!keys.length) return 0;
   // allow today or yesterday to start the streak
-  if (Math.round((stripTime(new Date()) - stripTime(new Date(dates[0]))) / dayMs) > 1) return 0;
-  let expect = stripTime(new Date(dates[0]));
+  if (daysBetween(keys[0], dateKeyFromDate(now)) > 1) return 0;
+  let expected = keys[0];
   let streak = 0;
-  for (const value of dates) {
-    const day = stripTime(new Date(value));
-    if (day === expect) { streak += 1; expect -= dayMs; }
-    else if (day < expect) break;
+  for (const key of keys) {
+    if (key === expected) { streak += 1; expected = addDays(expected, -1); }
+    else if (key < expected) break;
   }
   return streak;
 }

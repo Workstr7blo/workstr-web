@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The training streak now counts the days you actually trained. It derived each workout's
+  day in UTC and then compared it against your device's local midnights, so depending on
+  your timezone an evening or early-morning session could land on the wrong day and break
+  or extend a streak that was intact. History and Statistics now answer "which day was
+  that?" the same way, using the day the workout finished in local time.
+
 ## [1.2.0] - 2026-08-19
 
 ### Changed
