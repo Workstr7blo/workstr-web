@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without relying on colour, each day carries its full date and workout count for screen
   readers, and the grid fits a 320px phone without sideways scrolling.
 
+### Changed
+
+- **History is grouped by day and follows the calendar.** Completed sessions now sit under
+  Today, Yesterday or a dated heading instead of running together in one list, and picking
+  a day on the calendar shows just that day's workouts with a "Show all" way back. Deleting
+  a session has moved behind a "More actions" disclosure so it is no longer sitting next to
+  Publish summary; it still asks for confirmation. Deleting the last workout on the day you
+  were viewing returns you to the full timeline instead of an empty screen.
+
 ### Fixed
 
 - The training streak now counts the days you actually trained. It derived each workout's

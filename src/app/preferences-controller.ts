@@ -1,5 +1,6 @@
 import { mergeOwnedEquipment, MY_EQUIPMENT, ownedEquipmentKeys } from '../core/equipment';
 import { normalizeWeightUnit, storeWeightInput } from '../core/units';
+import { sessionDayKey } from '../core/dates';
 import { LOCAL_NAMESPACE } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
 import { fetchMonthlyZapReceipts } from '../nostr/zaps';
@@ -143,6 +144,12 @@ async function deleteSession(id: number): Promise<void> {
   await state.store.deleteSession(id);
   if (state.expandedSessionId === id) state.expandedSessionId = null;
   state.finishedSessions = await loadFinishedSessions();
+  // Deleting the last workout on the day you were filtering by would otherwise leave the
+  // timeline pinned to an empty date, so the selection falls back to the whole history.
+  const selected = state.history.selectedDate;
+  if (selected && !state.finishedSessions.some((session) => sessionDayKey(session.finishedAt, session.startedAt) === selected)) {
+    state.history.selectedDate = null;
+  }
   render();
 }
 

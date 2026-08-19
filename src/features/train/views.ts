@@ -1,9 +1,8 @@
 import { canonMuscle } from '../../core/muscles';
 import type { Exercise } from '../../core/types';
-import { displayWeightKg, formatWeightKg, normalizeWeightUnit, type WeightUnit } from '../../core/units';
-import { sessionExercises, type ActiveSession, type AppState, type SessionSetLog } from '../../app/state';
-import { formatSessionDate, html } from '../../app/format';
-import { paintBodyMapSvg } from '../../app/bodymap';
+import { formatWeightKg, type WeightUnit } from '../../core/units';
+import { sessionExercises, type ActiveSession, type SessionSetLog } from '../../app/state';
+import { html } from '../../app/format';
 
 export function workoutVolume(session: ActiveSession): number {
   return session.sets.filter((set) => set.done).reduce((total, set) => total + (Number(set.reps) || 0) * (Number(set.weight) || 0), 0);
@@ -79,38 +78,13 @@ export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPubli
     ${rows || '<p class="empty" style="padding:6px 0 12px">No sets were logged in this session.</p>'}
     <div class="workout-card-actions">
       ${publishSummaryButton(session, canPublish, publishing, 'small', publishingLabel)}
-      <button class="button danger small" data-delete-session="${session.id}">Delete session</button>
     </div>
+    <!-- Deleting is destructive and rarely what you came for, so it sits behind a
+         disclosure rather than beside publish. Native <details> keeps it keyboard
+         operable without new state; the confirm dialog still guards the click. -->
+    <details class="session-danger">
+      <summary>More actions</summary>
+      <button class="button danger small" data-delete-session="${session.id}">Delete session</button>
+    </details>
   </div>`;
-}
-
-export function workoutHistory(state: AppState): string {
-  const unit = normalizeWeightUnit(state.settings.unit);
-  if (!state.finishedSessions.length) return '<div class="list empty">No completed sessions yet. Finish a workout to see it here.</div>';
-  return `<div class="program-list" id="history-list">${state.finishedSessions.map((session) => {
-    const doneSets = session.sets.filter((set) => set.done);
-    const volume = workoutVolume(session);
-    const meta = [
-      formatSessionDate(session.finishedAt || session.startedAt),
-      sessionDuration(session),
-      `${doneSets.length} set${doneSets.length === 1 ? '' : 's'}`,
-      volume > 0 ? `${Math.round(displayWeightKg(volume, unit) || 0)} ${unit} volume` : ''
-    ].filter(Boolean).join(' · ');
-    const groups = sessionMuscleGroupNames(session, state.exercises);
-    const { primary, secondary } = sessionMuscleSets(session, state.exercises);
-    const map = paintBodyMapSvg(primary, secondary);
-    const expanded = state.expandedSessionId === session.id;
-    return `<div class="workout-card ${expanded ? 'expanded' : ''}" data-session="${session.id}">
-      <div class="workout-card-header" data-toggle-session="${session.id}">
-        <div class="workout-card-map ${map ? 'has-map' : ''}" data-session-map="${session.id}">${map || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'}</div>
-        <div class="workout-card-info">
-          <div class="workout-card-name">${html(session.sheetName || 'Freestyle')}</div>
-          <div class="workout-card-meta">${meta}</div>
-          ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(', '))}</div>` : ''}
-        </div>
-        <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-      </div>
-      <div class="workout-card-body" data-session-body="${session.id}">${expanded ? sessionDetail(session, unit, Boolean(state.pubkey), state.publishingSessionId === session.id, state.publishingStatus || 'Waiting for signer...') : ''}</div>
-    </div>`;
-  }).join('')}</div>`;
 }
