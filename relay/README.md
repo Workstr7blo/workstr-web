@@ -27,15 +27,44 @@ Copy `write-policy.mjs` onto the relay host, make it executable, and point strfr
 ```
 relay {
     writePolicy {
-        plugin = "<path to write-policy.mjs>"
+        plugin = "/app/write-policy.mjs"
         timeoutSeconds = 10
     }
 }
 ```
 
-Requires Node 22+ on the relay host. strfry starts the plugin as a long-lived child
-process and restarts it if it exits, so a config reload is enough to pick up a new
-version. Rejections are returned to the client as the NIP-20 `OK: false` message.
+strfry runs the plugin as a subprocess, so the interpreter has to exist **inside** the
+relay container. The upstream `ghcr.io/hoytech/strfry` image is Alpine carrying only
+`/bin/sh` — no node, python or perl — so `Dockerfile` here derives from it and adds the
+one package the plugin needs:
+
+```dockerfile
+FROM ghcr.io/hoytech/strfry:latest
+USER root
+RUN apk add --no-cache nodejs
+USER strfry
+```
+
+Alpine 3.18 ships Node 18. The plugin uses only `node:readline`, `node:url` and plain
+ESM, so it does not need the Node 22 the client's `package.json` asks for — that floor is
+Vite's, and Vite never runs on the relay.
+
+The relay's compose service builds from that Dockerfile and mounts the plugin read-only
+beside the config, so updating the policy is a file copy plus a container restart rather
+than an image rebuild:
+
+```yaml
+build:
+  context: ./strfry
+image: workstr-strfry:local
+volumes:
+  - ./strfry/strfry.conf:/app/strfry.conf:ro
+  - ./strfry/write-policy.mjs:/app/write-policy.mjs:ro
+```
+
+The plugin file needs mode 755 on the host — strfry executes it directly, through its
+`#!/usr/bin/env node` shebang. Rejections reach the client as the NIP-20 `OK: false`
+message.
 
 ## Verify after deploying
 
@@ -47,6 +76,13 @@ deployed relay, confirm all four:
 2. A `kind:1` note is rejected, with the reason visible in the `OK` message.
 3. A `kind:30078` with a foreign `d` prefix is rejected.
 4. NIP-11 still serves over HTTPS and reads still work — the policy is write-path only.
+
+Publish those from a throwaway key, then remove the accepted event so verification does
+not leave data behind:
+
+```
+strfry delete --filter '{"authors":["<throwaway pubkey>"]}'
+```
 
 ## Scope
 
