@@ -9,6 +9,7 @@ import { effectiveSessionStartedAt, isEmomSession, preEmomElapsedSec, readEmomCl
 import type { ActiveSession, AppState, SessionExercise } from './state';
 import type { Signer } from '../signer/types';
 import { createSessionSummary } from '../features/train/session-summary';
+import { repeatBlockedReason, repeatSeed, type RepeatSeed } from '../features/train/repeat-workout';
 import { EmomSessionController } from '../features/train/emom-session-controller';
 import { StandardSessionController } from '../features/train/standard-session-controller';
 
@@ -32,6 +33,7 @@ export interface SessionRunnerContext {
 
 export interface SessionRunner {
   startTrainingSession(program: RelayProgram): Promise<void>;
+  repeatSession(source: ActiveSession): Promise<boolean>;
   openSessionOverlay(session: ActiveSession): Promise<void>;
   publishSessionSummary(session: ActiveSession, button: HTMLButtonElement | null): Promise<void>;
   bindSessionControls(): void;
@@ -88,14 +90,43 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
 
   const summary = createSessionSummary({ ...ctx, programExercises: programSessionExercises });
 
-  async function startTrainingSession(program: RelayProgram): Promise<void> {
-    const exercises = programSessionExercises(program);
+  // The one path that opens a live session: persist the row, take it as the active
+  // session, prime the standard controller, show the overlay. Programs and repeats both
+  // arrive here so a repeated workout behaves exactly like any other.
+  async function beginSession(seed: RepeatSeed): Promise<void> {
     const startedAt = new Date().toISOString();
-    const blocks = program.blocks?.length ? program.blocks : undefined;
-    const sessionId = state.store ? await state.store.createSession({ sheet_name: program.name || 'Freestyle', started_at: startedAt, summary_image_url: program.muscleMapUrl || '', exercises, blocks }) : Date.now();
-    state.activeSession = { id: sessionId, sheetName: program.name || 'Freestyle', startedAt, summaryImageUrl: program.muscleMapUrl || '', exercises, blocks, sets: [] };
+    const blocks = seed.blocks?.length ? seed.blocks : undefined;
+    const sessionId = state.store
+      ? await state.store.createSession({ sheet_name: seed.name, started_at: startedAt, summary_image_url: seed.summaryImageUrl, exercises: seed.exercises, blocks })
+      : Date.now();
+    state.activeSession = { id: sessionId, sheetName: seed.name, startedAt, summaryImageUrl: seed.summaryImageUrl, exercises: seed.exercises, blocks, sets: [] };
     standard.start(state.activeSession);
     await openSessionOverlay(state.activeSession);
+  }
+
+  async function startTrainingSession(program: RelayProgram): Promise<void> {
+    await beginSession({
+      name: program.name || 'Freestyle',
+      exercises: programSessionExercises(program),
+      blocks: program.blocks,
+      summaryImageUrl: program.muscleMapUrl || ''
+    });
+  }
+
+  // A repeat starts from the completed session's own snapshot, so it still works after the
+  // source program or its exercises were edited or deleted. Nothing about the historical
+  // session is touched: it is read, copied, and left alone.
+  async function repeatSession(source: ActiveSession): Promise<boolean> {
+    if (repeatBlockedReason(source)) return false;
+    // Never silently discard work in progress. An unfinished session keeps the floor and
+    // the user is put back into it, rather than having it replaced out from under them.
+    if (state.activeSession) {
+      ctx.toast('Finish or cancel your current session first', 'bad');
+      await openSessionOverlay(state.activeSession);
+      return false;
+    }
+    await beginSession(repeatSeed(source));
+    return true;
   }
 
   function shouldOpenEmom(session: ActiveSession): boolean {
@@ -229,5 +260,5 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     standard.bindControls();
   }
 
-  return { startTrainingSession, openSessionOverlay, publishSessionSummary, bindSessionControls };
+  return { startTrainingSession, repeatSession, openSessionOverlay, publishSessionSummary, bindSessionControls };
 }

@@ -43,11 +43,11 @@ function fakeStore(): { store: WorkstrStore; sets: unknown[]; finished: number[]
   return { store, sets, finished, deleted, emomStarts, clockUpdates };
 }
 
-function makeContext(root: HTMLElement, state: AppState): SessionRunnerContext {
+function makeContext(root: HTMLElement, state: AppState, toasts: string[] = []): SessionRunnerContext {
   return {
     root, state,
     render: () => { root.innerHTML = shellMarkup(state); },
-    toast: () => {},
+    toast: (message: string) => { toasts.push(message); },
     openModal: (content: string) => {
       const host = root.querySelector('#modal-content');
       if (host) host.innerHTML = content;
@@ -124,6 +124,7 @@ describe('session runner', () => {
   let emomStarts: Array<{ id: number; startedAt: string }>;
   let clockUpdates: Array<{ positionSec: number; activeSec: number; runningSince?: string }>;
   let runner: ReturnType<typeof createSessionRunner>;
+  let toasts: string[];
 
   beforeEach(() => {
     document.body.innerHTML = '<div id="app"></div>';
@@ -136,8 +137,9 @@ describe('session runner', () => {
     emomStarts = fake.emomStarts;
     clockUpdates = fake.clockUpdates;
     state = makeState(store);
+    toasts = [];
     root.innerHTML = shellMarkup(state);
-    runner = createSessionRunner(makeContext(root, state));
+    runner = createSessionRunner(makeContext(root, state, toasts));
   });
 
   afterEach(() => {
@@ -235,6 +237,124 @@ describe('session runner', () => {
     }, 'kg');
     expect(history).toContain('Bench Press');
     expect(history).toContain('Superset 1');
+  });
+
+  it('repeats a completed workout as a fresh session and leaves the original alone', async () => {
+    const source = {
+      id: 42, sheetName: 'Push Pull', startedAt: '2026-08-18T10:00:00Z', finishedAt: '2026-08-18T10:40:00Z',
+      nostrEventId: 'published-event', summaryImageUrl: 'map.svg',
+      exercises: [{ exerciseSlug: 'bench-press', exerciseName: 'Bench Press', sets: 2, reps: '8', restSec: 60, weight: 60 }],
+      sets: [{ exerciseSlug: 'bench-press', setNumber: 1, reps: 8, weight: 72.5, done: true, completedAt: '2026-08-18T10:05:00Z' }]
+    };
+    state.finishedSessions = [source];
+
+    expect(await runner.repeatSession(source)).toBe(true);
+    await tick();
+
+    expect(state.activeSession?.id).not.toBe(42);
+    expect(state.activeSession?.sheetName).toBe('Push Pull');
+    expect(state.activeSession?.sets).toEqual([]);
+    expect(state.activeSession?.finishedAt).toBeUndefined();
+    expect(state.activeSession?.nostrEventId).toBeUndefined();
+    expect(state.activeSession?.startedAt).not.toBe(source.startedAt);
+    // Last time's weight comes through as the starting value, not as a logged set.
+    expect(state.activeSession?.exercises[0].weight).toBe(72.5);
+    expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(true);
+    expect(root.querySelector('#session-body')?.textContent).toContain('Bench Press');
+
+    // The historical session is untouched.
+    expect(source.sets).toHaveLength(1);
+    expect(source.finishedAt).toBe('2026-08-18T10:40:00Z');
+    expect(source.nostrEventId).toBe('published-event');
+    expect(source.exercises[0].weight).toBe(60);
+    expect(state.finishedSessions).toEqual([source]);
+  });
+
+  it('logs new work against the repeated session, never the source', async () => {
+    const source = {
+      id: 42, sheetName: 'Push', startedAt: '2026-08-18T10:00:00Z', finishedAt: '2026-08-18T10:40:00Z',
+      exercises: [{ exerciseSlug: 'bench-press', exerciseName: 'Bench Press', sets: 2, reps: '8', restSec: 60 }],
+      sets: [{ exerciseSlug: 'bench-press', setNumber: 1, reps: 8, weight: 60, done: true, completedAt: '2026-08-18T10:05:00Z' }]
+    };
+    state.finishedSessions = [source];
+    await runner.repeatSession(source);
+    await tick();
+
+    (root.querySelector('[data-session-reps="0"]') as HTMLInputElement).value = '10';
+    (root.querySelector('[data-set-log-btn="0"]') as HTMLButtonElement).click();
+    await tick();
+
+    expect(sets).toHaveLength(1);
+    expect(sets[0]).toMatchObject({ session_id: state.activeSession?.id, reps: 10 });
+    expect(source.sets).toHaveLength(1);
+  });
+
+  it('carries an EMOM structure into the repeat without its clock', async () => {
+    const source = {
+      id: 43, sheetName: 'Minute Work', startedAt: '2026-08-18T10:00:00Z', finishedAt: '2026-08-18T10:30:00Z',
+      emomStartedAt: '2026-08-18T10:02:00Z', emomActiveSec: 1200, emomPositionSec: 1200,
+      exercises: [{ exerciseSlug: 'sit-up', exerciseName: 'Sit Up', sets: 1, reps: '', restSec: 60 }],
+      blocks: [{ type: 'emom' as const, rounds: 2, intervals: [{ durationSec: 60, steps: [{ exerciseSlug: 'sit-up', exerciseName: 'Sit Up', targetDurationSec: 20 }] }] }],
+      sets: []
+    };
+    state.finishedSessions = [source];
+    await runner.repeatSession(source);
+    await tick();
+
+    expect(state.activeSession?.blocks?.[0].type).toBe('emom');
+    expect(state.activeSession?.emomStartedAt).toBeUndefined();
+    expect(state.activeSession?.emomActiveSec).toBeUndefined();
+    // A pure EMOM repeat opens straight on its start screen, exactly like any EMOM program.
+    expect(root.querySelector('#emom-start')).toBeTruthy();
+  });
+
+  it('refuses to repeat over an unfinished session and puts you back into it', async () => {
+    await runner.startTrainingSession(oneExerciseProgram());
+    const active = state.activeSession;
+    const source = {
+      id: 42, sheetName: 'Push Pull', startedAt: '2026-08-18T10:00:00Z', finishedAt: '2026-08-18T10:40:00Z',
+      exercises: [{ exerciseSlug: 'squat', exerciseName: 'Squat', sets: 2, reps: '5', restSec: 60 }],
+      sets: []
+    };
+
+    expect(await runner.repeatSession(source)).toBe(false);
+    await tick();
+
+    expect(state.activeSession).toBe(active);
+    expect(state.activeSession?.sheetName).toBe('Test Program');
+    expect(toasts).toContain('Finish or cancel your current session first');
+    expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(true);
+  });
+
+  it('refuses a snapshot with nothing to rebuild from', async () => {
+    const legacy = {
+      id: 44, sheetName: 'Ancient', startedAt: '2024-01-01T10:00:00Z', finishedAt: '2024-01-01T10:30:00Z',
+      exercises: [], sets: []
+    };
+    expect(await runner.repeatSession(legacy)).toBe(false);
+    expect(state.activeSession).toBeNull();
+  });
+
+  it('leaves the source history intact when a repeated session is cancelled', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const source = {
+      id: 42, sheetName: 'Push Pull', startedAt: '2026-08-18T10:00:00Z', finishedAt: '2026-08-18T10:40:00Z',
+      exercises: [{ exerciseSlug: 'bench-press', exerciseName: 'Bench Press', sets: 2, reps: '8', restSec: 60 }],
+      sets: [{ exerciseSlug: 'bench-press', setNumber: 1, reps: 8, weight: 60, done: true, completedAt: '2026-08-18T10:05:00Z' }]
+    };
+    state.finishedSessions = [source];
+    await runner.repeatSession(source);
+    await tick();
+    const repeatedId = state.activeSession?.id;
+
+    (root.querySelector('#session-close') as HTMLButtonElement).click();
+    await tick();
+
+    expect(state.activeSession).toBeNull();
+    expect(deleted).toEqual([repeatedId]);
+    expect(state.finishedSessions).toEqual([source]);
+    expect(source.sets).toHaveLength(1);
+    confirm.mockRestore();
   });
 
   it('finishes the session and opens the recap modal', async () => {
