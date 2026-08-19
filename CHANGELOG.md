@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The countdown beeps now cover a timed EMOM step's own work phase. Cues followed the
+  interval clock, so a step that finished before its interval did counted down only the
+  recovery that followed it and the work timer ran out in silence. Work and recovery each
+  count down on their own clock, and a step that fills its whole interval still beeps once
+  per second rather than twice.
 - The time on a program's EMOM summary counted only the EMOM half while the program card
   counted the whole program, so a mixed program advertised two different durations. Both
   now come from one estimate and agree.

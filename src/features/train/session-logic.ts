@@ -1,7 +1,7 @@
 import type { EmomBlock, StraightBlock } from '../../core/types';
 import type { ActiveSession, SessionExercise } from '../../app/state';
 import type { EmomClockState } from './emom-clock';
-import type { EmomSlot } from './emom';
+import type { EmomPosition, EmomSlot } from './emom';
 
 export interface EmomTimerPhase {
   mode: 'work' | 'recovery';
@@ -150,6 +150,19 @@ export function emomTimerPhase(slot: EmomSlot, elapsedInSlotSec: number): EmomTi
   const durationSec = Math.max(0, slot.durationSec - startsAtSec);
   if (!durationSec) return null;
   return { mode: 'recovery', secondsRemaining: Math.max(0, Math.ceil(slot.durationSec - elapsedInSlotSec)), durationSec, stepIndex: null };
+}
+
+// Which clock the countdown cues follow. A timed step counts down to the end of its own
+// work; everything else counts down to the end of the interval, which is where a recovery
+// phase ends too. Picking exactly one source keeps a step that fills its whole interval
+// from beeping twice a second.
+export function emomCountdownTarget(position: EmomPosition, phase: EmomTimerPhase | null): { channel: string; period: string | number; secondsRemaining: number } | null {
+  const slotIndex = position.slot?.index ?? null;
+  if (position.phase !== 'running' || slotIndex === null) return null;
+  if (phase?.mode === 'work') {
+    return { channel: 'emom-work', period: `${slotIndex}:${phase.stepIndex}`, secondsRemaining: phase.secondsRemaining };
+  }
+  return { channel: 'emom', period: slotIndex, secondsRemaining: position.secondsRemaining };
 }
 
 export function sessionDurationSeconds(session: ActiveSession): number | null {

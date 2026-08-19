@@ -1,11 +1,12 @@
 import type { AppState, ActiveSession, SessionSetLog } from '../../app/state';
 import { normalizeWeightUnit, storeWeightInput } from '../../core/units';
 import type { EmomBlock } from '../../core/types';
+import type { EmomTimerPhase } from './session-logic';
 import { CountdownCueGuard, playCountdownCue, unlockCountdownAudio, type CountdownCue } from './countdown-audio';
 import { compileEmomBlocks, emomDurationSec, emomPosition, type EmomPosition, type EmomSlot } from './emom';
 import { emomClockSnapshot, pauseEmomClock, resumeEmomClock, seekEmomClock } from './emom-clock';
 import { renderEmomSessionView, updateEmomTimerView } from './emom-session-view';
-import { activeEmomBlocks, emomTimerPhase, isMixedSession, readEmomClock, writeEmomClock } from './session-logic';
+import { activeEmomBlocks, emomCountdownTarget, emomTimerPhase, isMixedSession, readEmomClock, writeEmomClock } from './session-logic';
 
 export interface EmomSessionControllerContext {
   root: HTMLElement;
@@ -96,8 +97,8 @@ export class EmomSessionController {
       this.persist(session);
       this.stopTimer();
     }
-    this.cues(position).forEach(playCountdownCue);
     const timerPhase = position.slot ? emomTimerPhase(position.slot, position.elapsedInSlotSec) : null;
+    this.cues(position, timerPhase).forEach(playCountdownCue);
     updateEmomTimerView(this.ctx.root, schedule, position, timerPhase);
     if (!this.shouldRender(position)) return;
     renderEmomSessionView({
@@ -239,15 +240,16 @@ export class EmomSessionController {
     this.roundWindowManual = false;
   }
 
-  private cues(position: EmomPosition): CountdownCue[] {
+  private cues(position: EmomPosition, timerPhase: EmomTimerPhase | null): CountdownCue[] {
     const cues: CountdownCue[] = [];
     const slotIndex = position.slot?.index ?? null;
     if (this.previousPhase === 'running' && this.previousSlotIndex !== null && (position.phase === 'complete' || slotIndex !== this.previousSlotIndex)) {
       const cue = this.ctx.cueGuard.finish('emom', this.previousSlotIndex);
       if (cue) cues.push(cue);
     }
-    if (position.phase === 'running' && slotIndex !== null) {
-      const cue = this.ctx.cueGuard.countdown('emom', slotIndex, position.secondsRemaining);
+    const target = emomCountdownTarget(position, timerPhase);
+    if (target) {
+      const cue = this.ctx.cueGuard.countdown(target.channel, target.period, target.secondsRemaining);
       if (cue) cues.push(cue);
     }
     this.previousPhase = position.phase;
