@@ -4,6 +4,7 @@ import type { EmomSlot } from '../src/features/train/emom';
 import {
   durationLabel,
   effectiveSessionStartedAt,
+  emomCountdownTarget,
   emomTimerPhase,
   isMixedSession,
   preEmomElapsedSec,
@@ -90,6 +91,41 @@ describe('session runner pure logic', () => {
     expect(emomTimerPhase(timed, 5)).toMatchObject({ mode: 'work', secondsRemaining: 15, stepIndex: 0 });
     expect(emomTimerPhase(timed, 25)).toMatchObject({ mode: 'work', secondsRemaining: 10, stepIndex: 1 });
     expect(emomTimerPhase(timed, 40)).toMatchObject({ mode: 'recovery', secondsRemaining: 20, stepIndex: null });
+  });
+
+  it('counts down a timed step to the end of its own work, not the interval', () => {
+    const timed = slot(60, [20, 15]);
+    const at = (elapsed: number, remaining: number) => emomCountdownTarget(
+      { phase: 'running', slot: timed, secondsRemaining: remaining, elapsedInSlotSec: elapsed, activeStepIndex: 0 },
+      emomTimerPhase(timed, elapsed)
+    );
+    // Last 5s of the first step: its own clock, on a channel of its own.
+    expect(at(17, 43)).toEqual({ channel: 'emom-work', period: `${timed.index}:0`, secondsRemaining: 3 });
+    // Last 5s of the second step, which ends 25s before the interval does.
+    expect(at(33, 27)).toEqual({ channel: 'emom-work', period: `${timed.index}:1`, secondsRemaining: 2 });
+    // Recovery still follows the interval clock, so the round boundary is unchanged.
+    expect(at(57, 3)).toEqual({ channel: 'emom', period: timed.index, secondsRemaining: 3 });
+  });
+
+  it('keeps one countdown source when a step fills its whole interval', () => {
+    const full = slot(30, [30]);
+    const target = emomCountdownTarget(
+      { phase: 'running', slot: full, secondsRemaining: 4, elapsedInSlotSec: 26, activeStepIndex: 0 },
+      emomTimerPhase(full, 26)
+    );
+    // Work and interval end together; the work channel wins so nothing beeps twice.
+    expect(target).toEqual({ channel: 'emom-work', period: `${full.index}:0`, secondsRemaining: 4 });
+  });
+
+  it('falls back to the interval clock for rep-based intervals and idle phases', () => {
+    const reps = slot(60, []);
+    expect(emomCountdownTarget(
+      { phase: 'running', slot: reps, secondsRemaining: 5, elapsedInSlotSec: 55, activeStepIndex: null },
+      emomTimerPhase(reps, 55)
+    )).toEqual({ channel: 'emom', period: reps.index, secondsRemaining: 5 });
+    expect(emomCountdownTarget(
+      { phase: 'complete', slot: null, secondsRemaining: 0, elapsedInSlotSec: 0, activeStepIndex: null }, null
+    )).toBeNull();
   });
 
   it('uses the persisted EMOM clock and start time', () => {
