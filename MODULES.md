@@ -63,6 +63,7 @@ or set updates would make full-root rendering inappropriate.
 | Encrypted backup: record shapes and addresses | `src/sync/records.ts`, `src/sync/addresses.ts` | `src/nostr/codecs30078.ts`, `docs/plans/v2-encrypted-backup-alpha.md` | `tests/codecs30078.test.ts`, `tests/sync-backfill.test.ts` |
 | Encrypted backup: queue and first-run backfill | `src/sync/backfill.ts` | `src/db/store.ts` (change listener, `sync_queue`) | `tests/sync-backfill.test.ts` |
 | Encrypted backup: relay transport and upload | `src/sync/relay.ts`, `src/sync/push.ts` | `src/nostr/codecs30078.ts`, `relay/write-policy.mjs` | `tests/sync-push.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in, needs `WORKSTR_TEST_RELAY`) |
+| Encrypted backup: pull, decrypt and merge | `src/sync/merge.ts` | `src/sync/relay.ts`, `src/db/store.ts` (`applyRemote`) | `tests/sync-merge.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in) |
 
 ## Important module groups
 
