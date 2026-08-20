@@ -136,6 +136,29 @@ a real thumb, a real screen reader, and a device whose clock is not the build ma
       body log all return.
 - [ ] **Cross-device.** Export from the phone, import on desktop. Same result.
 
+## 6b. Encrypted backup (from v2.0-alpha)
+
+Needs **two real devices and a real signer**. Everything else about backup is covered by
+automation (see the evidence section below); this section exists for what a browser driver
+and an integration suite cannot reach — a real NIP-46 signer round trip on a phone, an
+installed PWA that has been backgrounded, and a genuinely offline radio.
+
+- [ ] **Turning it on.** Phone, signed out, Settings → Backup → Auto-backup. Sign-in is
+      offered, and after signing in the toggle is on by itself.
+- [ ] **Backfill.** Existing history uploads. The status line counts up through the first
+      run rather than showing a pending count that falls, and it settles on "up to date".
+- [ ] **A new workout.** Log one on the phone; within a minute the status line says the
+      backup is current.
+- [ ] **Restore.** Laptop, same identity, no local data for it. Sign in, turn Auto-backup
+      on, and the phone's programs, history, body log and unit preference come back.
+- [ ] **Offline.** Put the phone in airplane mode, log a full workout. Nothing blocks, and
+      no error interrupts training. Restore the network; pending changes upload.
+- [ ] **NIP-46 specifically.** A remote signer sleeps and the tab is backgrounded. Backup
+      reports a readable error rather than hanging, and recovers after signing in again.
+- [ ] **Off is off.** Turn Auto-backup off, log a workout, confirm nothing new reaches the
+      relay (`relay-admin usage <pubkey>` does not grow), and that turning it back on does
+      not duplicate anything.
+
 ## 7. Support surface (from v1.0)
 
 Skip until the support screen ships.
@@ -222,3 +245,38 @@ below the fold on short screens.
 - The "unfinished session already exists" guard on repeat is covered by unit test, not the
   browser driver: the live-session overlay is fullscreen, so the path is not reachable by
   ordinary navigation.
+
+---
+
+## Automated evidence: v2.0-alpha encrypted backup
+
+Run against the **production relay** on 2026-08-20, not a local stand-in.
+
+**The relay's own policy** — verified by publishing directly at it and reading the NIP-20
+reason back:
+
+| Case | Result |
+|---|---|
+| `kind:30078` with a `workstr:v1:` `d` tag | accepted |
+| `kind:1` note | rejected — *"this relay only stores Workstr encrypted backup records"* |
+| `kind:30078` with a foreign `d` prefix | rejected |
+| `kind:30078` with no `d` tag | rejected |
+| Blocked pubkey | rejected, and restored by `unblock` without a restart |
+| Over quota | rejected — *"storage quota reached (…). Existing records are kept"* |
+
+That covers checklist items 7 and 8 of the phone-to-laptop plan; they do not need redoing
+by hand.
+
+**The client loop** — `tests/sync-relay.integration.test.ts` run with
+`WORKSTR_TEST_RELAY=wss://relay.workstr.fit:43736`, all six green: real NIP-44 ciphertext
+on the wire, a full phone → relay → laptop restore, and offline logging uploading after
+reconnect. This exercises the same modules the app runs, so what section 6b adds is the
+device surface around them, not the sync logic itself.
+
+**What automation could not reach.** Browser WebSockets to the relay are blocked in the
+build sandbox, so the headless pass drives the UI (toggle, sign-in routing, status line,
+errors not blocking training, state surviving reload) but never completes a real relay
+round trip in a browser. That gap is exactly section 6b.
+
+All test data was deleted afterwards and the ledger rebuilt; the relay was left at zero
+events, zero authors, zero blocked.
