@@ -46,8 +46,53 @@ export class WorkstrStore {
     this.changeListener = listener;
   }
 
+  private applyingRemote = false;
+
   private noteChange(address: string, updatedAt = new Date().toISOString()): void {
+    // A record merged from the relay is not a local change. Re-enqueueing it would
+    // upload what was just downloaded, forever.
+    if (this.applyingRemote) return;
     this.changeListener?.(address, updatedAt);
+  }
+
+  // Every write inside `apply` is treated as a merge rather than an edit.
+  async applyRemote<T>(apply: () => Promise<T>): Promise<T> {
+    this.applyingRemote = true;
+    try {
+      return await apply();
+    } finally {
+      this.applyingRemote = false;
+    }
+  }
+
+  async getSheetBySlug(slug: string): Promise<Sheet | undefined> {
+    return this.db.getFromIndex('sheets', 'slug', slug);
+  }
+
+  async getSessionByUid(uid: string): Promise<Session | undefined> {
+    return (await this.db.getAll('sessions')).find((session) => session.uid === uid);
+  }
+
+  // Replaces a session and its sets wholesale. A session record travels as one payload,
+  // so a partial apply would leave sets from two different versions side by side.
+  async putSessionWithSets(session: Session, sets: Omit<SessionSet, 'id' | 'session_id'>[]): Promise<number> {
+    const existing = session.uid ? await this.getSessionByUid(session.uid) : undefined;
+    const tx = this.db.transaction(['sessions', 'session_sets'], 'readwrite');
+    const sessions = tx.objectStore('sessions');
+    const value = { ...session, ...(existing?.id ? { id: existing.id } : {}) };
+    const id = Number(existing?.id ? await sessions.put(value) : await sessions.add(value));
+    const rows = tx.objectStore('session_sets');
+    for await (const cursor of rows.index('session_id').iterate(id)) await cursor.delete();
+    for (const set of sets) await rows.add({ ...set, session_id: id });
+    await tx.done;
+    return id;
+  }
+
+  async replaceBodyweight(entries: Omit<BodyWeightEntry, 'id'>[]): Promise<void> {
+    const tx = this.db.transaction('bodyweight', 'readwrite');
+    await tx.store.clear();
+    for (const entry of entries) await tx.store.put(entry as BodyWeightEntry);
+    await tx.done;
   }
 
   static async open(pubkey: string): Promise<WorkstrStore> {
