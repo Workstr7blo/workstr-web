@@ -163,8 +163,11 @@ Detailed execution plan: `docs/plans/v2-encrypted-backup-alpha.md`.
 
 1. strfry write policy — kind `30078` plus the `workstr:v1:` `d` prefix, everything else
    rejected.
-2. Abuse controls — per-pubkey quota, total storage ceiling with an alert, block list.
-   With neither payment nor admission limiting anything, these are the only limiter.
+2. ~~Abuse controls — per-pubkey quota, total storage ceiling with an alert, block list.~~
+   — done. Usage is counted per record address rather than per publish, because `30078` is
+   addressable and charging every upload would bill a daily sync for storage that never
+   grew. Blocks take effect without a restart, and `rebuild` recomputes the ledger from
+   the relay's own contents when it drifts.
 3. ~~Off-machine nightly LMDB backups and a restore runbook.~~ — done. The backup host
    pulls a verified snapshot nightly, so the relay holds no credential for its own
    backups; seven dailies plus four weeklies, and `relay/backup/README.md` carries the
