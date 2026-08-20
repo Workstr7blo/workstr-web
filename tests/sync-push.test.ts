@@ -145,6 +145,50 @@ describe('push queue', () => {
     spy.mockRestore();
   }, 30000);
 
+  // A month of real training is several parts, each costing two signer round trips, so a
+  // pass that runs out of time or loses its connection partway is normal. Without this the
+  // month restarted from part one every time: the parts that had already landed were sent
+  // again, the later ones were never reached, and the same two addresses went to the
+  // signer over and over while the month never finished.
+  it('does not send a part that is already on the relay unchanged', async () => {
+    const store = await freshStore();
+    for (let day = 1; day <= 24; day += 1) {
+      const date = `2026-08-${String(day).padStart(2, '0')}`;
+      const id = await store.createSession({ started_at: `${date}T10:00:00.000Z`, sheet_name: 'Upper Body Hypertrophy Block A' });
+      for (let n = 1; n <= 24; n += 1) {
+        await store.addSessionSet({
+          session_id: id, exercise_slug: 'barbell-bench-press-medium-grip', set_number: n,
+          reps: 8, weight_kg: 82.5, completed_at: `${date}T10:${String(n).padStart(2, '0')}:00.000Z`
+        });
+      }
+    }
+    await store.enqueueSync(sessionsAddress('2026-08'), '2026-08-24T10:24:00.000Z');
+
+    const relay = await import('../src/sync/relay');
+    const sent: string[] = [];
+    // Fails from the third part on, the way a screen lock or a lost connection does.
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+      sent.push(record.address);
+      return sent.length > 2
+        ? { address: record.address, accepted: false, failure: 'network', reason: 'offline' }
+        : { address: record.address, accepted: true, reason: 'ok', eventId: `id-${sent.length}`, createdAt: sent.length };
+    });
+
+    await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    const firstPass = [...sent];
+    expect(firstPass.length).toBeGreaterThan(2);
+    expect(await store.listSyncQueue()).toHaveLength(1);
+
+    sent.length = 0;
+    await pushQueue(store, fakeSigner(), 'ws://relay.test');
+
+    // The two that landed are not sent again, so the retry starts where it stopped.
+    expect(sent).not.toContain(firstPass[0]);
+    expect(sent).not.toContain(firstPass[1]);
+    expect(sent[0]).toBe(firstPass[2]);
+    spy.mockRestore();
+  }, 30000);
+
   // A month that outgrew one event and later shrank back leaves its extra part on the
   // relay. Nothing overwrites it, so it has to be tombstoned or a restore reads sessions
   // out of it that this device has deleted.

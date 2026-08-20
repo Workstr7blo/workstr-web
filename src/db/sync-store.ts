@@ -6,6 +6,10 @@ export interface SeenRecord {
   address: string;
   event_id: string;
   created_at: number;
+  // Set when this device published the record: the record's own timestamp, which is what
+  // says whether the copy on the relay is still current. Absent on a record this device
+  // only read, where the event id already answers that question.
+  updated_at?: string;
 }
 
 // The half of the store that backup cares about: what changed, what is queued to upload,
@@ -103,13 +107,13 @@ export abstract class SyncAwareStore {
     return this.db.getAll('sync_seen');
   }
 
-  async noteSeen(address: string, eventId: string, createdAt: number): Promise<void> {
+  async noteSeen(address: string, eventId: string, createdAt: number, updatedAt?: string): Promise<void> {
     if (!eventId || !Number.isFinite(createdAt)) return;
     const existing = await this.db.get('sync_seen', address);
     // An older event for the same address is a replay, not news: the relay keeps only the
     // newest, and recording it would drag the pull cursor backwards.
     if (existing && existing.created_at > createdAt) return;
-    await this.db.put('sync_seen', { address, event_id: eventId, created_at: createdAt });
+    await this.db.put('sync_seen', { address, event_id: eventId, created_at: createdAt, ...(updatedAt ? { updated_at: updatedAt } : {}) });
   }
 
   // Backup progress is device-local state, deliberately outside the synced settings
