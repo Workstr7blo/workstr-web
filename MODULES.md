@@ -60,7 +60,8 @@ or set updates would make full-root rendering inappropriate.
 | Starter seed | `src/db/seed.ts`, `src/data/seed-events.json` | catalog codecs, program import, generation script | `tests/seed.test.ts` |
 | PWA registration/offline cache | `src/app/pwa.ts`, `public/sw.js` | manifest and Vite build output behavior | production-build browser validation |
 | Build/version/deployment | `vite.config.ts`, `src/app/version.ts` | Pages/release workflows | `npm run build`; workflow checks |
-| Encrypted sync | `src/sync/engine.ts` | `docs/plans/v2-encrypted-backup-alpha.md` | no sync test exists yet; implementation is not shipped |
+| Encrypted backup: record shapes and addresses | `src/sync/records.ts`, `src/sync/addresses.ts` | `src/nostr/codecs30078.ts`, `docs/plans/v2-encrypted-backup-alpha.md` | `tests/codecs30078.test.ts`, `tests/sync-backfill.test.ts` |
+| Encrypted backup: queue and first-run backfill | `src/sync/backfill.ts` | `src/db/store.ts` (change listener, `sync_queue`) | `tests/sync-backfill.test.ts` |
 
 ## Important module groups
 
