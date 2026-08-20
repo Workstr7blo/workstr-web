@@ -1,4 +1,4 @@
-const CACHE = 'workstr-web-v3';
+const CACHE = 'workstr-web-v4';
 const IMAGE_CACHE = 'workstr-web-img-v1';
 const KNOWN_CACHES = [CACHE, IMAGE_CACHE];
 const IMAGE_CACHE_MAX_ENTRIES = 60;
@@ -6,7 +6,12 @@ const CORE = ['./', './index.html', './manifest.webmanifest', './favicon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(CORE)));
-  self.skipWaiting();
+});
+
+// A new version parks here until the page says it is safe to take over, so an update can
+// never reload a workout out from under someone.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
