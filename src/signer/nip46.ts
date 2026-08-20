@@ -73,8 +73,14 @@ async function openRelays(pool: SimplePool, relays: string[]): Promise<void> {
 // repeat it costs a full round trip out to a signer app and back, and it is the first call
 // of every sync pass — so on a connection that has gone quiet it is also the call that
 // fails, reporting a stalled signer as a problem with reading a public key.
-function wrapBunkerSigner(signer: BunkerSigner, ready: Promise<void>, knownPubkey?: string): Signer {
-  const whenReady = <T>(run: () => Promise<T>): Promise<T> => ready.then(run);
+function wrapBunkerSigner(signer: BunkerSigner, ready: () => Promise<void>, knownPubkey?: string): Signer {
+  // Before every request, not only the first. A connection that carried one record and
+  // then dropped — a relay closing an idle or rate-limited socket is ordinary — leaves
+  // nostr-tools to re-open the subscription inside the next `sendRequest` and publish
+  // immediately after it, which is the same lost-answer race as a cold start, one record
+  // in. Re-opening here first means the subscription goes out on a socket that is already
+  // up. On a healthy connection this resolves at once and costs nothing.
+  const whenReady = <T>(run: () => Promise<T>): Promise<T> => ready().then(run);
   return {
     type: 'nip46',
     getPublicKey: () => (knownPubkey ? Promise.resolve(knownPubkey) : whenReady(() => signer.getPublicKey())),
@@ -128,7 +134,7 @@ export async function createBunkerSigner(input: string, options: BunkerOptions =
   });
   cacheConnection(secret, pointer);
 
-  return wrapBunkerSigner(signer, Promise.resolve());
+  return wrapBunkerSigner(signer, () => openRelays(pool, pointer.relays));
 }
 
 export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options: BunkerOptions = {}): NostrConnectRequest {
@@ -155,7 +161,7 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
       cacheConnection(secret, signer.bp);
       return {
         pubkey: signer.bp.pubkey,
-        signer: wrapBunkerSigner(signer, Promise.resolve())
+        signer: wrapBunkerSigner(signer, () => openRelays(pool, signer.bp.relays))
       };
     })
   };
@@ -171,7 +177,7 @@ export function createCachedNip46Signer(knownPubkey?: string, options: BunkerOpt
   const signer = BunkerSigner.fromBunker(hexToBytes(cached.clientSecret), cached.bunker, { pool, onauth: options.onAuthUrl });
   // Every reconnection starts cold, and this is the path a stalled signer is rebuilt on,
   // so without the wait a retry loses its first answer exactly like the attempt before it.
-  return wrapBunkerSigner(signer, openRelays(pool, cached.bunker.relays), knownPubkey);
+  return wrapBunkerSigner(signer, () => openRelays(pool, cached.bunker.relays), knownPubkey);
 }
 
 export function isLikelyBunkerInput(value: string): boolean {

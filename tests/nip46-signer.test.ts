@@ -77,4 +77,29 @@ describe('a reconnected bunker signer', () => {
 
     ensure.mockRestore();
   });
+
+  // One record went through and the next timed out, over and over. A relay that closes a
+  // socket after carrying one record is ordinary, and nostr-tools then re-opens the
+  // subscription inside the next request and publishes immediately after it — the cold
+  // start race again, one record in. So the connection is re-established before every
+  // request, not only the first.
+  it('re-opens the connection before every request, not just the first', async () => {
+    const publish = vi.fn(async () => 'ok');
+    const live = { subscribe: () => ({ close: () => {} }), publish };
+    const ensure = vi.spyOn(SimplePool.prototype, 'ensureRelay').mockImplementation(((url: string) => (
+      url.includes('stalled') ? new Promise(() => {}) : Promise.resolve(live)
+    )) as never);
+
+    const signer = createCachedNip46Signer(USER_PUBKEY)!;
+    void signer.nip44Encrypt(USER_PUBKEY, 'first').catch(() => {});
+    for (let tick = 0; tick < 20; tick += 1) await Promise.resolve();
+    const afterFirst = ensure.mock.calls.length;
+
+    void signer.signEvent({ kind: 30078, created_at: 1, tags: [], content: 'second' }).catch(() => {});
+    for (let tick = 0; tick < 20; tick += 1) await Promise.resolve();
+
+    expect(ensure.mock.calls.length).toBeGreaterThan(afterFirst);
+    expect(publish).toHaveBeenCalledTimes(2);
+    ensure.mockRestore();
+  });
 });

@@ -21,6 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Backup managed one record per attempt, then said your signer did not respond.** The
+  connection to a remote signer is allowed to close between requests, and reopening it
+  raced the reply to the next one — so the first record of every attempt went through and
+  the one after it timed out. The connection is now made ready before every request rather
+  than only the first.
+
+- **"Sync now" showed no count while a long backup was running.** Progress was counted in
+  months rather than in records sent, so a month that uploads as eight records showed
+  nothing at all until the whole month finished — on exactly the months that take longest,
+  which read as a hang. The count now moves with every record.
+
 - **A big month of training could never finish backing up, resending the same records
   every time.** A month is uploaded in several records, and the month only counted as done
   when all of them were in — so if a backup ran out of time or lost its connection partway,

@@ -87,28 +87,46 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
   const seen = new Map((await store.listSeen()).map((entry) => [entry.address, entry]));
   const published = new Set(seen.keys());
 
+  // Counted in records rather than queue entries. A month is several records and each one
+  // is two signer round trips, so counting entries meant a heavy month reported nothing at
+  // all for minutes: the status line said "Syncing now…" with no count beside it, which
+  // reads exactly like a hang. The total grows as months are resolved, because how many
+  // records a month becomes is not known until it is packed.
+  let sent = 0;
+  const report = (remainingEntries: number, remainingHere: number): void =>
+    options.onProgress?.(sent, sent + remainingHere + remainingEntries);
+
   try {
     for (const [index, entry] of batch.entries()) {
       const { records, updatedAt } = await recordsFor(store, entry, sessions, published);
+      report(batch.length - index - 1, records.length);
       let complete = true;
       let signerIsGone = false;
 
       // A month can publish as more than one event. The queue entry clears only when all
       // of them are in, so an interrupted month is retried whole rather than left half
       // uploaded with nothing recording which half made it.
-      for (const record of records) {
+      for (const [position, record] of records.entries()) {
         // Already on the relay, unchanged since it went there. A month of real training is
         // several parts and each one costs two signer round trips, so without this a month
         // that ran out of time or lost its connection partway restarted from part one every
         // pass — re-sending what had already landed and never reaching the end. Earlier
         // parts stay byte-identical as a month grows, which is why they are packed
         // chronologically, so an unchanged timestamp really does mean an unchanged record.
-        if (!record.deleted && seen.get(record.address)?.updated_at === record.updatedAt) continue;
+        if (!record.deleted && seen.get(record.address)?.updated_at === record.updatedAt) {
+          // A part already on the relay still counts as done, so a resumed month picks up
+          // its progress where it left off rather than starting the count over.
+          sent += 1;
+          report(batch.length - index - 1, records.length - position - 1);
+          continue;
+        }
         const outcome = await publishRecord(signer, relayUrl, record, pool, false);
         if (outcome.accepted) {
           // The device already holds what it just sent, so the next pull recognises this
           // event in the relay's answer and skips decrypting its own upload back to itself.
           if (outcome.eventId && outcome.createdAt) await store.noteSeen(record.address, outcome.eventId, outcome.createdAt, record.updatedAt);
+          sent += 1;
+          report(batch.length - index - 1, records.length - position - 1);
           continue;
         }
         complete = false;
@@ -132,7 +150,7 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
         await store.dequeueSync(entry.address, updatedAt);
         uploaded += 1;
       }
-      options.onProgress?.(index + 1, batch.length);
+      report(batch.length - index - 1, 0);
       if (signerIsGone) break;
     }
   } finally {
