@@ -40,10 +40,14 @@ function toSigned(event: VerifiedEvent): SignedNostrEvent {
   return event as SignedNostrEvent;
 }
 
-function wrapBunkerSigner(signer: BunkerSigner): Signer {
+// `knownPubkey` is the key this device is already signed in as. Asking the bunker to
+// repeat it costs a full round trip out to a signer app and back, and it is the first call
+// of every sync pass — so on a connection that has gone quiet it is also the call that
+// fails, reporting a stalled signer as a problem with reading a public key.
+function wrapBunkerSigner(signer: BunkerSigner, knownPubkey?: string): Signer {
   return {
     type: 'nip46',
-    getPublicKey: () => signer.getPublicKey(),
+    getPublicKey: () => (knownPubkey ? Promise.resolve(knownPubkey) : signer.getPublicKey()),
     signEvent: (event: UnsignedNostrEvent) => signer.signEvent(event).then(toSigned),
     nip44Encrypt: (peerPubkey, plaintext) => signer.nip44Encrypt(peerPubkey, plaintext),
     nip44Decrypt: (peerPubkey, ciphertext) => signer.nip44Decrypt(peerPubkey, ciphertext)
@@ -125,12 +129,15 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
   };
 }
 
-export function createCachedNip46Signer(options: BunkerOptions = {}): Signer | null {
+// Rebuilt rather than reused when a connection stalls: the subscription this opens is the
+// only path a bunker's answers come back on, and a websocket that died while the app was
+// backgrounded leaves the signer looking connected while nothing it is asked ever returns.
+export function createCachedNip46Signer(knownPubkey?: string, options: BunkerOptions = {}): Signer | null {
   const cached = readCachedConnection();
   if (!cached) return null;
   const pool = new SimplePool();
   const signer = BunkerSigner.fromBunker(hexToBytes(cached.clientSecret), cached.bunker, { pool, onauth: options.onAuthUrl });
-  return wrapBunkerSigner(signer);
+  return wrapBunkerSigner(signer, knownPubkey);
 }
 
 export function isLikelyBunkerInput(value: string): boolean {

@@ -363,6 +363,7 @@ export function renderShell(root: HTMLElement): void {
   const backup = createBackupController({
     state, render, toast,
     getSigner: identity.getActiveSigner,
+    onSignerStalled: identity.dropActiveSigner,
     requestSignIn: () => { void identity.startRemoteSignerRequest(); }
   });
 
