@@ -117,6 +117,10 @@ export interface StoredSessionExercise {
 
 export interface Session {
   id?: number;
+  // Device-independent identity. `id` is an autoincrement key, so it collides across
+  // devices and cannot address a session on a relay. Backfilled for older rows at
+  // database version 3.
+  uid?: string;
   sheet_id?: number;
   sheet_name?: string;
   started_at: ISODateTime;
@@ -174,6 +178,18 @@ export interface CanonCache {
   events: CanonCachedEvent[];
 }
 
+// Device-local backup state. Deliberately excluded from the synced settings record: it
+// describes this device's relationship to the relay, not a user preference to replicate.
+export interface BackupSettings {
+  enabled: boolean;
+  // Index into the deterministic backfill list, so an interrupted first run resumes
+  // instead of re-uploading everything it already sent.
+  backfillCursor?: number;
+  backfillTotal?: number;
+  lastSyncAt?: string;
+  lastError?: string;
+}
+
 export interface WorkstrSettings {
   unit: WeightUnit;
   publicRelays: string[];
@@ -188,4 +204,5 @@ export interface WorkstrSettings {
   // option and keeps Quick Workout from proposing exercises you cannot do.
   ownedEquipment?: string[];
   canonCache?: CanonCache;
+  backup?: BackupSettings;
 }

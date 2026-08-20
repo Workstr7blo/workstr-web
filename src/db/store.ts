@@ -1,9 +1,10 @@
 import type { IDBPDatabase } from 'idb';
-import { openWorkstrDB, type WorkstrDB } from './schema';
+import { newSessionUid, openWorkstrDB, type WorkstrDB } from './schema';
 import { exportDatabase, importDatabase, type WorkstrExport } from './export';
 import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, TrainingBlock, WorkstrSettings } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
+import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
 
 export type ExerciseDraft = Omit<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'> &
   Partial<Pick<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'>>;
@@ -36,6 +37,18 @@ const LEGACY_CATALOG_SOURCE = ['pre', 'mium'].join('');
 
 export class WorkstrStore {
   private constructor(private readonly db: IDBPDatabase<WorkstrDB>) {}
+
+  // Set by the sync engine when backup is on. Living on the store means every write path
+  // reports itself, rather than each caller remembering to.
+  private changeListener: ((address: string, updatedAt: string) => void) | null = null;
+
+  setChangeListener(listener: ((address: string, updatedAt: string) => void) | null): void {
+    this.changeListener = listener;
+  }
+
+  private noteChange(address: string, updatedAt = new Date().toISOString()): void {
+    this.changeListener?.(address, updatedAt);
+  }
 
   static async open(pubkey: string): Promise<WorkstrStore> {
     const store = new WorkstrStore(await openWorkstrDB(pubkey));
@@ -192,10 +205,13 @@ export class WorkstrStore {
       await rows.add({ ...row, sheet_id: sheetId, position: row.position ?? index });
     }
     await tx.done;
+    this.noteChange(sheetAddress(slug), now);
     return sheetId;
   }
 
   async deleteSheet(id: number): Promise<void> {
+    const doomed = await this.db.get('sheets', id);
+    if (doomed?.slug) this.noteChange(sheetAddress(doomed.slug));
     const tx = this.db.transaction(['sheets', 'sheet_exercises'], 'readwrite');
     await tx.objectStore('sheets').delete(id);
     for await (const cursor of tx.objectStore('sheet_exercises').index('sheet_id').iterate(id)) await cursor.delete();
@@ -203,13 +219,19 @@ export class WorkstrStore {
   }
 
   async createSession(session: Omit<Session, 'id'>): Promise<number> {
-    return Number(await this.db.add('sessions', session));
+    // Assigned here rather than by callers so no path can create an unaddressable session.
+    return Number(await this.db.add('sessions', { ...session, uid: session.uid || newSessionUid() }));
+  }
+
+  async getSession(id: number): Promise<Session | undefined> {
+    return this.db.get('sessions', id);
   }
 
   async finishSession(id: number, finishedAt = new Date().toISOString()): Promise<void> {
     const session = await this.db.get('sessions', id);
     if (!session) return;
     await this.db.put('sessions', { ...session, finished_at: finishedAt });
+    if (session.uid) this.noteChange(sessionAddress(session.uid), finishedAt);
   }
 
   async startSessionEmom(id: number, startedAt: string, keepStartedAt = false): Promise<void> {
@@ -243,6 +265,8 @@ export class WorkstrStore {
   }
 
   async deleteSession(id: number): Promise<void> {
+    const doomed = await this.db.get('sessions', id);
+    if (doomed?.uid) this.noteChange(sessionAddress(doomed.uid));
     const tx = this.db.transaction(['sessions', 'session_sets'], 'readwrite');
     await tx.objectStore('sessions').delete(id);
     const index = tx.objectStore('session_sets').index('session_id');
@@ -251,7 +275,10 @@ export class WorkstrStore {
   }
 
   async addSessionSet(set: Omit<SessionSet, 'id'>): Promise<number> {
-    return Number(await this.db.add('session_sets', set));
+    const id = Number(await this.db.add('session_sets', set));
+    const session = await this.db.get('sessions', set.session_id);
+    if (session?.uid) this.noteChange(sessionAddress(session.uid), set.completed_at || undefined);
+    return id;
   }
 
   async listSessions(): Promise<Session[]> {
@@ -279,10 +306,12 @@ export class WorkstrStore {
     const existing = await tx.store.index('date').get(date);
     await tx.store.put({ ...existing, date, weight_kg: entry.weight_kg, notes: entry.notes || '' });
     await tx.done;
+    this.noteChange(BODYWEIGHT_ADDRESS);
   }
 
   async deleteBody(id: number): Promise<void> {
     await this.db.delete('bodyweight', id);
+    this.noteChange(BODYWEIGHT_ADDRESS);
   }
 
   async getSettings(): Promise<WorkstrSettings> {
@@ -296,5 +325,31 @@ export class WorkstrStore {
 
   async saveSettings(settings: WorkstrSettings): Promise<void> {
     await this.db.put('settings', { ...settings, unit: normalizeWeightUnit(settings.unit) }, 'settings');
+    this.noteChange(SETTINGS_ADDRESS);
+  }
+
+  // Idempotent by address: an address queued twice before it uploads is still one upload,
+  // and the newer timestamp wins so a stale entry cannot pin an old version.
+  async enqueueSync(address: string, updatedAt: string): Promise<void> {
+    const existing = await this.db.get('sync_queue', address);
+    if (existing && existing.updated_at >= updatedAt) return;
+    await this.db.put('sync_queue', { address, updated_at: updatedAt });
+  }
+
+  async listSyncQueue(): Promise<{ address: string; updated_at: string }[]> {
+    return (await this.db.getAll('sync_queue')).sort((a, b) => a.address.localeCompare(b.address));
+  }
+
+  // Only called after the relay acknowledges the publish, so a failed upload keeps its
+  // place in the queue instead of being silently dropped.
+  async dequeueSync(address: string, publishedUpdatedAt: string): Promise<void> {
+    const existing = await this.db.get('sync_queue', address);
+    // A change made while the upload was in flight must survive it.
+    if (existing && existing.updated_at > publishedUpdatedAt) return;
+    await this.db.delete('sync_queue', address);
+  }
+
+  async clearSyncQueue(): Promise<void> {
+    await this.db.clear('sync_queue');
   }
 }

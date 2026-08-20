@@ -18,7 +18,6 @@
   "testHintExclusions": [
     "src/app/pwa.ts",
     "src/app/version.ts",
-    "src/main.ts",
-    "src/sync/engine.ts"
+    "src/main.ts"
   ]
 }
