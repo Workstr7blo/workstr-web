@@ -112,13 +112,6 @@ export abstract class SyncAwareStore {
     await this.db.put('sync_seen', { address, event_id: eventId, created_at: createdAt });
   }
 
-  // Called when local data is replaced wholesale. The ledger describes what this database
-  // already contains, so leaving it in place after a wipe would suppress the restore that
-  // is supposed to refill it.
-  async clearSeen(): Promise<void> {
-    await this.db.clear('sync_seen');
-  }
-
   // Backup progress is device-local state, deliberately outside the synced settings
   // record. Writing it through `saveSettings` would queue the settings record on every
   // status update, and uploading that record updates the status again — a sync loop that

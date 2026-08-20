@@ -2,7 +2,7 @@ import { SimplePool } from 'nostr-tools';
 import type { WorkstrStore } from '../db/store';
 import type { Signer } from '../signer/types';
 import { loadSessionEntries, resolveMonthRecords, resolveRecord, type SessionEntry } from './backfill';
-import { parseAddress, parseSessionsId } from './addresses';
+import { parseAddress, parseSessionsId, sessionsAddress } from './addresses';
 import { publishRecord, type PublishOutcome } from './relay';
 import type { PrivateRecord } from '../nostr/codecs30078';
 
@@ -26,19 +26,39 @@ export interface PushOptions {
 // What one queue entry actually publishes as, and the timestamp that covers it. A month
 // resolves to its parts; everything else is a single record. `updatedAt` is what the
 // dequeue is checked against, so it has to describe the whole entry, not one part of it.
+// Part addresses already on the relay for this month that the month no longer fills. A
+// month shrinks when sessions are deleted from it, and a part it has stopped writing would
+// otherwise sit on the relay forever holding sessions that no longer exist.
+function orphanedParts(published: Iterable<string>, month: string, keep: number): string[] {
+  const orphans: string[] = [];
+  for (const address of published) {
+    const parsed = parseAddress(address);
+    if (parsed?.kind !== 'sessions') continue;
+    const part = parseSessionsId(String(parsed.id));
+    if (part.month === month && part.part > keep) orphans.push(address);
+  }
+  return orphans.sort();
+}
+
 async function recordsFor(
   store: WorkstrStore,
   entry: { address: string; updated_at: string },
-  sessions: SessionEntry[]
+  sessions: SessionEntry[],
+  published: Iterable<string>
 ): Promise<{ records: PrivateRecord[]; updatedAt: string }> {
   const parsed = parseAddress(entry.address);
   if (parsed?.kind === 'sessions') {
-    const parts = await resolveMonthRecords(store, parseSessionsId(String(parsed.id)).month, sessions);
-    if (parts.length > 0) {
-      const updatedAt = parts.reduce((latest, part) => (part.updatedAt > latest ? part.updatedAt : latest), parts[0].updatedAt);
-      return { records: parts.map((part) => ({ address: part.address, updatedAt: part.updatedAt, payload: part.payload })), updatedAt };
-    }
-    return { records: [{ address: entry.address, updatedAt: entry.updated_at, deleted: true }], updatedAt: entry.updated_at };
+    const { month } = parseSessionsId(String(parsed.id));
+    const parts = await resolveMonthRecords(store, month, sessions);
+    const updatedAt = parts.length > 0
+      ? parts.reduce((latest, part) => (part.updatedAt > latest ? part.updatedAt : latest), parts[0].updatedAt)
+      : entry.updated_at;
+    const records: PrivateRecord[] = parts.map((part) => ({ address: part.address, updatedAt: part.updatedAt, payload: part.payload }));
+    // An emptied month tombstones its first part too, since nothing is left to overwrite it.
+    const retired = new Set(orphanedParts(published, month, parts.length));
+    if (parts.length === 0) retired.add(sessionsAddress(month));
+    for (const address of retired) records.push({ address, updatedAt, deleted: true });
+    return { records, updatedAt };
   }
   const snapshot = await resolveRecord(store, entry.address, sessions);
   // Gone locally means deleted: publish a tombstone rather than dropping the entry,
@@ -61,10 +81,13 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
   // and `dequeueSync` refuses to clear an entry newer than what was actually published,
   // so a snapshot taken here can never swallow a change made during the upload.
   const sessions = await loadSessionEntries(store);
+  // Every address this device has written or read. A month checks it to find the parts
+  // it published when it was bigger than it is now.
+  const published = new Set((await store.listSeen()).map((seen) => seen.address));
 
   try {
     for (const [index, entry] of batch.entries()) {
-      const { records, updatedAt } = await recordsFor(store, entry, sessions);
+      const { records, updatedAt } = await recordsFor(store, entry, sessions, published);
       let complete = true;
       let signerIsGone = false;
 
