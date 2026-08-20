@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The page jumped back to the top constantly.** Expanding a workout in history, or a
+  backup progress line ticking over while it worked, threw you back to the top of whatever
+  you were reading — on every device. The app redraws the whole page on any change, which
+  loses your place; it now keeps it. Moving to another view still starts at the top, which
+  is where a new page should start.
+
 - **Signing in on a second device restored your training but did not show it.** The
   restore wrote everything to the device correctly, while the screen kept showing what it
   had read before the restore ran — so a laptop that had just pulled a whole history looked
