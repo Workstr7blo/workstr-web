@@ -1,42 +1,53 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { preservingScroll } from '../src/app/scroll';
 
-// jsdom does not scroll, so the position is set directly and the call is observed.
-function atScroll(y: number): void {
-  Object.defineProperty(window, 'scrollY', { value: y, configurable: true, writable: true });
+// The real shape: a shell root whose entire contents, `.content` included, are replaced.
+function shell(scrollTop = 0): HTMLElement {
+  document.body.innerHTML = '<div id="app"><main class="content">old</main></div>';
+  const root = document.getElementById('app') as HTMLElement;
+  (root.querySelector('.content') as HTMLElement).scrollTop = scrollTop;
+  return root;
 }
 
-afterEach(() => { vi.restoreAllMocks(); atScroll(0); });
+const redraw = (root: HTMLElement) => (): void => { root.innerHTML = '<main class="content">new</main>'; };
+const scrollTop = (root: HTMLElement): number => (root.querySelector('.content') as HTMLElement).scrollTop;
 
 describe('redrawing without losing the reader\'s place', () => {
-  it('puts the page back where it was', () => {
-    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
-    atScroll(820);
-    // What replacing the document does: the height collapses and the browser clamps.
-    preservingScroll(() => atScroll(0));
-    expect(scrollTo).toHaveBeenCalledWith(0, 820);
+  it('puts the pane back where it was', () => {
+    const root = shell(820);
+    preservingScroll(root, redraw(root));
+    expect(scrollTop(root)).toBe(820);
+    expect(root.querySelector('.content')?.textContent).toBe('new');
+  });
+
+  // The position lives on `.content`, not the window: a fixed pane with its own overflow
+  // leaves `window.scrollY` at 0 forever, so restoring the window restored nothing.
+  it('reads the pane rather than the window', () => {
+    const root = shell(500);
+    expect(window.scrollY).toBe(0);
+    preservingScroll(root, redraw(root));
+    expect(scrollTop(root)).toBe(500);
   });
 
   it('goes to the top when the redraw is a different view', () => {
-    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
-    atScroll(820);
-    preservingScroll(() => {}, true);
-    expect(scrollTo).toHaveBeenCalledWith(0, 0);
-  });
-
-  // An unnecessary scrollTo interrupts momentum scrolling on iOS, so a redraw that did
-  // not move the page must not touch it.
-  it('leaves the page alone when the redraw did not move it', () => {
-    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
-    atScroll(400);
-    preservingScroll(() => {});
-    expect(scrollTo).not.toHaveBeenCalled();
+    const root = shell(820);
+    preservingScroll(root, redraw(root), true);
+    expect(scrollTop(root)).toBe(0);
   });
 
   it('reads the position before the redraw, not after', () => {
-    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
-    atScroll(500);
-    preservingScroll(() => atScroll(12));
-    expect(scrollTo).toHaveBeenCalledWith(0, 500);
+    const root = shell(640);
+    preservingScroll(root, () => {
+      // The old pane is gone by the time the new one exists, and a position read here
+      // would be the replacement's zero.
+      root.innerHTML = '<main class="content">new</main>';
+    });
+    expect(scrollTop(root)).toBe(640);
+  });
+
+  it('survives a rebuild that renders the pane deeper in the tree', () => {
+    const root = shell(300);
+    preservingScroll(root, () => { root.innerHTML = '<div class="app"><main class="content">new</main></div>'; });
+    expect(scrollTop(root)).toBe(300);
   });
 });

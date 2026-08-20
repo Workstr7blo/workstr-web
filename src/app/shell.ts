@@ -144,7 +144,7 @@ export function renderShell(root: HTMLElement): void {
 
   // `toTop`: moving to another view is a new page to the reader, not a redraw.
   function render(options: { toTop?: boolean } = {}): void {
-    preservingScroll(() => {
+    preservingScroll(root, () => {
       root.innerHTML = shellMarkup(state);
       bind();
       if (state.activeSession) void sessionRunner.openSessionOverlay(state.activeSession);
