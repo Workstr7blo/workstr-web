@@ -1,6 +1,6 @@
 import type { BodyWeightEntry, Session, SessionSet, WorkstrSettings } from '../core/types';
 import type { SheetWithExercises } from '../db/store';
-import { BODYWEIGHT_ADDRESS, MANIFEST_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from './addresses';
+import { BODYWEIGHT_ADDRESS, MANIFEST_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from './addresses';
 
 export interface RecordSnapshot<T = unknown> {
   address: string;
@@ -70,6 +70,84 @@ export function sessionRecord(session: Session, sets: SessionSet[]): RecordSnaps
       sets: sets.map((set) => withoutLocalKeys(set as unknown as Record<string, unknown>, 'session_id', 'exercise_id'))
     }
   };
+}
+
+// One session inside a month bundle. It keeps its own `updatedAt` so a merge stays
+// per session: two devices that both trained in the same month rewrite the same bundle
+// address, and whole-record last-write-wins would let the later upload erase the other
+// device's sessions.
+export interface BundledSession {
+  uid: string;
+  updatedAt: string;
+  deleted?: boolean;
+  payload?: unknown;
+}
+
+export interface SessionsBundlePayload {
+  month: string;
+  // Absent on a month that fits in one record, which is almost all of them.
+  part?: number;
+  items: BundledSession[];
+}
+
+// How much session JSON goes into one record before it is split. strfry's stock
+// `maxEventSize` is 64 KB and NIP-44 base64 inflates the plaintext by roughly a third, so
+// a budget much above this produces records the relay refuses — a heavy month of training
+// is well over 100 KB on its own. The cost of a split is one more signer round trip; the
+// cost of guessing high is a backup that cannot upload at all.
+export const MAX_BUNDLE_BYTES = 40000;
+
+function bundledSessions(entries: { session: Session; sets: SessionSet[] }[]): BundledSession[] {
+  return entries
+    .filter((entry) => Boolean(entry.session.uid))
+    .map((entry) => ({
+      uid: String(entry.session.uid),
+      updatedAt: sessionUpdatedAt(entry.session, entry.sets),
+      payload: sessionRecord(entry.session, entry.sets).payload
+    }))
+    // Chronological, so a session logged today extends the last part and every part
+    // before it stays byte-identical to what the relay already holds.
+    .sort((a, b) => String((a.payload as { started_at?: string }).started_at).localeCompare(String((b.payload as { started_at?: string }).started_at)) || a.uid.localeCompare(b.uid));
+}
+
+function newest(items: BundledSession[]): string {
+  return items.reduce((latest, item) => (item.updatedAt > latest ? item.updatedAt : latest), items[0]?.updatedAt || new Date().toISOString());
+}
+
+// The month's sessions as one record. This is what makes a first sync finish: a signer
+// round trip is the unit of cost, and bundling turns two per session into two per month.
+// This is the month's logical record — what the queue names and the manifest lists.
+// `sessionsBundleRecords` is what actually goes on the wire.
+export function sessionsBundleRecord(month: string, entries: { session: Session; sets: SessionSet[] }[]): RecordSnapshot<SessionsBundlePayload> {
+  const items = bundledSessions(entries);
+  return { address: sessionsAddress(month), updatedAt: newest(items), payload: { month, items } };
+}
+
+// The month split into records that each fit in one event. One part for almost every
+// month; a very heavy one becomes two or three, which is still nothing beside the one
+// event per session this replaced.
+export function sessionsBundleRecords(month: string, entries: { session: Session; sets: SessionSet[] }[]): RecordSnapshot<SessionsBundlePayload>[] {
+  const parts: BundledSession[][] = [[]];
+  let bytes = 0;
+  for (const item of bundledSessions(entries)) {
+    const size = JSON.stringify(item).length;
+    const current = parts[parts.length - 1];
+    // A single session larger than the whole budget still gets its own part rather than
+    // being dropped: one oversized record is a visible relay rejection, silence is not.
+    if (current.length > 0 && bytes + size > MAX_BUNDLE_BYTES) {
+      parts.push([]);
+      bytes = 0;
+    }
+    parts[parts.length - 1].push(item);
+    bytes += size;
+  }
+  return parts
+    .filter((items) => items.length > 0)
+    .map((items, index) => ({
+      address: sessionsAddress(month, index + 1),
+      updatedAt: newest(items),
+      payload: { month, part: index + 1, items }
+    }));
 }
 
 // Body weight and settings are one record each rather than one per row: they are small,

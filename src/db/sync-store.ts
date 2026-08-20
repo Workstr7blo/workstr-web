@@ -2,6 +2,12 @@ import type { IDBPDatabase } from 'idb';
 import type { WorkstrDB } from './schema';
 import type { BackupSettings, BodyWeightEntry, Session, SessionSet, Sheet, WorkstrSettings } from '../core/types';
 
+export interface SeenRecord {
+  address: string;
+  event_id: string;
+  created_at: number;
+}
+
 // The half of the store that backup cares about: what changed, what is queued to upload,
 // and how a record arriving from the relay is written back. Split from `store.ts` because
 // the CRUD surface and the sync surface grow independently, and one file carrying both
@@ -88,6 +94,29 @@ export abstract class SyncAwareStore {
 
   async clearSyncQueue(): Promise<void> {
     await this.db.clear('sync_queue');
+  }
+
+  // The ledger of relay events this device has already read or written. Its whole purpose
+  // is to make a pull cheap: an event whose id is already recorded against its address
+  // needs no decrypt, and a decrypt is a round trip to the signer app.
+  async listSeen(): Promise<SeenRecord[]> {
+    return this.db.getAll('sync_seen');
+  }
+
+  async noteSeen(address: string, eventId: string, createdAt: number): Promise<void> {
+    if (!eventId || !Number.isFinite(createdAt)) return;
+    const existing = await this.db.get('sync_seen', address);
+    // An older event for the same address is a replay, not news: the relay keeps only the
+    // newest, and recording it would drag the pull cursor backwards.
+    if (existing && existing.created_at > createdAt) return;
+    await this.db.put('sync_seen', { address, event_id: eventId, created_at: createdAt });
+  }
+
+  // Called when local data is replaced wholesale. The ledger describes what this database
+  // already contains, so leaving it in place after a wipe would suppress the restore that
+  // is supposed to refill it.
+  async clearSeen(): Promise<void> {
+    await this.db.clear('sync_seen');
   }
 
   // Backup progress is device-local state, deliberately outside the synced settings

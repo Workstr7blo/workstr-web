@@ -63,11 +63,11 @@ or set updates would make full-root rendering inappropriate.
 | Encrypted backup: record shapes and addresses | `src/sync/records.ts`, `src/sync/addresses.ts` | `src/nostr/codecs30078.ts`, `docs/plans/v2-encrypted-backup-alpha.md` | `tests/codecs30078.test.ts`, `tests/sync-backfill.test.ts` |
 | Encrypted backup: queue and first-run backfill | `src/sync/backfill.ts` | `src/db/store.ts` (change listener, `sync_queue`) | `tests/sync-backfill.test.ts` |
 | Encrypted backup: relay transport and upload | `src/sync/relay.ts`, `src/sync/push.ts` | `src/nostr/codecs30078.ts`, `relay/write-policy.mjs` | `tests/sync-push.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in, needs `WORKSTR_TEST_RELAY`) |
-| Encrypted backup: pull, decrypt and merge | `src/sync/merge.ts` | `src/sync/relay.ts`, `src/db/store.ts` (`applyRemote`) | `tests/sync-merge.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in) |
+| Encrypted backup: pull, decrypt and merge | `src/sync/merge.ts` | `src/sync/relay.ts`, `src/db/store.ts` (`applyRemote`, `sync_seen`) | `tests/sync-merge.test.ts`, `tests/sync-pull.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in) |
 | Encrypted backup: sync orchestration | `src/sync/engine.ts` | `src/sync/backfill.ts`, `src/sync/push.ts`, `src/sync/merge.ts` | `tests/sync-engine.test.ts` |
 | Signer call timeouts | `src/signer/timeout.ts` | `src/signer/types.ts`, `src/sync/engine.ts` | `tests/signer-timeout.test.ts` |
 | Encrypted backup: the Auto-backup toggle | `src/features/backup/views.ts`, `src/app/backup-controller.ts` | `src/sync/engine.ts`, `src/app/layout.ts` | `tests/backup-views.test.ts`, `tests/sync-engine.test.ts` |
-| Sync-facing half of the store | `src/db/sync-store.ts` | `src/db/store.ts` (extends it) | `tests/sync-backfill.test.ts`, `tests/sync-merge.test.ts` |
+| Sync-facing half of the store | `src/db/sync-store.ts` | `src/db/store.ts` (extends it) | `tests/sync-backfill.test.ts`, `tests/sync-merge.test.ts`, `tests/sync-pull.test.ts` |
 
 ## Important module groups
 
@@ -112,7 +112,7 @@ not open IndexedDB directly. Keep frequent DOM updates inside the controllers/vi
 
 ### Persistence model
 
-`src/db/schema.ts` currently creates these version-1 object stores:
+`src/db/schema.ts` currently creates these object stores:
 
 - `exercises`
 - `sheets` and `sheet_exercises`
@@ -120,6 +120,8 @@ not open IndexedDB directly. Keep frequent DOM updates inside the controllers/vi
 - `bodyweight`
 - `settings`
 - `sync_queue`
+- `sync_seen` (v4: which relay events this device has already read, so a pull decrypts
+  only what is new)
 - `blobs`
 - `plan` (unused and scheduled for removal)
 

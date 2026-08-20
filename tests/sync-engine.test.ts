@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
-import { createSyncEngine, RETRY_BASE_MS, type SyncStatus } from '../src/sync/engine';
-import { sheetAddress } from '../src/sync/addresses';
+import { createSyncEngine, RECORD_FORMAT, RETRY_BASE_MS, type SyncStatus } from '../src/sync/engine';
+import { sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 import { withSignerTimeout } from '../src/signer/timeout';
 import type { PrivateRecord } from '../src/nostr/codecs30078';
@@ -12,7 +12,10 @@ const SELF = 'ab'.repeat(32);
 // backfill, push, codec and merge code. Only the socket is fake.
 const relay = vi.hoisted(() => ({
   events: new Map<string, { event: unknown }>(),
-  failure: null as null | 'policy' | 'network'
+  failure: null as null | 'policy' | 'network',
+  // Real event ids are content hashes, so republishing an address produces a different
+  // one. The seen ledger keys on that, so a double that reused ids would never be tested.
+  seq: 0
 }));
 
 vi.mock('../src/sync/relay', async () => {
@@ -25,9 +28,10 @@ vi.mock('../src/sync/relay', async () => {
       if (relay.failure) return { address: record.address, accepted: false, failure: relay.failure, reason: `${relay.failure} failure` };
       try {
         const unsigned = await encodePrivateRecord(signer, record);
+        const id = `id-${record.address}-${relay.seq += 1}`;
         // Addressable: republishing an address replaces it, exactly like a real relay.
-        relay.events.set(record.address, { event: { ...unsigned, id: `id-${record.address}`, pubkey: SELF, sig: 'sig' } });
-        return { address: record.address, accepted: true, reason: 'ok' };
+        relay.events.set(record.address, { event: { ...unsigned, id, pubkey: SELF, sig: 'sig' } });
+        return { address: record.address, accepted: true, reason: 'ok', eventId: id, createdAt: unsigned.created_at };
       } catch (error) {
         // Mirrors the real publishRecord: encoding and signing happen before anything is
         // sent, so a throw here is the signer. A double that lets it escape instead hides
@@ -95,6 +99,7 @@ async function populate(store: WorkstrStore): Promise<void> {
 beforeEach(() => {
   relay.events.clear();
   relay.failure = null;
+  relay.seq = 0;
 });
 
 describe('turning backup on', () => {
@@ -130,13 +135,92 @@ describe('turning backup on', () => {
     const store = await freshStore();
     await populate(store);
     // A previous run got three records in before it was cut off.
-    await store.saveBackupState({ backfillCursor: 3, backfillTotal: 5 });
+    await store.saveBackupState({ recordFormat: RECORD_FORMAT, backfillCursor: 3, backfillTotal: 5 });
     const { engine } = await harness(store);
 
     await engine.start();
 
     // Only the tail was enqueued; the first three are not re-sent.
     expect(relay.events.size).toBe(2);
+  });
+});
+
+describe('opening the app again', () => {
+  it('does not ask the signer to decrypt a backup it has already read', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const signer = fakeSigner();
+    const decrypt = vi.spyOn(signer, 'nip44Decrypt');
+
+    const first = await harness(store, signer);
+    await first.engine.start();
+    first.engine.stop();
+    expect(relay.events.size).toBeGreaterThan(0);
+
+    // A fresh engine, exactly as a reopened PWA builds one. Everything on the relay is
+    // this device's own upload, and the seen ledger recognises all of it.
+    decrypt.mockClear();
+    const second = await harness(store, signer);
+    const status = await second.engine.start();
+
+    expect(status.state).toBe('idle');
+    expect(decrypt).not.toHaveBeenCalled();
+  });
+
+  it('reads only what changed elsewhere', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const signer = fakeSigner();
+    const decrypt = vi.spyOn(signer, 'nip44Decrypt');
+    const first = await harness(store, signer);
+    await first.engine.start();
+    first.engine.stop();
+
+    // One record rewritten by another device, at an address this one already knows.
+    const settings = relay.events.get('workstr:v1:settings')!;
+    relay.events.set('workstr:v1:settings', { event: { ...(settings.event as Record<string, unknown>), id: 'from-another-device' } });
+
+    decrypt.mockClear();
+    const second = await harness(store, signer);
+    await second.engine.start();
+
+    expect(decrypt).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a device that last synced before bundling', () => {
+  it('re-sends its history as month bundles and drops the per-session queue', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const uid = (await store.listSessions())[0].uid as string;
+    // The pre-bundle client left an entry per session in the queue and recorded no
+    // record format, which is what marks the device as needing the migration.
+    await store.saveBackupState({ enabled: true, backfillCursor: 4, backfillTotal: 4 });
+    await store.enqueueSync(sessionAddress(uid), '2026-08-01T11:00:00.000Z');
+
+    const { engine } = await harness(store);
+    await engine.start();
+
+    expect([...relay.events.keys()]).toContain(sessionsAddress('2026-08'));
+    // The per-session address is not uploaded again: the month it belongs to carries it.
+    expect([...relay.events.keys()]).not.toContain(sessionAddress(uid));
+    expect(await store.listSyncQueue()).toHaveLength(0);
+    expect((await store.getSettings()).backup?.recordFormat).toBe(RECORD_FORMAT);
+  });
+
+  it('keeps a queued deletion, which no bundle can express', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const [session] = await store.listSessions();
+    await store.saveBackupState({ enabled: true, backfillCursor: 4, backfillTotal: 4 });
+    await store.enqueueSync(sessionAddress(session.uid as string), '2026-08-02T11:00:00.000Z');
+    // Deleted locally, so the queued address is a tombstone rather than a stale upload.
+    await store.deleteSession(session.id as number);
+
+    const { engine } = await harness(store);
+    await engine.start();
+
+    expect([...relay.events.keys()]).toContain(sessionAddress(session.uid as string));
   });
 });
 
