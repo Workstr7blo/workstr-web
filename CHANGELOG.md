@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A deleted workout could come back on a restore.** A training month heavy enough to be
+  split across several relay records left the extra record behind when it later shrank,
+  and a workout deleted from that month was still listed in it — so setting up a new
+  device could bring the workout back. The leftover record is now cleared when the month
+  no longer needs it, and a deletion always outranks an older record that still mentions
+  the workout, whichever order they arrive in.
+
 - **Opening the app no longer restores your whole history every time.** Backup re-read and
   re-decrypted every record on the relay at every start, which meant one signer round trip
   per session just to conclude nothing had changed. It now remembers which records it has

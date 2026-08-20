@@ -145,6 +145,60 @@ describe('push queue', () => {
     spy.mockRestore();
   }, 30000);
 
+  // A month that outgrew one event and later shrank back leaves its extra part on the
+  // relay. Nothing overwrites it, so it has to be tombstoned or a restore reads sessions
+  // out of it that this device has deleted.
+  it('tombstones a part the month no longer fills', async () => {
+    const store = await freshStore();
+    await store.createSession({ started_at: '2026-08-05T10:00:00.000Z', sheet_name: 'Push Day' });
+    // What a bigger version of this month published last time.
+    await store.noteSeen(sessionsAddress('2026-08'), 'id-1', 1);
+    await store.noteSeen(sessionsAddress('2026-08', 2), 'id-2', 1);
+    await store.noteSeen(sessionsAddress('2026-07', 2), 'id-3', 1);
+    await store.enqueueSync(sessionsAddress('2026-08'), '2026-08-05T10:05:00.000Z');
+
+    const relay = await import('../src/sync/relay');
+    const published: { address: string; deleted?: boolean }[] = [];
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+      published.push({ address: record.address, deleted: record.deleted });
+      return { address: record.address, accepted: true, reason: 'ok', eventId: 'id', createdAt: 2 };
+    });
+
+    const summary = await pushQueue(store, fakeSigner(), 'ws://relay.test');
+
+    expect(summary.uploaded).toBe(1);
+    // July's spare part is none of August's business: only the month being published is
+    // ever tombstoned, so a queue entry cannot reach into a month it does not name.
+    expect(published).toEqual([
+      { address: sessionsAddress('2026-08'), deleted: undefined },
+      { address: sessionsAddress('2026-08', 2), deleted: true }
+    ]);
+    spy.mockRestore();
+  });
+
+  it('tombstones every part of a month whose sessions are all gone', async () => {
+    const store = await freshStore();
+    await store.noteSeen(sessionsAddress('2026-08'), 'id-1', 1);
+    await store.noteSeen(sessionsAddress('2026-08', 2), 'id-2', 1);
+    await store.enqueueSync(sessionsAddress('2026-08'), '2026-08-09T10:00:00.000Z');
+
+    const relay = await import('../src/sync/relay');
+    const published: { address: string; deleted?: boolean }[] = [];
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+      published.push({ address: record.address, deleted: record.deleted });
+      return { address: record.address, accepted: true, reason: 'ok', eventId: 'id', createdAt: 2 };
+    });
+
+    await pushQueue(store, fakeSigner(), 'ws://relay.test');
+
+    expect(published).toEqual([
+      { address: sessionsAddress('2026-08'), deleted: true },
+      { address: sessionsAddress('2026-08', 2), deleted: true }
+    ]);
+    expect(await store.listSyncQueue()).toHaveLength(0);
+    spy.mockRestore();
+  });
+
   it('bounds a pass so a long backfill cannot block the UI', async () => {
     const store = await freshStore();
     for (const slug of ['a', 'b', 'c', 'd']) await store.enqueueSync(sheetAddress(slug), '2026-08-20T10:00:00.000Z');

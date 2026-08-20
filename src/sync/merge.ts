@@ -151,7 +151,13 @@ async function applySession(store: WorkstrStore, record: DecodedPrivateRecord): 
 // both train in the same month write the same address, so taking the newer event entire
 // would delete whatever the other device logged that month. Each session carries its own
 // timestamp precisely so this comparison can be made per session.
-async function applySessionsBundle(store: WorkstrStore, record: DecodedPrivateRecord, pending: Map<string, string>, summary: MergeSummary): Promise<void> {
+async function applySessionsBundle(
+  store: WorkstrStore,
+  record: DecodedPrivateRecord,
+  pending: Map<string, string>,
+  tombstoned: Map<string, string>,
+  summary: MergeSummary
+): Promise<void> {
   const payload = record.payload as SessionsBundlePayload | undefined;
   if (!payload?.items?.length) return;
   // Read once per bundle. Every uid in a bundle is distinct, so no item can be invalidated
@@ -160,6 +166,11 @@ async function applySessionsBundle(store: WorkstrStore, record: DecodedPrivateRe
   const held = new Map((await store.listSessions()).filter((session) => session.uid).map((session) => [String(session.uid), session]));
   for (const item of payload.items) {
     if (!item?.uid || typeof item.updatedAt !== 'string') { summary.skipped += 1; continue; }
+    // Deleted through its own address after this part was written. A part the relay kept
+    // when its month shrank below the split threshold still lists sessions that are gone,
+    // and without this the resurrection would come down to which record merged first.
+    const buried = tombstoned.get(item.uid);
+    if (buried && buried >= item.updatedAt) { summary.skipped += 1; continue; }
     const existing = held.get(item.uid);
     if (!existing || existing.id == null) {
       // Queued against the session's own address with nothing behind it locally: this
@@ -213,11 +224,26 @@ async function applyTombstone(store: WorkstrStore, record: DecodedPrivateRecord)
   return false;
 }
 
+// Which sessions this pull carries a deletion for, and when it was made. A tombstone and a
+// stale bundle part can name the same session, so the answer has to be known before either
+// is applied rather than decided by the order the relay happened to return them in.
+function tombstonedSessions(records: DecodedPrivateRecord[]): Map<string, string> {
+  const tombstoned = new Map<string, string>();
+  for (const record of records) {
+    if (!record.deleted || record.parsed.kind !== 'session' || !record.parsed.id) continue;
+    const uid = String(record.parsed.id);
+    const known = tombstoned.get(uid);
+    if (!known || record.updatedAt > known) tombstoned.set(uid, record.updatedAt);
+  }
+  return tombstoned;
+}
+
 export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateRecord[], unreadable = 0): Promise<MergeSummary> {
   const summary: MergeSummary = { applied: 0, skipped: 0, deleted: 0, unreadable };
   // Read once rather than per record: a full-history restore is exactly the case this
   // function exists for, and re-reading the queue inside the loop makes it quadratic.
   const pending = new Map((await store.listSyncQueue()).map((entry) => [entry.address, entry.updated_at]));
+  const tombstoned = tombstonedSessions(records);
   for (const record of records) {
     // The manifest is an index for deciding what to fetch, not a record to merge into the
     // database — applying it would mean writing a list of addresses over real data. It is
@@ -236,7 +262,7 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
       if (record.deleted) {
         if (await applyTombstone(store, record)) summary.deleted += 1; else summary.skipped += 1;
       } else if (record.parsed.kind === 'sessions') {
-        await applySessionsBundle(store, record, pending, summary);
+        await applySessionsBundle(store, record, pending, tombstoned, summary);
       } else if (record.parsed.kind === 'sheet') {
         await applySheet(store, record);
         summary.applied += 1;

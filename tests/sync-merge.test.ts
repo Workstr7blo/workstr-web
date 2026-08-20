@@ -61,9 +61,9 @@ describe('merging records into an empty database', () => {
   });
 });
 
-function bundle(month: string, items: { uid: string; updatedAt: string; deleted?: boolean; payload?: unknown }[]) {
+function bundle(month: string, items: { uid: string; updatedAt: string; deleted?: boolean; payload?: unknown }[], part = 1) {
   const updatedAt = items.reduce((latest, item) => (item.updatedAt > latest ? item.updatedAt : latest), items[0]?.updatedAt || '');
-  return record(sessionsAddress(month), updatedAt, { month, items });
+  return record(sessionsAddress(month, part), updatedAt, part > 1 ? { month, part, items } : { month, items });
 }
 
 function session(startedAt: string, completedAt: string) {
@@ -127,6 +127,35 @@ describe('month bundles', () => {
 
     expect(summary.skipped).toBe(1);
     expect(await store.getSessionByUid(uid)).toBeUndefined();
+  });
+
+  // A month that once needed a second part keeps that part on the relay after it shrinks
+  // back to one, and the stale part still lists sessions that have since been deleted.
+  it('does not resurrect a deleted session listed in a part the relay kept', async () => {
+    for (const reversed of [false, true]) {
+      const store = await freshStore();
+      const stale = bundle('2026-08', [
+        { uid: 'uid-gone', updatedAt: '2026-08-05T10:05:00.000Z', payload: session('2026-08-05T10:00:00.000Z', '2026-08-05T10:05:00.000Z') }
+      ], 2);
+      const tombstone = record(sessionAddress('uid-gone'), '2026-08-09T10:00:00.000Z', undefined, true);
+      // Whichever way round the relay returns them, the deletion has to win.
+      const summary = await mergeRecords(store, reversed ? [tombstone, stale] : [stale, tombstone]);
+
+      expect(await store.getSessionByUid('uid-gone')).toBeUndefined();
+      expect(summary.applied).toBe(0);
+    }
+  });
+
+  it('still restores a session whose bundle is newer than the tombstone', async () => {
+    const store = await freshStore();
+    await mergeRecords(store, [
+      record(sessionAddress('uid-1'), '2026-08-05T10:00:00.000Z', undefined, true),
+      bundle('2026-08', [
+        { uid: 'uid-1', updatedAt: '2026-08-09T10:05:00.000Z', payload: session('2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z') }
+      ])
+    ]);
+
+    expect(await store.getSessionByUid('uid-1')).toBeTruthy();
   });
 
   it('applies a deletion another device recorded inside the bundle', async () => {
