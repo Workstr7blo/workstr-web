@@ -182,6 +182,10 @@ export interface CanonCache {
 // describes this device's relationship to the relay, not a user preference to replicate.
 export interface BackupSettings {
   enabled: boolean;
+  // Which record layout this device has uploaded. 1 was one event per session; 2 bundles
+  // a training month into one. A device still on 1 re-runs the backfill once so its
+  // history is re-sent in the bundled shape, and then never again.
+  recordFormat?: number;
   // Index into the deterministic backfill list, so an interrupted first run resumes
   // instead of re-uploading everything it already sent.
   backfillCursor?: number;

@@ -4,7 +4,7 @@ import { exportDatabase, importDatabase, type WorkstrExport } from './export';
 import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, TrainingBlock, WorkstrSettings } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
-import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
+import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionMonth, sessionsAddress, sheetAddress } from '../sync/addresses';
 import { SyncAwareStore } from './sync-store';
 
 export type ExerciseDraft = Omit<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'> &
@@ -222,7 +222,9 @@ export class WorkstrStore extends SyncAwareStore {
     const session = await this.db.get('sessions', id);
     if (!session) return;
     await this.db.put('sessions', { ...session, finished_at: finishedAt });
-    if (session.uid) this.noteChange(sessionAddress(session.uid), finishedAt);
+    // The month bundle, not the session: sessions are uploaded a month at a time so one
+    // signer round trip covers every session trained in it.
+    if (session.uid) this.noteChange(sessionsAddress(sessionMonth(session.started_at, finishedAt)), finishedAt);
   }
 
   async startSessionEmom(id: number, startedAt: string, keepStartedAt = false): Promise<void> {
@@ -257,7 +259,13 @@ export class WorkstrStore extends SyncAwareStore {
 
   async deleteSession(id: number): Promise<void> {
     const doomed = await this.db.get('sessions', id);
-    if (doomed?.uid) this.noteChange(sessionAddress(doomed.uid));
+    if (doomed?.uid) {
+      // Two records: the month bundle loses the session, and the session's own address
+      // carries the tombstone. A bundle that has simply stopped mentioning a session
+      // cannot express a deletion — another device would read it as no news.
+      this.noteChange(sessionAddress(doomed.uid));
+      this.noteChange(sessionsAddress(sessionMonth(doomed.started_at, doomed.finished_at)));
+    }
     const tx = this.db.transaction(['sessions', 'session_sets'], 'readwrite');
     await tx.objectStore('sessions').delete(id);
     const index = tx.objectStore('session_sets').index('session_id');
@@ -268,7 +276,7 @@ export class WorkstrStore extends SyncAwareStore {
   async addSessionSet(set: Omit<SessionSet, 'id'>): Promise<number> {
     const id = Number(await this.db.add('session_sets', set));
     const session = await this.db.get('sessions', set.session_id);
-    if (session?.uid) this.noteChange(sessionAddress(session.uid), set.completed_at || undefined);
+    if (session?.uid) this.noteChange(sessionsAddress(sessionMonth(session.started_at, session.finished_at)), set.completed_at || undefined);
     return id;
   }
 

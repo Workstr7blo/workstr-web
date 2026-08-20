@@ -107,6 +107,11 @@ Server work (1–3) must land before any real device test. Client work (4–8) c
 - `workstr:v1:settings`
 - `workstr:v1:manifest`
 
+> Superseded after the alpha: sessions are written as `workstr:v1:sessions:<YYYY-MM>`, one
+> record per training month, with `-p2`, `-p3` … when a month outgrows one event. A signer
+> round trip per session made a first sync unusably slow. `workstr:v1:session:<uuid>` is
+> still read, and is still what a deletion tombstone uses. See `src/sync/records.ts`.
+
 **Acceptance criteria:**
 - Round-trip tests pass with a fake signer.
 - Every emitted `d` tag carries the `workstr:v1:` prefix the relay policy requires.

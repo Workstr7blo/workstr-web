@@ -1,6 +1,6 @@
 import type { WorkstrStore } from '../db/store';
 import type { Signer } from '../signer/types';
-import { runBackfill } from './backfill';
+import { retireLegacySessionQueue, runBackfill } from './backfill';
 import { pullAndMerge } from './merge';
 import { pushQueue } from './push';
 import { withSignerTimeout } from '../signer/timeout';
@@ -17,6 +17,10 @@ export const RETRY_BASE_MS = 30000;
 export const RETRY_MAX_MS = 900000;
 // Logging a set writes several records in a burst; one sync afterwards is enough.
 export const CHANGE_DEBOUNCE_MS = 4000;
+
+// The record layout this client writes. Bumping it makes every device re-run its backfill
+// once, in the new shape. See `BackupSettings.recordFormat`.
+export const RECORD_FORMAT = 2;
 
 export type SyncState = 'off' | 'idle' | 'syncing' | 'error';
 
@@ -107,10 +111,19 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       if (merged.unreadable > 0) report({ lastError: `${merged.unreadable} backup record(s) could not be read` });
     }
 
+    // A device that last synced in the per-session layout re-enqueues its history as month
+    // bundles. Its old events stay on the relay and stay readable; nothing is deleted to
+    // make this work, so an interrupted migration leaves a device that still restores.
+    const migrating = (backup?.recordFormat ?? 1) < RECORD_FORMAT;
+    if (migrating) {
+      await retireLegacySessionQueue(ctx.store);
+      await ctx.store.saveBackupState({ recordFormat: RECORD_FORMAT, backfillCursor: 0, backfillTotal: undefined });
+    }
+
     // Resumable: an interrupted first run continues from its cursor rather than
     // re-enqueueing history it already sent.
-    if (backup?.backfillTotal === undefined || (backup.backfillCursor ?? 0) < backup.backfillTotal) {
-      const progress = await runBackfill(ctx.store, backup?.backfillCursor ?? 0, async ({ cursor, total }) => {
+    if (migrating || backup?.backfillTotal === undefined || (backup.backfillCursor ?? 0) < backup.backfillTotal) {
+      const progress = await runBackfill(ctx.store, migrating ? 0 : backup?.backfillCursor ?? 0, async ({ cursor, total }) => {
         await ctx.store.saveBackupState({ backfillCursor: cursor, backfillTotal: total });
         report({ progress: { phase: 'prepare', done: cursor, total } });
       });

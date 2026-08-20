@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { collectRecords, resolveRecord, runBackfill } from '../src/sync/backfill';
-import { BODYWEIGHT_ADDRESS, MANIFEST_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
-import { sessionUpdatedAt, syncedSettings } from '../src/sync/records';
+import { BODYWEIGHT_ADDRESS, MANIFEST_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
+import { parseSessionsId } from '../src/sync/addresses';
+import { MAX_BUNDLE_BYTES, sessionsBundleRecords, sessionUpdatedAt, syncedSettings, type SessionsBundlePayload } from '../src/sync/records';
 
 let namespace = 0;
 async function freshStore(): Promise<WorkstrStore> {
@@ -29,7 +30,9 @@ describe('record collection', () => {
     expect(addresses).toContain(BODYWEIGHT_ADDRESS);
     expect(addresses).toContain(SETTINGS_ADDRESS);
     expect(addresses).toContain(MANIFEST_ADDRESS);
-    expect(addresses.some((address) => address.startsWith('workstr:v1:session:'))).toBe(true);
+    // Sessions travel as one record per training month, not one per session.
+    expect(addresses).toContain(sessionsAddress('2026-08'));
+    expect(addresses.some((address) => address.startsWith('workstr:v1:session:'))).toBe(false);
 
     // Autoincrement keys are meaningless on another device.
     const sheet = records.find((record) => record.address === sheetAddress('push-day'))!;
@@ -37,6 +40,31 @@ describe('record collection', () => {
     expect(payload.id).toBeUndefined();
     expect(payload.exercises[0].id).toBeUndefined();
     expect(payload.exercises[0].sheet_id).toBeUndefined();
+  });
+
+  it('bundles sessions by the month they were trained in', async () => {
+    const store = await freshStore();
+    const august = await store.createSession({ started_at: '2026-08-01T10:00:00.000Z' });
+    await store.addSessionSet({ session_id: august, exercise_slug: 'bench', set_number: 1, reps: 8, completed_at: '2026-08-01T10:05:00.000Z' });
+    const september = await store.createSession({ started_at: '2026-09-02T10:00:00.000Z' });
+    await store.addSessionSet({ session_id: september, exercise_slug: 'squat', set_number: 1, reps: 5, completed_at: '2026-09-02T10:05:00.000Z' });
+
+    const records = await collectRecords(store);
+    const addresses = records.map((record) => record.address);
+    expect(addresses).toContain(sessionsAddress('2026-08'));
+    expect(addresses).toContain(sessionsAddress('2026-09'));
+
+    const bundle = records.find((record) => record.address === sessionsAddress('2026-08'))!;
+    const payload = bundle.payload as SessionsBundlePayload;
+    expect(payload.items).toHaveLength(1);
+    expect(payload.items[0].uid).toBe((await store.getSession(august))!.uid);
+    // Each session keeps its own stamp, which is what makes a per-session merge possible.
+    expect(payload.items[0].updatedAt).toBe('2026-08-01T10:05:00.000Z');
+    expect(bundle.updatedAt).toBe('2026-08-01T10:05:00.000Z');
+    // Autoincrement keys are meaningless on another device, inside a bundle as well.
+    const session = payload.items[0].payload as { id?: number; sets: { id?: number; session_id?: number }[] };
+    expect(session.id).toBeUndefined();
+    expect(session.sets[0].session_id).toBeUndefined();
   });
 
   it('keeps device-local settings out of the synced record', async () => {
@@ -65,6 +93,55 @@ describe('record collection', () => {
       [{ session_id: 1, set_number: 1, reps: 5, completed_at: '2026-08-01T12:00:00.000Z' }]
     );
     expect(stamp).toBe('2026-08-01T12:00:00.000Z');
+  });
+});
+
+describe('a month too heavy for one event', () => {
+  // strfry refuses an event over its size limit, so a month has to be split before it is
+  // encrypted rather than discovered to be too big at the relay.
+  function month(days: number, setsPerDay: number) {
+    const entries = [];
+    for (let day = 1; day <= days; day += 1) {
+      const date = `2026-08-${String(day).padStart(2, '0')}`;
+      entries.push({
+        session: { id: day, uid: `uid-${day}`, started_at: `${date}T10:00:00.000Z`, sheet_name: 'Upper Body Hypertrophy Block A' },
+        sets: Array.from({ length: setsPerDay }, (_unused, n) => ({
+          session_id: day, exercise_slug: 'barbell-bench-press-medium-grip', set_number: n + 1,
+          reps: 8, weight_kg: 82.5, completed_at: `${date}T10:${String(n + 1).padStart(2, '0')}:00.000Z`
+        }))
+      });
+    }
+    return entries;
+  }
+
+  it('splits into parts that each fit, and leaves a light month whole', async () => {
+    const heavy = sessionsBundleRecords('2026-08', month(24, 24));
+    expect(heavy.length).toBeGreaterThan(1);
+    expect(heavy[0].address).toBe(sessionsAddress('2026-08'));
+    expect(heavy[1].address).toBe(sessionsAddress('2026-08', 2));
+    for (const part of heavy) expect(JSON.stringify(part.payload).length).toBeLessThan(MAX_BUNDLE_BYTES * 1.2);
+    // Nothing is lost in the split.
+    expect(heavy.flatMap((part) => (part.payload as SessionsBundlePayload).items)).toHaveLength(24);
+
+    const light = sessionsBundleRecords('2026-08', month(4, 6));
+    expect(light).toHaveLength(1);
+    expect(light[0].address).toBe(sessionsAddress('2026-08'));
+  });
+
+  // The point of packing chronologically: training today must not rewrite, and re-upload,
+  // every part of the month behind it.
+  it('leaves the earlier parts untouched when a session is added', async () => {
+    const before = sessionsBundleRecords('2026-08', month(24, 24));
+    const after = sessionsBundleRecords('2026-08', month(25, 24));
+    expect(after.length).toBeGreaterThanOrEqual(before.length);
+    for (let index = 0; index < before.length - 1; index += 1) {
+      expect(JSON.stringify(after[index])).toBe(JSON.stringify(before[index]));
+    }
+  });
+
+  it('reads a part address back as its month', () => {
+    expect(parseSessionsId('2026-08')).toEqual({ month: '2026-08', part: 1 });
+    expect(parseSessionsId('2026-08-p3')).toEqual({ month: '2026-08', part: 3 });
   });
 });
 
@@ -123,11 +200,13 @@ describe('change tracking', () => {
 
     const addresses = seen.map((entry) => entry.address);
     expect(addresses).toContain(sheetAddress('push-day'));
-    expect(addresses).toContain(sessionAddress(uid));
+    expect(addresses).toContain(sessionsAddress('2026-08'));
+    // Nothing addresses a session on its own any more; the month it belongs to does.
+    expect(addresses).not.toContain(sessionAddress(uid));
     expect(addresses).toContain(BODYWEIGHT_ADDRESS);
     expect(addresses).toContain(SETTINGS_ADDRESS);
-    // A logged set dates the session by when the set happened.
-    expect(seen.find((entry) => entry.address === sessionAddress(uid))?.updatedAt).toBe('2026-08-01T10:05:00.000Z');
+    // A logged set dates the month by when the set happened.
+    expect(seen.find((entry) => entry.address === sessionsAddress('2026-08'))?.updatedAt).toBe('2026-08-01T10:05:00.000Z');
   });
 
   it('reports deletions before the row is gone, so the address is still knowable', async () => {
@@ -137,7 +216,9 @@ describe('change tracking', () => {
     seen = [];
     await store.deleteSheet(sheetId);
     await store.deleteSession(sessionId);
-    expect(seen.map((entry) => entry.address)).toEqual([sheetAddress('push-day'), sessionAddress(uid)]);
+    // A deleted session needs both: the tombstone on its own address, because a bundle
+    // that stops mentioning a session reads as no news, and the rewritten month.
+    expect(seen.map((entry) => entry.address)).toEqual([sheetAddress('push-day'), sessionAddress(uid), sessionsAddress('2026-08')]);
   });
 
   it('resolves a deleted address to nothing, which is how a tombstone is decided', async () => {
@@ -207,7 +288,10 @@ describe('database upgrade to version 3', () => {
     // Distinct, or two sessions would collide on one relay address.
     expect(new Set(sessions.map((session) => session.uid)).size).toBe(2);
     // And they are addressable, which is the whole point of the upgrade.
-    const addresses = (await collectRecords(store)).map((record) => record.address);
-    for (const session of sessions) expect(addresses).toContain(sessionAddress(session.uid!));
+    const records = await collectRecords(store);
+    const bundled = records
+      .filter((record) => record.address.startsWith('workstr:v1:sessions:'))
+      .flatMap((record) => (record.payload as SessionsBundlePayload).items.map((item) => item.uid));
+    for (const session of sessions) expect(bundled).toContain(session.uid!);
   });
 });

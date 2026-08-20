@@ -1,10 +1,12 @@
 import type { BodyWeightEntry, Session, SessionSet, Sheet, SheetExercise, WorkstrSettings } from '../core/types';
 import type { WorkstrStore } from '../db/store';
-import type { Signer } from '../signer/types';
+import type { SeenRecord } from '../db/sync-store';
+import type { SignedNostrEvent, Signer } from '../signer/types';
 import { decodePrivateRecord, type DecodedPrivateRecord } from '../nostr/codecs30078';
 import { fetchRecords } from './relay';
 import { resolveRecord } from './backfill';
-import type { SyncedSettings } from './records';
+import { parseAddress, sessionAddress, sessionMonth, sessionsAddress } from './addresses';
+import { sessionUpdatedAt, type SessionsBundlePayload, type SyncedSettings } from './records';
 
 export interface MergeSummary {
   applied: number;
@@ -19,10 +21,46 @@ export interface PullOptions {
   onProgress?: (done: number, total: number) => void;
 }
 
+// How far behind the newest event this device has read the next pull still asks. A device
+// with a fast clock can stamp its own upload ahead of another device's, and a `since` cut
+// exactly at that stamp would step over the other device's work permanently. Re-fetching a
+// day is nearly free: those events are skipped by the ledger before any decrypt.
+export const PULL_OVERLAP_SEC = 86400;
+
+function dTag(event: SignedNostrEvent): string {
+  return ((event.tags || []).find((tag) => tag[0] === 'd') || [])[1] || '';
+}
+
 // Decrypts one event at a time. Under NIP-46 every decrypt is a round trip to a remote
 // signer, so this is deliberately not parallel and callers keep it off the critical path.
-export async function pullRecords(relayUrl: string, signer: Signer, options: PullOptions = {}): Promise<{ records: DecodedPrivateRecord[]; unreadable: number }> {
-  const events = await fetchRecords(relayUrl, await signer.getPublicKey());
+//
+// The seen ledger is what keeps a routine start cheap. The `d` tag and `created_at` of an
+// addressable event are cleartext, so an event this device has already read is recognised
+// and dropped without asking the signer anything. Without it, opening the app cost one
+// decrypt per record every single time, even when nothing had changed.
+export async function pullRecords(store: WorkstrStore, relayUrl: string, signer: Signer, options: PullOptions = {}): Promise<{ records: DecodedPrivateRecord[]; unreadable: number }> {
+  const seen = new Map((await store.listSeen()).map((entry) => [entry.address, entry]));
+  const newest = [...seen.values()].reduce((latest, entry) => Math.max(latest, entry.created_at), 0);
+  const since = newest > 0 ? Math.max(0, newest - PULL_OVERLAP_SEC) : undefined;
+
+  const fetched = await fetchRecords(relayUrl, await signer.getPublicKey(), undefined, true, since);
+  const unread = fetched.filter((event) => {
+    const known = seen.get(dTag(event));
+    return !known || known.event_id !== event.id;
+  });
+
+  // Per-session events written by an earlier version stay on the relay forever, so they
+  // are separated out and read last: by then this pull knows which of them a month bundle
+  // has already superseded, and a superseded one is retired without a decrypt.
+  const legacy = unread.filter((event) => parseAddress(dTag(event))?.kind === 'session');
+  const superseded = await supersededLegacy(store, seen, legacy);
+  const events = [...unread.filter((event) => !legacy.includes(event)), ...legacy.filter((event) => !superseded.has(event.id))];
+  for (const event of legacy.filter((candidate) => superseded.has(candidate.id))) {
+    // Retired rather than ignored: recorded as read, this event never comes back in a
+    // `since` window again, so the cost of an old per-session record is paid once.
+    await store.noteSeen(dTag(event), event.id, event.created_at);
+  }
+
   const records: DecodedPrivateRecord[] = [];
   let unreadable = 0;
   let consecutiveFailures = 0;
@@ -46,17 +84,37 @@ export async function pullRecords(relayUrl: string, signer: Signer, options: Pul
   return { records, unreadable };
 }
 
+// Which of the old per-session events this device no longer needs to read. One is
+// superseded when the session it names is held locally and the bundle for that session's
+// month was published after it: the bundle carries the same session, in newer form, and
+// re-decrypting the old event could only tell this device what it already knows.
+async function supersededLegacy(store: WorkstrStore, seen: Map<string, SeenRecord>, legacy: SignedNostrEvent[]): Promise<Set<string>> {
+  const retired = new Set<string>();
+  if (legacy.length === 0) return retired;
+  const byUid = new Map((await store.listSessions()).filter((session) => session.uid).map((session) => [String(session.uid), session]));
+  for (const event of legacy) {
+    const uid = parseAddress(dTag(event))?.id;
+    const session = uid ? byUid.get(uid) : undefined;
+    if (!session) continue;
+    const bundle = seen.get(sessionsAddress(sessionMonth(session.started_at, session.finished_at)));
+    if (bundle && bundle.created_at >= event.created_at) retired.add(event.id);
+  }
+  return retired;
+}
+
 // The local claim on an address: a pending queue entry is an edit this device has made
 // and not yet uploaded, so it outranks anything the relay can offer.
 async function localUpdatedAt(store: WorkstrStore, address: string, pending: Map<string, string>): Promise<string | null> {
   const queued = pending.get(address);
   if (queued) return queued;
-  const snapshot = await resolveRecord(store, address);
-  if (!snapshot) return null;
   // Singletons are rebuilt with a read timestamp, which says nothing about when they last
-  // changed. Only per-row records carry a timestamp worth comparing.
-  const parsed = address.split(':')[2];
-  return parsed === 'sheet' || parsed === 'session' ? snapshot.updatedAt : null;
+  // changed, and a month bundle is compared one session at a time rather than as a whole.
+  // Only per-row records carry a timestamp worth comparing — and asking for any of the
+  // others would rebuild the record just to throw the answer away.
+  const kind = parseAddress(address)?.kind;
+  if (kind !== 'sheet' && kind !== 'session') return null;
+  const snapshot = await resolveRecord(store, address);
+  return snapshot ? snapshot.updatedAt : null;
 }
 
 async function applySheet(store: WorkstrStore, record: DecodedPrivateRecord): Promise<void> {
@@ -79,10 +137,49 @@ async function applySheet(store: WorkstrStore, record: DecodedPrivateRecord): Pr
   }, existing?.id));
 }
 
-async function applySession(store: WorkstrStore, record: DecodedPrivateRecord): Promise<void> {
-  const payload = record.payload as Session & { sets?: SessionSet[] };
+async function applySessionPayload(store: WorkstrStore, uid: string, raw: unknown): Promise<void> {
+  const payload = raw as Session & { sets?: SessionSet[] };
   const { sets = [], ...session } = payload;
-  await store.applyRemote(() => store.putSessionWithSets({ ...session, uid: String(record.parsed.id) }, sets));
+  await store.applyRemote(() => store.putSessionWithSets({ ...session, uid }, sets));
+}
+
+async function applySession(store: WorkstrStore, record: DecodedPrivateRecord): Promise<void> {
+  await applySessionPayload(store, String(record.parsed.id), record.payload);
+}
+
+// A month bundle is merged one session at a time rather than as a whole. Two devices that
+// both train in the same month write the same address, so taking the newer event entire
+// would delete whatever the other device logged that month. Each session carries its own
+// timestamp precisely so this comparison can be made per session.
+async function applySessionsBundle(store: WorkstrStore, record: DecodedPrivateRecord, pending: Map<string, string>, summary: MergeSummary): Promise<void> {
+  const payload = record.payload as SessionsBundlePayload | undefined;
+  if (!payload?.items?.length) return;
+  // Read once per bundle. Every uid in a bundle is distinct, so no item can be invalidated
+  // by another item's write, and looking each one up against the whole session table was
+  // quadratic on exactly the full-history restore this exists to make fast.
+  const held = new Map((await store.listSessions()).filter((session) => session.uid).map((session) => [String(session.uid), session]));
+  for (const item of payload.items) {
+    if (!item?.uid || typeof item.updatedAt !== 'string') { summary.skipped += 1; continue; }
+    const existing = held.get(item.uid);
+    if (!existing || existing.id == null) {
+      // Queued against the session's own address with nothing behind it locally: this
+      // device has deleted the session and not yet uploaded the tombstone. Writing the
+      // session back would undo a deletion the user has already made.
+      if (item.deleted || pending.has(sessionAddress(item.uid))) { summary.skipped += 1; continue; }
+      await applySessionPayload(store, item.uid, item.payload);
+      summary.applied += 1;
+      continue;
+    }
+    const local = sessionUpdatedAt(existing, await store.listSessionSets(existing.id));
+    if (local >= item.updatedAt) { summary.skipped += 1; continue; }
+    if (item.deleted) {
+      await store.applyRemote(() => store.deleteSession(existing.id as number));
+      summary.deleted += 1;
+      continue;
+    }
+    await applySessionPayload(store, item.uid, item.payload);
+    summary.applied += 1;
+  }
 }
 
 async function applySingleton(store: WorkstrStore, record: DecodedPrivateRecord): Promise<void> {
@@ -121,20 +218,38 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
   // Read once rather than per record: a full-history restore is exactly the case this
   // function exists for, and re-reading the queue inside the loop makes it quadratic.
   const pending = new Map((await store.listSyncQueue()).map((entry) => [entry.address, entry.updated_at]));
-  // The manifest is an index for deciding what to fetch, not a record to merge into the
-  // database — applying it would mean writing a list of addresses over real data.
-  for (const record of records.filter((candidate) => candidate.parsed.kind !== 'manifest')) {
+  for (const record of records) {
+    // The manifest is an index for deciding what to fetch, not a record to merge into the
+    // database — applying it would mean writing a list of addresses over real data. It is
+    // still recorded as read, so the next pull does not decrypt it again to learn that.
+    if (record.parsed.kind === 'manifest') {
+      await store.noteSeen(record.address, record.eventId, record.createdAt);
+      continue;
+    }
     const local = await localUpdatedAt(store, record.address, pending);
-    if (local !== null && local >= record.updatedAt) { summary.skipped += 1; continue; }
+    if (local !== null && local >= record.updatedAt) {
+      summary.skipped += 1;
+      await store.noteSeen(record.address, record.eventId, record.createdAt);
+      continue;
+    }
     try {
       if (record.deleted) {
         if (await applyTombstone(store, record)) summary.deleted += 1; else summary.skipped += 1;
-        continue;
+      } else if (record.parsed.kind === 'sessions') {
+        await applySessionsBundle(store, record, pending, summary);
+      } else if (record.parsed.kind === 'sheet') {
+        await applySheet(store, record);
+        summary.applied += 1;
+      } else if (record.parsed.kind === 'session') {
+        await applySession(store, record);
+        summary.applied += 1;
+      } else {
+        await applySingleton(store, record);
+        summary.applied += 1;
       }
-      if (record.parsed.kind === 'sheet') await applySheet(store, record);
-      else if (record.parsed.kind === 'session') await applySession(store, record);
-      else await applySingleton(store, record);
-      summary.applied += 1;
+      // Only a record that landed is remembered. One that threw is left out of the ledger
+      // on purpose, so the next pull tries it again rather than writing it off forever.
+      await store.noteSeen(record.address, record.eventId, record.createdAt);
     } catch {
       // One damaged record must not abort the restore of everything after it.
       summary.unreadable += 1;
@@ -144,6 +259,6 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
 }
 
 export async function pullAndMerge(store: WorkstrStore, signer: Signer, relayUrl: string, options: PullOptions = {}): Promise<MergeSummary> {
-  const { records, unreadable } = await pullRecords(relayUrl, signer, options);
+  const { records, unreadable } = await pullRecords(store, relayUrl, signer, options);
   return mergeRecords(store, records, unreadable);
 }

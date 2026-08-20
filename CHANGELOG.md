@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Backup uploads a month of training at a time.** Workout history used to be sent one
+  session at a time, and every session cost two round trips to your signer, so a first
+  backup on a real history ran for a very long time. Sessions now travel one record per
+  training month: a year of training is around a dozen uploads instead of hundreds, and a
+  finished month is never sent again. Your existing backup is re-sent once in the new
+  shape, automatically — nothing on the relay is deleted, and the old records stay
+  readable, so a device still on the previous version keeps working. A month with more
+  training in it than fits in one relay event is split across a few, so a heavy training
+  block still uploads instead of being refused.
+
 ### Fixed
+
+- **Opening the app no longer restores your whole history every time.** Backup re-read and
+  re-decrypted every record on the relay at every start, which meant one signer round trip
+  per session just to conclude nothing had changed. It now remembers which records it has
+  already read and asks the relay only for what is newer, so a routine start does no
+  decryption at all and a restore only covers what actually changed on another device.
 
 - **Backup could get stuck on "Syncing now…" and never recover.** If a signer app stopped
   answering — backgrounded on a phone, or the connection dropped while switching apps to

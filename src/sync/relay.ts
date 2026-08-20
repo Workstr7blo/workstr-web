@@ -15,6 +15,10 @@ export interface PublishOutcome {
   accepted: boolean;
   failure?: PublishFailure;
   reason: string;
+  // Present only on an accepted publish. The caller records it so the next pull can see
+  // its own upload in the relay's answer and skip decrypting what it just sent.
+  eventId?: string;
+  createdAt?: number;
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -47,7 +51,7 @@ export async function publishRecord(signer: Signer, relayUrl: string, record: Pr
     const signed = await signer.signEvent(unsigned);
     const [publish] = pool.publish([relayUrl], signed as Parameters<typeof pool.publish>[1]);
     const settled = await Promise.allSettled([withTimeout(publish, PUBLISH_TIMEOUT_MS, 'relay publish timed out')]);
-    return { address: record.address, ...classifyPublish(settled[0]) };
+    return { address: record.address, eventId: signed.id, createdAt: signed.created_at, ...classifyPublish(settled[0]) };
   } catch (error) {
     // Encoding and signing happen before anything is sent, so a throw here is the signer,
     // never the relay. Retrying the next record would just wait out the same timeout again.
@@ -58,10 +62,15 @@ export async function publishRecord(signer: Signer, relayUrl: string, record: Pr
 }
 
 // No AUTH handshake: the relay is open and a signature already binds authorship.
-export async function fetchRecords(relayUrl: string, pubkey: string, pool = new SimplePool(), ownPool = true): Promise<SignedNostrEvent[]> {
+//
+// `since` is the newest event this device has already read. It is inclusive on purpose:
+// asking for one second later would drop an event published in the same second as the
+// last one, and a boundary event that comes back again costs nothing because the seen
+// ledger skips it before it is ever decrypted.
+export async function fetchRecords(relayUrl: string, pubkey: string, pool = new SimplePool(), ownPool = true, since?: number): Promise<SignedNostrEvent[]> {
   try {
     const events = await withTimeout(
-      pool.querySync([relayUrl], { authors: [pubkey], kinds: [PRIVATE_RECORD_KIND] }, { maxWait: FETCH_TIMEOUT_MS }),
+      pool.querySync([relayUrl], { authors: [pubkey], kinds: [PRIVATE_RECORD_KIND], ...(since ? { since } : {}) }, { maxWait: FETCH_TIMEOUT_MS }),
       FETCH_TIMEOUT_MS,
       'relay query timed out'
     );

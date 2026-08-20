@@ -37,8 +37,12 @@ export async function exportDatabase(db: IDBPDatabase<WorkstrDB>, pubkeyNamespac
 // design (predictable over a field-merge); callers must confirm first.
 export async function importDatabase(db: IDBPDatabase<WorkstrDB>, data: WorkstrExport): Promise<void> {
   assertWorkstrExport(data);
-  const names = [...KEYED_STORES, ...KV_STORES];
+  // `sync_seen` is wiped but never exported: it describes which relay events this database
+  // already contains, and an import replaces exactly that. Carrying it across would tell
+  // the next pull it had already read records the imported data does not hold.
+  const names = [...KEYED_STORES, ...KV_STORES, 'sync_seen' as const];
   const tx = db.transaction(names, 'readwrite');
+  await tx.objectStore('sync_seen').clear();
   for (const name of KEYED_STORES) {
     const store = tx.objectStore(name as KeyedStore);
     await store.clear();

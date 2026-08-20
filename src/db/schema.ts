@@ -10,6 +10,7 @@ export interface WorkstrDB extends DBSchema {
   bodyweight: { key: number; value: BodyWeightEntry; indexes: { date: string } };
   settings: { key: string; value: unknown };
   sync_queue: { key: string; value: { address: string; updated_at: string } };
+  sync_seen: { key: string; value: { address: string; event_id: string; created_at: number } };
   blobs: { key: string; value: Blob };
 }
 
@@ -21,7 +22,10 @@ export function dbName(pubkey: string): string {
 // to, so dropping it cannot lose user data.
 // v3 gave every session a `uid`, so it can be addressed on a relay independently of its
 // autoincrement key.
-export const DB_VERSION = 3;
+// v4 added `sync_seen`, the ledger of relay events this device has already read. Without
+// it every app start re-decrypted the whole backup, which is one signer round trip per
+// record on a device that already had all of them.
+export const DB_VERSION = 4;
 
 export function newSessionUid(): string {
   return globalThis.crypto?.randomUUID
@@ -48,6 +52,7 @@ export async function openWorkstrDB(pubkey: string): Promise<IDBPDatabase<Workst
       const legacy = db as unknown as IDBPDatabase;
       if (legacy.objectStoreNames.contains('plan')) legacy.deleteObjectStore('plan');
       if (oldVersion < 3 && oldVersion >= 1) backfillSessionUids(transaction);
+      if (oldVersion < 4 && oldVersion >= 1) db.createObjectStore('sync_seen', { keyPath: 'address' });
     }
   });
 }
@@ -70,5 +75,6 @@ function createInitialStores(db: IDBPDatabase<WorkstrDB>): void {
   bodyweight.createIndex('date', 'date', { unique: true });
   db.createObjectStore('settings');
   db.createObjectStore('sync_queue', { keyPath: 'address' });
+  db.createObjectStore('sync_seen', { keyPath: 'address' });
   db.createObjectStore('blobs');
 }

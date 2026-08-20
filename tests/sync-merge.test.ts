@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { mergeRecords } from '../src/sync/merge';
-import { BODYWEIGHT_ADDRESS, MANIFEST_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
+import { BODYWEIGHT_ADDRESS, MANIFEST_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import type { DecodedPrivateRecord } from '../src/nostr/codecs30078';
 
 let namespace = 0;
@@ -58,6 +58,88 @@ describe('merging records into an empty database', () => {
     expect(settings.workstrRelay).toBe('wss://mine');
     expect(settings.signerType).toBe('nip46');
     expect(settings.backup).toEqual({ enabled: true });
+  });
+});
+
+function bundle(month: string, items: { uid: string; updatedAt: string; deleted?: boolean; payload?: unknown }[]) {
+  const updatedAt = items.reduce((latest, item) => (item.updatedAt > latest ? item.updatedAt : latest), items[0]?.updatedAt || '');
+  return record(sessionsAddress(month), updatedAt, { month, items });
+}
+
+function session(startedAt: string, completedAt: string) {
+  return { started_at: startedAt, sets: [{ exercise_slug: 'bench', set_number: 1, reps: 8, completed_at: completedAt }] };
+}
+
+describe('month bundles', () => {
+  it('restores a whole month from one record', async () => {
+    const store = await freshStore();
+    const summary = await mergeRecords(store, [bundle('2026-08', [
+      { uid: 'uid-1', updatedAt: '2026-08-01T10:05:00.000Z', payload: session('2026-08-01T10:00:00.000Z', '2026-08-01T10:05:00.000Z') },
+      { uid: 'uid-2', updatedAt: '2026-08-03T10:05:00.000Z', payload: session('2026-08-03T10:00:00.000Z', '2026-08-03T10:05:00.000Z') }
+    ])]);
+
+    expect(summary.applied).toBe(2);
+    expect(await store.listSessions()).toHaveLength(2);
+    const restored = await store.getSessionByUid('uid-2');
+    expect(await store.listSessionSets(restored!.id!)).toHaveLength(1);
+  });
+
+  // The reason a bundle carries a timestamp per session rather than one for the record:
+  // both devices write the same address, and taking the newer event whole would delete
+  // whatever the other device trained that month.
+  it('keeps a session the other device never had', async () => {
+    const store = await freshStore();
+    const mine = await store.createSession({ started_at: '2026-08-05T10:00:00.000Z' });
+    const myUid = (await store.getSession(mine))!.uid!;
+
+    await mergeRecords(store, [bundle('2026-08', [
+      { uid: 'theirs', updatedAt: '2026-08-20T10:05:00.000Z', payload: session('2026-08-20T10:00:00.000Z', '2026-08-20T10:05:00.000Z') }
+    ])]);
+
+    expect(await store.getSessionByUid(myUid)).toBeTruthy();
+    expect(await store.getSessionByUid('theirs')).toBeTruthy();
+  });
+
+  it('does not overwrite a session this device has taken further', async () => {
+    const store = await freshStore();
+    const id = await store.createSession({ started_at: '2026-08-05T10:00:00.000Z' });
+    const uid = (await store.getSession(id))!.uid!;
+    await store.addSessionSet({ session_id: id, exercise_slug: 'squat', set_number: 1, reps: 5, completed_at: '2026-08-05T12:00:00.000Z' });
+
+    const summary = await mergeRecords(store, [bundle('2026-08', [
+      { uid, updatedAt: '2026-08-05T10:05:00.000Z', payload: session('2026-08-05T10:00:00.000Z', '2026-08-05T10:05:00.000Z') }
+    ])]);
+
+    expect(summary.skipped).toBe(1);
+    expect((await store.listSessionSets(id))[0].exercise_slug).toBe('squat');
+  });
+
+  it('does not resurrect a session this device deleted but has not uploaded yet', async () => {
+    const store = await freshStore();
+    const id = await store.createSession({ started_at: '2026-08-05T10:00:00.000Z' });
+    const uid = (await store.getSession(id))!.uid!;
+    await store.enqueueSync(sessionAddress(uid), '2026-08-06T10:00:00.000Z');
+    await store.deleteSession(id);
+
+    const summary = await mergeRecords(store, [bundle('2026-08', [
+      { uid, updatedAt: '2026-08-05T10:05:00.000Z', payload: session('2026-08-05T10:00:00.000Z', '2026-08-05T10:05:00.000Z') }
+    ])]);
+
+    expect(summary.skipped).toBe(1);
+    expect(await store.getSessionByUid(uid)).toBeUndefined();
+  });
+
+  it('applies a deletion another device recorded inside the bundle', async () => {
+    const store = await freshStore();
+    const id = await store.createSession({ started_at: '2026-08-05T10:00:00.000Z' });
+    const uid = (await store.getSession(id))!.uid!;
+
+    const summary = await mergeRecords(store, [bundle('2026-08', [
+      { uid, updatedAt: '2026-08-09T10:00:00.000Z', deleted: true }
+    ])]);
+
+    expect(summary.deleted).toBe(1);
+    expect(await store.getSessionByUid(uid)).toBeUndefined();
   });
 });
 
