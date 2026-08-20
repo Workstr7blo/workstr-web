@@ -92,3 +92,17 @@ the total storage ceiling, and the block list are separate and stateful; they ar
 Do not add an allowlist here. If the funding trigger in `docs/instruction.md` §11.4 ever
 fires, admission control arrives as part of Phase 2b along with NIP-42, and that is a
 deliberate, announced change rather than a quiet edit to this file.
+
+## Running it locally for client tests
+
+The client's opt-in integration tests (`tests/sync-relay.integration.test.ts`) need a real
+relay carrying this policy — a mock cannot prove the policy or NIP-44 interop, which is
+the only reason those tests exist. Build the image here, mount the stock strfry config
+with `writePolicy.plugin` pointed at `/app/write-policy.mjs` and `bind` set to `0.0.0.0`,
+then:
+
+```bash
+WORKSTR_TEST_RELAY=ws://localhost:7788 npx vitest run tests/sync-relay.integration.test.ts
+```
+
+With `WORKSTR_TEST_RELAY` unset the suite skips, so CI stays green without a relay.
