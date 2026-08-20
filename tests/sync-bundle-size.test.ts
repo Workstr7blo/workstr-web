@@ -14,7 +14,15 @@ const secret = generateSecretKey();
 const self = getPublicKey(secret);
 const conversation = nip44.getConversationKey(secret, self);
 
-function heavyMonth(sessions: number, setsEach: number): { session: Session; sets: SessionSet[] }[] {
+// The shape that broke: sessions small enough that the packer fits many into one part and
+// fills it right up to the budget. A month of large sessions stops well short — three to a
+// part and no more — which is why measuring only that shape passed a budget that was over
+// the ceiling in the field.
+function worstCasePart(): { session: Session; sets: SessionSet[] }[] {
+  return month(40, 3);
+}
+
+function month(sessions: number, setsEach: number): { session: Session; sets: SessionSet[] }[] {
   return Array.from({ length: sessions }, (_, day) => {
     const date = `2026-08-${String(day + 1).padStart(2, '0')}`;
     return {
@@ -42,7 +50,8 @@ function nip46RequestBytes(method: string, params: string[]): number {
 
 describe('a bundle a remote signer can actually sign', () => {
   it('keeps both NIP-46 round trips inside the ceiling', () => {
-    const parts = sessionsBundleRecords('2026-08', heavyMonth(26, 30));
+    // Both shapes: large sessions that split early, and small ones that pack a part full.
+    const parts = [...sessionsBundleRecords('2026-08', month(26, 30)), ...sessionsBundleRecords('2026-07', worstCasePart())];
     expect(parts.length).toBeGreaterThan(1);
 
     for (const part of parts) {
@@ -57,8 +66,15 @@ describe('a bundle a remote signer can actually sign', () => {
     }
   });
 
+  it('fills a part right up to the budget, so the worst case is the measured one', () => {
+    const parts = sessionsBundleRecords('2026-07', worstCasePart());
+    const fullest = Math.max(...parts.map((part) => JSON.stringify(part.payload.items).length));
+    // Without this the suite could pass on months that never reach the budget at all.
+    expect(fullest).toBeGreaterThan(MAX_BUNDLE_BYTES * 0.9);
+  });
+
   it('splits a month rather than letting one session grow past the budget', () => {
-    const parts = sessionsBundleRecords('2026-08', heavyMonth(26, 30));
+    const parts = sessionsBundleRecords('2026-08', month(26, 30));
     for (const part of parts) {
       const items = JSON.stringify(part.payload.items).length;
       // One session may exceed the budget on its own and still gets its own part; what
