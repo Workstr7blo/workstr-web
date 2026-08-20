@@ -50,8 +50,9 @@ ESM, so it does not need the Node 22 the client's `package.json` asks for — th
 Vite's, and Vite never runs on the relay.
 
 The relay's compose service builds from that Dockerfile and mounts the plugin read-only
-beside the config, so updating the policy is a file copy plus a container restart rather
-than an image rebuild:
+beside the config, so updating the policy is a file copy plus a stack cycle rather than an
+image rebuild — see [Restarting the stack](#restarting-the-stack), which is not the same as
+restarting the container:
 
 ```yaml
 build:
@@ -65,6 +66,54 @@ volumes:
 The plugin file needs mode 755 on the host — strfry executes it directly, through its
 `#!/usr/bin/env node` shebang. Rejections reach the client as the NIP-20 `OK: false`
 message.
+
+## Restarting the stack
+
+**Never restart or recreate these services individually. Always cycle the whole stack:**
+
+```sh
+docker compose down && docker compose up -d
+```
+
+strfry and Caddy run with `network_mode: service:gluetun`, so all three share one network
+namespace and the published port belongs to the gluetun container. Restarting one service
+leaves that arrangement half-rebuilt:
+
+- Recreating gluetun destroys the namespace that strfry and Caddy are still attached to.
+  They keep running and keep listening, on a namespace nothing routes to any more.
+- gluetun tears down and rebuilds its firewall on every VPN restart, and the rule for the
+  relay port goes with it. A tunnel that is flapping removes the allowed input port every
+  few seconds, so the relay is unreachable from outside while looking healthy inside.
+
+Both failures present as "the relay is down" with every container reporting `Up`, and
+neither is fixed by restarting the service that looks broken. `down` removes all three
+containers and the network; `up` rebuilds them in dependency order. That is the only clean
+restart this stack has.
+
+This matters for routine changes, not just outages: **`strfry.conf` and `write-policy.mjs`
+are read at startup**, so editing either needs a full cycle before it takes effect. The
+files are mounted, so the container sees the new content immediately and behaves as though
+nothing changed — which reads as the edit having failed.
+
+### Checking whether the relay is actually up
+
+Test through the hostname, never a bare IP:
+
+```sh
+curl -s -H "Accept: application/nostr+json" https://<relay-host>:<port>
+curl -s --resolve <relay-host>:<port>:<ip> -H "Accept: application/nostr+json" https://<relay-host>:<port>
+```
+
+Caddy holds a certificate for the relay hostname only. `curl -k https://<ip>:<port>` aborts
+with a TLS internal error and returns an empty response, which looks exactly like an
+outage. Use `--resolve` to reach a specific address with the right SNI.
+
+Inside the container the relay answers on plain HTTP, which separates "the stack is broken"
+from "the network path is broken":
+
+```sh
+docker exec <container> wget -qO- --header="Accept: application/nostr+json" http://127.0.0.1:7777
+```
 
 ## Verify after deploying
 
