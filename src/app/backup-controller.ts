@@ -14,6 +14,10 @@ export interface BackupControllerContext {
   getSigner(): Promise<Signer | null>;
   // Drops the cached signer so the next pass builds a fresh connection to it.
   onSignerStalled?(): void;
+  // A restore has written records into the database. What the screen draws was read when
+  // the namespace opened, so it has to be read again or the restored training is on the
+  // device and invisible.
+  onRestored?(): void;
   requestSignIn(): void;
   relayUrl?: string;
 }
@@ -36,7 +40,7 @@ export function createBackupController(ctx: BackupControllerContext): BackupCont
   const engineFor = (): SyncEngine | null => {
     const store = ctx.state.store;
     if (!store) return null;
-    if (!engine) engine = createSyncEngine({ store, getSigner: ctx.getSigner, onStatus, relayUrl: ctx.relayUrl, onSignerStalled: ctx.onSignerStalled });
+    if (!engine) engine = createSyncEngine({ store, getSigner: ctx.getSigner, onStatus, relayUrl: ctx.relayUrl, onSignerStalled: ctx.onSignerStalled, onRestored: ctx.onRestored });
     return engine;
   };
 

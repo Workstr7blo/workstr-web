@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Signing in on a second device restored your training but did not show it.** The
+  restore wrote everything to the device correctly, while the screen kept showing what it
+  had read before the restore ran — so a laptop that had just pulled a whole history looked
+  empty, and only reloading the page revealed it. The screen is now re-read as soon as a
+  restore lands.
+
 - **One press of Sync now backs up everything, instead of one record at a time.** The
   connection to a remote signer can close between records, and backup treated that as the
   signer being away: it stopped, and you had to press Sync now again for the next record —

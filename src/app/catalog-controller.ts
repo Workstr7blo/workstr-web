@@ -1,6 +1,6 @@
 import { canonMuscle } from '../core/muscles';
 import type { Exercise } from '../core/types';
-import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, type RelayProgram } from '../nostr/canon';
+import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
 import { discoverImportState } from '../features/discover/views';
@@ -79,6 +79,19 @@ async function refreshPrograms(): Promise<void> {
       : `program relay error: ${(error as Error).message}`;
   }
   render();
+}
+
+// Opens Discover instantly from the persisted snapshot, before any relay answers. Called
+// as a namespace loads, so the catalog is on screen while the network refresh runs behind
+// it and replaces what it shows.
+function primeFromCache(): void {
+  const cached = primeCanonCache(state.settings.canonCache);
+  if (!cached) return;
+  state.discoverExercises = cached.exercises;
+  state.programs = cached.programs;
+  state.exerciseStatus = `showing ${cached.exercises.length} Workstr exercises from the last sync`;
+  state.programStatus = `showing ${cached.programs.length} Workstr programs from the last sync`;
+  void refreshDiscoverProfiles();
 }
 
 async function refreshDiscoverProfiles(): Promise<void> {
@@ -246,7 +259,7 @@ async function toggleFavourite(slug: string): Promise<void> {
 }
 
   return {
-    refreshMergedExercises, reloadLibrary, persistCanonCache, refreshExercises, refreshPrograms,
+    refreshMergedExercises, reloadLibrary, persistCanonCache, primeFromCache, refreshExercises, refreshPrograms,
     refreshDiscoverProfiles, openExerciseDetail, importDiscovered, importSelectedDiscovered,
     importProgram, deleteExerciseFromLibrary, deleteSelectedExercises, toggleFavourite
   };

@@ -76,7 +76,7 @@ interface Harness {
   timers: { run: () => void; delayMs: number }[];
 }
 
-async function harness(store: WorkstrStore, signer: Signer | null = fakeSigner(), onSignerStalled?: () => void) {
+async function harness(store: WorkstrStore, signer: Signer | null = fakeSigner(), onSignerStalled?: () => void, onRestored?: () => void) {
   const state: Harness = { store, statuses: [], timers: [] };
   const engine = createSyncEngine({
     store,
@@ -84,6 +84,7 @@ async function harness(store: WorkstrStore, signer: Signer | null = fakeSigner()
     getSigner: async () => signer,
     onStatus: (status) => state.statuses.push({ ...status }),
     onSignerStalled,
+    onRestored,
     schedule: (run, delayMs) => { state.timers.push({ run, delayMs }); return () => {}; }
   });
   return { engine, state };
@@ -257,6 +258,33 @@ describe('staying in sync', () => {
     const sheets = await laptop.listSheets();
     expect(sheets.map((sheet) => sheet.name)).toContain('Push Day');
     expect((await laptop.listBody()).map((entry) => entry.weight_kg)).toEqual([80]);
+  });
+
+  // Restoring into the database is not the whole job. What the screen draws is read when
+  // the namespace opens, so a device that signs in and pulls its whole history showed
+  // nothing at all and looked as though the restore had not happened — it had, and only
+  // reloading the page revealed it.
+  it('tells the app to re-read what it is showing after a restore', async () => {
+    const phone = await freshStore();
+    await populate(phone);
+    await (await harness(phone)).engine.start();
+
+    const laptop = await freshStore();
+    const restored = vi.fn();
+    const second = await harness(laptop, fakeSigner(), undefined, restored);
+    await second.engine.start();
+
+    expect(restored).toHaveBeenCalled();
+    expect(await laptop.listSheets()).not.toHaveLength(0);
+  });
+
+  it('does not announce a restore when the relay had nothing new', async () => {
+    const laptop = await freshStore();
+    const restored = vi.fn();
+    const { engine } = await harness(laptop, fakeSigner(), undefined, restored);
+    await engine.start();
+
+    expect(restored).not.toHaveBeenCalled();
   });
 
   it('does not re-upload what it just restored', async () => {

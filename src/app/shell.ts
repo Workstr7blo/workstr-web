@@ -9,7 +9,7 @@ import { fetchMonthlyZapReceipts } from '../nostr/zaps';
 import type { Exercise, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { addMonths, dateKeyFromDate, isDateKey, monthKeyOf } from '../core/dates';
-import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
+import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, type RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
 import type { ActiveSession, AppState, SubView, View } from './state';
@@ -118,24 +118,27 @@ export function renderShell(root: HTMLElement): void {
     // Backfills the starter programs on a fresh namespace, and is a no-op
     // afterwards. Also retires any pre-seed bundled rows on first run.
     if ((await applyStarterSeed(state.store)).applied) state.settings = await state.store.getSettings();
-    state.finishedSessions = await sessionPersistence.loadFinished();
-    state.bodyEntries = await state.store.listBody();
-    state.sheets = await state.store.listSheets();
-    // Open Discover instantly from the persisted canon snapshot; the network
-    // refresh replaces it in the background when relays answer.
-    const cached = primeCanonCache(state.settings.canonCache);
-    if (cached) {
-      state.discoverExercises = cached.exercises;
-      state.programs = cached.programs;
-      state.exerciseStatus = `showing ${cached.exercises.length} Workstr exercises from the last sync`;
-      state.programStatus = `showing ${cached.programs.length} Workstr programs from the last sync`;
-      void catalog.refreshDiscoverProfiles();
-    }
-    await catalog.reloadLibrary();
-    state.activeSession = await sessionPersistence.loadUnfinished();
+    catalog.primeFromCache();
+    await refreshFromStore();
     // Last: the engine attaches a change listener to this store, and every load step
     // above is a write it must not mistake for something the user did.
     void backup.resume();
+  }
+
+  // Re-reads everything the screen draws from the database. A restore writes records
+  // straight to IndexedDB, and the state the UI renders was read when the namespace
+  // opened — so without this a device that has just signed in and pulled its whole
+  // history shows nothing at all, and looks like the restore never happened. It had, and
+  // only reloading the page revealed it.
+  async function refreshFromStore(): Promise<void> {
+    if (!state.store) return;
+    state.settings = await state.store.getSettings();
+    state.finishedSessions = await sessionPersistence.loadFinished();
+    state.bodyEntries = await state.store.listBody();
+    state.sheets = await state.store.listSheets();
+    await catalog.reloadLibrary();
+    state.activeSession = await sessionPersistence.loadUnfinished();
+    render();
   }
 
   function render(): void {
@@ -364,6 +367,7 @@ export function renderShell(root: HTMLElement): void {
     state, render, toast,
     getSigner: identity.getActiveSigner,
     onSignerStalled: identity.dropActiveSigner,
+    onRestored: () => { void refreshFromStore(); },
     requestSignIn: () => { void identity.startRemoteSignerRequest(); }
   });
 
