@@ -1,4 +1,4 @@
-import type { SyncStatus } from '../../sync/engine';
+import type { SyncProgress, SyncStatus } from '../../sync/engine';
 import { html } from '../../app/format';
 
 export interface BackupPanelState {
@@ -28,12 +28,19 @@ export function statusPill(state: BackupPanelState): { label: string; ok: boolea
   return { label: state.sync.pending > 0 ? `${state.sync.pending} pending` : 'up to date', ok: true };
 }
 
-// The one line that answers "is my training safe". Backfill progress replaces it while a
-// first run is still walking existing history, because a pending count that starts at 400
-// and falls reads like a fault rather than progress.
+const PHASE_LABEL: Record<SyncProgress['phase'], string> = {
+  restore: 'Restoring your training',
+  prepare: 'Preparing your history',
+  upload: 'Backing up'
+};
+
+// The one line that answers "is my training safe". Progress replaces it whenever a pass is
+// actually moving: a first run is minutes of work, and a bare "Syncing now…" reads exactly
+// the same whether it is uploading or wedged. A falling pending count reads like a fault,
+// so the count of what is done leads instead.
 export function statusLine(state: BackupPanelState): string {
   const { sync } = state;
-  if (sync.backfill) return `Backing up existing history: ${sync.backfill.done} of ${sync.backfill.total}.`;
+  if (sync.progress) return `${PHASE_LABEL[sync.progress.phase]}: ${sync.progress.done} of ${sync.progress.total}.`;
   if (sync.state === 'error') return sync.lastError || 'Backup could not reach the relay. It will retry on its own.';
   if (sync.state === 'syncing') return 'Syncing now…';
   const pending = sync.pending > 0 ? `${sync.pending} change${sync.pending === 1 ? '' : 's'} waiting to upload. ` : '';

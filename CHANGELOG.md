@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Backup could get stuck on "Syncing now…" and never recover.** If a signer app stopped
+  answering — backgrounded on a phone, or the connection dropped while switching apps to
+  approve — backup waited on it forever: no error, no retry, and Sync now did nothing.
+  Signer requests now time out, backup says your signer did not respond and to open it and
+  tap Sync now, and it retries on its own. Nothing queued is lost while the signer is away.
+
+- **A long first backup no longer looks like a hang.** The status line now counts through
+  what it is doing — restoring, preparing, or backing up, with a running total — instead of
+  showing one unchanging "Syncing now…" for the whole run.
+
 ### Added
 
 - **Auto-backup.** One switch in Settings → Backup copies your programs, workout history,

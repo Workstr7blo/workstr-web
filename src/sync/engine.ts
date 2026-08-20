@@ -3,6 +3,7 @@ import type { Signer } from '../signer/types';
 import { runBackfill } from './backfill';
 import { pullAndMerge } from './merge';
 import { pushQueue } from './push';
+import { withSignerTimeout } from '../signer/timeout';
 
 // The single backup destination. Not a user preference and never announced: the relay
 // accepts only this client's encrypted records, so putting it in the user's kind:10002
@@ -19,13 +20,20 @@ export const CHANGE_DEBOUNCE_MS = 4000;
 
 export type SyncState = 'off' | 'idle' | 'syncing' | 'error';
 
+// Which half of a pass is running. A first sync on a real history is minutes of work, and
+// without this the status line reads the same whether it is uploading or wedged.
+export interface SyncProgress {
+  phase: 'restore' | 'prepare' | 'upload';
+  done: number;
+  total: number;
+}
+
 export interface SyncStatus {
   state: SyncState;
   pending: number;
   lastSyncAt?: string;
   lastError?: string;
-  // Present only while a first run is still working through existing history.
-  backfill?: { done: number; total: number };
+  progress?: SyncProgress;
 }
 
 export interface SyncEngineContext {
@@ -91,8 +99,11 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     if (!pulled) {
       // Before uploading anything: a device that has just signed in may be the empty one,
       // and last-write-wins protects a populated one.
-      const merged = await pullAndMerge(ctx.store, signer, relayUrl);
+      const merged = await pullAndMerge(ctx.store, signer, relayUrl, {
+        onProgress: (done, total) => report({ progress: { phase: 'restore', done, total } })
+      });
       pulled = true;
+      report({ progress: undefined });
       if (merged.unreadable > 0) report({ lastError: `${merged.unreadable} backup record(s) could not be read` });
     }
 
@@ -101,13 +112,22 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     if (backup?.backfillTotal === undefined || (backup.backfillCursor ?? 0) < backup.backfillTotal) {
       const progress = await runBackfill(ctx.store, backup?.backfillCursor ?? 0, async ({ cursor, total }) => {
         await ctx.store.saveBackupState({ backfillCursor: cursor, backfillTotal: total });
-        report({ backfill: { done: cursor, total } });
+        report({ progress: { phase: 'prepare', done: cursor, total } });
       });
       await ctx.store.saveBackupState({ backfillCursor: progress.cursor, backfillTotal: progress.total });
-      report({ backfill: undefined });
+      report({ progress: undefined });
     }
 
-    const result = await pushQueue(ctx.store, signer, relayUrl);
+    // The slow half on a first run: two signer round trips per record. Reported per record
+    // so a long upload is visibly moving rather than indistinguishable from a hang.
+    const result = await pushQueue(ctx.store, signer, relayUrl, {
+      onProgress: (done, total) => report({ progress: { phase: 'upload', done, total } })
+    });
+    report({ progress: undefined });
+    const signerFailure = result.failed.find((outcome) => outcome.failure === 'signer');
+    if (signerFailure) {
+      throw new Error('Your signer did not respond. Open your signer app, then tap Sync now.');
+    }
     if (result.rejected.length > 0) {
       // The relay refused the record itself. Retrying unchanged cannot fix it, and the
       // entry stays queued rather than vanishing, so say so plainly.
@@ -124,7 +144,10 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     report({ state: 'syncing' });
     inFlight = (async (): Promise<SyncStatus> => {
       try {
-        const signer = await ctx.getSigner();
+        // Wrapped here so every downstream call — encrypt, decrypt, sign — is bounded.
+        // One unwrapped signer call is enough to hang a pass forever.
+        const resolved = await ctx.getSigner();
+        const signer = resolved ? withSignerTimeout(resolved) : null;
         if (!signer) {
           failures += 1;
           return report({ state: 'error', lastError: 'Signer connection was lost. Sign in again to resume backup.' });

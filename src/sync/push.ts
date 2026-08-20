@@ -45,6 +45,11 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
         // Only now: an unacknowledged publish that cleared the queue would lose the record.
         await store.dequeueSync(entry.address, record.updatedAt);
         uploaded += 1;
+      } else if (outcome.failure === 'signer') {
+        // Every remaining record would wait out the same timeout, turning one dead signer
+        // into minutes of hanging. Stop and report; the queue keeps its place.
+        failed.push(outcome);
+        break;
       } else if (outcome.failure === 'policy') {
         // Kept in the queue deliberately. A silently vanishing record is the one outcome
         // a backup feature may never produce, even when the relay refuses it.

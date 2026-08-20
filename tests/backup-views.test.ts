@@ -41,10 +41,19 @@ describe('status pill', () => {
 });
 
 describe('status line', () => {
-  it('reports first-run progress instead of a falling pending count', () => {
+  it('reports progress instead of a falling pending count', () => {
     // 400 pending falling to zero reads like a fault; "12 of 400" reads like progress.
-    expect(statusLine(panelState({ sync: { state: 'syncing', pending: 388, backfill: { done: 12, total: 400 } } })))
-      .toBe('Backing up existing history: 12 of 400.');
+    expect(statusLine(panelState({ sync: { state: 'syncing', pending: 388, progress: { phase: 'upload', done: 12, total: 400 } } })))
+      .toBe('Backing up: 12 of 400.');
+  });
+
+  it('names the phase, so a long first sync is not mistaken for a hang', () => {
+    // The complaint this exists for: a bare "Syncing now…" looks identical whether the
+    // pass is uploading or wedged.
+    expect(statusLine(panelState({ sync: { state: 'syncing', pending: 0, progress: { phase: 'restore', done: 3, total: 40 } } })))
+      .toBe('Restoring your training: 3 of 40.');
+    expect(statusLine(panelState({ sync: { state: 'syncing', pending: 0, progress: { phase: 'prepare', done: 5, total: 9 } } })))
+      .toBe('Preparing your history: 5 of 9.');
   });
 
   it('shows the error the engine reported', () => {

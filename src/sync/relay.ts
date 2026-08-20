@@ -5,9 +5,10 @@ import { PRIVATE_RECORD_KIND, encodePrivateRecord, type PrivateRecord } from '..
 export const PUBLISH_TIMEOUT_MS = 10000;
 export const FETCH_TIMEOUT_MS = 15000;
 
-// A policy rejection and a dead network need different user copy and different retry
-// behaviour: one will never succeed unchanged, the other will succeed on its own.
-export type PublishFailure = 'policy' | 'network';
+// A policy rejection, a dead network and an unresponsive signer need different user copy
+// and different retry behaviour: the first will never succeed unchanged, the second
+// succeeds on its own, and the third needs the person to go and open their signer app.
+export type PublishFailure = 'policy' | 'network' | 'signer';
 
 export interface PublishOutcome {
   address: string;
@@ -48,8 +49,9 @@ export async function publishRecord(signer: Signer, relayUrl: string, record: Pr
     const settled = await Promise.allSettled([withTimeout(publish, PUBLISH_TIMEOUT_MS, 'relay publish timed out')]);
     return { address: record.address, ...classifyPublish(settled[0]) };
   } catch (error) {
-    // Signing was refused or timed out. Not the relay's doing, and retrying is right.
-    return { address: record.address, accepted: false, failure: 'network', reason: error instanceof Error ? error.message : String(error) };
+    // Encoding and signing happen before anything is sent, so a throw here is the signer,
+    // never the relay. Retrying the next record would just wait out the same timeout again.
+    return { address: record.address, accepted: false, failure: 'signer', reason: error instanceof Error ? error.message : String(error) };
   } finally {
     if (ownPool) pool.close([relayUrl]);
   }
