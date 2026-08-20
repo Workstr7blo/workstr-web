@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Backup could stop doing anything at all — no request reaching your signer, and Sync
+  now doing nothing.** Waiting for the connection to your signer to be ready was meant to
+  stop replies being missed, but it waited for *every* relay it could reach your signer
+  through, with nothing to end the wait if one of them stalled while connecting. On a
+  phone that happens routinely, and then nothing was ever sent. It now goes ahead as soon
+  as one relay is up, and never waits more than a few seconds regardless.
+
 - **Backup could still fail to sign a month of training, on months made up of shorter
   workouts.** The limit on how much training goes into one record was set from a month of
   long workouts, which never fills a record completely. A month of shorter, more frequent

@@ -50,9 +50,23 @@ function toSigned(event: VerifiedEvent): SignedNostrEvent {
 // Waiting on the same relay connections the subscription is waiting on fixes the order:
 // `subscribe` asked for them first, so its REQ is on the wire before this resolves and
 // before any request that needs an answer is published.
+// How long that is worth waiting for. A request sent late still gets an answer; a request
+// never sent cannot, so this wait is capped on every path rather than trusted to end.
+const RELAY_OPEN_TIMEOUT_MS = 4000;
+
 async function openRelays(pool: SimplePool, relays: string[]): Promise<void> {
-  // One unreachable relay must not hold the signer back; the others still carry it.
-  await Promise.all(relays.map((relay) => pool.ensureRelay(relay).catch(() => null)));
+  // `connectionTimeout` is not optional in practice: nostr-tools only arms a timer when it
+  // is given one, so a socket that stalls mid-handshake — routine on a phone — leaves the
+  // connection pending for good. Waiting on that means never sending the request at all.
+  const opening = relays.map((relay) => pool.ensureRelay(relay, { connectionTimeout: RELAY_OPEN_TIMEOUT_MS }));
+  // Rejections are expected and handled by the cap below, not by failing the wait.
+  opening.forEach((attempt) => attempt.catch(() => null));
+  await Promise.race([
+    // One open relay is enough to receive an answer, and waiting for the slowest of them
+    // would let a single bad relay decide when anything gets sent.
+    Promise.any(opening).catch(() => null),
+    new Promise((resolve) => setTimeout(resolve, RELAY_OPEN_TIMEOUT_MS))
+  ]);
 }
 
 // `knownPubkey` is the key this device is already signed in as. Asking the bunker to

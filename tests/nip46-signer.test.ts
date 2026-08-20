@@ -9,7 +9,7 @@ const USER_PUBKEY = '33'.repeat(32);
 beforeEach(() => {
   localStorage.setItem('workstr.nip46.connection', JSON.stringify({
     clientSecret: CLIENT_SECRET,
-    bunker: { pubkey: BUNKER_PUBKEY, relays: ['wss://relay.test'], secret: null }
+    bunker: { pubkey: BUNKER_PUBKEY, relays: ['wss://stalled.test', 'wss://relay.test'], secret: null }
   }));
 });
 
@@ -45,7 +45,7 @@ describe('a reconnected bunker signer', () => {
     void signer.nip44Encrypt(USER_PUBKEY, 'a workout').catch(() => {});
 
     for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
-    expect(ensure).toHaveBeenCalledWith('wss://relay.test');
+    expect(ensure).toHaveBeenCalledWith('wss://relay.test', expect.anything());
     // Nothing has gone out while the socket is still being dialled, so no answer can
     // arrive before the subscription that has to catch it.
     expect(publish).not.toHaveBeenCalled();
@@ -53,6 +53,28 @@ describe('a reconnected bunker signer', () => {
     openTheRelay();
     for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
     expect(publish).toHaveBeenCalled();
+    ensure.mockRestore();
+  });
+
+  // The wait above must never become the reason nothing is sent. Waiting for every relay
+  // meant one that stalls mid-handshake — routine on a phone, and unbounded because
+  // nostr-tools only arms a timer when it is handed one — held back a request that the
+  // other relay was perfectly able to carry. Nothing reached the signer at all.
+  it('sends the request over a relay that is up while another never connects', async () => {
+    const publish = vi.fn(async () => 'ok');
+    const live = { subscribe: () => ({ close: () => {} }), publish };
+    const ensure = vi.spyOn(SimplePool.prototype, 'ensureRelay').mockImplementation(((url: string) => (
+      url.includes('stalled') ? new Promise(() => {}) : Promise.resolve(live)
+    )) as never);
+
+    const signer = createCachedNip46Signer(USER_PUBKEY)!;
+    void signer.nip44Encrypt(USER_PUBKEY, 'a workout').catch(() => {});
+
+    for (let tick = 0; tick < 20; tick += 1) await Promise.resolve();
+    expect(publish).toHaveBeenCalled();
+    // And every socket is dialled with a timeout, so none of them can hang for good.
+    expect(ensure).toHaveBeenCalledWith('wss://stalled.test', expect.objectContaining({ connectionTimeout: expect.any(Number) }));
+
     ensure.mockRestore();
   });
 });
