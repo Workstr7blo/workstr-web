@@ -90,12 +90,26 @@ export interface SessionsBundlePayload {
   items: BundledSession[];
 }
 
-// How much session JSON goes into one record before it is split. strfry's stock
-// `maxEventSize` is 64 KB and NIP-44 base64 inflates the plaintext by roughly a third, so
-// a budget much above this produces records the relay refuses — a heavy month of training
-// is well over 100 KB on its own. The cost of a split is one more signer round trip; the
-// cost of guessing high is a backup that cannot upload at all.
-export const MAX_BUNDLE_BYTES = 40000;
+// What a NIP-46 signer's own relay has to carry to sign one of our records. A remote
+// signer is asked to sign by sending it the whole unsigned event as a JSON-RPC parameter,
+// itself NIP-44 encrypted into a kind:24133 event on the signer's relay — so our record
+// travels inside another event, encrypted twice over. 32 KB is the most conservative
+// event size in common use, and clearing it means every signer can answer.
+export const NIP46_REQUEST_CEILING_BYTES = 32768;
+
+// How much session JSON goes into one record before it is split.
+//
+// The binding limit is not the backup relay's `maxEventSize` — strfry ships 64 KB and a
+// record that big arrives intact. It is the round trip above: NIP-44 inflates by about a
+// third at each of the two hops, so a bundle asks the signer's relay to accept roughly
+// twice its plaintext. A 40 KB bundle meant a ~100 KB request, which no relay accepted;
+// the signer never answered, the pass hit its timeout, and backup could not upload at all.
+//
+// 16 KB of JSON encrypts to a ~22 KB record and a ~31 KB signing request, inside the
+// ceiling. The cost of a split is one more signer round trip; the cost of guessing high is
+// a backup that does not work, which is what 40 KB bought. `tests/sync-bundle-size.test.ts`
+// measures the whole chain with real NIP-44 rather than trusting this arithmetic.
+export const MAX_BUNDLE_BYTES = 16000;
 
 function bundledSessions(entries: { session: Session; sets: SessionSet[] }[]): BundledSession[] {
   return entries

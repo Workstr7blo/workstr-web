@@ -20,7 +20,11 @@ export const CHANGE_DEBOUNCE_MS = 4000;
 
 // The record layout this client writes. Bumping it makes every device re-run its backfill
 // once, in the new shape. See `BackupSettings.recordFormat`.
-export const RECORD_FORMAT = 2;
+//
+// 2 bundled sessions by month. 3 is the same layout at a size a NIP-46 signer can actually
+// sign: a month published under 2 may sit on the relay in one oversized record that no
+// remote signer can decrypt either, so those months are republished rather than left.
+export const RECORD_FORMAT = 3;
 
 export type SyncState = 'off' | 'idle' | 'syncing' | 'error';
 
