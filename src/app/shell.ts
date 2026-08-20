@@ -21,6 +21,7 @@ import { discoverImportable, discoverImportState } from '../features/discover/vi
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
 import { getQuickWorkout } from '../features/recovery/quickWorkout';
 import { sheetToProgram } from '../features/sheets/views';
+import { createUpdateController } from './update-controller';
 import { createProgramBuilder } from './program-builder';
 import { createSessionPersistence } from './session-persistence';
 import { createCatalogController } from './catalog-controller';
@@ -338,6 +339,7 @@ export function renderShell(root: HTMLElement): void {
   // exercises plus the relay library, deduped by slug.
   let toastTimer: number | undefined;
 
+  createUpdateController({ root, state, toast });
   const programBuilder = createProgramBuilder({ root, state, render, openModal, closeModal, toast });
   const catalog = createCatalogController({ root, state, render, toast, openModal, closeModal, fetchProfile });
   const sessionPersistence = createSessionPersistence(state);

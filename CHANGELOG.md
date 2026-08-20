@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The app now updates itself.** An installed PWA resumes its existing page instead of
+  navigating, so a phone could keep running a build for days and never pick up a fix. The
+  app now checks for a new version while it is open, and applies it the next time you
+  leave the app, so you come back to the current build without ever seeing a reload. An
+  update is never applied during a workout, with the session overlay open, or with a form
+  open, and a short message says when one is waiting.
+
 ### Changed
 
 - Shortened the History intro line. On a short phone screen it ran to seven lines and
