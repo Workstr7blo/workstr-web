@@ -145,6 +145,60 @@ describe('push queue', () => {
     spy.mockRestore();
   }, 30000);
 
+  // The reported flow: one record goes through, the next one's encrypt is met with
+  // silence, and the pass gives up — so a month of eight records took eight presses of
+  // Sync now. A closed socket is the ordinary reason for that silence, and the cure is to
+  // rebuild the connection and carry on rather than to hand the work back to the user.
+  it('rebuilds the connection mid-pass instead of giving up on the month', async () => {
+    const store = await freshStore();
+    for (const slug of ['a', 'b', 'c', 'd']) await store.enqueueSync(sheetAddress(slug), '2026-08-20T10:00:00.000Z');
+    for (const slug of ['a', 'b', 'c', 'd']) await store.saveSheet({ name: slug, exercises: [] });
+
+    const relay = await import('../src/sync/relay');
+    let sent = 0;
+    // Every other record meets a dead socket, the way a relay that closes between
+    // requests does.
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+      sent += 1;
+      return sent % 2 === 0
+        ? { address: record.address, accepted: false, failure: 'signer', reason: 'Signer did not respond' }
+        : { address: record.address, accepted: true, reason: 'ok', eventId: `id-${sent}`, createdAt: sent };
+    });
+
+    let renewals = 0;
+    const summary = await pushQueue(store, fakeSigner(), 'ws://relay.test', {
+      renewSigner: async () => { renewals += 1; return fakeSigner(); }
+    });
+
+    // Everything queued goes up in one pass, and the queue is empty afterwards.
+    expect(summary.uploaded).toBe(4);
+    expect(await store.listSyncQueue()).toHaveLength(0);
+    expect(renewals).toBeGreaterThan(0);
+    spy.mockRestore();
+  });
+
+  it('gives up on a signer that is gone rather than rebuilding forever', async () => {
+    const store = await freshStore();
+    for (const slug of ['a', 'b', 'c', 'd']) await store.enqueueSync(sheetAddress(slug), '2026-08-20T10:00:00.000Z');
+    for (const slug of ['a', 'b', 'c', 'd']) await store.saveSheet({ name: slug, exercises: [] });
+
+    const relay = await import('../src/sync/relay');
+    let attempts = 0;
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+      attempts += 1;
+      return { address: record.address, accepted: false, failure: 'signer', reason: 'Signer did not respond' };
+    });
+
+    const summary = await pushQueue(store, fakeSigner(), 'ws://relay.test', { renewSigner: async () => fakeSigner() });
+
+    expect(summary.uploaded).toBe(0);
+    // One rebuild and one retry on the first record, then it stops rather than paying a
+    // timeout for every record in the queue.
+    expect(attempts).toBe(2);
+    expect(await store.listSyncQueue()).toHaveLength(4);
+    spy.mockRestore();
+  });
+
   // "Sync now" said syncing with no count beside it for minutes. Progress was reported
   // between queue entries, so a month that is eight records reported nothing at all until
   // the whole month was done — indistinguishable from a hang, on exactly the months that

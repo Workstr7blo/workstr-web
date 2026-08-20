@@ -151,7 +151,14 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     // The slow half on a first run: two signer round trips per record. Reported per record
     // so a long upload is visibly moving rather than indistinguishable from a hang.
     const result = await pushQueue(ctx.store, signer, relayUrl, {
-      onProgress: (done, total) => report({ progress: { phase: 'upload', done, total } })
+      onProgress: (done, total) => report({ progress: { phase: 'upload', done, total } }),
+      // Rebuilt through the same path a stalled signer takes between passes, so one press
+      // of Sync now carries a whole month across a socket that closes partway.
+      renewSigner: async () => {
+        ctx.onSignerStalled?.();
+        const renewed = await ctx.getSigner();
+        return renewed ? withSignerTimeout(renewed) : null;
+      }
     });
     report({ progress: undefined });
     const signerFailure = result.failed.find((outcome) => outcome.failure === 'signer');
