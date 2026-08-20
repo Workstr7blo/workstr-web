@@ -21,7 +21,16 @@ export interface PushOptions {
   // caller can bound one pass and come back for the rest.
   limit?: number;
   onProgress?: (done: number, total: number) => void;
+  // Builds a fresh connection to the signer. A remote signer is reached over a relay
+  // socket that is allowed to close whenever it likes, and a month is many records, so a
+  // pass that gave up at the first silence uploaded one record per press of Sync now.
+  renewSigner?: () => Promise<Signer | null>;
 }
+
+// How many times one pass will rebuild the connection before it accepts that the signer is
+// really gone. Enough to carry a month of records through a flaky socket; not so many that
+// a signer that is genuinely away costs minutes of timeouts before it says so.
+const MAX_RECONNECTS = 6;
 
 // What one queue entry actually publishes as, and the timestamp that covers it. A month
 // resolves to its parts; everything else is a single record. `updatedAt` is what the
@@ -96,6 +105,11 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
   const report = (remainingEntries: number, remainingHere: number): void =>
     options.onProgress?.(sent, sent + remainingHere + remainingEntries);
 
+  // Replaced in place when the connection is rebuilt mid-pass, so the records after the
+  // one that failed are sent over the new connection rather than the dead one.
+  let active = signer;
+  let reconnects = 0;
+
   try {
     for (const [index, entry] of batch.entries()) {
       const { records, updatedAt } = await recordsFor(store, entry, sessions, published);
@@ -120,7 +134,18 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
           report(batch.length - index - 1, records.length - position - 1);
           continue;
         }
-        const outcome = await publishRecord(signer, relayUrl, record, pool, false);
+        let outcome = await publishRecord(active, relayUrl, record, pool, false);
+        // A silent signer is usually a closed socket rather than an absent user, and the
+        // record after it would meet the same one. Rebuild and try this record once more:
+        // one press of Sync now should upload a month, not one record of it.
+        if (!outcome.accepted && outcome.failure === 'signer' && options.renewSigner && reconnects < MAX_RECONNECTS) {
+          reconnects += 1;
+          const renewed = await options.renewSigner();
+          if (renewed) {
+            active = renewed;
+            outcome = await publishRecord(active, relayUrl, record, pool, false);
+          }
+        }
         if (outcome.accepted) {
           // The device already holds what it just sent, so the next pull recognises this
           // event in the relay's answer and skips decrypting its own upload back to itself.

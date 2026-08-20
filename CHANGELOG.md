@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **One press of Sync now backs up everything, instead of one record at a time.** The
+  connection to a remote signer can close between records, and backup treated that as the
+  signer being away: it stopped, and you had to press Sync now again for the next record —
+  eight presses for a month of training. It now reconnects and carries on, so a whole
+  month goes up in one attempt. If the signer really is away it still stops promptly
+  rather than working through the queue one timeout at a time.
+
 - **Backup managed one record per attempt, then said your signer did not respond.** The
   connection to a remote signer is allowed to close between requests, and reopening it
   raced the reply to the next one — so the first record of every attempt went through and

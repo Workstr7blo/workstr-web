@@ -371,7 +371,7 @@ describe('when the relay or signer will not cooperate', () => {
   });
 
   it('stops at the first unanswered record instead of waiting out every one', async () => {
-    // Five records with a dead signer is five timeouts if the loop keeps going.
+    // Every queued record with a dead signer is one timeout each if the loop keeps going.
     const store = await freshStore();
     await populate(store);
     let attempts = 0;
@@ -384,7 +384,12 @@ describe('when the relay or signer will not cooperate', () => {
     };
     const { engine } = await harness(store, withSignerTimeout(silent, 20));
     await engine.start();
-    expect(attempts).toBe(1);
+
+    // One rebuild and one retry, because silence is usually a closed socket rather than an
+    // absent user. Then it stops: a signer that is genuinely away must not cost a timeout
+    // for every record in the queue.
+    expect(attempts).toBe(2);
+    expect(attempts).toBeLessThan((await store.listSyncQueue()).length);
   });
 
   it('goes quiet rather than failing loudly when the signer is gone', async () => {
