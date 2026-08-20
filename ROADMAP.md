@@ -167,16 +167,14 @@ Detailed execution plan: `docs/plans/v2-encrypted-backup-alpha.md`.
    With neither payment nor admission limiting anything, these are the only limiter.
 3. Off-machine nightly LMDB backups and a restore runbook. Hard gate before anyone but
    the operator enables the toggle.
-4. Publish the real monthly cost, and set the §11.4 threshold to a real number at the same
-   time. Do not launch without both.
 
 **Client**
 
-5. `nostr/codecs30078.ts` — NIP-44 encrypted `kind:30078` private-record codecs.
-6. `sync/engine.ts` — write queue, manifest, tombstones, LWW merge, push, pull, lazy
+4. `nostr/codecs30078.ts` — NIP-44 encrypted `kind:30078` private-record codecs.
+5. `sync/engine.ts` — write queue, manifest, tombstones, LWW merge, push, pull, lazy
    restore, and the first-run backfill that uploads existing history when the toggle is
    first turned on.
-7. `features/backup/` — the Auto-backup toggle in the Settings → Backup panel, its status
+6. `features/backup/` — the Auto-backup toggle in the Settings → Backup panel, its status
    line, and automatic non-blocking sync with retry and a manual sync-now fallback.
 
 **Done when:** phone toggles backup on → relay → laptop restore works after decryption,
@@ -184,7 +182,26 @@ with no operator step at any point, no plaintext private training data leaving t
 browser, and a `kind:1` aimed at the Workstr relay bouncing off the write policy.
 
 Moved out of this milestone: NWC/NIP-47 custom in-app zaps (issue #26) is support work,
-not backup work, and ships independently.
+not backup work, and ships independently. Publishing the real monthly cost and setting the
+§11.4 threshold (issue #59) moved to v2.2 — the alpha is what produces the cost figure, so
+gating the alpha on it was circular.
+
+## v2.2 — Funding numbers and training polish
+
+Deferred items that do not gate the alpha. Both were written down elsewhere and never
+reached the issue queue, which is the only reason they are called out here.
+
+1. Publish the real monthly relay cost and set the §11.4 threshold to a real number at the
+   same time (#59). The alpha is the thing that generates the cost, so this follows it
+   rather than blocking it — but it is still a pair: a published cost without a threshold
+   restates the problem instead of answering it.
+2. Mark the EMOM work-to-recovery transition with a tone (#60). Work counts down and then
+   goes silent, while recovery ends on the round-boundary tone; the two halves of an
+   interval are not treated the same.
+
+**Done when:** the funding figures in the app and on the landing page are measured rather
+than placeholder, the §11.4 trigger is a number with its reasoning recorded, and a timed
+EMOM step ends audibly.
 
 ## v3 — Growth
 
@@ -223,7 +240,8 @@ Not a milestone and not scheduled. Built only if the funding trigger in `instruc
 - **RPE** — the field is typed and unwritten on purpose. Three decisions block it: RPE or
   RIR, prompted per set or per exercise, and what consumes the number. Build the consumer
   before the input.
-- **The §11.4 threshold** — deliberately unset until v2 gives it a real denominator.
+- **The §11.4 threshold** — deliberately unset until the alpha gives it a real
+  denominator. Scheduled as v2.2 #59, not as an alpha launch gate.
 - ~~**Does this file ship with the repo?**~~ — settled by practice: it is tracked and
   committed, so the accurate description of the project ships alongside the spec.
 

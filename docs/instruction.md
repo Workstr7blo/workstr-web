@@ -906,12 +906,16 @@ Writing the condition down *before* it is needed is what makes an optional paywa
 credible instead of a rug-pull.
 
 `[X]` is deliberately unset. It cannot be chosen honestly yet: Phase 1 has no
-infrastructure bill, so the denominator does not exist. **Fill it in when Phase 2a goes
-live**, alongside the real cost figures in 11.1 — at that point the monthly bill is known,
+infrastructure bill, so the denominator does not exist. **Fill it in once Phase 2a has
+run**, alongside the real cost figures in 11.1 — at that point the monthly bill is known,
 the funding panel has a season of zap data behind it, and the number is an observation
 rather than a guess. Until then the trigger reads as "there is a threshold, and it will be
-published with the costs it refers to", which is the commitment that matters. Do not
-launch 2a with the placeholder still in place.
+published with the costs it refers to", which is the commitment that matters.
+
+It is scheduled as v2.2 (issue #59), not as a 2a launch gate: 2a is what generates the
+denominator, so blocking 2a on it was circular. The guard that still bites is on the other
+end — **2b must never fire while the placeholder stands.** Switching admission to paid
+against an unpublished threshold is the rug-pull this section exists to prevent.
 
 ### 11.5 Wind-down commitment
 
@@ -1046,8 +1050,9 @@ kind cannot be satisfied before a release exists.
   infrastructure, including at least one who never signed in.
 - **Phase 2a:** toggle auto-backup on → cross-device restore, hands-off; the write policy
   rejects everything that is not a Workstr encrypted record; LMDB backups restorable;
-  curated library fetchable by anyone from public relays; storage quotas enforced; monthly
-  cost published, and the 11.4 threshold set to a real number at the same time.
+  curated library fetchable by anyone from public relays; storage quotas enforced. The real
+  monthly cost and the 11.4 threshold follow in v2.2 (issue #59) rather than gating this
+  phase: 2a is what produces the bill they describe.
 - **Phase 2b:** not done — not started. Done means the trigger in 11.4 fired, was
   announced 30 days ahead, and existing pubkeys were grandfathered without action.
 - **Phase 3:** each item ships independently; nothing in it blocks 1–2.
