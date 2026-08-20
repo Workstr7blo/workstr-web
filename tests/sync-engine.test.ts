@@ -1,0 +1,267 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { WorkstrStore } from '../src/db/store';
+import { createSyncEngine, RETRY_BASE_MS, type SyncStatus } from '../src/sync/engine';
+import { sheetAddress } from '../src/sync/addresses';
+import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
+import type { PrivateRecord } from '../src/nostr/codecs30078';
+
+const SELF = 'ab'.repeat(32);
+
+// An in-memory relay behind the real transport module, so the engine drives the actual
+// backfill, push, codec and merge code. Only the socket is fake.
+const relay = vi.hoisted(() => ({
+  events: new Map<string, { event: unknown }>(),
+  failure: null as null | 'policy' | 'network'
+}));
+
+vi.mock('../src/sync/relay', async () => {
+  const { encodePrivateRecord } = await import('../src/nostr/codecs30078');
+  return {
+    PUBLISH_TIMEOUT_MS: 10000,
+    FETCH_TIMEOUT_MS: 15000,
+    classifyPublish: () => ({ accepted: true, reason: 'ok' }),
+    async publishRecord(signer: Signer, _url: string, record: PrivateRecord) {
+      if (relay.failure) return { address: record.address, accepted: false, failure: relay.failure, reason: `${relay.failure} failure` };
+      const unsigned = await encodePrivateRecord(signer, record);
+      // Addressable: republishing an address replaces it, exactly like a real relay.
+      relay.events.set(record.address, { event: { ...unsigned, id: `id-${record.address}`, pubkey: SELF, sig: 'sig' } });
+      return { address: record.address, accepted: true, reason: 'ok' };
+    },
+    async fetchRecords() {
+      return [...relay.events.values()].map((entry) => entry.event);
+    }
+  };
+});
+
+// Round-trips through the real codec without real keys: the "ciphertext" is the plaintext.
+function fakeSigner(): Signer {
+  return {
+    type: 'nip07',
+    getPublicKey: async () => SELF,
+    signEvent: async (event: UnsignedNostrEvent) => ({ ...event, id: 'id', pubkey: SELF, sig: 'sig' }),
+    nip44Encrypt: async (_peer: string, plaintext: string) => plaintext,
+    nip44Decrypt: async (_peer: string, ciphertext: string) => ciphertext
+  };
+}
+
+let namespace = 0;
+const freshStore = () => WorkstrStore.open(`engine-${namespace += 1}`);
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+// The engine deliberately runs its passes in the background, so tests wait on the
+// condition rather than on a fixed number of microtask turns.
+async function until(condition: () => boolean | Promise<boolean>, label: string): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (await condition()) return;
+    await flush();
+  }
+  throw new Error(`timed out waiting for ${label}`);
+}
+
+interface Harness {
+  store: WorkstrStore;
+  statuses: SyncStatus[];
+  timers: { run: () => void; delayMs: number }[];
+}
+
+async function harness(store: WorkstrStore, signer: Signer | null = fakeSigner()) {
+  const state: Harness = { store, statuses: [], timers: [] };
+  const engine = createSyncEngine({
+    store,
+    relayUrl: 'ws://memory',
+    getSigner: async () => signer,
+    onStatus: (status) => state.statuses.push({ ...status }),
+    schedule: (run, delayMs) => { state.timers.push({ run, delayMs }); return () => {}; }
+  });
+  return { engine, state };
+}
+
+async function populate(store: WorkstrStore): Promise<void> {
+  await store.saveSheet({ name: 'Push Day', exercises: [{ exercise_slug: 'bench', position: 0, sets: 3, reps: '8' }] });
+  const id = await store.createSession({ started_at: '2026-08-01T10:00:00.000Z', sheet_name: 'Push Day' });
+  await store.addSessionSet({ session_id: id, exercise_slug: 'bench', set_number: 1, reps: 8, weight_kg: 60, completed_at: '2026-08-01T10:05:00.000Z' });
+  await store.finishSession(id, '2026-08-01T11:00:00.000Z');
+  await store.logBody({ date: '2026-08-01', weight_kg: 80 });
+}
+
+beforeEach(() => {
+  relay.events.clear();
+  relay.failure = null;
+});
+
+describe('turning backup on', () => {
+  it('uploads the history that already exists and reports up to date', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const { engine } = await harness(store);
+
+    const status = await engine.start();
+
+    expect(status.state).toBe('idle');
+    expect(status.pending).toBe(0);
+    expect(status.lastSyncAt).toBeTruthy();
+    expect([...relay.events.keys()]).toContain(sheetAddress('push-day'));
+    // Sheet, session, bodyweight, settings and the manifest.
+    expect(relay.events.size).toBe(5);
+    expect(await store.listSyncQueue()).toHaveLength(0);
+  });
+
+  it('records the backfill as complete so it never runs twice', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const { engine } = await harness(store);
+    await engine.start();
+
+    const backup = (await store.getSettings()).backup;
+    expect(backup?.enabled).toBe(false);
+    expect(backup?.backfillCursor).toBe(backup?.backfillTotal);
+    expect(backup?.backfillTotal).toBe(5);
+  });
+
+  it('resumes an interrupted first run instead of restarting it', async () => {
+    const store = await freshStore();
+    await populate(store);
+    // A previous run got three records in before it was cut off.
+    await store.saveBackupState({ backfillCursor: 3, backfillTotal: 5 });
+    const { engine } = await harness(store);
+
+    await engine.start();
+
+    // Only the tail was enqueued; the first three are not re-sent.
+    expect(relay.events.size).toBe(2);
+  });
+});
+
+describe('staying in sync', () => {
+  it('queues a local change and syncs it on the next scheduled pass', async () => {
+    const store = await freshStore();
+    const { engine, state } = await harness(store);
+    await engine.start();
+    relay.events.clear();
+
+    await store.saveSheet({ name: 'Leg Day', exercises: [] });
+    await until(() => state.timers.length > 0, 'the debounced sync to be scheduled');
+
+    expect(state.timers.at(-1)?.delayMs).toBe(4000);
+    expect(await store.listSyncQueue()).toHaveLength(1);
+
+    state.timers.at(-1)!.run();
+    await until(() => engine.status().state !== 'syncing', 'the scheduled sync to finish');
+    expect([...relay.events.keys()]).toEqual([sheetAddress('leg-day')]);
+  });
+
+  it('restores onto a device that has never seen the data', async () => {
+    const phone = await freshStore();
+    await populate(phone);
+    const first = await harness(phone);
+    await first.engine.start();
+
+    const laptop = await freshStore();
+    expect(await laptop.listSheets()).toHaveLength(0);
+    const second = await harness(laptop);
+    await second.engine.start();
+
+    const sheets = await laptop.listSheets();
+    expect(sheets.map((sheet) => sheet.name)).toContain('Push Day');
+    expect((await laptop.listBody()).map((entry) => entry.weight_kg)).toEqual([80]);
+  });
+
+  it('does not re-upload what it just restored', async () => {
+    const phone = await freshStore();
+    await populate(phone);
+    await (await harness(phone)).engine.start();
+
+    const laptop = await freshStore();
+    const { engine } = await harness(laptop);
+    await engine.start();
+    // The merge wrote every record locally; none of it is a local edit.
+    const queued = await laptop.listSyncQueue();
+    expect(queued.filter((entry) => entry.address.includes('sheet'))).toHaveLength(0);
+  });
+});
+
+describe('when the relay or signer will not cooperate', () => {
+  it('reports a network failure and backs off further each time', async () => {
+    const store = await freshStore();
+    await populate(store);
+    relay.failure = 'network';
+    const { engine, state } = await harness(store);
+
+    const first = await engine.start();
+    expect(first.state).toBe('error');
+    expect(state.timers.at(-1)?.delayMs).toBe(RETRY_BASE_MS);
+
+    state.timers.at(-1)!.run();
+    await until(() => engine.status().state !== 'syncing', 'the retry to finish');
+    expect(state.timers.at(-1)?.delayMs).toBe(RETRY_BASE_MS * 2);
+  });
+
+  it('keeps a policy-rejected record queued and says so', async () => {
+    const store = await freshStore();
+    await populate(store);
+    relay.failure = 'policy';
+    const { engine } = await harness(store);
+
+    const status = await engine.start();
+
+    expect(status.state).toBe('error');
+    expect(status.lastError).toContain('Relay rejected');
+    // The one outcome a backup may never produce is a record that quietly disappears.
+    expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
+  });
+
+  it('goes quiet rather than failing loudly when the signer is gone', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const { engine } = await harness(store, null);
+
+    const status = await engine.start();
+
+    expect(status.state).toBe('error');
+    expect(status.lastError).toContain('Signer connection was lost');
+    expect(relay.events.size).toBe(0);
+  });
+
+  it('persists the last error so the panel can show it after a reload', async () => {
+    const store = await freshStore();
+    await populate(store);
+    relay.failure = 'network';
+    const { engine } = await harness(store);
+    await engine.start();
+
+    expect((await store.getSettings()).backup?.lastError).toContain('network failure');
+  });
+});
+
+describe('turning backup off', () => {
+  it('stops syncing and leaves both sides intact', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const { engine } = await harness(store);
+    await engine.start();
+    const uploaded = relay.events.size;
+
+    engine.stop();
+    await store.saveSheet({ name: 'After Off', exercises: [] });
+    await flush();
+    await flush();
+
+    expect(engine.status().state).toBe('off');
+    // Nothing deleted on the relay, and a later change is not queued behind its back.
+    expect(relay.events.size).toBe(uploaded);
+    expect(await store.listSyncQueue()).toHaveLength(0);
+  });
+
+  it('does not duplicate records when it is turned back on', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const { engine } = await harness(store);
+    await engine.start();
+    const uploaded = relay.events.size;
+
+    engine.stop();
+    await engine.start();
+
+    expect(relay.events.size).toBe(uploaded);
+  });
+});

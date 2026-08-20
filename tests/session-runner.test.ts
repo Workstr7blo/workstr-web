@@ -17,7 +17,7 @@ function makeState(store: WorkstrStore): AppState {
     exercises: [], programs: [], activeSession: null, finishedSessions: [],
     publishingSessionId: null, publishingStatus: null, editingId: null, filter: '',
     programFilter: '', expandedProgramAddress: null, exerciseStatus: '', programStatus: '',
-    signInStatus: null, expandedSessionId: null, history: { monthKey: null, selectedDate: null },
+    signInStatus: null, backup: { state: 'off' as const, pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null },
     qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false },
     bodyEntries: [], sheets: [], library: [],
     librarySelect: { active: false, slugs: new Set() }, discoverSelect: { active: false, addresses: new Set() },
