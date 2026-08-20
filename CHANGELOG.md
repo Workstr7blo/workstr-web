@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Backup said your signer did not respond while the signer app showed it had already
+  answered.** The reply from a signer travels back over a relay connection that was still
+  being opened when the request went out, so a signer quick enough to answer immediately —
+  any signer you have already given permission to — answered before anything was listening,
+  and the reply was lost. Every retry started a new connection and lost the reply the same
+  way. The connection is now open before the first request is sent.
+
 - **Backup stayed broken until you reloaded the app, once your signer had gone quiet
   once.** A remote signer is reached over a connection your phone closes when it puts the
   app to sleep, and the app kept using that closed connection for the rest of the session

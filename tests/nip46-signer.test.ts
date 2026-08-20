@@ -1,4 +1,5 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { SimplePool } from 'nostr-tools';
 import { createCachedNip46Signer } from '../src/signer/nip46';
 
 const CLIENT_SECRET = '11'.repeat(32);
@@ -26,5 +27,32 @@ describe('a reconnected bunker signer', () => {
   it('is null when this device has no bunker to reconnect to', () => {
     localStorage.removeItem('workstr.nip46.connection');
     expect(createCachedNip46Signer(USER_PUBKEY)).toBeNull();
+  });
+
+  // The bug behind "your signer did not respond" while the signer app showed the request
+  // handled: a BunkerSigner opens the subscription its answers arrive on and publishes the
+  // request on sockets that are still being dialled, so a permissioned signer's instant
+  // answer can reach the relay before the subscription does, and is then lost for good.
+  it('does not send a request until the relay sockets are open', async () => {
+    let openTheRelay = (): void => {};
+    const opened = new Promise<void>((resolve) => { openTheRelay = resolve; });
+    const publish = vi.fn(async () => 'ok');
+    const relay = { subscribe: () => ({ close: () => {} }), publish };
+    const ensure = vi.spyOn(SimplePool.prototype, 'ensureRelay')
+      .mockImplementation((() => opened.then(() => relay)) as never);
+
+    const signer = createCachedNip46Signer(USER_PUBKEY)!;
+    void signer.nip44Encrypt(USER_PUBKEY, 'a workout').catch(() => {});
+
+    for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
+    expect(ensure).toHaveBeenCalledWith('wss://relay.test');
+    // Nothing has gone out while the socket is still being dialled, so no answer can
+    // arrive before the subscription that has to catch it.
+    expect(publish).not.toHaveBeenCalled();
+
+    openTheRelay();
+    for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+    expect(publish).toHaveBeenCalled();
+    ensure.mockRestore();
   });
 });

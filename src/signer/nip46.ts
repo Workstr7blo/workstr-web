@@ -40,17 +40,33 @@ function toSigned(event: VerifiedEvent): SignedNostrEvent {
   return event as SignedNostrEvent;
 }
 
+// A BunkerSigner opens the subscription its answers arrive on and then publishes the
+// request straight away, both on sockets that are still being dialled. A permissioned
+// signer answers immediately, so on a cold connection the answer reaches the relay before
+// the subscription does — and an answer nobody is listening for is gone for good. The
+// request itself lands, which is why the signer app shows it handled while the client sits
+// there until it times out.
+//
+// Waiting on the same relay connections the subscription is waiting on fixes the order:
+// `subscribe` asked for them first, so its REQ is on the wire before this resolves and
+// before any request that needs an answer is published.
+async function openRelays(pool: SimplePool, relays: string[]): Promise<void> {
+  // One unreachable relay must not hold the signer back; the others still carry it.
+  await Promise.all(relays.map((relay) => pool.ensureRelay(relay).catch(() => null)));
+}
+
 // `knownPubkey` is the key this device is already signed in as. Asking the bunker to
 // repeat it costs a full round trip out to a signer app and back, and it is the first call
 // of every sync pass — so on a connection that has gone quiet it is also the call that
 // fails, reporting a stalled signer as a problem with reading a public key.
-function wrapBunkerSigner(signer: BunkerSigner, knownPubkey?: string): Signer {
+function wrapBunkerSigner(signer: BunkerSigner, ready: Promise<void>, knownPubkey?: string): Signer {
+  const whenReady = <T>(run: () => Promise<T>): Promise<T> => ready.then(run);
   return {
     type: 'nip46',
-    getPublicKey: () => (knownPubkey ? Promise.resolve(knownPubkey) : signer.getPublicKey()),
-    signEvent: (event: UnsignedNostrEvent) => signer.signEvent(event).then(toSigned),
-    nip44Encrypt: (peerPubkey, plaintext) => signer.nip44Encrypt(peerPubkey, plaintext),
-    nip44Decrypt: (peerPubkey, ciphertext) => signer.nip44Decrypt(peerPubkey, ciphertext)
+    getPublicKey: () => (knownPubkey ? Promise.resolve(knownPubkey) : whenReady(() => signer.getPublicKey())),
+    signEvent: (event: UnsignedNostrEvent) => whenReady(() => signer.signEvent(event).then(toSigned)),
+    nip44Encrypt: (peerPubkey, plaintext) => whenReady(() => signer.nip44Encrypt(peerPubkey, plaintext)),
+    nip44Decrypt: (peerPubkey, ciphertext) => whenReady(() => signer.nip44Decrypt(peerPubkey, ciphertext))
   };
 }
 
@@ -90,13 +106,15 @@ export async function createBunkerSigner(input: string, options: BunkerOptions =
   const secret = clientSecretKey();
   const pool = new SimplePool();
   const signer = BunkerSigner.fromBunker(secret, pointer, { pool, onauth: options.onAuthUrl });
+  // Before `connect`, not after: that request needs an answer like any other.
+  await openRelays(pool, pointer.relays);
   await signer.connect({
     name: 'Workstr',
     url: window.location.origin
   });
   cacheConnection(secret, pointer);
 
-  return wrapBunkerSigner(signer);
+  return wrapBunkerSigner(signer, Promise.resolve());
 }
 
 export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options: BunkerOptions = {}): NostrConnectRequest {
@@ -123,7 +141,7 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
       cacheConnection(secret, signer.bp);
       return {
         pubkey: signer.bp.pubkey,
-        signer: wrapBunkerSigner(signer)
+        signer: wrapBunkerSigner(signer, Promise.resolve())
       };
     })
   };
@@ -137,7 +155,9 @@ export function createCachedNip46Signer(knownPubkey?: string, options: BunkerOpt
   if (!cached) return null;
   const pool = new SimplePool();
   const signer = BunkerSigner.fromBunker(hexToBytes(cached.clientSecret), cached.bunker, { pool, onauth: options.onAuthUrl });
-  return wrapBunkerSigner(signer, knownPubkey);
+  // Every reconnection starts cold, and this is the path a stalled signer is rebuilt on,
+  // so without the wait a retry loses its first answer exactly like the attempt before it.
+  return wrapBunkerSigner(signer, openRelays(pool, cached.bunker.relays), knownPubkey);
 }
 
 export function isLikelyBunkerInput(value: string): boolean {
