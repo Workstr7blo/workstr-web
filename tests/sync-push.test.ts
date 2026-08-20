@@ -145,6 +145,42 @@ describe('push queue', () => {
     spy.mockRestore();
   }, 30000);
 
+  // "Sync now" said syncing with no count beside it for minutes. Progress was reported
+  // between queue entries, so a month that is eight records reported nothing at all until
+  // the whole month was done — indistinguishable from a hang, on exactly the months that
+  // take longest.
+  it('counts progress in records, so a long month visibly moves', async () => {
+    const store = await freshStore();
+    for (let day = 1; day <= 24; day += 1) {
+      const date = `2026-08-${String(day).padStart(2, '0')}`;
+      const id = await store.createSession({ started_at: `${date}T10:00:00.000Z`, sheet_name: 'Upper Body Hypertrophy Block A' });
+      for (let n = 1; n <= 24; n += 1) {
+        await store.addSessionSet({
+          session_id: id, exercise_slug: 'barbell-bench-press-medium-grip', set_number: n,
+          reps: 8, weight_kg: 82.5, completed_at: `${date}T10:${String(n).padStart(2, '0')}:00.000Z`
+        });
+      }
+    }
+    await store.enqueueSync(sessionsAddress('2026-08'), '2026-08-24T10:24:00.000Z');
+
+    const relay = await import('../src/sync/relay');
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => (
+      { address: record.address, accepted: true, reason: 'ok', eventId: 'id', createdAt: 1 }
+    ));
+
+    const seen: string[] = [];
+    await pushQueue(store, fakeSigner(), 'ws://relay.test', { onProgress: (done, total) => seen.push(`${done}/${total}`) });
+
+    // One queued month, several records: the count has to move within it, not jump from
+    // nothing straight to done.
+    expect(seen.length).toBeGreaterThan(3);
+    expect(seen[0]).toMatch(/^0\//);
+    const [done, total] = seen[seen.length - 1].split('/').map(Number);
+    expect(done).toBe(total);
+    expect(total).toBeGreaterThan(3);
+    spy.mockRestore();
+  }, 30000);
+
   // A month of real training is several parts, each costing two signer round trips, so a
   // pass that runs out of time or loses its connection partway is normal. Without this the
   // month restarted from part one every time: the parts that had already landed were sent
