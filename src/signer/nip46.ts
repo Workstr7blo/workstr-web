@@ -2,7 +2,25 @@ import { SimplePool, type VerifiedEvent } from 'nostr-tools';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { BunkerSigner, createNostrConnectURI, parseBunkerInput, type BunkerPointer } from 'nostr-tools/nip46';
+import { PRIVATE_RECORD_KIND } from '../nostr/codecs30078';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from './types';
+
+// Everything Workstr ever asks a signer to do, named as narrowly as NIP-46 allows.
+// Requested once, at connection: a signer that has not been told up front asks the user
+// about every request instead, and a backup is one request per record — several per month
+// of training, twice over, since each record is encrypted and then signed.
+//
+// The two kinds are the whole surface: 30078 is the encrypted backup record
+// (`src/nostr/codecs30078.ts`), kind 1 the workout summary a user chooses to share
+// (`src/nostr/share.ts`). Naming them rather than asking for blanket `sign_event` means a
+// signer can show what it is granting, and Workstr cannot quietly sign anything else.
+export const SIGNER_PERMS = [
+  'get_public_key',
+  'nip44_encrypt',
+  'nip44_decrypt',
+  `sign_event:${PRIVATE_RECORD_KIND}`,
+  'sign_event:1'
+];
 
 const CLIENT_SECRET_KEY = 'workstr.nip46.clientSecret';
 const CACHED_CONNECTION_KEY = 'workstr.nip46.connection';
@@ -128,10 +146,15 @@ export async function createBunkerSigner(input: string, options: BunkerOptions =
   const signer = BunkerSigner.fromBunker(secret, pointer, { pool, onauth: options.onAuthUrl });
   // Before `connect`, not after: that request needs an answer like any other.
   await openRelays(pool, pointer.relays);
-  await signer.connect({
-    name: 'Workstr',
-    url: window.location.origin
-  });
+  // Not `signer.connect()`: nostr-tools sends an empty permission string there, which asks
+  // the signer for nothing and leaves it prompting on every request afterwards. The
+  // connect params are [remote pubkey, secret, permissions, client metadata].
+  await signer.sendRequest('connect', [
+    pointer.pubkey,
+    pointer.secret || '',
+    SIGNER_PERMS.join(','),
+    JSON.stringify({ name: 'Workstr', url: window.location.origin })
+  ]);
   cacheConnection(secret, pointer);
 
   return wrapBunkerSigner(signer, () => openRelays(pool, pointer.relays));
@@ -151,7 +174,7 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
     secret: connectionSecret,
     name: 'Workstr',
     url: window.location.origin,
-    perms: ['get_public_key', 'sign_event', 'nip44_encrypt', 'nip44_decrypt']
+    perms: SIGNER_PERMS
   });
   const pool = new SimplePool();
   return {

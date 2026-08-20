@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   training in it than fits in one relay event is split across a few, so a heavy training
   block still uploads instead of being refused.
 
+### Changed
+
+- **Connecting a signer now asks for exactly what Workstr needs, once.** It names the two
+  kinds of event the app ever signs — your encrypted backup records and the workout
+  summaries you choose to share — instead of asking to sign anything at all in your name.
+  Connecting by pasting a `bunker://` link previously asked for no permissions whatsoever,
+  which left some signer apps asking you to approve every single record; that link now
+  requests the same permissions the QR code does. Existing connections are unaffected.
+
 ### Fixed
 
 - **The page jumped back to the top constantly.** Expanding a workout in history, or a
