@@ -97,19 +97,30 @@ export interface SessionsBundlePayload {
 // event size in common use, and clearing it means every signer can answer.
 export const NIP46_REQUEST_CEILING_BYTES = 32768;
 
-// How much session JSON goes into one record before it is split.
+// What a record's plaintext grows to by the time it is inside a signing request. NIP-44
+// base64 inflates it at each of the two hops and every hop adds an event envelope, and the
+// two compound: measured against real NIP-44, a part packed to the budget arrives at the
+// signer's relay at 2.07x the JSON that went in.
 //
-// The binding limit is not the backup relay's `maxEventSize` — strfry ships 64 KB and a
-// record that big arrives intact. It is the round trip above: NIP-44 inflates by about a
-// third at each of the two hops, so a bundle asks the signer's relay to accept roughly
-// twice its plaintext. A 40 KB bundle meant a ~100 KB request, which no relay accepted;
-// the signer never answered, the pass hit its timeout, and backup could not upload at all.
-//
-// 16 KB of JSON encrypts to a ~22 KB record and a ~31 KB signing request, inside the
-// ceiling. The cost of a split is one more signer round trip; the cost of guessing high is
-// a backup that does not work, which is what 40 KB bought. `tests/sync-bundle-size.test.ts`
-// measures the whole chain with real NIP-44 rather than trusting this arithmetic.
-export const MAX_BUNDLE_BYTES = 16000;
+// This factor is the whole reason the budget cannot be eyeballed. A 40 KB bundle produced
+// an 83 KB request no relay would carry. Correcting it to 16 KB was still wrong: it was
+// checked against a month of large sessions, which packs three to a part and stops well
+// short of the budget, while a month of smaller sessions fills a part right up to it and
+// produced a 33,269 byte request — over the ceiling by 500 bytes, and refused, while the
+// encrypt request at 27,805 went through. Encrypt succeeding and signing failing is the
+// signature of a budget that is too high by a little rather than a lot.
+const NIP46_EXPANSION = 2.1;
+
+// Kept off the ceiling rather than tuned up to it. Signers differ, the expansion varies
+// with how JSON happens to compress, and the cost of a split is one more round trip while
+// the cost of overshooting is a backup that does not work at all.
+const NIP46_HEADROOM = 0.8;
+
+// How much session JSON goes into one record before it is split. A part packed right to
+// this budget is the worst case, and it is the one `tests/sync-bundle-size.test.ts`
+// measures — the earlier test asserted on an easier shape and passed while real months
+// were over the line.
+export const MAX_BUNDLE_BYTES = Math.floor((NIP46_REQUEST_CEILING_BYTES * NIP46_HEADROOM) / NIP46_EXPANSION);
 
 function bundledSessions(entries: { session: Session; sets: SessionSet[] }[]): BundledSession[] {
   return entries

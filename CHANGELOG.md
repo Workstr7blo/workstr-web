@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Backup could still fail to sign a month of training, on months made up of shorter
+  workouts.** The limit on how much training goes into one record was set from a month of
+  long workouts, which never fills a record completely. A month of shorter, more frequent
+  workouts packs one full — and those records came out just over what a signer will accept,
+  so encrypting worked and signing failed. The limit is now worked out from the signer
+  limit itself rather than set by hand, and checked against a record packed completely
+  full.
+
 - **Backup said your signer did not respond while the signer app showed it had already
   answered.** The reply from a signer travels back over a relay connection that was still
   being opened when the request went out, so a signer quick enough to answer immediately —
