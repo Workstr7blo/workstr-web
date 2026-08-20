@@ -29,6 +29,7 @@ or set updates would make full-root rendering inappropriate.
 | Preferences, recovery, history actions, and backup controls | `src/app/preferences-controller.ts` | `src/db/export.ts`, recovery modules, `src/nostr/zaps.ts` | feature tests, `tests/export.test.ts`, browser verification |
 | Stored/live session adaptation | `src/app/session-persistence.ts` | `src/db/store.ts`, `src/app/state.ts` | `tests/session-runner.test.ts`, `tests/store.test.ts` |
 | Top-level navigation and page markup | `src/app/layout.ts` | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
+| Redrawing without losing the reader's place | `src/app/scroll.ts` | `src/app/shell.ts` (`render`) | `tests/scroll.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
 | Programs and program builder | `src/app/program-builder.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts` | `src/db/store.ts`, `src/nostr/programImport.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, browser verification |

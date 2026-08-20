@@ -17,6 +17,7 @@ import { EX_PLACEHOLDER, exerciseImage, exerciseSourceLabel, filterExercises, fo
 import { shellMarkup } from './layout';
 import { createSessionRunner } from './session-runner';
 import { paintBodyMapSvg } from './bodymap';
+import { preservingScroll } from './scroll';
 import { discoverImportable, discoverImportState } from '../features/discover/views';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
 import { getQuickWorkout } from '../features/recovery/quickWorkout';
@@ -141,19 +142,22 @@ export function renderShell(root: HTMLElement): void {
     render();
   }
 
-  function render(): void {
-    root.innerHTML = shellMarkup(state);
-    bind();
-    if (state.activeSession) void sessionRunner.openSessionOverlay(state.activeSession);
-    identity.renderIfPending();
-    programBuilder.renderIfOpen();
+  // `toTop`: moving to another view is a new page to the reader, not a redraw.
+  function render(options: { toTop?: boolean } = {}): void {
+    preservingScroll(() => {
+      root.innerHTML = shellMarkup(state);
+      bind();
+      if (state.activeSession) void sessionRunner.openSessionOverlay(state.activeSession);
+      identity.renderIfPending();
+      programBuilder.renderIfOpen();
+    }, options.toTop);
   }
 
   function bind(): void {
     root.querySelectorAll<HTMLElement>('[data-view]').forEach((button) => button.addEventListener('click', () => {
       state.view = button.dataset.view as View;
       state.editingId = null;
-      render();
+      render({ toTop: true });
       if (state.view === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
       if (state.view === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
       if (state.view === 'settings') void preferences.refreshFunding();
@@ -164,12 +168,12 @@ export function renderShell(root: HTMLElement): void {
         (state.subState[parent] as SubView) = button.dataset.subtab as SubView;
         state.view = parent as View;
         state.editingId = null;
-        render();
+        render({ toTop: true });
         if (parent === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
         if (parent === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
       }
     }));
-    root.querySelector('#account-chip')?.addEventListener('click', () => { state.view = 'settings'; render(); void preferences.refreshFunding(); });
+    root.querySelector('#account-chip')?.addEventListener('click', () => { state.view = 'settings'; render({ toTop: true }); void preferences.refreshFunding(); });
     root.querySelectorAll<HTMLElement>('[data-copy]').forEach((button) => button.addEventListener('click', () => {
       void navigator.clipboard.writeText(button.dataset.copy || '')
         .then(() => toast('Copied'), () => toast('Could not copy', 'bad'));
