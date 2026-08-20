@@ -165,8 +165,11 @@ Detailed execution plan: `docs/plans/v2-encrypted-backup-alpha.md`.
    rejected.
 2. Abuse controls — per-pubkey quota, total storage ceiling with an alert, block list.
    With neither payment nor admission limiting anything, these are the only limiter.
-3. Off-machine nightly LMDB backups and a restore runbook. Hard gate before anyone but
-   the operator enables the toggle.
+3. ~~Off-machine nightly LMDB backups and a restore runbook.~~ — done. The backup host
+   pulls a verified snapshot nightly, so the relay holds no credential for its own
+   backups; seven dailies plus four weeklies, and `relay/backup/README.md` carries the
+   restore procedure and the drill record. Repeating the drill against a production
+   snapshot is what gates the toggle beyond the operator.
 
 **Client**
 
