@@ -25,9 +25,22 @@ export async function pullRecords(relayUrl: string, signer: Signer, options: Pul
   const events = await fetchRecords(relayUrl, await signer.getPublicKey());
   const records: DecodedPrivateRecord[] = [];
   let unreadable = 0;
+  let consecutiveFailures = 0;
   for (const [index, event] of events.entries()) {
     const decoded = await decodePrivateRecord(signer, event);
-    if (decoded) records.push(decoded); else unreadable += 1;
+    if (decoded) {
+      records.push(decoded);
+      consecutiveFailures = 0;
+    } else {
+      unreadable += 1;
+      consecutiveFailures += 1;
+      // A damaged record is rare and isolated; a run of failures from the very start is
+      // the signer, not the data. Without this a restore would wait out one timeout per
+      // event, which on a real history is hours of a status line saying nothing.
+      if (consecutiveFailures >= 3 && records.length === 0) {
+        throw new Error('Signer could not decrypt your backup. Open your signer app and try again.');
+      }
+    }
     options.onProgress?.(index + 1, events.length);
   }
   return { records, unreadable };

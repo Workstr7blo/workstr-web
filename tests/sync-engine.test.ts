@@ -3,6 +3,7 @@ import { WorkstrStore } from '../src/db/store';
 import { createSyncEngine, RETRY_BASE_MS, type SyncStatus } from '../src/sync/engine';
 import { sheetAddress } from '../src/sync/addresses';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
+import { withSignerTimeout } from '../src/signer/timeout';
 import type { PrivateRecord } from '../src/nostr/codecs30078';
 
 const SELF = 'ab'.repeat(32);
@@ -22,10 +23,17 @@ vi.mock('../src/sync/relay', async () => {
     classifyPublish: () => ({ accepted: true, reason: 'ok' }),
     async publishRecord(signer: Signer, _url: string, record: PrivateRecord) {
       if (relay.failure) return { address: record.address, accepted: false, failure: relay.failure, reason: `${relay.failure} failure` };
-      const unsigned = await encodePrivateRecord(signer, record);
-      // Addressable: republishing an address replaces it, exactly like a real relay.
-      relay.events.set(record.address, { event: { ...unsigned, id: `id-${record.address}`, pubkey: SELF, sig: 'sig' } });
-      return { address: record.address, accepted: true, reason: 'ok' };
+      try {
+        const unsigned = await encodePrivateRecord(signer, record);
+        // Addressable: republishing an address replaces it, exactly like a real relay.
+        relay.events.set(record.address, { event: { ...unsigned, id: `id-${record.address}`, pubkey: SELF, sig: 'sig' } });
+        return { address: record.address, accepted: true, reason: 'ok' };
+      } catch (error) {
+        // Mirrors the real publishRecord: encoding and signing happen before anything is
+        // sent, so a throw here is the signer. A double that lets it escape instead hides
+        // the very handling these tests exist to check.
+        return { address: record.address, accepted: false, failure: 'signer', reason: error instanceof Error ? error.message : String(error) };
+      }
     },
     async fetchRecords() {
       return [...relay.events.values()].map((entry) => entry.event);
@@ -208,6 +216,47 @@ describe('when the relay or signer will not cooperate', () => {
     expect(status.lastError).toContain('Relay rejected');
     // The one outcome a backup may never produce is a record that quietly disappears.
     expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
+  });
+
+  it('does not hang forever when the signer never answers', async () => {
+    // The iPhone bug: a NIP-46 signer that goes silent used to leave the pass wedged with
+    // the status stuck on "syncing", no error, and Sync now returning the same dead promise.
+    const store = await freshStore();
+    await populate(store);
+    const silent: Signer = {
+      type: 'nip46',
+      getPublicKey: async () => SELF,
+      signEvent: () => new Promise(() => {}),
+      nip44Encrypt: () => new Promise(() => {}),
+      nip44Decrypt: () => new Promise(() => {})
+    };
+    const { engine, state } = await harness(store, withSignerTimeout(silent, 20));
+
+    const status = await engine.start();
+
+    expect(status.state).toBe('error');
+    expect(status.lastError).toContain('signer did not respond');
+    // And it schedules a retry rather than sitting there.
+    expect(state.timers.at(-1)?.delayMs).toBe(RETRY_BASE_MS);
+    // The queue is intact, so nothing was lost while the signer was away.
+    expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
+  });
+
+  it('stops at the first unanswered record instead of waiting out every one', async () => {
+    // Five records with a dead signer is five timeouts if the loop keeps going.
+    const store = await freshStore();
+    await populate(store);
+    let attempts = 0;
+    const silent: Signer = {
+      type: 'nip46',
+      getPublicKey: async () => SELF,
+      signEvent: () => new Promise(() => {}),
+      nip44Encrypt: () => { attempts += 1; return new Promise(() => {}); },
+      nip44Decrypt: () => new Promise(() => {})
+    };
+    const { engine } = await harness(store, withSignerTimeout(silent, 20));
+    await engine.start();
+    expect(attempts).toBe(1);
   });
 
   it('goes quiet rather than failing loudly when the signer is gone', async () => {
