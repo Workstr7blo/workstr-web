@@ -81,13 +81,66 @@ Publish those from a throwaway key, then remove the accepted event so verificati
 not leave data behind:
 
 ```
-strfry delete --filter '{"authors":["<throwaway pubkey>"]}'
+docker exec <container> /app/strfry --config=/app/strfry.conf delete --filter '{"authors":["<throwaway pubkey>"]}'
 ```
 
-## Scope
+`strfry` is not on `PATH` inside the upstream image, so invoke it by its full path.
 
-This plugin decides accept/reject per event and holds no state. Per-pubkey storage quotas,
-the total storage ceiling, and the block list are separate and stateful; they are issue #2.
+## Limits
+
+With neither payment nor admission bounding anything, the kind and prefix filter plus these
+limits are the entire defence. Organic use is not the worry — `30078` is addressable, so an
+honest user's footprint is capped by their distinct `d` tags — deliberate abuse is.
+
+| Limit | Default | Environment variable |
+|---|---|---|
+| Per-pubkey quota | 50 MB | `WORKSTR_QUOTA_BYTES` |
+| Total storage ceiling | 20 GB | `WORKSTR_CEILING_BYTES` |
+| Alert threshold | 80% of the ceiling | `WORKSTR_ALERT_RATIO` |
+| State directory | — | `WORKSTR_POLICY_STATE` |
+
+The state directory must be **writable by the container user**, and must be a mounted
+volume — the plugin itself is mounted read-only. If it cannot be written the plugin says so
+once and keeps enforcing from memory: failing open on quota would be bad, and refusing every
+write because a disk is read-only would be worse for a backup relay.
+
+**Usage is counted per address, not per publish.** Kind 30078 is addressable, so
+republishing a record replaces the stored event; charging every publish would bill a user
+who syncs daily for storage that never grew. The ledger therefore tracks the size of the
+current event at each `d` tag, and a replacement is charged the difference.
+
+Two files, two owners, so neither clobbers the other: the plugin writes `usage.json`, the
+admin tool writes `blocklist.json`, and the plugin re-reads the block list whenever it
+changes on disk — a block takes effect without a relay restart.
+
+The alert fires against the threshold rather than on a full disk, once per crossing rather
+than once per event, and goes to the container log. It names no path and no pubkey.
+
+## Admin commands
+
+The relay host has no node, so these run inside the container:
+
+```sh
+admin() { docker exec -e WORKSTR_POLICY_STATE=/app/policy-state <container> node /app/relay-admin.mjs "$@"; }
+
+admin status                     # totals, ceiling, alert threshold, block count
+admin list [n]                   # the n largest authors
+admin usage <pubkey>             # one author's footprint
+admin block <pubkey> [reason]    # takes effect immediately, no restart
+admin unblock <pubkey>
+```
+
+`rebuild` recomputes the ledger from what the relay actually holds, which is the fix for
+drift after a restore, a manual delete, or a lost state file:
+
+```sh
+docker exec <container> /app/strfry --config=/app/strfry.conf export \
+  | docker exec -i -e WORKSTR_POLICY_STATE=/app/policy-state <container> node /app/relay-admin.mjs rebuild
+```
+
+Restart the relay afterwards so the plugin reloads the ledger.
+
+## Scope
 
 Do not add an allowlist here. If the funding trigger in `docs/instruction.md` §11.4 ever
 fires, admission control arrives as part of Phase 2b along with NIP-42, and that is a
