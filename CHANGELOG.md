@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Auto-backup.** One switch in Settings → Backup copies your programs, workout history,
+  body log and preferences to the Workstr relay, and keeps them there as you train.
+  Everything is encrypted on your device to your own key before it leaves: the relay holds
+  ciphertext it cannot open, and only your key can read it back. Sign in on another device
+  with the same identity and your training is restored. Turning it on the first time backs
+  up the history you already have, and picks up where it left off if that is interrupted.
+  A status line says what is waiting to upload and when the last backup ran; Sync now is
+  there when you want it, and a relay that cannot be reached retries on its own without
+  ever interrupting a workout. Turning it off stops the copying and leaves both your device
+  and the relay untouched. Backup needs an identity, so turning it on while signed out
+  takes you through sign-in and comes back on by itself.
+
 - **The app now updates itself.** An installed PWA resumes its existing page instead of
   navigating, so a phone could keep running a build for days and never pick up a fix. The
   app now checks for a new version while it is open, and applies it the next time you

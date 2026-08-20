@@ -3,6 +3,7 @@ import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings } from '
 import type { RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import type { SupportState } from '../features/support/views';
+import type { SyncStatus } from '../sync/engine';
 
 export type View = 'exercises' | 'workouts' | 'statistics' | 'settings';
 export type SubView = 'library' | 'discover' | 'programs' | 'history' | 'recovery' | 'training' | 'body';
@@ -91,6 +92,9 @@ export interface AppState {
   exerciseStatus: string;
   programStatus: string;
   signInStatus: string | null;
+  // Live backup status, mirrored from the sync engine so the Settings panel renders from
+  // state like every other view rather than reaching into the engine.
+  backup: SyncStatus;
 }
 
 // Session-model helpers shared by more than one feature (features must not

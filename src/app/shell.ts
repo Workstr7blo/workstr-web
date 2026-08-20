@@ -27,6 +27,7 @@ import { createSessionPersistence } from './session-persistence';
 import { createCatalogController } from './catalog-controller';
 import { createIdentityController } from './identity-controller';
 import { createPreferencesController } from './preferences-controller';
+import { createBackupController } from './backup-controller';
 export { launchSignerUri } from './identity-controller';
 
 const SESSION_KEY = 'workstr.currentPubkey';
@@ -61,7 +62,7 @@ async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<Rela
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -132,6 +133,9 @@ export function renderShell(root: HTMLElement): void {
     }
     await catalog.reloadLibrary();
     state.activeSession = await sessionPersistence.loadUnfinished();
+    // Last: the engine attaches a change listener to this store, and every load step
+    // above is a write it must not mistake for something the user did.
+    void backup.resume();
   }
 
   function render(): void {
@@ -173,6 +177,8 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#remove-account-data')?.addEventListener('click', () => { void identity.signOutAndRemoveData(); });
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void preferences.saveUnitPreference((event.target as HTMLSelectElement).value); });
     root.querySelectorAll('.equip-toggle').forEach((box) => box.addEventListener('change', () => { void preferences.saveOwnedEquipment(); }));
+    root.querySelector('#auto-backup')?.addEventListener('change', (event) => { void backup.setEnabled((event.target as HTMLInputElement).checked); });
+    root.querySelector('#sync-now')?.addEventListener('click', () => { void backup.syncNow(); });
     root.querySelector('#export-data')?.addEventListener('click', () => { void preferences.exportUserData(); });
     root.querySelector('#import-data')?.addEventListener('click', () => root.querySelector<HTMLInputElement>('#import-file')?.click());
     root.querySelector('#import-file')?.addEventListener('change', (event) => { void preferences.importUserData(event.target as HTMLInputElement); });
@@ -353,6 +359,11 @@ export function renderShell(root: HTMLElement): void {
     root, state, render, toast,
     startTrainingSession: sessionRunner.startTrainingSession,
     loadFinishedSessions: sessionPersistence.loadFinished
+  });
+  const backup = createBackupController({
+    state, render, toast,
+    getSigner: identity.getActiveSigner,
+    requestSignIn: () => { void identity.startRemoteSignerRequest(); }
   });
 
   function unitLabel(): string { return normalizeWeightUnit(state.settings.unit); }
