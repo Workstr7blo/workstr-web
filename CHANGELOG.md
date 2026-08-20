@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A big month of training could never finish backing up, resending the same records
+  every time.** A month is uploaded in several records, and the month only counted as done
+  when all of them were in — so if a backup ran out of time or lost its connection partway,
+  the next one started that month again from the beginning. On a month with a lot of
+  training it never got to the end, and the same records went to your signer over and over.
+  Records already safely on the relay are now skipped, so each attempt picks up where the
+  last one stopped.
+
 - **Backup could stop doing anything at all — no request reaching your signer, and Sync
   now doing nothing.** Waiting for the connection to your signer to be ready was meant to
   stop replies being missed, but it waited for *every* relay it could reach your signer

@@ -81,9 +81,11 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
   // and `dequeueSync` refuses to clear an entry newer than what was actually published,
   // so a snapshot taken here can never swallow a change made during the upload.
   const sessions = await loadSessionEntries(store);
-  // Every address this device has written or read. A month checks it to find the parts
-  // it published when it was bigger than it is now.
-  const published = new Set((await store.listSeen()).map((seen) => seen.address));
+  // What this device has already put on the relay, by address. A month reads it twice: to
+  // find the parts it published when it was bigger than it is now, and to skip the parts
+  // it has already sent unchanged.
+  const seen = new Map((await store.listSeen()).map((entry) => [entry.address, entry]));
+  const published = new Set(seen.keys());
 
   try {
     for (const [index, entry] of batch.entries()) {
@@ -95,11 +97,18 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
       // of them are in, so an interrupted month is retried whole rather than left half
       // uploaded with nothing recording which half made it.
       for (const record of records) {
+        // Already on the relay, unchanged since it went there. A month of real training is
+        // several parts and each one costs two signer round trips, so without this a month
+        // that ran out of time or lost its connection partway restarted from part one every
+        // pass — re-sending what had already landed and never reaching the end. Earlier
+        // parts stay byte-identical as a month grows, which is why they are packed
+        // chronologically, so an unchanged timestamp really does mean an unchanged record.
+        if (!record.deleted && seen.get(record.address)?.updated_at === record.updatedAt) continue;
         const outcome = await publishRecord(signer, relayUrl, record, pool, false);
         if (outcome.accepted) {
           // The device already holds what it just sent, so the next pull recognises this
           // event in the relay's answer and skips decrypting its own upload back to itself.
-          if (outcome.eventId && outcome.createdAt) await store.noteSeen(record.address, outcome.eventId, outcome.createdAt);
+          if (outcome.eventId && outcome.createdAt) await store.noteSeen(record.address, outcome.eventId, outcome.createdAt, record.updatedAt);
           continue;
         }
         complete = false;
