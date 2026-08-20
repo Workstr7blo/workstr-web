@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Backup failed with "your signer did not respond" and never got past the first few
+  records.** A month of training was packed into a record large enough that asking a
+  remote signer app to sign it meant sending that signer a message twice the size again —
+  bigger than any relay will carry — so the request never arrived and backup waited out
+  its timeout. Months are now packed to a size a signer can handle, split across a few
+  more records where needed. Anything already uploaded in the oversized shape is rewritten
+  automatically the next time backup runs.
+
 - **A deleted workout could come back on a restore.** A training month heavy enough to be
   split across several relay records left the extra record behind when it later shrank,
   and a workout deleted from that month was still listed in it — so setting up a new
