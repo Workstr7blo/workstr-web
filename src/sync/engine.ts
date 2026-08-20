@@ -54,6 +54,11 @@ export interface SyncEngineContext {
   // Called when a signer stops answering, so the caller can discard the connection it
   // handed over. Without it a dead NIP-46 subscription is retried until the page reloads.
   onSignerStalled?(): void;
+  // Called when a pull actually changed the database, so the caller can re-read what it
+  // is showing. Restoring into IndexedDB is not enough on its own: the screen renders
+  // state read when the namespace opened, and a device that has just signed in and pulled
+  // its whole history would otherwise show nothing.
+  onRestored?(): void;
   // Injected by tests so a backoff is asserted rather than waited out.
   schedule?(run: () => void, delayMs: number): () => void;
 }
@@ -125,6 +130,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       });
       pulled = true;
       report({ progress: undefined });
+      if (merged.applied > 0 || merged.deleted > 0) ctx.onRestored?.();
       if (merged.unreadable > 0) report({ lastError: `${merged.unreadable} backup record(s) could not be read` });
     }
 
