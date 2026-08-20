@@ -12,6 +12,8 @@ export interface BackupControllerContext {
   render(): void;
   toast(message: string, kind?: 'ok' | 'bad'): void;
   getSigner(): Promise<Signer | null>;
+  // Drops the cached signer so the next pass builds a fresh connection to it.
+  onSignerStalled?(): void;
   requestSignIn(): void;
   relayUrl?: string;
 }
@@ -34,7 +36,7 @@ export function createBackupController(ctx: BackupControllerContext): BackupCont
   const engineFor = (): SyncEngine | null => {
     const store = ctx.state.store;
     if (!store) return null;
-    if (!engine) engine = createSyncEngine({ store, getSigner: ctx.getSigner, onStatus, relayUrl: ctx.relayUrl });
+    if (!engine) engine = createSyncEngine({ store, getSigner: ctx.getSigner, onStatus, relayUrl: ctx.relayUrl, onSignerStalled: ctx.onSignerStalled });
     return engine;
   };
 

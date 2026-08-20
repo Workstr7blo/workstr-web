@@ -3,7 +3,7 @@ import type { Signer } from '../signer/types';
 import { retireLegacySessionQueue, runBackfill } from './backfill';
 import { pullAndMerge } from './merge';
 import { pushQueue } from './push';
-import { withSignerTimeout } from '../signer/timeout';
+import { SignerTimeoutError, withSignerTimeout } from '../signer/timeout';
 
 // The single backup destination. Not a user preference and never announced: the relay
 // accepts only this client's encrypted records, so putting it in the user's kind:10002
@@ -51,6 +51,9 @@ export interface SyncEngineContext {
   // erroring loudly: the user is training, not administering a backup.
   getSigner(): Promise<Signer | null>;
   onStatus(status: SyncStatus): void;
+  // Called when a signer stops answering, so the caller can discard the connection it
+  // handed over. Without it a dead NIP-46 subscription is retried until the page reloads.
+  onSignerStalled?(): void;
   // Injected by tests so a backoff is asserted rather than waited out.
   schedule?(run: () => void, delayMs: number): () => void;
 }
@@ -60,6 +63,16 @@ export interface SyncEngine {
   stop(): void;
   syncNow(): Promise<SyncStatus>;
   status(): SyncStatus;
+}
+
+// A signer that stopped answering, wherever it was noticed. Both halves of a pass can
+// meet one — a decrypt during restore, a sign during upload — and both mean the same
+// thing to the caller, so one check in the catch decides to rebuild the connection.
+class StalledSignerError extends Error {
+  constructor() {
+    super('Your signer did not respond. Open your signer app, then tap Sync now.');
+    this.name = 'StalledSignerError';
+  }
 }
 
 const defaultSchedule = (run: () => void, delayMs: number): (() => void) => {
@@ -142,9 +155,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     });
     report({ progress: undefined });
     const signerFailure = result.failed.find((outcome) => outcome.failure === 'signer');
-    if (signerFailure) {
-      throw new Error('Your signer did not respond. Open your signer app, then tap Sync now.');
-    }
+    if (signerFailure) throw new StalledSignerError();
     if (result.rejected.length > 0) {
       // The relay refused the record itself. Retrying unchanged cannot fix it, and the
       // entry stays queued rather than vanishing, so say so plainly.
@@ -176,7 +187,13 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
         return report({ state: 'idle', pending: (await ctx.store.listSyncQueue()).length, lastSyncAt, lastError: undefined });
       } catch (error) {
         failures += 1;
-        const message = error instanceof Error ? error.message : String(error);
+        // A timeout on any single call means the same as a failed publish: the connection
+        // is no longer answering. Say so in words the user can act on rather than naming
+        // the internal call that happened to be first, and let the caller rebuild it so
+        // the retry is not aimed at the same dead socket.
+        const stalled = error instanceof StalledSignerError || error instanceof SignerTimeoutError;
+        if (stalled) ctx.onSignerStalled?.();
+        const message = stalled ? new StalledSignerError().message : error instanceof Error ? error.message : String(error);
         await ctx.store.saveBackupState({ lastError: message });
         // Never thrown onward: a failed backup is a status line, not an interrupted workout.
         return report({ state: 'error', pending: (await ctx.store.listSyncQueue()).length, lastError: message });

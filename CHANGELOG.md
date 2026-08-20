@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Backup stayed broken until you reloaded the app, once your signer had gone quiet
+  once.** A remote signer is reached over a connection your phone closes when it puts the
+  app to sleep, and the app kept using that closed connection for the rest of the session
+  — so every backup afterwards waited 45 seconds and gave up, even with the signer app
+  wide open. It now drops a signer that stops answering and reconnects on the next
+  attempt. Backup also no longer asks your signer to confirm which account you are: it
+  already knows, and that request was both the slowest part of starting a backup and the
+  first thing to fail. The message when a signer really is away now says so plainly
+  instead of naming an internal call.
+
 - **Backup failed with "your signer did not respond" and never got past the first few
   records.** A month of training was packed into a record large enough that asking a
   remote signer app to sign it meant sending that signer a message twice the size again —

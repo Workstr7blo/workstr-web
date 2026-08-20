@@ -97,10 +97,21 @@ async function getActiveSigner(): Promise<Signer | null> {
     return activeSigner;
   }
   if (state.signerType === 'nip46') {
-    activeSigner = createCachedNip46Signer({ onAuthUrl: launchSignerRequest });
+    // The signed-in key is already known here — it names the database this session is
+    // reading — so the reconnected signer never has to ask the bunker for it.
+    activeSigner = createCachedNip46Signer(state.pubkey || undefined, { onAuthUrl: launchSignerRequest });
     return activeSigner;
   }
   return null;
+}
+
+// Thrown away when a call to it times out. A NIP-46 signer holds a relay subscription that
+// its answers arrive on, and a phone that backgrounds the app kills that socket without
+// the signer noticing: it keeps reporting itself open while every request goes nowhere.
+// Dropping it means the next attempt builds a fresh connection instead of retrying into a
+// dead one until the user reloads the page.
+function dropActiveSigner(): void {
+  activeSigner = null;
 }
 
 
@@ -170,7 +181,7 @@ async function openAndRender(pubkey: string, signerType: AppState['signerType'] 
   render();
 }
   return {
-    signOut, signOutAndRemoveData, connectNip07, startRemoteSignerRequest, getActiveSigner,
+    signOut, signOutAndRemoveData, connectNip07, startRemoteSignerRequest, getActiveSigner, dropActiveSigner,
     renderIfPending: () => { if (pendingConnect) renderConnectModal(); },
     clearPending: () => { pendingConnect = null; }
   };

@@ -76,13 +76,14 @@ interface Harness {
   timers: { run: () => void; delayMs: number }[];
 }
 
-async function harness(store: WorkstrStore, signer: Signer | null = fakeSigner()) {
+async function harness(store: WorkstrStore, signer: Signer | null = fakeSigner(), onSignerStalled?: () => void) {
   const state: Harness = { store, statuses: [], timers: [] };
   const engine = createSyncEngine({
     store,
     relayUrl: 'ws://memory',
     getSigner: async () => signer,
     onStatus: (status) => state.statuses.push({ ...status }),
+    onSignerStalled,
     schedule: (run, delayMs) => { state.timers.push({ run, delayMs }); return () => {}; }
   });
   return { engine, state };
@@ -324,6 +325,49 @@ describe('when the relay or signer will not cooperate', () => {
     expect(state.timers.at(-1)?.delayMs).toBe(RETRY_BASE_MS);
     // The queue is intact, so nothing was lost while the signer was away.
     expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
+  });
+
+  // A phone that backgrounds the app kills the websocket a NIP-46 signer's answers come
+  // back on, and the signer keeps reporting itself open. Retrying into that same dead
+  // connection can only fail, so the pass tells its caller to throw the signer away.
+  it('asks for a fresh connection when the signer stops answering', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const stalled = vi.fn();
+    const silent: Signer = {
+      type: 'nip46',
+      getPublicKey: async () => SELF,
+      signEvent: () => new Promise(() => {}),
+      nip44Encrypt: () => new Promise(() => {}),
+      nip44Decrypt: () => new Promise(() => {})
+    };
+    const { engine } = await harness(store, withSignerTimeout(silent, 20), stalled);
+
+    await engine.start();
+
+    expect(stalled).toHaveBeenCalled();
+  });
+
+  it('reports a stalled signer in words rather than naming the call that timed out', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const stalled = vi.fn();
+    // The reported failure: the first call of a pass is reading the public key, so a dead
+    // connection surfaced as "did not respond to getPublicKey within 45s".
+    const mute: Signer = {
+      type: 'nip46',
+      getPublicKey: () => new Promise(() => {}),
+      signEvent: () => new Promise(() => {}),
+      nip44Encrypt: () => new Promise(() => {}),
+      nip44Decrypt: () => new Promise(() => {})
+    };
+    const { engine } = await harness(store, withSignerTimeout(mute, 20), stalled);
+
+    const status = await engine.start();
+
+    expect(status.lastError).toBe('Your signer did not respond. Open your signer app, then tap Sync now.');
+    expect(status.lastError).not.toContain('getPublicKey');
+    expect(stalled).toHaveBeenCalled();
   });
 
   it('stops at the first unanswered record instead of waiting out every one', async () => {
