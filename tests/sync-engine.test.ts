@@ -116,8 +116,8 @@ describe('turning backup on', () => {
     expect(status.pending).toBe(0);
     expect(status.lastSyncAt).toBeTruthy();
     expect([...relay.events.keys()]).toContain(sheetAddress('push-day'));
-    // Sheet, session, bodyweight, settings and the manifest.
-    expect(relay.events.size).toBe(5);
+    // Sheet, session, bodyweight, settings. No manifest: nothing ever read it.
+    expect(relay.events.size).toBe(4);
     expect(await store.listSyncQueue()).toHaveLength(0);
   });
 
@@ -130,20 +130,20 @@ describe('turning backup on', () => {
     const backup = (await store.getSettings()).backup;
     expect(backup?.enabled).toBe(false);
     expect(backup?.backfillCursor).toBe(backup?.backfillTotal);
-    expect(backup?.backfillTotal).toBe(5);
+    expect(backup?.backfillTotal).toBe(4);
   });
 
   it('resumes an interrupted first run instead of restarting it', async () => {
     const store = await freshStore();
     await populate(store);
     // A previous run got three records in before it was cut off.
-    await store.saveBackupState({ recordFormat: RECORD_FORMAT, backfillCursor: 3, backfillTotal: 5 });
+    await store.saveBackupState({ recordFormat: RECORD_FORMAT, backfillCursor: 3, backfillTotal: 4 });
     const { engine } = await harness(store);
 
     await engine.start();
 
     // Only the tail was enqueued; the first three are not re-sent.
-    expect(relay.events.size).toBe(2);
+    expect(relay.events.size).toBe(1);
   });
 });
 
@@ -191,6 +191,24 @@ describe('opening the app again', () => {
 });
 
 describe('a device from the old local-only era', () => {
+  it('drops the queue entries it can no longer publish instead of wedging on them', async () => {
+    const store = await freshStore();
+    // What the previous client left behind when its last pass did not drain. This client
+    // cannot resolve a v1 address, so it would publish a tombstone the relay refuses and
+    // report an error on every pass from then on.
+    await store.enqueueSync('workstr:v1:sessions:2026-08', '2026-08-01T10:05:00.000Z');
+    await store.enqueueSync('workstr:v1:session:9f1c', '2026-08-01T10:05:00.000Z');
+
+    const { engine } = await harness(store);
+    const status = await engine.start();
+
+    expect(status.state).toBe('idle');
+    expect(status.lastError).toBeUndefined();
+    expect((await store.listSyncQueue()).map((entry) => entry.address)).not.toContain('workstr:v1:sessions:2026-08');
+    expect([...relay.events.keys()].some((address) => address.startsWith('workstr:v1:'))).toBe(false);
+  });
+
+
   it('does not migrate local-only history into V2 relay backup', async () => {
     const store = await freshStore();
     const id = await store.createSession({ started_at: '2026-08-01T10:00:00.000Z', backup_version: 1 });

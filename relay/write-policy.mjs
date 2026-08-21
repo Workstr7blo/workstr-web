@@ -26,6 +26,13 @@ import { join } from 'node:path';
 export const ACCEPTED_KIND = 30078;
 export const REQUIRED_D_PREFIX = 'workstr:v2:';
 
+// `workstr:v1:` is still accepted so the relay and the web app do not have to be deployed
+// in the same instant. A client on either side of the cutover keeps working, which is what
+// stops the swap being a flag day where whichever ships second rejects every publish.
+// Narrow this to the v2 prefix alone once no v1 client is left.
+export const LEGACY_D_PREFIX = 'workstr:v1:';
+export const ACCEPTED_D_PREFIXES = [REQUIRED_D_PREFIX, LEGACY_D_PREFIX];
+
 // With neither payment nor admission bounding anything, these limits plus the kind and
 // prefix filter are the entire defence. Organic use is not the worry: 30078 is
 // addressable, so an honest user's footprint is capped by their distinct `d` tags.
@@ -67,7 +74,7 @@ export function decide(event, limits = null) {
   const address = readDTag(event);
   if (address === null) return { action: 'reject', msg: REJECT_ADDRESS };
   // A bare prefix is not an address, so `workstr:v2:` on its own is rejected too.
-  if (!address.startsWith(REQUIRED_D_PREFIX) || address.length === REQUIRED_D_PREFIX.length) {
+  if (!ACCEPTED_D_PREFIXES.some((prefix) => address.startsWith(prefix) && address.length > prefix.length)) {
     return { action: 'reject', msg: REJECT_ADDRESS };
   }
 

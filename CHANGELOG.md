@@ -9,15 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Backup uploads a month of training at a time.** Workout history used to be sent one
-  session at a time, and every session cost two round trips to your signer, so a first
-  backup on a real history ran for a very long time. Sessions now travel one record per
-  training month: a year of training is around a dozen uploads instead of hundreds, and a
-  finished month is never sent again. Your existing backup is re-sent once in the new
-  shape, automatically — nothing on the relay is deleted, and the old records stay
-  readable, so a device still on the previous version keeps working. A month with more
-  training in it than fits in one relay event is split across a few, so a heavy training
-  block still uploads instead of being refused.
+- **Backup no longer interrupts a workout.** Logging a set used to queue a backup a few
+  seconds later, which on a remote signer meant your signer app waking up over and over
+  while you were still training. A workout is now held on the device and copied to the
+  relay once you finish it. Editing or deleting a finished workout still backs up straight
+  away.
+- **Backup starts fresh, and older history stays on the device.** Workout history is now
+  copied to the relay one workout at a time, from the day backup is switched on. Workouts
+  logged before that are kept on this device and are included in JSON export, but they are
+  not sent to the relay. Settings tells you how many of those you have.
+- **Restoring is no longer slowed down by an index nobody read.** Backup used to publish
+  and re-publish a growing list of everything it had stored, which cost a signer round trip
+  on every pass and was never used to restore anything. It has been removed.
+
+### Fixed
+
+- **A backup that was stuck now unsticks itself.** A device left holding records queued by
+  the previous version could not send them and reported "needs attention" on every attempt,
+  with no way out. Those entries are now cleared once, automatically, the first time the
+  new version syncs.
+- **Importing a JSON archive now backs the workouts up.** Workouts restored from an export
+  file were treated as older history and quietly left out of backup, while the panel still
+  reported everything up to date. An imported archive now joins backup like anything else,
+  and the exporting device's pending queue is no longer replayed onto the importing one.
 
 ### Changed
 

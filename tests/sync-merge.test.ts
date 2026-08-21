@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { mergeRecords } from '../src/sync/merge';
-import { BODYWEIGHT_ADDRESS, MANIFEST_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
+import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import type { DecodedPrivateRecord } from '../src/nostr/codecs30078';
 
 let namespace = 0;
@@ -41,12 +41,6 @@ describe('merging records into an empty database', () => {
     expect(await store.listSessionSets(session!.id!)).toHaveLength(1);
     expect(await store.listBody()).toHaveLength(1);
     expect((await store.getSettings()).unit).toBe('lbs');
-  });
-
-  it('never merges the manifest into the database', async () => {
-    const store = await freshStore();
-    const summary = await mergeRecords(store, [record(MANIFEST_ADDRESS, '2026-08-20T10:00:00.000Z', { entries: [] })]);
-    expect(summary).toMatchObject({ applied: 0, skipped: 0 });
   });
 
   it('keeps this device relay, signer and backup settings on a restore', async () => {

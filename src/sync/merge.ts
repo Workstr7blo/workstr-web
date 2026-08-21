@@ -222,13 +222,6 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
   const pending = new Map((await store.listSyncQueue()).map((entry) => [entry.address, entry.updated_at]));
   const tombstoned = tombstonedSessions(records);
   for (const record of records) {
-    // The manifest is an index for deciding what to fetch, not a record to merge into the
-    // database — applying it would mean writing a list of addresses over real data. It is
-    // still recorded as read, so the next pull does not decrypt it again to learn that.
-    if (record.parsed.kind === 'manifest') {
-      await store.noteSeen(record.address, record.eventId, record.createdAt);
-      continue;
-    }
     const local = await localUpdatedAt(store, record.address, pending);
     if (local !== null && local >= record.updatedAt) {
       summary.skipped += 1;

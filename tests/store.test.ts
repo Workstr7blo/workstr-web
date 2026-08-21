@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { openDB } from 'idb';
 import { WorkstrStore } from '../src/db/store';
 import type { ExerciseDraft } from '../src/db/store';
@@ -74,7 +74,10 @@ describe('WorkstrStore', () => {
     expect(await store.listSyncQueue()).toHaveLength(0);
 
     await store.saveSettings({ ...(await store.getSettings()), unit: 'lbs' });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // The change listener enqueues asynchronously, so this waits for the write rather than
+    // for one macrotask: a single tick is usually enough and occasionally is not, which
+    // showed up as a test that failed only when the whole suite ran at once.
+    await vi.waitFor(async () => expect(await store.listSyncQueue()).toHaveLength(1));
     expect(await store.listSyncQueue()).toEqual([{ address: 'workstr:v2:settings', updated_at: expect.any(String) }]);
   });
 

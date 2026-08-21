@@ -23,6 +23,16 @@ export function lastSyncLabel(iso: string | undefined, now = new Date()): string
   return then.toLocaleDateString();
 }
 
+// The day backup started holding this device's history, as a date. Unlike `lastSyncLabel`
+// this never goes relative: it marks a boundary the user may need to reason about months
+// later, and "3 months ago" is not something you can line up against a training log.
+export function startedOnLabel(iso: string | undefined): string {
+  if (!iso) return 'backup was switched on';
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return 'backup was switched on';
+  return then.toLocaleDateString();
+}
+
 export function statusPill(state: BackupPanelState): { label: string; ok: boolean } {
   if (!state.enabled) return { label: 'off', ok: false };
   if (state.sync.state === 'error') return { label: 'needs attention', ok: false };
@@ -83,12 +93,15 @@ export function backupPanel(state: BackupPanelState): string {
     <div class="web-empty-actions"><button id="sync-now" class="button ghost" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button></div>`
     : '';
   const explainer = state.signedIn
-    ? 'Encrypted backup protects new V2-era workouts from this device forward, plus programs, body log and preferences. Older workouts already on this device stay local and are still included in JSON export. Only your key can read relay records — the relay stores ciphertext it cannot open.'
-    : 'Backup needs an identity: new V2-era records are encrypted to your own key and signed by it. Turning this on takes you through sign-in first.';
+    ? 'Your programs, workout history, body log and preferences are encrypted on this device and copied to the Workstr relay. Only your key can read them — the relay stores ciphertext it cannot open. Sign in on another device to restore. Turning this off stops the copying and leaves both sides intact.'
+    : 'Backup needs an identity: records are encrypted to your own key and signed by it. Turning this on takes you through sign-in first.';
   const localOnly = state.backup?.localOnlyHistoryCount ?? 0;
-  const era = state.backup?.v2StartedAt ? ` Backup era started ${html(lastSyncLabel(state.backup.v2StartedAt))}.` : '';
-  const eraLine = state.signedIn
-    ? `<p class="section-help">Relay-backed V2 workouts sync from this backup era forward.${localOnly ? ` Local-only older workouts on this device: ${localOnly}.` : ''}${era} Use JSON export for a full local archive.</p>`
+  // Only when there is something to say, and only once backup is actually on. The count is
+  // the one fact the user cannot work out for themselves: which of their workouts this
+  // relay will never hold. The date is absolute — "started 12 min ago" reads as a status,
+  // and this is a boundary in their history, not a status.
+  const eraLine = state.signedIn && state.enabled && localOnly > 0
+    ? `<p class="section-help">${localOnly} workout${localOnly === 1 ? '' : 's'} logged before ${html(startedOnLabel(state.backup?.v2StartedAt))} stay${localOnly === 1 ? 's' : ''} on this device only and ${localOnly === 1 ? 'is' : 'are'} not copied to the relay. Export to JSON to keep a full archive of those.</p>`
     : '';
   return `<div class="panel">
     <div class="panel-head"><span>Backup</span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></div>

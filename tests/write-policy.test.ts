@@ -54,8 +54,16 @@ describe('write policy decisions', () => {
   it('rejects kind:30078 from another app', () => {
     // Kind 30078 is NIP-78 arbitrary app data; other clients publish it too.
     expect(decide(event({ tags: [['d', 'coracle:settings']] })).action).toBe('reject');
-    expect(decide(event({ tags: [['d', 'workstr:v1:session:1']] })).action).toBe('reject');
     expect(decide(event({ tags: [['d', 'notworkstr:v2:session:1']] })).action).toBe('reject');
+    expect(decide(event({ tags: [['d', 'notworkstr:v1:session:1']] })).action).toBe('reject');
+  });
+
+  // Both prefixes are live through the cutover so the relay and the app need not deploy in
+  // the same instant; a bare prefix is still not an address on either.
+  it('accepts either workstr prefix while the cutover is in flight', () => {
+    expect(decide(event({ tags: [['d', 'workstr:v2:log:7f3a:0001']] })).action).toBe('accept');
+    expect(decide(event({ tags: [['d', 'workstr:v1:sessions:2026-08']] })).action).toBe('accept');
+    expect(decide(event({ tags: [['d', 'workstr:v1:']] })).action).toBe('reject');
   });
 
   it('rejects a missing, empty, or non-string d tag', () => {

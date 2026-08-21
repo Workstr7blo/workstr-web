@@ -1,7 +1,7 @@
 import type { Session, SessionSet } from '../core/types';
 import type { WorkstrStore } from '../db/store';
 import { parseAddress, parseSessionsId, sessionMonth } from './addresses';
-import { bodyweightRecord, manifestRecord, sessionRecord, sessionsBundleRecord, sessionsBundleRecords, settingsRecord, sheetRecord, type ManifestEntry, type RecordSnapshot } from './records';
+import { bodyweightRecord, sessionRecord, sessionsBundleRecord, sessionsBundleRecords, settingsRecord, sheetRecord, type RecordSnapshot } from './records';
 
 export interface BackfillProgress {
   cursor: number;
@@ -61,12 +61,7 @@ export async function collectRecords(store: WorkstrStore): Promise<RecordSnapsho
   const collectedAt = new Date().toISOString();
   records.push(bodyweightRecord(body, collectedAt));
   records.push(settingsRecord(settings, collectedAt));
-  records.push(manifestRecord(manifestEntries(records), collectedAt));
   return records;
-}
-
-export function manifestEntries(records: RecordSnapshot[]): ManifestEntry[] {
-  return records.map((record) => ({ address: record.address, updatedAt: record.updatedAt }));
 }
 
 // Enqueues from `cursor` onward and advances it as it goes, so an interrupted run picks up
@@ -95,22 +90,6 @@ export async function resolveMonthRecords(store: WorkstrStore, month: string, en
   const loaded = entries ?? await loadSessionEntries(store);
   const inMonth = loaded.filter((entry) => sessionMonth(entry.session.started_at, entry.session.finished_at) === month);
   return inMonth.length ? sessionsBundleRecords(month, inMonth) : [];
-}
-
-// Drops per-session entries left in the queue by the pre-bundle client. Their sessions
-// are about to be enqueued again as month bundles, so uploading them one at a time would
-// pay the exact cost bundling exists to avoid. An entry whose session is gone locally is
-// kept: that one is a pending deletion, and a bundle cannot express a deletion.
-export async function retireLegacySessionQueue(store: WorkstrStore): Promise<number> {
-  const uids = new Set((await store.listSessions()).map((session) => String(session.uid)));
-  let retired = 0;
-  for (const entry of await store.listSyncQueue()) {
-    const parsed = parseAddress(entry.address);
-    if (parsed?.kind !== 'session' || !uids.has(String(parsed.id))) continue;
-    await store.dequeueSync(entry.address, entry.updated_at);
-    retired += 1;
-  }
-  return retired;
 }
 
 // Resolves an address back to its current local state. A missing record is not an error:
@@ -145,6 +124,5 @@ export async function resolveRecord(store: WorkstrStore, address: string, entrie
   }
   const now = new Date().toISOString();
   if (parsed.kind === 'bodyweight') return bodyweightRecord(await store.listBody(Number.MAX_SAFE_INTEGER), now);
-  if (parsed.kind === 'settings') return settingsRecord(await store.getSettings(), now);
-  return manifestRecord(manifestEntries(await collectRecords(store)), now);
+  return settingsRecord(await store.getSettings(), now);
 }

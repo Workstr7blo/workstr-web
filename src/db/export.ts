@@ -46,7 +46,12 @@ export async function importDatabase(db: IDBPDatabase<WorkstrDB>, data: WorkstrE
   for (const name of KEYED_STORES) {
     const store = tx.objectStore(name as KeyedStore);
     await store.clear();
-    for (const row of (data.stores[name] || [])) await store.put(row as never);
+    // The queue is emptied, never restored. Its entries name addresses this build may no
+    // longer be able to publish, and an export carries whatever was pending on the device
+    // that wrote it — replaying that onto a different database uploads the wrong thing at
+    // best and wedges the engine at worst. Everything imported is enqueued by the backfill.
+    if (name === 'sync_queue') continue;
+    for (const row of (data.stores[name] || [])) await store.put(importedRow(name, row) as never);
   }
   for (const name of KV_STORES) {
     const store = tx.objectStore(name as KvStore);
@@ -56,6 +61,15 @@ export async function importDatabase(db: IDBPDatabase<WorkstrDB>, data: WorkstrE
     }
   }
   await tx.done;
+}
+
+// Importing a JSON archive is the user deliberately moving their training onto this
+// database, so what arrives joins the live backup era. Without this, sessions written
+// before the era existed — or by an older build that had no such field — would be held
+// back from backup forever while the panel still reported everything up to date.
+function importedRow(store: KeyedStore, row: unknown): unknown {
+  if (store !== 'sessions') return row;
+  return { ...(row as Record<string, unknown>), backup_version: 2 };
 }
 
 export function assertWorkstrExport(data: unknown): asserts data is WorkstrExport {

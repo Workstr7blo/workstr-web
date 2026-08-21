@@ -1,21 +1,11 @@
 import type { BodyWeightEntry, Session, SessionSet, WorkstrSettings } from '../core/types';
 import type { SheetWithExercises } from '../db/store';
-import { BODYWEIGHT_ADDRESS, MANIFEST_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from './addresses';
+import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from './addresses';
 
 export interface RecordSnapshot<T = unknown> {
   address: string;
   updatedAt: string;
   payload: T;
-}
-
-export interface ManifestEntry {
-  address: string;
-  updatedAt: string;
-  deleted?: boolean;
-}
-
-export interface ManifestPayload {
-  entries: ManifestEntry[];
 }
 
 // Preferences that describe the user, not the device. `workstrRelay` and `signerType` are
@@ -188,9 +178,4 @@ export function bodyweightRecord(entries: BodyWeightEntry[], updatedAt: string):
 
 export function settingsRecord(settings: WorkstrSettings, updatedAt: string): RecordSnapshot<SyncedSettings> {
   return { address: SETTINGS_ADDRESS, updatedAt, payload: syncedSettings(settings) };
-}
-
-export function manifestRecord(entries: ManifestEntry[], updatedAt: string): RecordSnapshot<ManifestPayload> {
-  const sorted = [...entries].sort((a, b) => a.address.localeCompare(b.address));
-  return { address: MANIFEST_ADDRESS, updatedAt, payload: { entries: sorted } };
 }

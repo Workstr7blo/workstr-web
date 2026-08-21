@@ -7,10 +7,10 @@ export const LEGACY_RECORD_PREFIX = 'workstr:v1:';
 // V2 workout history is object-level: one record per session UID, plus a tombstone at the
 // same address when deleted. `sessions` remains for old helper/tests and future manual
 // tooling; the normal V2 relay path does not read or write monthly bundles.
-export type RecordKind = 'sheet' | 'session' | 'sessions' | 'bodyweight' | 'settings' | 'manifest';
+export type RecordKind = 'sheet' | 'session' | 'sessions' | 'bodyweight' | 'settings';
 
 // Singletons hold the whole collection in one record; the rest are addressed per row.
-const SINGLETON_KINDS: RecordKind[] = ['bodyweight', 'settings', 'manifest'];
+const SINGLETON_KINDS: RecordKind[] = ['bodyweight', 'settings'];
 const KEYED_KINDS: RecordKind[] = ['sheet', 'session', 'sessions'];
 
 export interface RecordAddress {
@@ -20,7 +20,6 @@ export interface RecordAddress {
 
 export const BODYWEIGHT_ADDRESS = `${RECORD_PREFIX}bodyweight`;
 export const SETTINGS_ADDRESS = `${RECORD_PREFIX}settings`;
-export const MANIFEST_ADDRESS = `${RECORD_PREFIX}manifest`;
 
 // A `d` tag is cleartext on an open relay, so an id must never carry anything private.
 // Slugs and uuids are already opaque; this only guards the delimiter.

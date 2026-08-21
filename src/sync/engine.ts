@@ -131,15 +131,25 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     }
 
     if ((backup?.recordFormat ?? 0) < RECORD_FORMAT) {
-      const counts = await ctx.store.countSessionBackupEra();
+      // The previous version left `workstr:v1:` addresses in the queue. This client cannot
+      // resolve them, so they would publish as tombstones the relay refuses and hold the
+      // engine in an error state no retry clears. Dropped once, here, before anything else.
+      await ctx.store.purgeUnpublishableQueue();
       await ctx.store.saveBackupState({
         recordFormat: RECORD_FORMAT,
         v2StartedAt: backup?.v2StartedAt || new Date().toISOString(),
-        localOnlyHistoryCount: counts.localOnly,
         backfillCursor: 0,
         backfillTotal: undefined
       });
       report({ progress: undefined });
+    }
+
+    // Recounted every pass rather than captured once at the cutover: deleting an old
+    // workout, or importing an archive, changes how many are held back from the relay, and
+    // a number frozen at the cutover would keep reporting the count from before.
+    const counts = await ctx.store.countSessionBackupEra();
+    if (counts.localOnly !== backup?.localOnlyHistoryCount) {
+      await ctx.store.saveBackupState({ localOnlyHistoryCount: counts.localOnly });
     }
 
     const refreshed = await ctx.store.getSettings();

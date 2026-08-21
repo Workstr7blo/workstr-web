@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  BODYWEIGHT_ADDRESS, MANIFEST_ADDRESS, SETTINGS_ADDRESS, parseAddress,
+  BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, parseAddress,
   sessionAddress, sheetAddress, isRecordAddress, RECORD_PREFIX
 } from '../src/sync/addresses';
 import { CLIENT_TAG, PRIVATE_RECORD_KIND, decodePrivateRecord, encodePrivateRecord } from '../src/nostr/codecs30078';
@@ -32,7 +32,7 @@ describe('record addresses', () => {
   it('builds addresses the relay policy accepts', () => {
     expect(sheetAddress('push-day')).toBe(`${RECORD_PREFIX}sheet:push-day`);
     expect(sessionAddress('9f1c')).toBe(`${RECORD_PREFIX}session:9f1c`);
-    for (const address of [BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, MANIFEST_ADDRESS, sheetAddress('a'), sessionAddress('b')]) {
+    for (const address of [BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sheetAddress('a'), sessionAddress('b')]) {
       expect(address.startsWith(RECORD_PREFIX)).toBe(true);
       expect(isRecordAddress(address)).toBe(true);
     }
@@ -43,7 +43,6 @@ describe('record addresses', () => {
     expect(parseAddress(sessionAddress('9f1c'))).toEqual({ kind: 'session', id: '9f1c' });
     expect(parseAddress(BODYWEIGHT_ADDRESS)).toEqual({ kind: 'bodyweight' });
     expect(parseAddress(SETTINGS_ADDRESS)).toEqual({ kind: 'settings' });
-    expect(parseAddress(MANIFEST_ADDRESS)).toEqual({ kind: 'manifest' });
   });
 
   it('rejects foreign and malformed addresses instead of guessing', () => {
@@ -135,7 +134,7 @@ describe('codec output against the deployed relay policy', () => {
   it('produces events the write policy accepts, for every address kind', async () => {
     const { decide } = await import('../relay/write-policy.mjs');
     const signer = fakeSigner();
-    const addresses = [sheetAddress('push-day'), sessionAddress('9f1c'), BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, MANIFEST_ADDRESS];
+    const addresses = [sheetAddress('push-day'), sessionAddress('9f1c'), BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS];
     for (const address of addresses) {
       const event = await encodePrivateRecord(signer, { address, updatedAt: '2026-08-20T10:00:00.000Z', payload: {} });
       expect(decide({ ...event, id: 'x', pubkey: SELF, sig: 'sig' })).toEqual({ action: 'accept' });

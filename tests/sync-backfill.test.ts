@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { collectRecords, resolveRecord, runBackfill } from '../src/sync/backfill';
-import { BODYWEIGHT_ADDRESS, MANIFEST_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
+import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import { parseSessionsId } from '../src/sync/addresses';
 import { MAX_BUNDLE_BYTES, sessionsBundleRecords, sessionUpdatedAt, syncedSettings, type SessionsBundlePayload } from '../src/sync/records';
 
@@ -29,7 +29,6 @@ describe('record collection', () => {
     expect(addresses).toContain(sheetAddress('push-day'));
     expect(addresses).toContain(BODYWEIGHT_ADDRESS);
     expect(addresses).toContain(SETTINGS_ADDRESS);
-    expect(addresses).toContain(MANIFEST_ADDRESS);
     // V2 sessions travel as one record per session, not mutable month bundles.
     const uid = (await store.getSession(sessionId))!.uid!;
     expect(addresses).toContain(sessionAddress(uid));
@@ -204,8 +203,26 @@ describe('change tracking', () => {
     expect(addresses).not.toContain(sessionsAddress('2026-08'));
     expect(addresses).toContain(BODYWEIGHT_ADDRESS);
     expect(addresses).toContain(SETTINGS_ADDRESS);
-    // A logged set dates the session record by when the set happened.
-    expect(seen.find((entry) => entry.address === sessionAddress(uid))?.updatedAt).toBe('2026-08-01T10:05:00.000Z');
+    // Finishing dates the record, not the set: a set logged into a running session reports
+    // nothing, so no backup pass fires while the user is still training.
+    expect(seen.filter((entry) => entry.address === sessionAddress(uid))).toHaveLength(1);
+    expect(seen.find((entry) => entry.address === sessionAddress(uid))?.updatedAt).toBe('2026-08-01T11:00:00.000Z');
+  });
+
+  it('says nothing while a workout is running, and reports a set added to a finished one', async () => {
+    const sessionId = await store.createSession({ started_at: '2026-08-01T10:00:00.000Z' });
+    await store.addSessionSet({ session_id: sessionId, exercise_slug: 'bench', set_number: 1, reps: 8, completed_at: '2026-08-01T10:05:00.000Z' });
+    // Nothing yet: the session is still open, so the signer is left alone.
+    expect(seen).toHaveLength(0);
+
+    await store.finishSession(sessionId, '2026-08-01T11:00:00.000Z');
+    const uid = (await store.getSession(sessionId))!.uid!;
+    expect(seen.map((entry) => entry.address)).toEqual([sessionAddress(uid)]);
+
+    // Editing the finished workout does report, which is how a correction reaches backup.
+    seen = [];
+    await store.addSessionSet({ session_id: sessionId, exercise_slug: 'bench', set_number: 2, reps: 6, completed_at: '2026-08-01T11:30:00.000Z' });
+    expect(seen).toEqual([{ address: sessionAddress(uid), updatedAt: '2026-08-01T11:30:00.000Z' }]);
   });
 
   it('reports deletions before the row is gone, so the address is still knowable', async () => {

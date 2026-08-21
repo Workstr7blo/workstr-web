@@ -30,4 +30,3 @@ export function sessionAddress(id: string): string {
 
 export const BODYWEIGHT_ADDRESS = 'workstr:v2:bodyweight';
 export const SETTINGS_ADDRESS = 'workstr:v2:settings';
-export const MANIFEST_ADDRESS = 'workstr:v2:manifest';

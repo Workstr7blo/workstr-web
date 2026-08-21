@@ -1,6 +1,7 @@
 import type { IDBPDatabase } from 'idb';
 import type { WorkstrDB } from './schema';
 import type { BackupSettings, BodyWeightEntry, Session, SessionSet, Sheet, WorkstrSettings } from '../core/types';
+import { isRecordAddress } from '../sync/addresses';
 
 export interface SeenRecord {
   address: string;
@@ -98,6 +99,21 @@ export abstract class SyncAwareStore {
 
   async clearSyncQueue(): Promise<void> {
     await this.db.clear('sync_queue');
+  }
+
+  // Entries this client can no longer publish: a `workstr:v1:` address left behind by the
+  // previous version, or anything else `parseAddress` refuses. Left in place they resolve
+  // to nothing, publish as a tombstone at an address the relay rejects, and wedge the
+  // engine in a permanent error that no retry can clear — so they are dropped once, at the
+  // cutover, rather than retried forever.
+  async purgeUnpublishableQueue(): Promise<number> {
+    let purged = 0;
+    for (const entry of await this.listSyncQueue()) {
+      if (isRecordAddress(entry.address)) continue;
+      await this.db.delete('sync_queue', entry.address);
+      purged += 1;
+    }
+    return purged;
   }
 
   // The ledger of relay events this device has already read or written. Its whole purpose

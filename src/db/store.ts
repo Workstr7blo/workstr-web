@@ -272,7 +272,13 @@ export class WorkstrStore extends SyncAwareStore {
   async addSessionSet(set: Omit<SessionSet, 'id'>): Promise<number> {
     const id = Number(await this.db.add('session_sets', set));
     const session = await this.db.get('sessions', set.session_id);
-    if (session?.uid && session.backup_version === 2) this.noteChange(sessionAddress(session.uid), set.completed_at || undefined);
+    // Only once the workout is over. A set logged into a running session used to queue a
+    // record, so a backup pass — two signer round trips — fired every few minutes while the
+    // user was training, waking their signer app mid-set. A session in progress is held on
+    // the device and uploaded when it finishes; this branch is for editing a past workout.
+    if (session?.uid && session.backup_version === 2 && session.finished_at) {
+      this.noteChange(sessionAddress(session.uid), set.completed_at || undefined);
+    }
     return id;
   }
 
