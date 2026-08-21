@@ -1,12 +1,12 @@
 import type { BodyWeightEntry, Session, SessionSet, Sheet, SheetExercise, WorkstrSettings } from '../core/types';
 import type { WorkstrStore } from '../db/store';
-import type { SeenRecord } from '../db/sync-store';
 import type { SignedNostrEvent, Signer } from '../signer/types';
-import { decodePrivateRecord, type DecodedPrivateRecord } from '../nostr/codecs30078';
+import { decodePrivateRecord, type DecodedPrivateRecord, type RecordCipher } from '../nostr/codecs30078';
 import { fetchRecords } from './relay';
 import { resolveRecord } from './backfill';
-import { parseAddress, sessionAddress, sessionMonth, sessionsAddress } from './addresses';
+import { parseAddress, sessionAddress } from './addresses';
 import { sessionUpdatedAt, type SessionsBundlePayload, type SyncedSettings } from './records';
+import { isLogEntry, type ChunkPayload } from './chunks';
 
 export interface MergeSummary {
   applied: number;
@@ -38,21 +38,18 @@ async function unreadEvents(store: WorkstrStore, relayUrl: string, signer: Signe
 
   const fetched = await fetchRecords(relayUrl, await signer.getPublicKey(), undefined, true, since);
   const unread = fetched.filter((event) => {
-    const known = seen.get(dTag(event));
+    const address = dTag(event);
+    const parsed = parseAddress(address);
+    if (!parsed) return false;
+    // The wrapped backup key is NIP-44 to the user's own pubkey, not a sealed record, and
+    // it is resolved before a pass starts. Left in, every pull would try to open it with
+    // the key it hands out and report it as a record that could not be read.
+    if (parsed.kind === 'key') return false;
+    const known = seen.get(address);
     return !known || known.event_id !== event.id;
   });
 
-  // Per-session events written by an earlier version stay on the relay forever, so they
-  // are separated out and read last: by then this pull knows which of them a month bundle
-  // has already superseded, and a superseded one is retired without a decrypt.
-  const legacy = unread.filter((event) => parseAddress(dTag(event))?.kind === 'session');
-  const superseded = await supersededLegacy(store, seen, legacy);
-  for (const event of legacy.filter((candidate) => superseded.has(candidate.id))) {
-    // Retired rather than ignored: recorded as read, this event never comes back in a
-    // `since` window again, so the cost of an old per-session record is paid once.
-    await store.noteSeen(dTag(event), event.id, event.created_at);
-  }
-  return [...unread.filter((event) => !legacy.includes(event)), ...legacy.filter((event) => !superseded.has(event.id))];
+  return unread;
 }
 
 // Decrypts one event at a time. Under NIP-46 every decrypt is a round trip to a remote
@@ -62,14 +59,14 @@ async function unreadEvents(store: WorkstrStore, relayUrl: string, signer: Signe
 // addressable event are cleartext, so an event this device has already read is recognised
 // and dropped without asking the signer anything. Without it, opening the app cost one
 // decrypt per record every single time, even when nothing had changed.
-export async function pullRecords(store: WorkstrStore, relayUrl: string, signer: Signer, options: PullOptions = {}): Promise<{ records: DecodedPrivateRecord[]; unreadable: number }> {
+export async function pullRecords(store: WorkstrStore, relayUrl: string, signer: Signer, cipher: RecordCipher, options: PullOptions = {}): Promise<{ records: DecodedPrivateRecord[]; unreadable: number }> {
   const events = await unreadEvents(store, relayUrl, signer);
 
   const records: DecodedPrivateRecord[] = [];
   let unreadable = 0;
   let consecutiveFailures = 0;
   for (const [index, event] of events.entries()) {
-    const decoded = await decodePrivateRecord(signer, event);
+    const decoded = await decodePrivateRecord(cipher, event);
     if (decoded) {
       records.push(decoded);
       consecutiveFailures = 0;
@@ -80,30 +77,12 @@ export async function pullRecords(store: WorkstrStore, relayUrl: string, signer:
       // the signer, not the data. Without this a restore would wait out one timeout per
       // event, which on a real history is hours of a status line saying nothing.
       if (consecutiveFailures >= 3 && records.length === 0) {
-        throw new Error('Signer could not decrypt your backup. Open your signer app and try again.');
+        throw new Error('Your backup could not be read with this account key.');
       }
     }
     options.onProgress?.(index + 1, events.length);
   }
   return { records, unreadable };
-}
-
-// Which of the old per-session events this device no longer needs to read. One is
-// superseded when the session it names is held locally and the bundle for that session's
-// month was published after it: the bundle carries the same session, in newer form, and
-// re-decrypting the old event could only tell this device what it already knows.
-async function supersededLegacy(store: WorkstrStore, seen: Map<string, SeenRecord>, legacy: SignedNostrEvent[]): Promise<Set<string>> {
-  const retired = new Set<string>();
-  if (legacy.length === 0) return retired;
-  const byUid = new Map((await store.listSessions()).filter((session) => session.uid).map((session) => [String(session.uid), session]));
-  for (const event of legacy) {
-    const uid = parseAddress(dTag(event))?.id;
-    const session = uid ? byUid.get(uid) : undefined;
-    if (!session) continue;
-    const bundle = seen.get(sessionsAddress(sessionMonth(session.started_at, session.finished_at)));
-    if (bundle && bundle.created_at >= event.created_at) retired.add(event.id);
-  }
-  return retired;
 }
 
 // The local claim on an address: a pending queue entry is an edit this device has made
@@ -197,6 +176,81 @@ async function applySessionsBundle(
   }
 }
 
+// One chunk of the append-only log, merged an entry at a time.
+//
+// Every entry is compared against what this device already holds rather than against the
+// entry before it, so a chunk merges the same way whatever order the pull happened to
+// return it in, and a chunk that is read twice changes nothing the second time.
+async function applyLogChunk(store: WorkstrStore, record: DecodedPrivateRecord, summary: MergeSummary): Promise<void> {
+  const payload = record.payload as ChunkPayload | undefined;
+  const entries = payload?.entries;
+  if (!Array.isArray(entries) || entries.length === 0) return;
+
+  // Read once. A restore replays every chunk in the account, and looking each uid up
+  // against the whole session table would make exactly that case quadratic.
+  const held = new Map((await store.listSessions()).filter((session) => session.uid).map((session) => [String(session.uid), session]));
+  // Deletions this device has made and not yet published. A chunk written before the
+  // deletion still carries the session, and writing it back would undo the user's edit.
+  const buried = await store.pendingDeletions('log');
+
+  for (const entry of entries) {
+    if (!isLogEntry(entry)) { summary.skipped += 1; continue; }
+    if (buried.has(entry.uid)) { summary.skipped += 1; continue; }
+
+    const existing = held.get(entry.uid);
+    if (!existing || existing.id == null) {
+      if (entry.deleted) { summary.skipped += 1; continue; }
+      await applySessionPayload(store, entry.uid, entry.payload);
+      summary.applied += 1;
+      continue;
+    }
+
+    const local = sessionUpdatedAt(existing, await store.listSessionSets(existing.id));
+    if (local >= entry.updatedAt) { summary.skipped += 1; continue; }
+    if (entry.deleted) {
+      await store.applyRemote(() => store.deleteSession(existing.id as number));
+      summary.deleted += 1;
+      continue;
+    }
+    await applySessionPayload(store, entry.uid, entry.payload);
+    summary.applied += 1;
+  }
+}
+
+// The body log, merged one weigh-in at a time. Same shape as the workout log, and for the
+// same reason: the whole collection as one record could only be last-write-wins, so two
+// devices that each logged a weigh-in offline would lose one of them.
+async function applyBodyChunk(store: WorkstrStore, record: DecodedPrivateRecord, summary: MergeSummary): Promise<void> {
+  const payload = record.payload as ChunkPayload | undefined;
+  const entries = payload?.entries;
+  if (!Array.isArray(entries) || entries.length === 0) return;
+
+  const held = new Map((await store.listBody(Number.MAX_SAFE_INTEGER)).map((entry) => [String(entry.date), entry]));
+  const buried = await store.pendingDeletions('body');
+
+  for (const entry of entries) {
+    if (!isLogEntry(entry)) { summary.skipped += 1; continue; }
+    if (buried.has(entry.uid)) { summary.skipped += 1; continue; }
+
+    const existing = held.get(entry.uid);
+    // An entry written before this device recorded modification times counts as older:
+    // the relay's copy is the one that knows when it changed.
+    const local = existing?.updated_at || '';
+    if (existing && local >= entry.updatedAt) { summary.skipped += 1; continue; }
+
+    if (entry.deleted) {
+      if (!existing?.id) { summary.skipped += 1; continue; }
+      await store.applyRemote(() => store.deleteBody(existing.id as number));
+      summary.deleted += 1;
+      continue;
+    }
+    const incoming = entry.payload as BodyWeightEntry | undefined;
+    if (!incoming || !Number.isFinite(incoming.weight_kg)) { summary.skipped += 1; continue; }
+    await store.applyRemote(() => store.putBodyEntry({ ...incoming, date: entry.uid, updated_at: entry.updatedAt }));
+    summary.applied += 1;
+  }
+}
+
 async function applySingleton(store: WorkstrStore, record: DecodedPrivateRecord): Promise<void> {
   if (record.parsed.kind === 'bodyweight') {
     const payload = record.payload as { entries?: BodyWeightEntry[] };
@@ -249,13 +303,6 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
   const pending = new Map((await store.listSyncQueue()).map((entry) => [entry.address, entry.updated_at]));
   const tombstoned = tombstonedSessions(records);
   for (const record of records) {
-    // The manifest is an index for deciding what to fetch, not a record to merge into the
-    // database — applying it would mean writing a list of addresses over real data. It is
-    // still recorded as read, so the next pull does not decrypt it again to learn that.
-    if (record.parsed.kind === 'manifest') {
-      await store.noteSeen(record.address, record.eventId, record.createdAt);
-      continue;
-    }
     const local = await localUpdatedAt(store, record.address, pending);
     if (local !== null && local >= record.updatedAt) {
       summary.skipped += 1;
@@ -265,6 +312,10 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
     try {
       if (record.deleted) {
         if (await applyTombstone(store, record)) summary.deleted += 1; else summary.skipped += 1;
+      } else if (record.parsed.kind === 'log') {
+        await applyLogChunk(store, record, summary);
+      } else if (record.parsed.kind === 'body') {
+        await applyBodyChunk(store, record, summary);
       } else if (record.parsed.kind === 'sessions') {
         await applySessionsBundle(store, record, pending, tombstoned, summary);
       } else if (record.parsed.kind === 'sheet') {
@@ -293,18 +344,18 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
 // decrypt finishes, the next app open repeats the same signer prompts from the beginning.
 // Processing each decoded record immediately means a phone that reached "2 of 13" starts
 // next time after those two, not at one again.
-export async function pullAndMerge(store: WorkstrStore, signer: Signer, relayUrl: string, options: PullOptions = {}): Promise<MergeSummary> {
+export async function pullAndMerge(store: WorkstrStore, signer: Signer, cipher: RecordCipher, relayUrl: string, options: PullOptions = {}): Promise<MergeSummary> {
   const events = (await unreadEvents(store, relayUrl, signer)).sort((a, b) => a.created_at - b.created_at || dTag(a).localeCompare(dTag(b)));
   const summary: MergeSummary = { applied: 0, skipped: 0, deleted: 0, unreadable: 0 };
   let consecutiveFailures = 0;
 
   for (const [index, event] of events.entries()) {
-    const decoded = await decodePrivateRecord(signer, event);
+    const decoded = await decodePrivateRecord(cipher, event);
     if (!decoded) {
       summary.unreadable += 1;
       consecutiveFailures += 1;
       if (consecutiveFailures >= 3 && summary.applied === 0 && summary.deleted === 0 && summary.skipped === 0) {
-        throw new Error('Signer could not decrypt your backup. Open your signer app and try again.');
+        throw new Error('Your backup could not be read with this account key.');
       }
       options.onProgress?.(index + 1, events.length);
       continue;

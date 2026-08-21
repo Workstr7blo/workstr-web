@@ -4,7 +4,7 @@ import { exportDatabase, importDatabase, type WorkstrExport } from './export';
 import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, TrainingBlock, WorkstrSettings } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
-import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionMonth, sessionsAddress, sheetAddress } from '../sync/addresses';
+import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
 import { syncedSettings } from '../sync/records';
 import { SyncAwareStore } from './sync-store';
 
@@ -212,7 +212,9 @@ export class WorkstrStore extends SyncAwareStore {
 
   async createSession(session: Omit<Session, 'id'>): Promise<number> {
     // Assigned here rather than by callers so no path can create an unaddressable session.
-    return Number(await this.db.add('sessions', { ...session, uid: session.uid || newSessionUid() }));
+    // New local sessions are the start of the fresh V2 backup era; pre-upgrade rows are
+    // marked local-only by the v5 database migration.
+    return Number(await this.db.add('sessions', { ...session, uid: session.uid || newSessionUid(), backup_version: session.backup_version ?? 2 }));
   }
 
   async getSession(id: number): Promise<Session | undefined> {
@@ -222,10 +224,9 @@ export class WorkstrStore extends SyncAwareStore {
   async finishSession(id: number, finishedAt = new Date().toISOString()): Promise<void> {
     const session = await this.db.get('sessions', id);
     if (!session) return;
-    await this.db.put('sessions', { ...session, finished_at: finishedAt });
-    // The month bundle, not the session: sessions are uploaded a month at a time so one
-    // signer round trip covers every session trained in it.
-    if (session.uid) this.noteChange(sessionsAddress(sessionMonth(session.started_at, finishedAt)), finishedAt);
+    const next = { ...session, finished_at: finishedAt };
+    await this.db.put('sessions', next);
+    if (next.uid && next.backup_version === 2) this.noteLogChange('log', next.uid, finishedAt);
   }
 
   async startSessionEmom(id: number, startedAt: string, keepStartedAt = false): Promise<void> {
@@ -260,13 +261,9 @@ export class WorkstrStore extends SyncAwareStore {
 
   async deleteSession(id: number): Promise<void> {
     const doomed = await this.db.get('sessions', id);
-    if (doomed?.uid) {
-      // Two records: the month bundle loses the session, and the session's own address
-      // carries the tombstone. A bundle that has simply stopped mentioning a session
-      // cannot express a deletion — another device would read it as no news.
-      this.noteChange(sessionAddress(doomed.uid));
-      this.noteChange(sessionsAddress(sessionMonth(doomed.started_at, doomed.finished_at)));
-    }
+    // A deletion is an entry in its own right. Absence cannot express it: a chunk that
+    // stops mentioning a session reads as no news.
+    if (doomed?.uid && doomed.backup_version === 2) this.noteLogChange('log', doomed.uid, new Date().toISOString(), true);
     const tx = this.db.transaction(['sessions', 'session_sets'], 'readwrite');
     await tx.objectStore('sessions').delete(id);
     const index = tx.objectStore('session_sets').index('session_id');
@@ -277,7 +274,13 @@ export class WorkstrStore extends SyncAwareStore {
   async addSessionSet(set: Omit<SessionSet, 'id'>): Promise<number> {
     const id = Number(await this.db.add('session_sets', set));
     const session = await this.db.get('sessions', set.session_id);
-    if (session?.uid) this.noteChange(sessionsAddress(sessionMonth(session.started_at, session.finished_at)), set.completed_at || undefined);
+    // Only once the workout is over. A set logged into a running session used to queue a
+    // record, so a backup pass — two signer round trips — fired every few minutes while the
+    // user was training, waking their signer app mid-set. A session in progress is held on
+    // the device and uploaded when it finishes; this branch is for editing a past workout.
+    if (session?.uid && session.backup_version === 2 && session.finished_at) {
+      this.noteLogChange('log', session.uid, set.completed_at || new Date().toISOString());
+    }
     return id;
   }
 
@@ -292,6 +295,14 @@ export class WorkstrStore extends SyncAwareStore {
     });
   }
 
+  async countSessionBackupEra(): Promise<{ v2: number; localOnly: number }> {
+    const sessions = await this.listSessions();
+    return {
+      v2: sessions.filter((session) => session.backup_version === 2).length,
+      localOnly: sessions.filter((session) => session.backup_version !== 2).length
+    };
+  }
+
   async listBody(limit = 120): Promise<BodyWeightEntry[]> {
     return (await this.db.getAll('bodyweight'))
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))
@@ -302,16 +313,22 @@ export class WorkstrStore extends SyncAwareStore {
   async logBody(entry: { date?: string; weight_kg: number; notes?: string }): Promise<void> {
     if (!Number.isFinite(entry.weight_kg)) throw new Error('weight_kg must be a number');
     const date = String(entry.date || new Date().toISOString().slice(0, 10));
+    const updatedAt = new Date().toISOString();
     const tx = this.db.transaction('bodyweight', 'readwrite');
     const existing = await tx.store.index('date').get(date);
-    await tx.store.put({ ...existing, date, weight_kg: entry.weight_kg, notes: entry.notes || '' });
+    await tx.store.put({ ...existing, date, weight_kg: entry.weight_kg, notes: entry.notes || '', updated_at: updatedAt });
     await tx.done;
-    this.noteChange(BODYWEIGHT_ADDRESS);
+    // One entry per date, so the date is what addresses it in the log. A whole-collection
+    // record could only ever be last-write-wins, which loses a weigh-in whenever two
+    // devices log one before either has synced.
+    this.noteLogChange('body', date, updatedAt);
   }
 
   async deleteBody(id: number): Promise<void> {
+    // Read before the row goes, or the date that addresses it is no longer knowable.
+    const doomed = await this.db.get('bodyweight', id);
     await this.db.delete('bodyweight', id);
-    this.noteChange(BODYWEIGHT_ADDRESS);
+    if (doomed?.date) this.noteLogChange('body', String(doomed.date), new Date().toISOString(), true);
   }
 
   async getSettings(): Promise<WorkstrSettings> {

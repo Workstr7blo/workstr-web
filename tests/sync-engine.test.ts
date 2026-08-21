@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { createSyncEngine, RECORD_FORMAT, RETRY_BASE_MS, type SyncStatus } from '../src/sync/engine';
-import { sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
+import { SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 import { withSignerTimeout } from '../src/signer/timeout';
-import type { PrivateRecord } from '../src/nostr/codecs30078';
+import { decodePrivateRecord, type PrivateRecord, type RecordCipher } from '../src/nostr/codecs30078';
 
 const SELF = 'ab'.repeat(32);
 
@@ -12,6 +12,9 @@ const SELF = 'ab'.repeat(32);
 // backfill, push, codec and merge code. Only the socket is fake.
 const relay = vi.hoisted(() => ({
   events: new Map<string, { event: unknown }>(),
+  // The wrapped backup key, held apart from the records because it is not one: it is
+  // NIP-44 to the user's own pubkey and is resolved before a pass can start.
+  keyEvent: null as null | { content: string },
   failure: null as null | 'policy' | 'network',
   // Real event ids are content hashes, so republishing an address produces a different
   // one. The seen ledger keys on that, so a double that reused ids would never be tested.
@@ -24,10 +27,13 @@ vi.mock('../src/sync/relay', async () => {
     PUBLISH_TIMEOUT_MS: 10000,
     FETCH_TIMEOUT_MS: 15000,
     classifyPublish: () => ({ accepted: true, reason: 'ok' }),
-    async publishRecord(signer: Signer, _url: string, record: PrivateRecord) {
+    async publishRecord(signer: Signer, cipher: RecordCipher, _url: string, record: PrivateRecord) {
       if (relay.failure) return { address: record.address, accepted: false, failure: relay.failure, reason: `${relay.failure} failure` };
       try {
-        const unsigned = await encodePrivateRecord(signer, record);
+        // Signing still goes through the signer, which is what lets these tests keep
+        // exercising a signer that stalls partway through an upload.
+        await signer.signEvent({ kind: 30078, created_at: 0, tags: [['d', record.address]], content: '' });
+        const unsigned = await encodePrivateRecord(cipher, record);
         const id = `id-${record.address}-${relay.seq += 1}`;
         // Addressable: republishing an address replaces it, exactly like a real relay.
         relay.events.set(record.address, { event: { ...unsigned, id, pubkey: SELF, sig: 'sig' } });
@@ -41,6 +47,17 @@ vi.mock('../src/sync/relay', async () => {
     },
     async fetchRecords() {
       return [...relay.events.values()].map((entry) => entry.event);
+    },
+    async fetchKeyEvent() {
+      if (relay.failure === 'network') throw new Error('relay query timed out');
+      return relay.keyEvent
+        ? { ...relay.keyEvent, id: 'key-event', pubkey: SELF, sig: 'sig', kind: 30078, created_at: 1, tags: [['d', 'workstr:v2:key']] }
+        : null;
+    },
+    async publishKeyEvent(_signer: Signer, _url: string, content: string) {
+      if (relay.failure) return { accepted: false, reason: `${relay.failure} failure` };
+      relay.keyEvent = { content };
+      return { accepted: true, reason: 'ok' };
     }
   };
 });
@@ -56,8 +73,28 @@ function fakeSigner(): Signer {
   };
 }
 
+// A backup key already cached on the device. Most of these tests are about syncing, not
+// about bootstrapping the key, and a device that has synced before has one.
+const CACHED_KEY = btoa(String.fromCharCode(...new Uint8Array(32).fill(3)));
+
+async function cipherOf(store: WorkstrStore): Promise<RecordCipher> {
+  const raw = (await store.getSettings()).backup?.key as string;
+  const bytes = Uint8Array.from(atob(raw), (char) => char.charCodeAt(0));
+  return { key: await crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt']), pubkey: SELF };
+}
+
+function fakeSignerWith(overrides: Partial<Signer>): Signer {
+  return { ...fakeSigner(), ...overrides };
+}
+
 let namespace = 0;
-const freshStore = () => WorkstrStore.open(`engine-${namespace += 1}`);
+const freshStore = async (): Promise<WorkstrStore> => {
+  const store = await WorkstrStore.open(`engine-${namespace += 1}`);
+  await store.saveBackupState({ key: CACHED_KEY });
+  return store;
+};
+// For the bootstrap tests below, which are about a device that has no key yet.
+const keylessStore = () => WorkstrStore.open(`engine-keyless-${namespace += 1}`);
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 // The engine deliberately runs its passes in the background, so tests wait on the
@@ -100,6 +137,7 @@ async function populate(store: WorkstrStore): Promise<void> {
 
 beforeEach(() => {
   relay.events.clear();
+  relay.keyEvent = null;
   relay.failure = null;
   relay.seq = 0;
 });
@@ -116,8 +154,11 @@ describe('turning backup on', () => {
     expect(status.pending).toBe(0);
     expect(status.lastSyncAt).toBeTruthy();
     expect([...relay.events.keys()]).toContain(sheetAddress('push-day'));
-    // Sheet, session, bodyweight, settings and the manifest.
-    expect(relay.events.size).toBe(5);
+    // Sheet and settings by address, plus a workout-log chunk and a body-log chunk.
+    // No manifest: nothing ever read it.
+    expect(relay.events.size).toBe(4);
+    expect([...relay.events.keys()].filter((address) => address.includes(':log:'))).toHaveLength(1);
+    expect([...relay.events.keys()].filter((address) => address.includes(':body:'))).toHaveLength(1);
     expect(await store.listSyncQueue()).toHaveLength(0);
   });
 
@@ -130,20 +171,21 @@ describe('turning backup on', () => {
     const backup = (await store.getSettings()).backup;
     expect(backup?.enabled).toBe(false);
     expect(backup?.backfillCursor).toBe(backup?.backfillTotal);
-    expect(backup?.backfillTotal).toBe(5);
+    expect(backup?.backfillTotal).toBe(2);
   });
 
   it('resumes an interrupted first run instead of restarting it', async () => {
     const store = await freshStore();
     await populate(store);
-    // A previous run got three records in before it was cut off.
-    await store.saveBackupState({ recordFormat: RECORD_FORMAT, backfillCursor: 3, backfillTotal: 5 });
+    // A previous run got one record in before it was cut off.
+    await store.saveBackupState({ recordFormat: RECORD_FORMAT, backfillCursor: 1, backfillTotal: 2 });
     const { engine } = await harness(store);
 
     await engine.start();
 
-    // Only the tail was enqueued; the first three are not re-sent.
-    expect(relay.events.size).toBe(2);
+    // Only the tail was enqueued; what already went is not re-sent. The log chunks are
+    // published from the journal rather than the queue, so they are here regardless.
+    expect([...relay.events.keys()].filter((address) => !address.includes(':log:') && !address.includes(':body:'))).toHaveLength(1);
   });
 });
 
@@ -179,50 +221,87 @@ describe('opening the app again', () => {
     first.engine.stop();
 
     // One record rewritten by another device, at an address this one already knows.
-    const settings = relay.events.get('workstr:v1:settings')!;
-    relay.events.set('workstr:v1:settings', { event: { ...(settings.event as Record<string, unknown>), id: 'from-another-device' } });
+    const settings = relay.events.get(SETTINGS_ADDRESS)!;
+    relay.events.set(SETTINGS_ADDRESS, { event: { ...(settings.event as Record<string, unknown>), id: 'from-another-device' } });
 
-    decrypt.mockClear();
+    // Opening a record is local, so the signer no longer measures anything here. What the
+    // ledger must still prove is that only the changed record was read again.
+    const opens = vi.spyOn(crypto.subtle, 'decrypt');
     const second = await harness(store, signer);
     await second.engine.start();
 
-    expect(decrypt).toHaveBeenCalledTimes(1);
+    expect(opens).toHaveBeenCalledTimes(1);
+    opens.mockRestore();
+    void decrypt;
   });
 });
 
-describe('a device that last synced before bundling', () => {
-  it('re-sends its history as month bundles and drops the per-session queue', async () => {
+describe('a device from the old local-only era', () => {
+  it('drops the queue entries it can no longer publish instead of wedging on them', async () => {
     const store = await freshStore();
-    await populate(store);
-    const uid = (await store.listSessions())[0].uid as string;
-    // The pre-bundle client left an entry per session in the queue and recorded no
-    // record format, which is what marks the device as needing the migration.
-    await store.saveBackupState({ enabled: true, backfillCursor: 4, backfillTotal: 4 });
-    await store.enqueueSync(sessionAddress(uid), '2026-08-01T11:00:00.000Z');
+    // What the previous client left behind when its last pass did not drain. This client
+    // cannot resolve a v1 address, so it would publish a tombstone the relay refuses and
+    // report an error on every pass from then on.
+    await store.enqueueSync('workstr:v1:sessions:2026-08', '2026-08-01T10:05:00.000Z');
+    await store.enqueueSync('workstr:v1:session:9f1c', '2026-08-01T10:05:00.000Z');
+
+    const { engine } = await harness(store);
+    const status = await engine.start();
+
+    expect(status.state).toBe('idle');
+    expect(status.lastError).toBeUndefined();
+    expect((await store.listSyncQueue()).map((entry) => entry.address)).not.toContain('workstr:v1:sessions:2026-08');
+    expect([...relay.events.keys()].some((address) => address.startsWith('workstr:v1:'))).toBe(false);
+  });
+
+
+  it('does not migrate local-only history into V2 relay backup', async () => {
+    const store = await freshStore();
+    const id = await store.createSession({ started_at: '2026-08-01T10:00:00.000Z', backup_version: 1 });
+    const uid = (await store.getSession(id))!.uid as string;
+    await store.addSessionSet({ session_id: id, exercise_slug: 'bench', set_number: 1, reps: 8, completed_at: '2026-08-01T10:05:00.000Z' });
+    await store.saveBackupState({ enabled: true, backfillCursor: 0, backfillTotal: undefined });
 
     const { engine } = await harness(store);
     await engine.start();
 
-    expect([...relay.events.keys()]).toContain(sessionsAddress('2026-08'));
-    // The per-session address is not uploaded again: the month it belongs to carries it.
+    expect([...relay.events.keys()]).not.toContain(sessionsAddress('2026-08'));
     expect([...relay.events.keys()]).not.toContain(sessionAddress(uid));
-    expect(await store.listSyncQueue()).toHaveLength(0);
     expect((await store.getSettings()).backup?.recordFormat).toBe(RECORD_FORMAT);
   });
 
-  it('keeps a queued deletion, which no bundle can express', async () => {
+  it('drops per-workout addresses left by the previous format', async () => {
     const store = await freshStore();
     await populate(store);
     const [session] = await store.listSessions();
-    await store.saveBackupState({ enabled: true, backfillCursor: 4, backfillTotal: 4 });
+    // A device on the previous format queued history by address. Sending those would write
+    // workout history to the very addresses the log replaces.
     await store.enqueueSync(sessionAddress(session.uid as string), '2026-08-02T11:00:00.000Z');
-    // Deleted locally, so the queued address is a tombstone rather than a stale upload.
-    await store.deleteSession(session.id as number);
 
     const { engine } = await harness(store);
     await engine.start();
 
-    expect([...relay.events.keys()]).toContain(sessionAddress(session.uid as string));
+    expect([...relay.events.keys()]).not.toContain(sessionAddress(session.uid as string));
+    expect(await store.listSyncQueue()).toHaveLength(0);
+    // The session is not lost: seeding puts it into the log, which is what gets published.
+    expect([...relay.events.keys()].some((address) => address.startsWith('workstr:v2:log:'))).toBe(true);
+  });
+
+  it('carries a deletion into the log, because absence cannot express one', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const [session] = await store.listSessions();
+    const { engine } = await harness(store);
+    await engine.start();
+
+    await store.deleteSession(session.id as number);
+    await vi.waitFor(async () => expect((await store.listJournal('log')).some((row) => row.deleted)).toBe(true));
+    await engine.syncNow();
+
+    const chunk = [...relay.events.keys()].find((address) => address.startsWith('workstr:v2:log:'))!;
+    const decoded = await decodePrivateRecord(await cipherOf(store), relay.events.get(chunk)!.event as never);
+    const entries = (decoded!.payload as { entries: { uid: string; deleted?: boolean }[] }).entries;
+    expect(entries.find((entry) => entry.uid === session.uid)?.deleted).toBe(true);
   });
 });
 
@@ -232,6 +311,7 @@ describe('staying in sync', () => {
     const { engine, state } = await harness(store);
     await engine.start();
     relay.events.clear();
+    relay.keyEvent = null;
 
     await store.saveSheet({ name: 'Leg Day', exercises: [] });
     await until(() => state.timers.length > 0, 'the debounced sync to be scheduled');
@@ -405,9 +485,10 @@ describe('when the relay or signer will not cooperate', () => {
     let attempts = 0;
     const silent: Signer = {
       type: 'nip46',
+      // Sealing is local, so the signature is the only thing left that can hang.
+      signEvent: () => { attempts += 1; return new Promise(() => {}); },
       getPublicKey: async () => SELF,
-      signEvent: () => new Promise(() => {}),
-      nip44Encrypt: () => { attempts += 1; return new Promise(() => {}); },
+      nip44Encrypt: () => new Promise(() => {}),
       nip44Decrypt: () => new Promise(() => {})
     };
     const { engine } = await harness(store, withSignerTimeout(silent, 20));
@@ -416,8 +497,9 @@ describe('when the relay or signer will not cooperate', () => {
     // One rebuild and one retry, because silence is usually a closed socket rather than an
     // absent user. Then it stops: a signer that is genuinely away must not cost a timeout
     // for every record in the queue.
+    // One try and one rebuild, then it stops — not one timeout per queued record.
     expect(attempts).toBe(2);
-    expect(attempts).toBeLessThan((await store.listSyncQueue()).length);
+    expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
   });
 
   it('goes quiet rather than failing loudly when the signer is gone', async () => {
@@ -440,6 +522,60 @@ describe('when the relay or signer will not cooperate', () => {
     await engine.start();
 
     expect((await store.getSettings()).backup?.lastError).toContain('network failure');
+  });
+});
+
+describe('a device bootstrapping its backup key', () => {
+  it('mints and publishes one when the relay has none, then seals records with it', async () => {
+    const store = await keylessStore();
+    await populate(store);
+    const { engine } = await harness(store);
+
+    const status = await engine.start();
+
+    expect(status.state).toBe('idle');
+    expect(relay.keyEvent).not.toBeNull();
+    // Cached, so the next launch costs the signer nothing to read the backup.
+    expect((await store.getSettings()).backup?.key).toBeTruthy();
+    expect(relay.events.size).toBeGreaterThan(0);
+  });
+
+  it('adopts the key already on the relay instead of starting a second one', async () => {
+    const store = await keylessStore();
+    // Another device got there first. The NIP-44 double is an identity function, so the
+    // wrapped key is readable here exactly as the signer would return it.
+    const existing = btoa(String.fromCharCode(...new Uint8Array(32).fill(11)));
+    relay.keyEvent = { content: existing };
+
+    const { engine } = await harness(store);
+    await engine.start();
+
+    expect((await store.getSettings()).backup?.key).toBe(existing);
+  });
+
+  it('stops rather than inventing a key when the relay cannot be asked', async () => {
+    const store = await keylessStore();
+    await populate(store);
+    relay.failure = 'network';
+
+    const { engine } = await harness(store);
+    const status = await engine.start();
+
+    expect(status.state).toBe('error');
+    expect(status.lastError).toContain('backup key');
+    // The one outcome that must never happen: a second key, written over data that was
+    // sealed with the first, on a device that simply could not reach the relay.
+    expect(relay.keyEvent).toBeNull();
+    expect(relay.events.size).toBe(0);
+  });
+
+  it('does not ask the signer again once the key is cached', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const decrypt = vi.fn(async (_peer: string, ciphertext: string) => ciphertext);
+    await (await harness(store, fakeSignerWith({ nip44Decrypt: decrypt }))).engine.start();
+
+    expect(decrypt).not.toHaveBeenCalled();
   });
 });
 

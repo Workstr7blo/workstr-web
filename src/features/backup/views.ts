@@ -1,3 +1,4 @@
+import type { BackupSettings } from '../../core/types';
 import type { SyncProgress, SyncStatus } from '../../sync/engine';
 import { html } from '../../app/format';
 
@@ -5,6 +6,7 @@ export interface BackupPanelState {
   signedIn: boolean;
   enabled: boolean;
   sync: SyncStatus;
+  backup?: BackupSettings;
 }
 
 // Minutes, then hours, then the date. Nobody needs "backed up 4 days and 3 hours ago" —
@@ -18,6 +20,16 @@ export function lastSyncLabel(iso: string | undefined, now = new Date()): string
   if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  return then.toLocaleDateString();
+}
+
+// The day backup started holding this device's history, as a date. Unlike `lastSyncLabel`
+// this never goes relative: it marks a boundary the user may need to reason about months
+// later, and "3 months ago" is not something you can line up against a training log.
+export function startedOnLabel(iso: string | undefined): string {
+  if (!iso) return 'backup was switched on';
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return 'backup was switched on';
   return then.toLocaleDateString();
 }
 
@@ -83,9 +95,18 @@ export function backupPanel(state: BackupPanelState): string {
   const explainer = state.signedIn
     ? 'Your programs, workout history, body log and preferences are encrypted on this device and copied to the Workstr relay. Only your key can read them — the relay stores ciphertext it cannot open. Sign in on another device to restore. Turning this off stops the copying and leaves both sides intact.'
     : 'Backup needs an identity: records are encrypted to your own key and signed by it. Turning this on takes you through sign-in first.';
+  const localOnly = state.backup?.localOnlyHistoryCount ?? 0;
+  // Only when there is something to say, and only once backup is actually on. The count is
+  // the one fact the user cannot work out for themselves: which of their workouts this
+  // relay will never hold. The date is absolute — "started 12 min ago" reads as a status,
+  // and this is a boundary in their history, not a status.
+  const eraLine = state.signedIn && state.enabled && localOnly > 0
+    ? `<p class="section-help">${localOnly} workout${localOnly === 1 ? '' : 's'} logged before ${html(startedOnLabel(state.backup?.v2StartedAt))} stay${localOnly === 1 ? 's' : ''} on this device only and ${localOnly === 1 ? 'is' : 'are'} not copied to the relay. Export to JSON to keep a full archive of those.</p>`
+    : '';
   return `<div class="panel">
     <div class="panel-head"><span>Backup</span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></div>
     <p class="section-help">${html(explainer)}</p>
+    ${eraLine}
     ${toggle}
     ${live}
     <p class="section-help">Or keep your own copy: export your whole library, programs, history, body log and settings to a JSON file, or restore from one. Import replaces everything in this account.</p>

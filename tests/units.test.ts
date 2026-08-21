@@ -9,7 +9,7 @@ describe('core ids', () => {
   });
 
   it('builds private record addresses', () => {
-    expect(exerciseAddress('push-up')).toBe('workstr:v1:exercise:push-up');
+    expect(exerciseAddress('push-up')).toBe('workstr:v2:exercise:push-up');
   });
 });
 

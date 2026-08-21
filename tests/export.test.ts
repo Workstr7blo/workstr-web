@@ -53,7 +53,45 @@ describe('export/import round-trip', () => {
     const restored = await exportDatabase(empty, ns);
     empty.close();
 
-    expect(restored.stores).toEqual(dump.stores);
+    // Everything is restored as it was, with two deliberate exceptions below.
+    expect(restored.stores).toEqual({
+      ...dump.stores,
+      sessions: [{ id: 1, started_at: '2026-01-01T00:00:00Z', backup_version: 2 }],
+      sync_queue: []
+    });
+  });
+
+  it('brings imported workouts into the live backup era', async () => {
+    const ns = 'export-era';
+    await seed(ns);
+    const db = await openWorkstrDB(ns);
+    const dump = await exportDatabase(db, ns);
+    db.close();
+
+    await wipe(ns);
+    const target = await openWorkstrDB(ns);
+    await importDatabase(target, dump);
+    // The archive's session predates the era and carries no marker. Left as it arrived it
+    // would sit outside backup forever while the panel reported everything up to date.
+    expect((await target.getAll('sessions')).map((row) => row.backup_version)).toEqual([2]);
+    target.close();
+  });
+
+  it('empties the sync queue rather than replaying the exporting device queue', async () => {
+    const ns = 'export-queue';
+    await seed(ns);
+    const db = await openWorkstrDB(ns);
+    const dump = await exportDatabase(db, ns);
+    db.close();
+    // The exporting device had a pending entry; it names an address that means nothing on
+    // the importing database, and this build cannot even publish it.
+    expect(dump.stores.sync_queue).toHaveLength(1);
+
+    await wipe(ns);
+    const target = await openWorkstrDB(ns);
+    await importDatabase(target, dump);
+    expect(await target.getAll('sync_queue')).toHaveLength(0);
+    target.close();
   });
 
   it('imports into a fresh (never-seeded) namespace', async () => {

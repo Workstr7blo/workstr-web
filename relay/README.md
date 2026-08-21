@@ -9,7 +9,8 @@ That makes `write-policy.mjs` the only control on what the relay stores. It acce
 event when:
 
 - `kind` is `30078`, **and**
-- the first `d` tag starts with `workstr:v1:` and carries something after the prefix.
+- the first `d` tag starts with `workstr:v2:` (or, through the cutover, `workstr:v1:`) and
+  carries something after the prefix.
 
 Everything else is rejected, `kind:1` included. This is what stops the relay becoming a
 general-purpose relay carrying other clients' notes, and there is no second line of
@@ -121,7 +122,7 @@ docker exec <container> wget -qO- --header="Accept: application/nostr+json" http
 real stdin/stdout protocol, but it cannot prove the relay is wired up. Against the
 deployed relay, confirm all four:
 
-1. A `kind:30078` with a `workstr:v1:` `d` tag is accepted.
+1. A `kind:30078` with a `workstr:v2:` `d` tag is accepted.
 2. A `kind:1` note is rejected, with the reason visible in the `OK` message.
 3. A `kind:30078` with a foreign `d` prefix is rejected.
 4. NIP-11 still serves over HTTPS and reads still work — the policy is write-path only.

@@ -13,7 +13,7 @@ export function uuid(): string {
 }
 
 export function recordAddress(type: string, id: string): string {
-  return `workstr:v1:${type}:${id}`;
+  return `workstr:v2:${type}:${id}`;
 }
 
 export function exerciseAddress(slug: string): string {
@@ -28,6 +28,5 @@ export function sessionAddress(id: string): string {
   return recordAddress('session', id);
 }
 
-export const BODYWEIGHT_ADDRESS = 'workstr:v1:bodyweight';
-export const SETTINGS_ADDRESS = 'workstr:v1:settings';
-export const MANIFEST_ADDRESS = 'workstr:v1:manifest';
+export const BODYWEIGHT_ADDRESS = 'workstr:v2:bodyweight';
+export const SETTINGS_ADDRESS = 'workstr:v2:settings';
