@@ -29,22 +29,46 @@ export function statusPill(state: BackupPanelState): { label: string; ok: boolea
 }
 
 const PHASE_LABEL: Record<SyncProgress['phase'], string> = {
-  restore: 'Restoring your training',
-  prepare: 'Preparing your history',
-  upload: 'Backing up'
+  restore: 'Checking encrypted backup…',
+  prepare: 'Preparing local changes…',
+  upload: 'Backing up local changes…'
 };
 
-// The one line that answers "is my training safe". Progress replaces it whenever a pass is
-// actually moving: a first run is minutes of work, and a bare "Syncing now…" reads exactly
-// the same whether it is uploading or wedged. A falling pending count reads like a fault,
-// so the count of what is done leads instead.
+const PHASE_DETAIL: Record<SyncProgress['phase'], string> = {
+  restore: 'records checked',
+  prepare: 'records queued',
+  upload: 'records backed up'
+};
+
+export function progressPercent(progress: SyncProgress): number {
+  if (!Number.isFinite(progress.total) || progress.total <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((progress.done / progress.total) * 100)));
+}
+
+export function progressDetail(progress: SyncProgress): string {
+  return `${progress.done} of ${progress.total} ${PHASE_DETAIL[progress.phase]}`;
+}
+
+// The one line that answers "is my training safe". The restore phase is deliberately named
+// as a check: the app must decrypt unknown backup records before it can tell whether any of
+// them actually restore data. "Restoring" is reserved for a completed pass that changed the
+// local database.
 export function statusLine(state: BackupPanelState): string {
   const { sync } = state;
-  if (sync.progress) return `${PHASE_LABEL[sync.progress.phase]}: ${sync.progress.done} of ${sync.progress.total}.`;
+  if (sync.progress) return PHASE_LABEL[sync.progress.phase];
   if (sync.state === 'error') return sync.lastError || 'Backup could not reach the relay. It will retry on its own.';
   if (sync.state === 'syncing') return 'Syncing now…';
   const pending = sync.pending > 0 ? `${sync.pending} change${sync.pending === 1 ? '' : 's'} waiting to upload. ` : '';
   return `${pending}Last backup ${lastSyncLabel(sync.lastSyncAt)}.`;
+}
+
+function progressMarkup(progress: SyncProgress | undefined): string {
+  if (!progress) return '';
+  const width = progressPercent(progress);
+  return `<div class="backup-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${width}">
+      <span style="width:${width}%"></span>
+    </div>
+    <p class="backup-progress-detail">${html(progressDetail(progress))}</p>`;
 }
 
 export function backupPanel(state: BackupPanelState): string {
@@ -53,7 +77,7 @@ export function backupPanel(state: BackupPanelState): string {
   // Only shown once it is on: an explanation of syncing is noise to someone who has not
   // turned it on, and a manual button is a fallback, not the normal path.
   const live = state.enabled
-    ? `<p class="section-help" id="backup-status">${html(statusLine(state))}</p>
+    ? `<div class="backup-live" id="backup-status"><p class="section-help">${html(statusLine(state))}</p>${progressMarkup(state.sync.progress)}</div>
     <div class="web-empty-actions"><button id="sync-now" class="button ghost" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button></div>`
     : '';
   const explainer = state.signedIn

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backupPanel, lastSyncLabel, statusLine, statusPill, type BackupPanelState } from '../src/features/backup/views';
+import { backupPanel, lastSyncLabel, progressDetail, progressPercent, statusLine, statusPill, type BackupPanelState } from '../src/features/backup/views';
 
 const panelState = (overrides: Partial<BackupPanelState> = {}): BackupPanelState => ({
   signedIn: true,
@@ -41,19 +41,22 @@ describe('status pill', () => {
 });
 
 describe('status line', () => {
-  it('reports progress instead of a falling pending count', () => {
-    // 400 pending falling to zero reads like a fault; "12 of 400" reads like progress.
-    expect(statusLine(panelState({ sync: { state: 'syncing', pending: 388, progress: { phase: 'upload', done: 12, total: 400 } } })))
-      .toBe('Backing up: 12 of 400.');
+  it('reports progress with calm phase names instead of a falling pending count', () => {
+    // 400 pending falling to zero reads like a fault; the bar/detail reads like progress.
+    const sync = { state: 'syncing' as const, pending: 388, progress: { phase: 'upload' as const, done: 12, total: 400 } };
+    expect(statusLine(panelState({ sync }))).toBe('Backing up local changes…');
+    expect(progressDetail(sync.progress)).toBe('12 of 400 records backed up');
+    expect(progressPercent(sync.progress)).toBe(3);
   });
 
-  it('names the phase, so a long first sync is not mistaken for a hang', () => {
-    // The complaint this exists for: a bare "Syncing now…" looks identical whether the
-    // pass is uploading or wedged.
+  it('names the check phase so decrypting unknown records is not mistaken for restoring data', () => {
+    // Unknown encrypted events need signer decrypts before the app can know whether they
+    // apply anything. The UI should describe that as checking, not restoring.
     expect(statusLine(panelState({ sync: { state: 'syncing', pending: 0, progress: { phase: 'restore', done: 3, total: 40 } } })))
-      .toBe('Restoring your training: 3 of 40.');
+      .toBe('Checking encrypted backup…');
+    expect(progressDetail({ phase: 'restore', done: 3, total: 40 })).toBe('3 of 40 records checked');
     expect(statusLine(panelState({ sync: { state: 'syncing', pending: 0, progress: { phase: 'prepare', done: 5, total: 9 } } })))
-      .toBe('Preparing your history: 5 of 9.');
+      .toBe('Preparing local changes…');
   });
 
   it('shows the error the engine reported', () => {
@@ -88,6 +91,15 @@ describe('the panel', () => {
     expect(html).toContain('checked');
     expect(html).toContain('id="sync-now"');
     expect(html).toContain('2 changes waiting to upload');
+  });
+
+  it('renders active sync progress as a bar with secondary detail', () => {
+    const html = backupPanel(panelState({ sync: { state: 'syncing', pending: 0, progress: { phase: 'restore', done: 2, total: 3 } } }));
+    expect(html).toContain('Checking encrypted backup…');
+    expect(html).toContain('class="backup-progress"');
+    expect(html).toContain('aria-valuenow="67"');
+    expect(html).toContain('2 of 3 records checked');
+    expect(html).not.toContain('Restoring your training');
   });
 
   it('disables sync-now while a sync is already running', () => {
