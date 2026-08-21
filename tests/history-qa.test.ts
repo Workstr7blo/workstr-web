@@ -167,7 +167,7 @@ describe('neighbouring features read the same rows', () => {
   const sessions = [session(1, at(2026, 8, 19), 3), session(2, at(2026, 8, 18), 3)];
 
   it('keeps statistics and history agreeing about which days were trained', () => {
-    const stats = getStats(sessions, []);
+    const stats = getStats(sessions, [], now);
     const model = buildHistoryModel(sessions, { now });
     expect(stats.totalSessions).toBe(2);
     // Both now answer "which day?" through core/dates, so the streak matches the calendar.

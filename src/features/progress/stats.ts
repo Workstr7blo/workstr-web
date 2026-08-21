@@ -48,7 +48,7 @@ export interface WorkstrStats {
 }
 
 // Ported verbatim from self-hosted Workstr src/app/store.js getStats().
-export function getStats(sessions: ActiveSession[], exercises: Exercise[]): WorkstrStats {
+export function getStats(sessions: ActiveSession[], exercises: Exercise[], now = new Date()): WorkstrStats {
   const sets = completedSets(sessions);
   const totalSessions = sessions.length;
   const totalSets = sets.length;
@@ -100,5 +100,5 @@ export function getStats(sessions: ActiveSession[], exercises: Exercise[]): Work
     .sort((a, b) => b.e1rm - a.e1rm)
     .slice(0, 12);
 
-  return { totalSessions, totalSets, totalVolume, weekly, muscle, prs, streak: computeStreak(sessions) };
+  return { totalSessions, totalSets, totalVolume, weekly, muscle, prs, streak: computeStreak(sessions, now) };
 }
