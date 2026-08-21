@@ -4,7 +4,7 @@ import { createSyncEngine, RECORD_FORMAT, RETRY_BASE_MS, type SyncStatus } from 
 import { SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 import { withSignerTimeout } from '../src/signer/timeout';
-import type { PrivateRecord, RecordCipher } from '../src/nostr/codecs30078';
+import { decodePrivateRecord, type PrivateRecord, type RecordCipher } from '../src/nostr/codecs30078';
 
 const SELF = 'ab'.repeat(32);
 
@@ -77,6 +77,12 @@ function fakeSigner(): Signer {
 // about bootstrapping the key, and a device that has synced before has one.
 const CACHED_KEY = btoa(String.fromCharCode(...new Uint8Array(32).fill(3)));
 
+async function cipherOf(store: WorkstrStore): Promise<RecordCipher> {
+  const raw = (await store.getSettings()).backup?.key as string;
+  const bytes = Uint8Array.from(atob(raw), (char) => char.charCodeAt(0));
+  return { key: await crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt']), pubkey: SELF };
+}
+
 function fakeSignerWith(overrides: Partial<Signer>): Signer {
   return { ...fakeSigner(), ...overrides };
 }
@@ -148,8 +154,11 @@ describe('turning backup on', () => {
     expect(status.pending).toBe(0);
     expect(status.lastSyncAt).toBeTruthy();
     expect([...relay.events.keys()]).toContain(sheetAddress('push-day'));
-    // Sheet, session, bodyweight, settings. No manifest: nothing ever read it.
+    // Sheet and settings by address, plus a workout-log chunk and a body-log chunk.
+    // No manifest: nothing ever read it.
     expect(relay.events.size).toBe(4);
+    expect([...relay.events.keys()].filter((address) => address.includes(':log:'))).toHaveLength(1);
+    expect([...relay.events.keys()].filter((address) => address.includes(':body:'))).toHaveLength(1);
     expect(await store.listSyncQueue()).toHaveLength(0);
   });
 
@@ -162,20 +171,21 @@ describe('turning backup on', () => {
     const backup = (await store.getSettings()).backup;
     expect(backup?.enabled).toBe(false);
     expect(backup?.backfillCursor).toBe(backup?.backfillTotal);
-    expect(backup?.backfillTotal).toBe(4);
+    expect(backup?.backfillTotal).toBe(2);
   });
 
   it('resumes an interrupted first run instead of restarting it', async () => {
     const store = await freshStore();
     await populate(store);
-    // A previous run got three records in before it was cut off.
-    await store.saveBackupState({ recordFormat: RECORD_FORMAT, backfillCursor: 3, backfillTotal: 4 });
+    // A previous run got one record in before it was cut off.
+    await store.saveBackupState({ recordFormat: RECORD_FORMAT, backfillCursor: 1, backfillTotal: 2 });
     const { engine } = await harness(store);
 
     await engine.start();
 
-    // Only the tail was enqueued; the first three are not re-sent.
-    expect(relay.events.size).toBe(1);
+    // Only the tail was enqueued; what already went is not re-sent. The log chunks are
+    // published from the journal rather than the queue, so they are here regardless.
+    expect([...relay.events.keys()].filter((address) => !address.includes(':log:') && !address.includes(':body:'))).toHaveLength(1);
   });
 });
 
@@ -260,19 +270,38 @@ describe('a device from the old local-only era', () => {
     expect((await store.getSettings()).backup?.recordFormat).toBe(RECORD_FORMAT);
   });
 
-  it('keeps a queued deletion, which no bundle can express', async () => {
+  it('drops per-workout addresses left by the previous format', async () => {
     const store = await freshStore();
     await populate(store);
     const [session] = await store.listSessions();
-    await store.saveBackupState({ enabled: true, backfillCursor: 4, backfillTotal: 4 });
+    // A device on the previous format queued history by address. Sending those would write
+    // workout history to the very addresses the log replaces.
     await store.enqueueSync(sessionAddress(session.uid as string), '2026-08-02T11:00:00.000Z');
-    // Deleted locally, so the queued address is a tombstone rather than a stale upload.
-    await store.deleteSession(session.id as number);
 
     const { engine } = await harness(store);
     await engine.start();
 
-    expect([...relay.events.keys()]).toContain(sessionAddress(session.uid as string));
+    expect([...relay.events.keys()]).not.toContain(sessionAddress(session.uid as string));
+    expect(await store.listSyncQueue()).toHaveLength(0);
+    // The session is not lost: seeding puts it into the log, which is what gets published.
+    expect([...relay.events.keys()].some((address) => address.startsWith('workstr:v2:log:'))).toBe(true);
+  });
+
+  it('carries a deletion into the log, because absence cannot express one', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const [session] = await store.listSessions();
+    const { engine } = await harness(store);
+    await engine.start();
+
+    await store.deleteSession(session.id as number);
+    await vi.waitFor(async () => expect((await store.listJournal('log')).some((row) => row.deleted)).toBe(true));
+    await engine.syncNow();
+
+    const chunk = [...relay.events.keys()].find((address) => address.startsWith('workstr:v2:log:'))!;
+    const decoded = await decodePrivateRecord(await cipherOf(store), relay.events.get(chunk)!.event as never);
+    const entries = (decoded!.payload as { entries: { uid: string; deleted?: boolean }[] }).entries;
+    expect(entries.find((entry) => entry.uid === session.uid)?.deleted).toBe(true);
   });
 });
 
@@ -468,8 +497,9 @@ describe('when the relay or signer will not cooperate', () => {
     // One rebuild and one retry, because silence is usually a closed socket rather than an
     // absent user. Then it stops: a signer that is genuinely away must not cost a timeout
     // for every record in the queue.
+    // One try and one rebuild, then it stops — not one timeout per queued record.
     expect(attempts).toBe(2);
-    expect(attempts).toBeLessThan((await store.listSyncQueue()).length);
+    expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
   });
 
   it('goes quiet rather than failing loudly when the signer is gone', async () => {

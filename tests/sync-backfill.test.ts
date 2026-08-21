@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
-import { collectRecords, resolveRecord, runBackfill } from '../src/sync/backfill';
+import { collectRecords, resolveRecord, runBackfill, seedJournal } from '../src/sync/backfill';
 import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import { parseSessionsId } from '../src/sync/addresses';
 import { MAX_BUNDLE_BYTES, sessionsBundleRecords, sessionUpdatedAt, syncedSettings, type SessionsBundlePayload } from '../src/sync/records';
@@ -27,11 +27,10 @@ describe('record collection', () => {
     const records = await collectRecords(store);
     const addresses = records.map((record) => record.address);
     expect(addresses).toContain(sheetAddress('push-day'));
-    expect(addresses).toContain(BODYWEIGHT_ADDRESS);
     expect(addresses).toContain(SETTINGS_ADDRESS);
-    // V2 sessions travel as one record per session, not mutable month bundles.
+    // Neither workout history nor the body log is here: it travels in the append-only log, packed at push time.
     const uid = (await store.getSession(sessionId))!.uid!;
-    expect(addresses).toContain(sessionAddress(uid));
+    expect(addresses).not.toContain(sessionAddress(uid));
     expect(addresses).not.toContain(sessionsAddress('2026-08'));
     expect(addresses.some((address) => address.startsWith('workstr:v1:'))).toBe(false);
 
@@ -43,27 +42,23 @@ describe('record collection', () => {
     expect(payload.exercises[0].sheet_id).toBeUndefined();
   });
 
-  it('collects V2 sessions individually by uid', async () => {
+  it('seeds backed-up sessions into the log, once', async () => {
     const store = await freshStore();
     const august = await store.createSession({ started_at: '2026-08-01T10:00:00.000Z' });
     await store.addSessionSet({ session_id: august, exercise_slug: 'bench', set_number: 1, reps: 8, completed_at: '2026-08-01T10:05:00.000Z' });
-    const september = await store.createSession({ started_at: '2026-09-02T10:00:00.000Z' });
-    await store.addSessionSet({ session_id: september, exercise_slug: 'squat', set_number: 1, reps: 5, completed_at: '2026-09-02T10:05:00.000Z' });
+    await store.finishSession(august, '2026-08-01T11:00:00.000Z');
+    const legacy = await store.createSession({ started_at: '2025-01-01T10:00:00.000Z', backup_version: 1 });
+    await store.finishSession(legacy, '2025-01-01T11:00:00.000Z');
+    await store.clearJournal();
 
-    const records = await collectRecords(store);
-    const addresses = records.map((record) => record.address);
-    const augustUid = (await store.getSession(august))!.uid!;
-    const septemberUid = (await store.getSession(september))!.uid!;
-    expect(addresses).toContain(sessionAddress(augustUid));
-    expect(addresses).toContain(sessionAddress(septemberUid));
-    expect(addresses).not.toContain(sessionsAddress('2026-08'));
-    expect(addresses).not.toContain(sessionsAddress('2026-09'));
-
-    const record = records.find((candidate) => candidate.address === sessionAddress(augustUid))!;
-    expect(record.updatedAt).toBe('2026-08-01T10:05:00.000Z');
-    const payload = record.payload as { id?: number; sets: { id?: number; session_id?: number }[] };
-    expect(payload.id).toBeUndefined();
-    expect(payload.sets[0].session_id).toBeUndefined();
+    expect(await seedJournal(store)).toBe(1);
+    const journal = await store.listJournal('log');
+    expect(journal.map((row) => row.uid)).toEqual([(await store.getSession(august))!.uid]);
+    // Pre-cutover history stays on the device.
+    expect(journal.map((row) => row.uid)).not.toContain((await store.getSession(legacy))!.uid);
+    // Running it again adds nothing: an interrupted first pass must be safe to repeat.
+    expect(await seedJournal(store)).toBe(0);
+    expect(await store.listJournal('log')).toHaveLength(1);
   });
 
   it('keeps device-local settings out of the synced record', async () => {
@@ -199,14 +194,15 @@ describe('change tracking', () => {
 
     const addresses = seen.map((entry) => entry.address);
     expect(addresses).toContain(sheetAddress('push-day'));
-    expect(addresses).toContain(sessionAddress(uid));
+    expect(addresses).toContain(`log:${uid}`);
     expect(addresses).not.toContain(sessionsAddress('2026-08'));
-    expect(addresses).toContain(BODYWEIGHT_ADDRESS);
+    // A weigh-in reports the date it belongs to, not the whole collection.
+    expect(addresses).toContain('body:2026-08-02');
     expect(addresses).toContain(SETTINGS_ADDRESS);
-    // Finishing dates the record, not the set: a set logged into a running session reports
+    // Finishing dates the entry, not the set: a set logged into a running session reports
     // nothing, so no backup pass fires while the user is still training.
-    expect(seen.filter((entry) => entry.address === sessionAddress(uid))).toHaveLength(1);
-    expect(seen.find((entry) => entry.address === sessionAddress(uid))?.updatedAt).toBe('2026-08-01T11:00:00.000Z');
+    expect(seen.filter((entry) => entry.address === `log:${uid}`)).toHaveLength(1);
+    expect(seen.find((entry) => entry.address === `log:${uid}`)?.updatedAt).toBe('2026-08-01T11:00:00.000Z');
   });
 
   it('says nothing while a workout is running, and reports a set added to a finished one', async () => {
@@ -217,12 +213,14 @@ describe('change tracking', () => {
 
     await store.finishSession(sessionId, '2026-08-01T11:00:00.000Z');
     const uid = (await store.getSession(sessionId))!.uid!;
-    expect(seen.map((entry) => entry.address)).toEqual([sessionAddress(uid)]);
+    // The signal follows the journal write rather than preceding it, so the engine can
+    // never be told to sync a log entry that is not in the journal yet.
+    await vi.waitFor(() => expect(seen.map((entry) => entry.address)).toEqual([`log:${uid}`]));
 
     // Editing the finished workout does report, which is how a correction reaches backup.
     seen = [];
     await store.addSessionSet({ session_id: sessionId, exercise_slug: 'bench', set_number: 2, reps: 6, completed_at: '2026-08-01T11:30:00.000Z' });
-    expect(seen).toEqual([{ address: sessionAddress(uid), updatedAt: '2026-08-01T11:30:00.000Z' }]);
+    await vi.waitFor(() => expect(seen).toEqual([{ address: `log:${uid}`, updatedAt: '2026-08-01T11:30:00.000Z' }]));
   });
 
   it('reports deletions before the row is gone, so the address is still knowable', async () => {
@@ -232,9 +230,9 @@ describe('change tracking', () => {
     seen = [];
     await store.deleteSheet(sheetId);
     await store.deleteSession(sessionId);
-    // A deleted V2 session needs only its own tombstone. Monthly bundles are no longer
-    // rewritten by normal workout-history changes.
-    expect(seen.map((entry) => entry.address)).toEqual([sheetAddress('push-day'), sessionAddress(uid)]);
+    // A deleted session appends a deletion entry to the log; the sheet still travels by
+    // address, because a program is edited in place rather than journaled.
+    await vi.waitFor(() => expect(seen.map((entry) => entry.address)).toEqual([sheetAddress('push-day'), `log:${uid}`]));
   });
 
   it('resolves a deleted address to nothing, which is how a tombstone is decided', async () => {

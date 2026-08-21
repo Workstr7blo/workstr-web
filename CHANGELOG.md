@@ -26,6 +26,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   history meant hundreds of round trips to it — and on a remote signer, minutes of waiting.
   Your account now has a single backup key, which your signer unlocks once. Everything
   after that is read and written on the device, and your signer is only asked to sign.
+- **Workout history no longer tells the relay how often you train.** Every workout used to
+  be its own record with its own name on the relay, in the clear, so anyone reading it could
+  count them. History now travels in batches: a year of training is around six records
+  instead of two hundred, and the relay learns roughly how much you have stored rather than
+  exactly how many times you trained.
+- **Two devices can no longer lose each other's work.** Body weight used to be copied as one
+  whole record, so if two devices each logged a weigh-in before either had synced, one of
+  them quietly won and the other entry was gone. Weigh-ins and workouts are now merged one
+  at a time, and a deletion is carried explicitly rather than by falling silent.
+- **Finished history is written once and left alone.** Once a batch is full it is never
+  rewritten, so editing an old workout no longer re-uploads the rest of that month, and a
+  correction costs a single small upload however long your history is.
 - **Backups take up far less room.** Records are compressed before they are encrypted,
   which takes a typical workout from around 2,900 bytes to 440 on the relay. Compression is
   skipped where it would not help, such as on a deletion marker.

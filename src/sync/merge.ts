@@ -6,6 +6,7 @@ import { fetchRecords } from './relay';
 import { resolveRecord } from './backfill';
 import { parseAddress, sessionAddress } from './addresses';
 import { sessionUpdatedAt, type SessionsBundlePayload, type SyncedSettings } from './records';
+import { isLogEntry, type ChunkPayload } from './chunks';
 
 export interface MergeSummary {
   applied: number;
@@ -175,6 +176,81 @@ async function applySessionsBundle(
   }
 }
 
+// One chunk of the append-only log, merged an entry at a time.
+//
+// Every entry is compared against what this device already holds rather than against the
+// entry before it, so a chunk merges the same way whatever order the pull happened to
+// return it in, and a chunk that is read twice changes nothing the second time.
+async function applyLogChunk(store: WorkstrStore, record: DecodedPrivateRecord, summary: MergeSummary): Promise<void> {
+  const payload = record.payload as ChunkPayload | undefined;
+  const entries = payload?.entries;
+  if (!Array.isArray(entries) || entries.length === 0) return;
+
+  // Read once. A restore replays every chunk in the account, and looking each uid up
+  // against the whole session table would make exactly that case quadratic.
+  const held = new Map((await store.listSessions()).filter((session) => session.uid).map((session) => [String(session.uid), session]));
+  // Deletions this device has made and not yet published. A chunk written before the
+  // deletion still carries the session, and writing it back would undo the user's edit.
+  const buried = await store.pendingDeletions('log');
+
+  for (const entry of entries) {
+    if (!isLogEntry(entry)) { summary.skipped += 1; continue; }
+    if (buried.has(entry.uid)) { summary.skipped += 1; continue; }
+
+    const existing = held.get(entry.uid);
+    if (!existing || existing.id == null) {
+      if (entry.deleted) { summary.skipped += 1; continue; }
+      await applySessionPayload(store, entry.uid, entry.payload);
+      summary.applied += 1;
+      continue;
+    }
+
+    const local = sessionUpdatedAt(existing, await store.listSessionSets(existing.id));
+    if (local >= entry.updatedAt) { summary.skipped += 1; continue; }
+    if (entry.deleted) {
+      await store.applyRemote(() => store.deleteSession(existing.id as number));
+      summary.deleted += 1;
+      continue;
+    }
+    await applySessionPayload(store, entry.uid, entry.payload);
+    summary.applied += 1;
+  }
+}
+
+// The body log, merged one weigh-in at a time. Same shape as the workout log, and for the
+// same reason: the whole collection as one record could only be last-write-wins, so two
+// devices that each logged a weigh-in offline would lose one of them.
+async function applyBodyChunk(store: WorkstrStore, record: DecodedPrivateRecord, summary: MergeSummary): Promise<void> {
+  const payload = record.payload as ChunkPayload | undefined;
+  const entries = payload?.entries;
+  if (!Array.isArray(entries) || entries.length === 0) return;
+
+  const held = new Map((await store.listBody(Number.MAX_SAFE_INTEGER)).map((entry) => [String(entry.date), entry]));
+  const buried = await store.pendingDeletions('body');
+
+  for (const entry of entries) {
+    if (!isLogEntry(entry)) { summary.skipped += 1; continue; }
+    if (buried.has(entry.uid)) { summary.skipped += 1; continue; }
+
+    const existing = held.get(entry.uid);
+    // An entry written before this device recorded modification times counts as older:
+    // the relay's copy is the one that knows when it changed.
+    const local = existing?.updated_at || '';
+    if (existing && local >= entry.updatedAt) { summary.skipped += 1; continue; }
+
+    if (entry.deleted) {
+      if (!existing?.id) { summary.skipped += 1; continue; }
+      await store.applyRemote(() => store.deleteBody(existing.id as number));
+      summary.deleted += 1;
+      continue;
+    }
+    const incoming = entry.payload as BodyWeightEntry | undefined;
+    if (!incoming || !Number.isFinite(incoming.weight_kg)) { summary.skipped += 1; continue; }
+    await store.applyRemote(() => store.putBodyEntry({ ...incoming, date: entry.uid, updated_at: entry.updatedAt }));
+    summary.applied += 1;
+  }
+}
+
 async function applySingleton(store: WorkstrStore, record: DecodedPrivateRecord): Promise<void> {
   if (record.parsed.kind === 'bodyweight') {
     const payload = record.payload as { entries?: BodyWeightEntry[] };
@@ -236,6 +312,10 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
     try {
       if (record.deleted) {
         if (await applyTombstone(store, record)) summary.deleted += 1; else summary.skipped += 1;
+      } else if (record.parsed.kind === 'log') {
+        await applyLogChunk(store, record, summary);
+      } else if (record.parsed.kind === 'body') {
+        await applyBodyChunk(store, record, summary);
       } else if (record.parsed.kind === 'sessions') {
         await applySessionsBundle(store, record, pending, tombstoned, summary);
       } else if (record.parsed.kind === 'sheet') {

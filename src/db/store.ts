@@ -226,7 +226,7 @@ export class WorkstrStore extends SyncAwareStore {
     if (!session) return;
     const next = { ...session, finished_at: finishedAt };
     await this.db.put('sessions', next);
-    if (next.uid && next.backup_version === 2) this.noteChange(sessionAddress(next.uid), finishedAt);
+    if (next.uid && next.backup_version === 2) this.noteLogChange('log', next.uid, finishedAt);
   }
 
   async startSessionEmom(id: number, startedAt: string, keepStartedAt = false): Promise<void> {
@@ -261,7 +261,9 @@ export class WorkstrStore extends SyncAwareStore {
 
   async deleteSession(id: number): Promise<void> {
     const doomed = await this.db.get('sessions', id);
-    if (doomed?.uid && doomed.backup_version === 2) this.noteChange(sessionAddress(doomed.uid));
+    // A deletion is an entry in its own right. Absence cannot express it: a chunk that
+    // stops mentioning a session reads as no news.
+    if (doomed?.uid && doomed.backup_version === 2) this.noteLogChange('log', doomed.uid, new Date().toISOString(), true);
     const tx = this.db.transaction(['sessions', 'session_sets'], 'readwrite');
     await tx.objectStore('sessions').delete(id);
     const index = tx.objectStore('session_sets').index('session_id');
@@ -277,7 +279,7 @@ export class WorkstrStore extends SyncAwareStore {
     // user was training, waking their signer app mid-set. A session in progress is held on
     // the device and uploaded when it finishes; this branch is for editing a past workout.
     if (session?.uid && session.backup_version === 2 && session.finished_at) {
-      this.noteChange(sessionAddress(session.uid), set.completed_at || undefined);
+      this.noteLogChange('log', session.uid, set.completed_at || new Date().toISOString());
     }
     return id;
   }
@@ -311,16 +313,22 @@ export class WorkstrStore extends SyncAwareStore {
   async logBody(entry: { date?: string; weight_kg: number; notes?: string }): Promise<void> {
     if (!Number.isFinite(entry.weight_kg)) throw new Error('weight_kg must be a number');
     const date = String(entry.date || new Date().toISOString().slice(0, 10));
+    const updatedAt = new Date().toISOString();
     const tx = this.db.transaction('bodyweight', 'readwrite');
     const existing = await tx.store.index('date').get(date);
-    await tx.store.put({ ...existing, date, weight_kg: entry.weight_kg, notes: entry.notes || '' });
+    await tx.store.put({ ...existing, date, weight_kg: entry.weight_kg, notes: entry.notes || '', updated_at: updatedAt });
     await tx.done;
-    this.noteChange(BODYWEIGHT_ADDRESS);
+    // One entry per date, so the date is what addresses it in the log. A whole-collection
+    // record could only ever be last-write-wins, which loses a weigh-in whenever two
+    // devices log one before either has synced.
+    this.noteLogChange('body', date, updatedAt);
   }
 
   async deleteBody(id: number): Promise<void> {
+    // Read before the row goes, or the date that addresses it is no longer knowable.
+    const doomed = await this.db.get('bodyweight', id);
     await this.db.delete('bodyweight', id);
-    this.noteChange(BODYWEIGHT_ADDRESS);
+    if (doomed?.date) this.noteLogChange('body', String(doomed.date), new Date().toISOString(), true);
   }
 
   async getSettings(): Promise<WorkstrSettings> {

@@ -6,9 +6,10 @@ import { WorkstrStore } from '../src/db/store';
 import { decodePrivateRecord } from '../src/nostr/codecs30078';
 import { fetchRecords, publishRecord } from '../src/sync/relay';
 import { pushQueue } from '../src/sync/push';
-import { runBackfill } from '../src/sync/backfill';
+import { runBackfill, seedJournal } from '../src/sync/backfill';
+import { pushJournal } from '../src/sync/journal';
 import { pullAndMerge } from '../src/sync/merge';
-import { SETTINGS_ADDRESS, sheetAddress } from '../src/sync/addresses';
+import { SETTINGS_ADDRESS, newDeviceId, sheetAddress } from '../src/sync/addresses';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 
 // Opt-in: a real strfry carrying the write policy. Started with the compose stack in
@@ -118,8 +119,14 @@ suite('against a real strfry running the write policy', () => {
     const uid = (await phone.getSession(sessionId))!.uid!;
 
     const shared = await liveCipher(await signer.getPublicKey());
+    await phone.saveBackupState({ device: newDeviceId() });
+    // Programs and settings travel by address; workout history and the body log travel as
+    // chunks of the append-only log, so a real restore needs both halves published.
     await runBackfill(phone);
+    await seedJournal(phone);
     expect((await pushQueue(phone, signer, shared, RELAY!)).failed).toHaveLength(0);
+    expect((await pushJournal(phone, signer, shared, RELAY!, 'log')).failed).toHaveLength(0);
+    expect((await pushJournal(phone, signer, shared, RELAY!, 'body')).failed).toHaveLength(0);
 
     expect(await laptop.listSheets()).toHaveLength(0);
     // The laptop opens what the phone sealed because both hold the account's backup key.

@@ -162,6 +162,9 @@ export interface BodyWeightEntry {
   date: string;
   weight_kg: number;
   notes?: string;
+  // When this entry was last written. Body weight travels in the append-only log now,
+  // and an entry with no modification time cannot be compared against another device's.
+  updated_at?: ISODateTime;
 }
 
 // Raw nostr event snapshot persisted for offline Discover (structurally the
@@ -195,6 +198,12 @@ export interface BackupSettings {
   // there — but it does travel in a JSON export, which is what lets an exported archive
   // be restored and keep reading the relay.
   key?: string;
+  // This device's own id, and the chunk it is currently appending to. A device only ever
+  // writes its own sequence, which is what removes any contention between devices: two of
+  // them can append at the same moment without ever writing the same address.
+  device?: string;
+  logOpenSeq?: number;
+  bodyOpenSeq?: number;
   v2StartedAt?: string;
   localOnlyHistoryCount?: number;
   // Index into the deterministic backfill list, so an interrupted first run resumes

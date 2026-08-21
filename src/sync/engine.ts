@@ -1,8 +1,10 @@
 import type { WorkstrStore } from '../db/store';
 import type { Signer } from '../signer/types';
-import { runBackfill } from './backfill';
+import { runBackfill, seedJournal } from './backfill';
 import { pullAndMerge } from './merge';
 import { pushQueue } from './push';
+import { compactJournal, pushJournal } from './journal';
+import { isRecordAddress, newDeviceId, parseAddress } from './addresses';
 import { SignerTimeoutError, withSignerTimeout } from '../signer/timeout';
 import { BackupKeyUnavailableError, republishBackupKey, resolveBackupKey } from '../nostr/backup-key';
 import { fetchKeyEvent, publishKeyEvent } from './relay';
@@ -21,9 +23,10 @@ export const RETRY_MAX_MS = 900000;
 // Logging a set writes several records in a burst; one sync afterwards is enough.
 export const CHANGE_DEBOUNCE_MS = 4000;
 
-// 4 starts the fresh V2-only backup era. Existing local V1/monthly-bundle history is not
-// migrated to the relay; new sessions write object-level `workstr:v2:session:<uid>` records.
-export const RECORD_FORMAT = 4;
+// 5 moves workout history into the append-only log. A device on 4 wrote one record per
+// workout; its sessions are seeded into the journal once and travel as chunks from then on.
+// The per-workout records it already wrote stay readable and are simply never added to.
+export const RECORD_FORMAT = 5;
 
 export type SyncState = 'off' | 'idle' | 'syncing' | 'error';
 
@@ -115,6 +118,9 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       fetchKeyEvent: () => fetchKeyEvent(relayUrl, pubkey),
       publishKeyEvent: (content: string) => publishKeyEvent(signer, relayUrl, content)
     };
+    if (!(await ctx.store.getSettings()).backup?.device) {
+      await ctx.store.saveBackupState({ device: newDeviceId() });
+    }
     const cached = (await ctx.store.getSettings()).backup?.key;
     const key = await resolveBackupKey(signer, transport, {
       read: async () => (await ctx.store.getSettings()).backup?.key,
@@ -176,6 +182,12 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       // resolve them, so they would publish as tombstones the relay refuses and hold the
       // engine in an error state no retry clears. Dropped once, here, before anything else.
       await ctx.store.purgeUnpublishableQueue();
+      // Per-workout addresses queued by the previous format. They resolve to valid records,
+      // but sending them would write history to the very addresses the log replaces.
+      for (const entry of await ctx.store.listSyncQueue()) {
+        if (parseAddress(entry.address)?.kind === 'session') await ctx.store.dequeueSync(entry.address, entry.updated_at);
+      }
+      await seedJournal(ctx.store);
       await ctx.store.saveBackupState({
         recordFormat: RECORD_FORMAT,
         v2StartedAt: backup?.v2StartedAt || new Date().toISOString(),
@@ -206,25 +218,65 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
 
     // One signer round trip per record now — the signature. Reported per record so a long
     // upload is visibly moving rather than indistinguishable from a hang.
+    const renewSigner = async (): Promise<Signer | null> => {
+      ctx.onSignerStalled?.();
+      const renewed = await ctx.getSigner();
+      return renewed ? withSignerTimeout(renewed) : null;
+    };
+
+    // Sheets and settings travel by address; workout history travels as log chunks. Both
+    // are one signature per record, and both report through the same progress line.
     const result = await pushQueue(ctx.store, signer, active, relayUrl, {
       onProgress: (done, total) => report({ progress: { phase: 'upload', done, total } }),
       // Rebuilt through the same path a stalled signer takes between passes, so one press
-      // of Sync now carries a whole month across a socket that closes partway.
-      renewSigner: async () => {
-        ctx.onSignerStalled?.();
-        const renewed = await ctx.getSigner();
-        return renewed ? withSignerTimeout(renewed) : null;
-      }
+      // of Sync now carries a long upload across a socket that closes partway.
+      renewSigner
     });
-    report({ progress: undefined });
+
+    // Checked before the log is touched. A signer that has already stopped answering would
+    // otherwise cost a second full round of timeouts here, which is the exact cost the
+    // early stop inside a push exists to avoid.
     const signerFailure = result.failed.find((outcome) => outcome.failure === 'signer');
-    if (signerFailure) throw new StalledSignerError();
+    if (signerFailure) {
+      report({ progress: undefined });
+      throw new StalledSignerError();
+    }
+
+    const log = await pushJournal(ctx.store, signer, active, relayUrl, 'log', {
+      onProgress: (done, total) => report({ progress: { phase: 'upload', done, total } }),
+      renewSigner
+    });
+    // The body log only after the workout log, so a stalled signer costs one round of
+    // timeouts rather than two.
+    const body = log.failed.length === 0
+      ? await pushJournal(ctx.store, signer, active, relayUrl, 'body', {
+        onProgress: (done, total) => report({ progress: { phase: 'upload', done, total } }),
+        renewSigner
+      })
+      : { published: 0, skipped: 0, rejected: [], failed: [] };
+    report({ progress: undefined });
+
+    // A stalled signer means the same thing whichever half of the pass met it, so it gets
+    // the same words the user can act on rather than the name of the call that timed out.
+    if ([...log.failed, ...body.failed].some((outcome) => outcome.failure === 'signer')) throw new StalledSignerError();
     if (result.rejected.length > 0) {
       // The relay refused the record itself. Retrying unchanged cannot fix it, and the
       // entry stays queued rather than vanishing, so say so plainly.
       throw new Error(`Relay rejected ${result.rejected.length} record(s): ${result.rejected[0].reason}`);
     }
+    const chunkRejected = [...log.rejected, ...body.rejected];
+    if (chunkRejected.length > 0) throw new Error(`Relay rejected ${chunkRejected.length} record(s): ${chunkRejected[0].reason}`);
     if (result.failed.length > 0) throw new Error(result.failed[0].reason);
+    const chunkFailed = [...log.failed, ...body.failed];
+    if (chunkFailed.length > 0) throw new Error(chunkFailed[0].reason);
+
+    // Reclaims sealed chunks that later entries have mostly replaced. Decided entirely from
+    // this device's own journal, so it costs nothing until there is something to reclaim,
+    // and it is the last thing a pass does: a backup that is larger than it needs to be is
+    // still a working backup, so this must never be the reason a pass fails.
+    for (const chunked of ['log', 'body'] as const) {
+      await compactJournal(ctx.store, signer, active, relayUrl, chunked);
+    }
   }
 
   async function runSync(): Promise<SyncStatus> {
@@ -286,7 +338,14 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       running = true;
       failures = 0;
       ctx.store.setChangeListener((address, updatedAt) => {
-        void ctx.store.enqueueSync(address, updatedAt).then(async () => {
+        // A log entry reports itself so a pass gets scheduled, but it is not an address:
+        // which chunk it lands in is not decided until the chunk is packed. Queueing one
+        // would resolve to a tombstone at an address the relay refuses, which is precisely
+        // how a pass gets wedged — the journal already records what to send.
+        const queued = isRecordAddress(address)
+          ? ctx.store.enqueueSync(address, updatedAt)
+          : Promise.resolve();
+        void queued.then(async () => {
           report({ pending: (await ctx.store.listSyncQueue()).length });
           scheduleSync(CHANGE_DEBOUNCE_MS);
         });

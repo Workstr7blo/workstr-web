@@ -148,21 +148,38 @@ describe('WorkstrStore', () => {
     db.close();
   });
 
-  it('queues only V2 session records for new workouts and leaves legacy rows local-only', async () => {
+  it('journals a finished workout and leaves legacy rows local-only', async () => {
     const store = await WorkstrStore.open('v2-session-queue-test');
-    store.setChangeListener((address, updatedAt) => { void store.enqueueSync(address, updatedAt); });
 
     const v2 = await store.createSession({ started_at: '2026-08-21T10:00:00.000Z' });
     await store.addSessionSet({ session_id: v2, set_number: 1, reps: 5, completed_at: '2026-08-21T10:01:00.000Z' });
     await store.finishSession(v2, '2026-08-21T10:02:00.000Z');
     const v2Uid = (await store.getSession(v2))!.uid as string;
-    expect((await store.listSyncQueue()).map((entry) => entry.address)).toEqual([sessionAddress(v2Uid)]);
+    await vi.waitFor(async () => expect(await store.listJournal('log')).toHaveLength(1));
+    // History travels in the log, never by address: the queue is for sheets and settings.
+    expect((await store.listJournal('log'))[0]).toMatchObject({ uid: v2Uid, seq: null });
+    expect(await store.listSyncQueue()).toHaveLength(0);
 
-    await store.clearSyncQueue();
     const localOnly = await store.createSession({ started_at: '2026-08-20T10:00:00.000Z', backup_version: 1 });
     await store.finishSession(localOnly, '2026-08-20T10:02:00.000Z');
     await store.deleteSession(localOnly);
-    expect(await store.listSyncQueue()).toHaveLength(0);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(await store.listJournal('log')).toHaveLength(1);
+  });
+
+  it('journals a deletion as an entry, because absence cannot express one', async () => {
+    const store = await WorkstrStore.open('journal-delete-test');
+    const id = await store.createSession({ started_at: '2026-08-21T10:00:00.000Z' });
+    await store.finishSession(id, '2026-08-21T10:02:00.000Z');
+    const uid = (await store.getSession(id))!.uid as string;
+    await vi.waitFor(async () => expect(await store.listJournal('log')).toHaveLength(1));
+
+    await store.deleteSession(id);
+
+    await vi.waitFor(async () => expect((await store.listJournal('log'))[0].deleted).toBe(true));
+    // Still one row: an unpublished entry is updated in place rather than added twice.
+    expect(await store.listJournal('log')).toHaveLength(1);
+    expect((await store.pendingDeletions('log')).has(uid)).toBe(true);
   });
 
   it('registers completed workouts and their sets in IndexedDB', async () => {

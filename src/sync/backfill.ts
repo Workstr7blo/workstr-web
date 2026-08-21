@@ -47,20 +47,17 @@ export async function collectRecords(store: WorkstrStore): Promise<RecordSnapsho
     records.push(sheetRecord(sheet));
   }
 
-  // Existing V2-era sessions are safe to enqueue individually. Rows marked backup_version=1
-  // by the v5 migration are pre-cutover local-only history and are never uploaded.
-  const sessionEntries = await loadSessionEntries(store);
-  for (const entry of sessionEntries.filter((item) => item.session.backup_version === 2)) {
-    records.push(sessionRecord(entry.session, entry.sets));
-  }
+  // Workout history is not here any more: it travels in the append-only log, whose chunks
+  // are packed at push time because which chunk an entry lands in is not known until then.
+  // `seedJournal` is what puts existing sessions into it.
 
   const settings = await store.getSettings();
-  const body = await store.listBody(Number.MAX_SAFE_INTEGER);
-  // Collections have no modification time of their own, so the moment they were read is
-  // the honest answer — it is never older than their newest change.
-  const collectedAt = new Date().toISOString();
-  records.push(bodyweightRecord(body, collectedAt));
-  records.push(settingsRecord(settings, collectedAt));
+  // Body weight is not here either: like workout history it travels in the log, so two
+  // devices that each logged a weigh-in offline both keep theirs.
+  //
+  // Settings has no modification time of its own, so the moment it was read is the honest
+  // answer — it is never older than its newest change.
+  records.push(settingsRecord(settings, new Date().toISOString()));
   return records;
 }
 
@@ -127,4 +124,31 @@ export async function resolveRecord(store: WorkstrStore, address: string, entrie
   if (parsed.kind === 'settings') return settingsRecord(await store.getSettings(), now);
   // The backup key is written by the key bootstrap, never by the queue.
   return null;
+}
+
+// Puts everything this device holds that belongs in a log into one, once, so a device with
+// history but no journal starts sending it. Rows already journaled are left alone, which is
+// what makes this safe to run again after an interrupted first pass.
+export async function seedJournal(store: WorkstrStore): Promise<number> {
+  let seeded = 0;
+
+  const inLog = new Set((await store.listJournal('log')).map((row) => row.uid));
+  for (const entry of await loadSessionEntries(store)) {
+    const uid = String(entry.session.uid);
+    // Rows marked backup_version 1 by the v5 migration are pre-cutover local-only history.
+    if (entry.session.backup_version !== 2 || inLog.has(uid)) continue;
+    await store.noteJournal('log', uid, sessionRecord(entry.session, entry.sets).updatedAt);
+    seeded += 1;
+  }
+
+  const inBody = new Set((await store.listJournal('body')).map((row) => row.uid));
+  const seededAt = new Date().toISOString();
+  for (const entry of await store.listBody(Number.MAX_SAFE_INTEGER)) {
+    const date = String(entry.date);
+    if (inBody.has(date)) continue;
+    await store.noteJournal('body', date, entry.updated_at || seededAt);
+    seeded += 1;
+  }
+
+  return seeded;
 }

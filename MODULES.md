@@ -65,6 +65,7 @@ or set updates would make full-root rendering inappropriate.
 | Encrypted backup: record envelope (binary header, gzip, AES-GCM) | `src/nostr/envelope.ts` | `src/nostr/codecs30078.ts` | `tests/envelope.test.ts` |
 | Encrypted backup: account backup key (wrap, unwrap, cache) | `src/nostr/backup-key.ts` | `src/signer/types.ts`, `src/sync/relay.ts` | `tests/backup-key.test.ts` |
 | Encrypted backup: append-only chunk log (pack, replay, compaction) | `src/sync/chunks.ts` | `src/sync/addresses.ts`, `src/nostr/envelope.ts` | `tests/chunks.test.ts` |
+| Encrypted backup: publishing the log (tail, sealing, compaction) | `src/sync/journal.ts` | `src/sync/chunks.ts`, `src/db/sync-store.ts` | `tests/sync-journal.test.ts` |
 | Encrypted backup: queue and first-run backfill | `src/sync/backfill.ts` | `src/db/store.ts` (change listener, `sync_queue`) | `tests/sync-backfill.test.ts` |
 | Encrypted backup: relay transport and upload | `src/sync/relay.ts`, `src/sync/push.ts` | `src/nostr/codecs30078.ts`, `relay/write-policy.mjs` | `tests/sync-push.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in, needs `WORKSTR_TEST_RELAY`) |
 | Encrypted backup: pull, decrypt and merge | `src/sync/merge.ts` | `src/sync/relay.ts`, `src/db/store.ts` (`applyRemote`, `sync_seen`) | `tests/sync-merge.test.ts`, `tests/sync-pull.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in) |

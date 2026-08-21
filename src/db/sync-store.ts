@@ -3,6 +3,15 @@ import type { WorkstrDB } from './schema';
 import type { BackupSettings, BodyWeightEntry, Session, SessionSet, Sheet, WorkstrSettings } from '../core/types';
 import { isRecordAddress } from '../sync/addresses';
 
+export interface JournalRow {
+  id?: number;
+  kind: 'log' | 'body';
+  uid: string;
+  updated_at: string;
+  deleted?: boolean;
+  seq: number | null;
+}
+
 export interface SeenRecord {
   address: string;
   event_id: string;
@@ -37,6 +46,20 @@ export abstract class SyncAwareStore {
     this.changeListener?.(address, updatedAt);
   }
 
+  // A change to something that travels in the append-only log. It is written to the
+  // journal rather than queued by address, because which chunk it lands in is not known
+  // until the chunk is packed — a queue full of chunk addresses would go stale the moment
+  // one entry moved between chunks.
+  //
+  // The listener is still told, so the engine debounces and schedules a pass exactly as it
+  // does for a sheet: the journal says what to send, the listener says when.
+  protected noteLogChange(kind: 'log' | 'body', uid: string, updatedAt = new Date().toISOString(), deleted = false): void {
+    if (this.applyingRemote) return;
+    void this.noteJournal(kind, uid, updatedAt, deleted).then(() => {
+      this.changeListener?.(`${kind}:${uid}`, updatedAt);
+    });
+  }
+
   // Every write inside `apply` is treated as a merge rather than an edit.
   async applyRemote<T>(apply: () => Promise<T>): Promise<T> {
     this.applyingRemote = true;
@@ -68,6 +91,15 @@ export abstract class SyncAwareStore {
     for (const set of sets) await rows.add({ ...set, session_id: id });
     await tx.done;
     return id;
+  }
+
+  // Writes one weigh-in, keyed by its date. Used by the merge, which applies the body log
+  // an entry at a time rather than replacing the collection.
+  async putBodyEntry(entry: Omit<BodyWeightEntry, 'id'>): Promise<void> {
+    const tx = this.db.transaction('bodyweight', 'readwrite');
+    const existing = await tx.store.index('date').get(String(entry.date));
+    await tx.store.put({ ...(existing || {}), ...entry } as BodyWeightEntry);
+    await tx.done;
   }
 
   async replaceBodyweight(entries: Omit<BodyWeightEntry, 'id'>[]): Promise<void> {
@@ -114,6 +146,55 @@ export abstract class SyncAwareStore {
       purged += 1;
     }
     return purged;
+  }
+
+  // Appends to this device's log. An entry that has not been published yet is updated in
+  // place rather than added twice: until it has a chunk, the only thing that matters about
+  // it is that the uid is dirty and how recently it changed.
+  async noteJournal(kind: 'log' | 'body', uid: string, updatedAt: string, deleted = false): Promise<void> {
+    const pending = (await this.db.getAllFromIndex('journal', 'uid', uid))
+      .filter((row) => row.kind === kind && row.seq === null);
+    const existing = pending[0];
+    if (existing?.id != null) {
+      if (existing.updated_at > updatedAt && existing.deleted === deleted) return;
+      await this.db.put('journal', { ...existing, updated_at: updatedAt, deleted });
+      return;
+    }
+    await this.db.add('journal', { kind, uid, updated_at: updatedAt, deleted, seq: null });
+  }
+
+  async listJournal(kind: 'log' | 'body'): Promise<JournalRow[]> {
+    return (await this.db.getAllFromIndex('journal', 'kind', kind))
+      .sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+  }
+
+  // Everything not yet in a chunk, oldest first: the order they are packed in, so a chunk
+  // reads chronologically and the tail is what keeps changing.
+  async listPendingJournal(kind: 'log' | 'body'): Promise<JournalRow[]> {
+    return (await this.listJournal(kind)).filter((row) => row.seq === null);
+  }
+
+  // Rows whose chunk no longer carries them, after a compaction rewrote it. The entry
+  // itself is not lost: a later chunk is what superseded it in the first place.
+  async dropJournalRows(ids: number[]): Promise<void> {
+    for (const id of ids) await this.db.delete('journal', id);
+  }
+
+  async clearJournal(): Promise<void> {
+    await this.db.clear('journal');
+  }
+
+  async assignJournalSeq(ids: number[], seq: number): Promise<void> {
+    for (const id of ids) {
+      const row = await this.db.get('journal', id);
+      if (row) await this.db.put('journal', { ...row, seq });
+    }
+  }
+
+  // A uid this device has an unpublished deletion for. A chunk from another device that
+  // still carries the session must not write it back.
+  async pendingDeletions(kind: 'log' | 'body'): Promise<Set<string>> {
+    return new Set((await this.listPendingJournal(kind)).filter((row) => row.deleted).map((row) => row.uid));
   }
 
   // The ledger of relay events this device has already read or written. Its whole purpose
