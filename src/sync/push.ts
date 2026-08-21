@@ -1,6 +1,7 @@
 import { SimplePool } from 'nostr-tools';
 import type { WorkstrStore } from '../db/store';
 import type { Signer } from '../signer/types';
+import type { RecordCipher } from '../nostr/codecs30078';
 import { loadSessionEntries, resolveMonthRecords, resolveRecord, type SessionEntry } from './backfill';
 import { parseAddress, parseSessionsId, sessionsAddress } from './addresses';
 import { publishRecord, type PublishOutcome } from './relay';
@@ -79,7 +80,7 @@ async function recordsFor(
 
 // Uploads queued records one at a time. Serial on purpose: a burst of parallel publishes
 // to a single relay buys nothing and makes a partial failure harder to reason about.
-export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: string, options: PushOptions = {}): Promise<PushSummary> {
+export async function pushQueue(store: WorkstrStore, signer: Signer, cipher: RecordCipher, relayUrl: string, options: PushOptions = {}): Promise<PushSummary> {
   const queued = await store.listSyncQueue();
   const batch = options.limit ? queued.slice(0, options.limit) : queued;
   const rejected: PublishOutcome[] = [];
@@ -136,7 +137,7 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
           report(batch.length - index - 1, records.length - position - 1);
           continue;
         }
-        let outcome = await publishRecord(active, relayUrl, record, pool, false);
+        let outcome = await publishRecord(active, cipher, relayUrl, record, pool, false);
         // A silent signer is usually a closed socket rather than an absent user, and the
         // record after it would meet the same one. Rebuild and try this record once more:
         // one press of Sync now should upload a month, not one record of it.
@@ -145,7 +146,7 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
           const renewed = await options.renewSigner();
           if (renewed) {
             active = renewed;
-            outcome = await publishRecord(active, relayUrl, record, pool, false);
+            outcome = await publishRecord(active, cipher, relayUrl, record, pool, false);
           }
         }
         if (outcome.accepted) {

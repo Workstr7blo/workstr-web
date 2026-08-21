@@ -1,15 +1,19 @@
-import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../signer/types';
+import type { SignedNostrEvent, UnsignedNostrEvent } from '../signer/types';
 import { isRecordAddress, parseAddress, type RecordAddress } from '../sync/addresses';
+import { openEnvelope, sealEnvelope } from './envelope';
 
 // NIP-78 arbitrary app data. Shared with other clients, which is exactly why the relay
 // policy also requires the address prefix rather than filtering on the kind alone.
 export const PRIVATE_RECORD_KIND = 30078;
 export const CLIENT_TAG = 'workstr';
 
-// Envelope version, independent of the address prefix. The prefix is a relay contract and
-// cannot change without an operator migration; this can, and a reader that meets a newer
-// envelope should skip the record rather than misread it.
-const ENVELOPE_VERSION = 1;
+// What a record is sealed with. The key is the account's backup key, held locally, so
+// neither sealing nor opening a record costs a signer round trip — only signing the event
+// does. `pubkey` is bound into the record's authentication, not just used to address it.
+export interface RecordCipher {
+  key: CryptoKey;
+  pubkey: string;
+}
 
 export interface PrivateRecord<T = unknown> {
   address: string;
@@ -39,33 +43,35 @@ export function buildPrivateRecordEvent(address: string, ciphertext: string, cre
   };
 }
 
-// Encrypts to the user's own pubkey: the record is a backup for one person, so the sender
-// and the recipient are the same key and no peer ever holds a readable copy.
-export async function encodePrivateRecord<T>(signer: Signer, record: PrivateRecord<T>): Promise<UnsignedNostrEvent> {
+// The record is a backup for one person, so nothing here is addressed to a peer: it is
+// sealed with the account's own backup key and no one else ever holds a readable copy.
+export async function encodePrivateRecord<T>(cipher: RecordCipher, record: PrivateRecord<T>): Promise<UnsignedNostrEvent> {
   if (!isRecordAddress(record.address)) throw new Error('refusing to encode an address the relay will reject');
-  const self = await signer.getPublicKey();
+  // No version field: it lives in the envelope's cleartext header, where a decoder can
+  // read it before it has to know how to decrypt anything.
   const envelope = {
-    v: ENVELOPE_VERSION,
     updatedAt: record.updatedAt,
     ...(record.deleted ? { deleted: true } : {}),
     ...(record.deleted ? {} : { payload: record.payload })
   };
-  const ciphertext = await signer.nip44Encrypt(self, JSON.stringify(envelope));
-  return buildPrivateRecordEvent(record.address, ciphertext);
+  const content = await sealEnvelope(cipher.key, { pubkey: cipher.pubkey, address: record.address }, JSON.stringify(envelope));
+  return buildPrivateRecordEvent(record.address, content);
 }
 
 // Returns null for anything unreadable. Events come from an open relay that anyone may
 // write to, so a foreign, corrupt or undecryptable event is an expected input.
-export async function decodePrivateRecord<T>(signer: Signer, event: SignedNostrEvent): Promise<DecodedPrivateRecord<T> | null> {
+export async function decodePrivateRecord<T>(cipher: RecordCipher, event: SignedNostrEvent): Promise<DecodedPrivateRecord<T> | null> {
   if (!event || event.kind !== PRIVATE_RECORD_KIND || typeof event.content !== 'string') return null;
   const address = tagValue(event.tags || [], 'd');
   const parsed = parseAddress(address);
   if (!parsed) return null;
   if (tagValue(event.tags || [], 'client') !== CLIENT_TAG) return null;
   try {
-    const plaintext = await signer.nip44Decrypt(event.pubkey, event.content);
-    const envelope = JSON.parse(plaintext) as { v?: number; updatedAt?: string; deleted?: boolean; payload?: T };
-    if (envelope?.v !== ENVELOPE_VERSION) return null;
+    // Authenticated against the address it was found at, so a record served from the wrong
+    // address does not open at all rather than opening into the wrong row.
+    const plaintext = await openEnvelope(cipher.key, { pubkey: event.pubkey, address }, event.content);
+    if (plaintext === null) return null;
+    const envelope = JSON.parse(plaintext) as { updatedAt?: string; deleted?: boolean; payload?: T };
     if (typeof envelope.updatedAt !== 'string' || !envelope.updatedAt) return null;
     return {
       address,

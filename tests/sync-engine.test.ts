@@ -4,7 +4,7 @@ import { createSyncEngine, RECORD_FORMAT, RETRY_BASE_MS, type SyncStatus } from 
 import { SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 import { withSignerTimeout } from '../src/signer/timeout';
-import type { PrivateRecord } from '../src/nostr/codecs30078';
+import type { PrivateRecord, RecordCipher } from '../src/nostr/codecs30078';
 
 const SELF = 'ab'.repeat(32);
 
@@ -12,6 +12,9 @@ const SELF = 'ab'.repeat(32);
 // backfill, push, codec and merge code. Only the socket is fake.
 const relay = vi.hoisted(() => ({
   events: new Map<string, { event: unknown }>(),
+  // The wrapped backup key, held apart from the records because it is not one: it is
+  // NIP-44 to the user's own pubkey and is resolved before a pass can start.
+  keyEvent: null as null | { content: string },
   failure: null as null | 'policy' | 'network',
   // Real event ids are content hashes, so republishing an address produces a different
   // one. The seen ledger keys on that, so a double that reused ids would never be tested.
@@ -24,10 +27,13 @@ vi.mock('../src/sync/relay', async () => {
     PUBLISH_TIMEOUT_MS: 10000,
     FETCH_TIMEOUT_MS: 15000,
     classifyPublish: () => ({ accepted: true, reason: 'ok' }),
-    async publishRecord(signer: Signer, _url: string, record: PrivateRecord) {
+    async publishRecord(signer: Signer, cipher: RecordCipher, _url: string, record: PrivateRecord) {
       if (relay.failure) return { address: record.address, accepted: false, failure: relay.failure, reason: `${relay.failure} failure` };
       try {
-        const unsigned = await encodePrivateRecord(signer, record);
+        // Signing still goes through the signer, which is what lets these tests keep
+        // exercising a signer that stalls partway through an upload.
+        await signer.signEvent({ kind: 30078, created_at: 0, tags: [['d', record.address]], content: '' });
+        const unsigned = await encodePrivateRecord(cipher, record);
         const id = `id-${record.address}-${relay.seq += 1}`;
         // Addressable: republishing an address replaces it, exactly like a real relay.
         relay.events.set(record.address, { event: { ...unsigned, id, pubkey: SELF, sig: 'sig' } });
@@ -41,6 +47,17 @@ vi.mock('../src/sync/relay', async () => {
     },
     async fetchRecords() {
       return [...relay.events.values()].map((entry) => entry.event);
+    },
+    async fetchKeyEvent() {
+      if (relay.failure === 'network') throw new Error('relay query timed out');
+      return relay.keyEvent
+        ? { ...relay.keyEvent, id: 'key-event', pubkey: SELF, sig: 'sig', kind: 30078, created_at: 1, tags: [['d', 'workstr:v2:key']] }
+        : null;
+    },
+    async publishKeyEvent(_signer: Signer, _url: string, content: string) {
+      if (relay.failure) return { accepted: false, reason: `${relay.failure} failure` };
+      relay.keyEvent = { content };
+      return { accepted: true, reason: 'ok' };
     }
   };
 });
@@ -56,8 +73,22 @@ function fakeSigner(): Signer {
   };
 }
 
+// A backup key already cached on the device. Most of these tests are about syncing, not
+// about bootstrapping the key, and a device that has synced before has one.
+const CACHED_KEY = btoa(String.fromCharCode(...new Uint8Array(32).fill(3)));
+
+function fakeSignerWith(overrides: Partial<Signer>): Signer {
+  return { ...fakeSigner(), ...overrides };
+}
+
 let namespace = 0;
-const freshStore = () => WorkstrStore.open(`engine-${namespace += 1}`);
+const freshStore = async (): Promise<WorkstrStore> => {
+  const store = await WorkstrStore.open(`engine-${namespace += 1}`);
+  await store.saveBackupState({ key: CACHED_KEY });
+  return store;
+};
+// For the bootstrap tests below, which are about a device that has no key yet.
+const keylessStore = () => WorkstrStore.open(`engine-keyless-${namespace += 1}`);
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 // The engine deliberately runs its passes in the background, so tests wait on the
@@ -100,6 +131,7 @@ async function populate(store: WorkstrStore): Promise<void> {
 
 beforeEach(() => {
   relay.events.clear();
+  relay.keyEvent = null;
   relay.failure = null;
   relay.seq = 0;
 });
@@ -182,11 +214,15 @@ describe('opening the app again', () => {
     const settings = relay.events.get(SETTINGS_ADDRESS)!;
     relay.events.set(SETTINGS_ADDRESS, { event: { ...(settings.event as Record<string, unknown>), id: 'from-another-device' } });
 
-    decrypt.mockClear();
+    // Opening a record is local, so the signer no longer measures anything here. What the
+    // ledger must still prove is that only the changed record was read again.
+    const opens = vi.spyOn(crypto.subtle, 'decrypt');
     const second = await harness(store, signer);
     await second.engine.start();
 
-    expect(decrypt).toHaveBeenCalledTimes(1);
+    expect(opens).toHaveBeenCalledTimes(1);
+    opens.mockRestore();
+    void decrypt;
   });
 });
 
@@ -246,6 +282,7 @@ describe('staying in sync', () => {
     const { engine, state } = await harness(store);
     await engine.start();
     relay.events.clear();
+    relay.keyEvent = null;
 
     await store.saveSheet({ name: 'Leg Day', exercises: [] });
     await until(() => state.timers.length > 0, 'the debounced sync to be scheduled');
@@ -419,9 +456,10 @@ describe('when the relay or signer will not cooperate', () => {
     let attempts = 0;
     const silent: Signer = {
       type: 'nip46',
+      // Sealing is local, so the signature is the only thing left that can hang.
+      signEvent: () => { attempts += 1; return new Promise(() => {}); },
       getPublicKey: async () => SELF,
-      signEvent: () => new Promise(() => {}),
-      nip44Encrypt: () => { attempts += 1; return new Promise(() => {}); },
+      nip44Encrypt: () => new Promise(() => {}),
       nip44Decrypt: () => new Promise(() => {})
     };
     const { engine } = await harness(store, withSignerTimeout(silent, 20));
@@ -454,6 +492,60 @@ describe('when the relay or signer will not cooperate', () => {
     await engine.start();
 
     expect((await store.getSettings()).backup?.lastError).toContain('network failure');
+  });
+});
+
+describe('a device bootstrapping its backup key', () => {
+  it('mints and publishes one when the relay has none, then seals records with it', async () => {
+    const store = await keylessStore();
+    await populate(store);
+    const { engine } = await harness(store);
+
+    const status = await engine.start();
+
+    expect(status.state).toBe('idle');
+    expect(relay.keyEvent).not.toBeNull();
+    // Cached, so the next launch costs the signer nothing to read the backup.
+    expect((await store.getSettings()).backup?.key).toBeTruthy();
+    expect(relay.events.size).toBeGreaterThan(0);
+  });
+
+  it('adopts the key already on the relay instead of starting a second one', async () => {
+    const store = await keylessStore();
+    // Another device got there first. The NIP-44 double is an identity function, so the
+    // wrapped key is readable here exactly as the signer would return it.
+    const existing = btoa(String.fromCharCode(...new Uint8Array(32).fill(11)));
+    relay.keyEvent = { content: existing };
+
+    const { engine } = await harness(store);
+    await engine.start();
+
+    expect((await store.getSettings()).backup?.key).toBe(existing);
+  });
+
+  it('stops rather than inventing a key when the relay cannot be asked', async () => {
+    const store = await keylessStore();
+    await populate(store);
+    relay.failure = 'network';
+
+    const { engine } = await harness(store);
+    const status = await engine.start();
+
+    expect(status.state).toBe('error');
+    expect(status.lastError).toContain('backup key');
+    // The one outcome that must never happen: a second key, written over data that was
+    // sealed with the first, on a device that simply could not reach the relay.
+    expect(relay.keyEvent).toBeNull();
+    expect(relay.events.size).toBe(0);
+  });
+
+  it('does not ask the signer again once the key is cached', async () => {
+    const store = await freshStore();
+    await populate(store);
+    const decrypt = vi.fn(async (_peer: string, ciphertext: string) => ciphertext);
+    await (await harness(store, fakeSignerWith({ nip44Decrypt: decrypt }))).engine.start();
+
+    expect(decrypt).not.toHaveBeenCalled();
   });
 });
 

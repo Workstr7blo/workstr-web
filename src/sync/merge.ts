@@ -1,7 +1,7 @@
 import type { BodyWeightEntry, Session, SessionSet, Sheet, SheetExercise, WorkstrSettings } from '../core/types';
 import type { WorkstrStore } from '../db/store';
 import type { SignedNostrEvent, Signer } from '../signer/types';
-import { decodePrivateRecord, type DecodedPrivateRecord } from '../nostr/codecs30078';
+import { decodePrivateRecord, type DecodedPrivateRecord, type RecordCipher } from '../nostr/codecs30078';
 import { fetchRecords } from './relay';
 import { resolveRecord } from './backfill';
 import { parseAddress, sessionAddress } from './addresses';
@@ -58,14 +58,14 @@ async function unreadEvents(store: WorkstrStore, relayUrl: string, signer: Signe
 // addressable event are cleartext, so an event this device has already read is recognised
 // and dropped without asking the signer anything. Without it, opening the app cost one
 // decrypt per record every single time, even when nothing had changed.
-export async function pullRecords(store: WorkstrStore, relayUrl: string, signer: Signer, options: PullOptions = {}): Promise<{ records: DecodedPrivateRecord[]; unreadable: number }> {
+export async function pullRecords(store: WorkstrStore, relayUrl: string, signer: Signer, cipher: RecordCipher, options: PullOptions = {}): Promise<{ records: DecodedPrivateRecord[]; unreadable: number }> {
   const events = await unreadEvents(store, relayUrl, signer);
 
   const records: DecodedPrivateRecord[] = [];
   let unreadable = 0;
   let consecutiveFailures = 0;
   for (const [index, event] of events.entries()) {
-    const decoded = await decodePrivateRecord(signer, event);
+    const decoded = await decodePrivateRecord(cipher, event);
     if (decoded) {
       records.push(decoded);
       consecutiveFailures = 0;
@@ -76,7 +76,7 @@ export async function pullRecords(store: WorkstrStore, relayUrl: string, signer:
       // the signer, not the data. Without this a restore would wait out one timeout per
       // event, which on a real history is hours of a status line saying nothing.
       if (consecutiveFailures >= 3 && records.length === 0) {
-        throw new Error('Signer could not decrypt your backup. Open your signer app and try again.');
+        throw new Error('Your backup could not be read with this account key.');
       }
     }
     options.onProgress?.(index + 1, events.length);
@@ -264,18 +264,18 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
 // decrypt finishes, the next app open repeats the same signer prompts from the beginning.
 // Processing each decoded record immediately means a phone that reached "2 of 13" starts
 // next time after those two, not at one again.
-export async function pullAndMerge(store: WorkstrStore, signer: Signer, relayUrl: string, options: PullOptions = {}): Promise<MergeSummary> {
+export async function pullAndMerge(store: WorkstrStore, signer: Signer, cipher: RecordCipher, relayUrl: string, options: PullOptions = {}): Promise<MergeSummary> {
   const events = (await unreadEvents(store, relayUrl, signer)).sort((a, b) => a.created_at - b.created_at || dTag(a).localeCompare(dTag(b)));
   const summary: MergeSummary = { applied: 0, skipped: 0, deleted: 0, unreadable: 0 };
   let consecutiveFailures = 0;
 
   for (const [index, event] of events.entries()) {
-    const decoded = await decodePrivateRecord(signer, event);
+    const decoded = await decodePrivateRecord(cipher, event);
     if (!decoded) {
       summary.unreadable += 1;
       consecutiveFailures += 1;
       if (consecutiveFailures >= 3 && summary.applied === 0 && summary.deleted === 0 && summary.skipped === 0) {
-        throw new Error('Signer could not decrypt your backup. Open your signer app and try again.');
+        throw new Error('Your backup could not be read with this account key.');
       }
       options.onProgress?.(index + 1, events.length);
       continue;

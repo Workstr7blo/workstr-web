@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Restoring is no longer slowed down by an index nobody read.** Backup used to publish
   and re-publish a growing list of everything it had stored, which cost a signer round trip
   on every pass and was never used to restore anything. It has been removed.
+- **Restoring a device now takes seconds instead of minutes.** Your backup used to be
+  encrypted and decrypted one record at a time by your signer app, so restoring a full
+  history meant hundreds of round trips to it — and on a remote signer, minutes of waiting.
+  Your account now has a single backup key, which your signer unlocks once. Everything
+  after that is read and written on the device, and your signer is only asked to sign.
+- **Backups take up far less room.** Records are compressed before they are encrypted,
+  which takes a typical workout from around 2,900 bytes to 440 on the relay. Compression is
+  skipped where it would not help, such as on a deletion marker.
 
 ### Fixed
 

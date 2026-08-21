@@ -1,4 +1,5 @@
 import type { SignedNostrEvent, Signer } from '../signer/types';
+import { SignerTimeoutError } from '../signer/timeout';
 
 // The one record that is not sealed with the backup key, because it is the backup key.
 // It is NIP-44 encrypted to the user's own pubkey, so unwrapping it is the single signer
@@ -63,6 +64,11 @@ async function unwrap(signer: Signer, event: SignedNostrEvent): Promise<string> 
   try {
     plaintext = await signer.nip44Decrypt(event.pubkey, event.content);
   } catch (error) {
+    // A signer that never answered is a different situation from one that answered no:
+    // the first is "go and open your signer app", the second is a broken backup. Passing
+    // the timeout through keeps the copy the user can act on, and it still aborts the
+    // pass, so a silent signer can no more mint a second key than a refusal can.
+    if (error instanceof SignerTimeoutError) throw error;
     throw new BackupKeyUnavailableError(
       `Your signer could not open your backup key: ${error instanceof Error ? error.message : String(error)}`
     );
@@ -135,6 +141,7 @@ async function wrapForSelf(signer: Signer, rawBase64: string): Promise<string> {
   try {
     return await signer.nip44Encrypt(await signer.getPublicKey(), rawBase64);
   } catch (error) {
+    if (error instanceof SignerTimeoutError) throw error;
     throw new BackupKeyUnavailableError(
       `Your signer could not wrap a backup key: ${error instanceof Error ? error.message : String(error)}`
     );

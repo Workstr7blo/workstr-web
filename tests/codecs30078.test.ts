@@ -4,25 +4,10 @@ import {
   sessionAddress, sheetAddress, isRecordAddress, RECORD_PREFIX
 } from '../src/sync/addresses';
 import { CLIENT_TAG, PRIVATE_RECORD_KIND, decodePrivateRecord, encodePrivateRecord } from '../src/nostr/codecs30078';
-import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../src/signer/types';
+import type { SignedNostrEvent, UnsignedNostrEvent } from '../src/signer/types';
+import { otherCipher, testCipher, TEST_PUBKEY } from './cipher';
 
-const SELF = 'ab'.repeat(32);
-
-// Reversible stand-in for NIP-44: proves the codec round-trips without asserting on a
-// cipher the signer owns.
-function fakeSigner(overrides: Partial<Signer> = {}): Signer {
-  return {
-    type: 'nip07',
-    getPublicKey: async () => SELF,
-    signEvent: async (event: UnsignedNostrEvent) => ({ ...event, id: 'id', pubkey: SELF, sig: 'sig' }),
-    nip44Encrypt: async (_peer: string, plaintext: string) => `enc:${btoa(unescape(encodeURIComponent(plaintext)))}`,
-    nip44Decrypt: async (_peer: string, ciphertext: string) => {
-      if (!ciphertext.startsWith('enc:')) throw new Error('not for this key');
-      return decodeURIComponent(escape(atob(ciphertext.slice(4))));
-    },
-    ...overrides
-  };
-}
+const SELF = TEST_PUBKEY;
 
 function signed(event: UnsignedNostrEvent, pubkey = SELF): SignedNostrEvent {
   return { ...event, id: 'event-id', pubkey, sig: 'sig' };
@@ -62,7 +47,7 @@ describe('record addresses', () => {
 
 describe('private record codecs', () => {
   it('round-trips a record through encryption', async () => {
-    const signer = fakeSigner();
+    const signer = await testCipher();
     const event = await encodePrivateRecord(signer, {
       address: sheetAddress('push-day'),
       updatedAt: '2026-08-20T10:00:00.000Z',
@@ -82,7 +67,7 @@ describe('private record codecs', () => {
   });
 
   it('carries a tombstone with no payload', async () => {
-    const signer = fakeSigner();
+    const signer = await testCipher();
     const event = await encodePrivateRecord(signer, {
       address: sessionAddress('gone'), updatedAt: '2026-08-20T10:00:00.000Z',
       deleted: true, payload: { secret: 'should not be encoded' }
@@ -94,12 +79,12 @@ describe('private record codecs', () => {
   });
 
   it('refuses to encode an address the relay would reject', async () => {
-    await expect(encodePrivateRecord(fakeSigner(), { address: 'other:thing', updatedAt: 'now', payload: {} }))
+    await expect(encodePrivateRecord(await testCipher(), { address: 'other:thing', updatedAt: 'now', payload: {} }))
       .rejects.toThrow(/relay will reject/);
   });
 
   it('skips events that are not ours', async () => {
-    const signer = fakeSigner();
+    const signer = await testCipher();
     const good = await encodePrivateRecord(signer, { address: SETTINGS_ADDRESS, updatedAt: '2026-08-20T10:00:00.000Z', payload: { unit: 'kg' } });
     expect(await decodePrivateRecord(signer, signed({ ...good, kind: 1 }))).toBeNull();
     expect(await decodePrivateRecord(signer, signed({ ...good, tags: [['d', 'other-app:thing'], ['client', CLIENT_TAG]] }))).toBeNull();
@@ -108,19 +93,25 @@ describe('private record codecs', () => {
   });
 
   it('survives corrupt ciphertext and foreign envelopes without throwing', async () => {
-    const signer = fakeSigner();
+    const signer = await testCipher();
     const good = await encodePrivateRecord(signer, { address: SETTINGS_ADDRESS, updatedAt: '2026-08-20T10:00:00.000Z', payload: {} });
     expect(await decodePrivateRecord(signer, signed({ ...good, content: 'not-decryptable' }))).toBeNull();
     expect(await decodePrivateRecord(signer, signed({ ...good, content: 'enc:bm90LWpzb24=' }))).toBeNull();
-    const wrongVersion = fakeSigner({ nip44Decrypt: async () => JSON.stringify({ v: 99, updatedAt: 'x', payload: {} }) });
-    expect(await decodePrivateRecord(wrongVersion, signed(good))).toBeNull();
-    const noTimestamp = fakeSigner({ nip44Decrypt: async () => JSON.stringify({ v: 1, payload: {} }) });
-    expect(await decodePrivateRecord(noTimestamp, signed(good))).toBeNull();
+    // Sealed for a different key: opens with nothing rather than throwing.
+    expect(await decodePrivateRecord(await otherCipher(), signed(good))).toBeNull();
+    // The same bytes republished under another author. Decoding binds to the event's own
+    // pubkey, so the record does not open rather than opening as that author's data.
+    expect(await decodePrivateRecord(await testCipher(), signed(good, 'cd'.repeat(32)))).toBeNull();
+    // A record whose envelope opens but whose contents are not a record.
+    const noTimestamp = await encodePrivateRecord(await testCipher(), { address: SETTINGS_ADDRESS, updatedAt: 'x', payload: {} });
+    const stripped = { ...noTimestamp, content: (await encodePrivateRecord(await testCipher(), { address: BODYWEIGHT_ADDRESS, updatedAt: 'x', payload: {} })).content };
+    // Bound to its own address, so one record's content at another's address is refused.
+    expect(await decodePrivateRecord(await testCipher(), signed(stripped))).toBeNull();
   });
 
   it('never logs ciphertext or plaintext when decoding fails', async () => {
     const spies = [vi.spyOn(console, 'warn').mockImplementation(() => {}), vi.spyOn(console, 'error').mockImplementation(() => {}), vi.spyOn(console, 'log').mockImplementation(() => {})];
-    const signer = fakeSigner();
+    const signer = await testCipher();
     const good = await encodePrivateRecord(signer, { address: SETTINGS_ADDRESS, updatedAt: '2026-08-20T10:00:00.000Z', payload: { unit: 'kg' } });
     await decodePrivateRecord(signer, signed({ ...good, content: 'enc:broken' }));
     spies.forEach((spy) => { expect(spy).not.toHaveBeenCalled(); spy.mockRestore(); });
@@ -133,7 +124,7 @@ describe('private record codecs', () => {
 describe('codec output against the deployed relay policy', () => {
   it('produces events the write policy accepts, for every address kind', async () => {
     const { decide } = await import('../relay/write-policy.mjs');
-    const signer = fakeSigner();
+    const signer = await testCipher();
     const addresses = [sheetAddress('push-day'), sessionAddress('9f1c'), BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS];
     for (const address of addresses) {
       const event = await encodePrivateRecord(signer, { address, updatedAt: '2026-08-20T10:00:00.000Z', payload: {} });
@@ -144,7 +135,7 @@ describe('codec output against the deployed relay policy', () => {
   it('cannot emit anything the policy would reject', async () => {
     const { decide } = await import('../relay/write-policy.mjs');
     // The guard in encodePrivateRecord is what makes this true, so prove the negative too.
-    await expect(encodePrivateRecord(fakeSigner(), { address: `${RECORD_PREFIX}`, updatedAt: 'x', payload: {} })).rejects.toThrow();
+    await expect(encodePrivateRecord(await testCipher(), { address: `${RECORD_PREFIX}`, updatedAt: 'x', payload: {} })).rejects.toThrow();
     expect(decide({ kind: 1, tags: [['d', `${RECORD_PREFIX}settings`]] }).action).toBe('reject');
   });
 });

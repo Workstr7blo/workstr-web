@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { classifyPublish } from '../src/sync/relay';
 import { pushQueue } from '../src/sync/push';
+import { testCipher } from './cipher';
 import { SETTINGS_ADDRESS, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import { MAX_BUNDLE_BYTES } from '../src/sync/records';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
@@ -43,13 +44,13 @@ describe('push queue', () => {
     const relay = await import('../src/sync/relay');
     const spy = vi.spyOn(relay, 'publishRecord')
       .mockResolvedValueOnce({ address: sheetAddress('push-day'), accepted: false, failure: 'network', reason: 'offline' });
-    const offline = await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    const offline = await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
     expect(offline.uploaded).toBe(0);
     expect(offline.failed).toHaveLength(1);
     expect(await store.listSyncQueue()).toHaveLength(1);
 
     spy.mockResolvedValueOnce({ address: sheetAddress('push-day'), accepted: true, reason: 'ok' });
-    const online = await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    const online = await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
     expect(online.uploaded).toBe(1);
     expect(await store.listSyncQueue()).toHaveLength(0);
     spy.mockRestore();
@@ -61,7 +62,7 @@ describe('push queue', () => {
     const relay = await import('../src/sync/relay');
     const spy = vi.spyOn(relay, 'publishRecord')
       .mockResolvedValue({ address: SETTINGS_ADDRESS, accepted: false, failure: 'policy', reason: 'blocked: nope' });
-    const summary = await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    const summary = await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
     expect(summary.rejected).toHaveLength(1);
     expect(summary.uploaded).toBe(0);
     // A backup feature may never silently drop a record, even one the relay refuses.
@@ -76,9 +77,9 @@ describe('push queue', () => {
     await store.enqueueSync(sheetAddress('push-day'), '2026-08-20T12:00:00.000Z');
     const relay = await import('../src/sync/relay');
     const spy = vi.spyOn(relay, 'publishRecord').mockResolvedValue({ address: sheetAddress('push-day'), accepted: true, reason: 'ok' });
-    await pushQueue(store, fakeSigner(), 'ws://relay.test');
-    expect(spy.mock.calls[0][2]).toMatchObject({ address: sheetAddress('push-day'), deleted: true });
-    expect(spy.mock.calls[0][2].payload).toBeUndefined();
+    await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
+    expect(spy.mock.calls[0][3]).toMatchObject({ address: sheetAddress('push-day'), deleted: true });
+    expect(spy.mock.calls[0][3].payload).toBeUndefined();
     spy.mockRestore();
   });
 
@@ -99,12 +100,12 @@ describe('push queue', () => {
 
     const relay = await import('../src/sync/relay');
     const published: { address: string; bytes: number }[] = [];
-    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_signer, _url, record) => {
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_signer, _cipher, _url, record) => {
       published.push({ address: record.address, bytes: JSON.stringify(record.payload ?? {}).length });
       return { address: record.address, accepted: true, reason: 'ok', eventId: `id-${record.address}`, createdAt: 1 };
     });
 
-    const summary = await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    const summary = await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
 
     expect(published.length).toBeGreaterThan(1);
     expect(published[0].address).toBe(sessionsAddress('2026-08'));
@@ -137,7 +138,7 @@ describe('push queue', () => {
       .mockResolvedValueOnce({ address: sessionsAddress('2026-08'), accepted: true, reason: 'ok', eventId: 'id-1', createdAt: 1 })
       .mockResolvedValueOnce({ address: sessionsAddress('2026-08', 2), accepted: false, failure: 'network', reason: 'offline' });
 
-    const summary = await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    const summary = await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
 
     expect(summary.uploaded).toBe(0);
     // A half-uploaded month is retried whole rather than left with nothing recording it.
@@ -158,7 +159,7 @@ describe('push queue', () => {
     let sent = 0;
     // Every other record meets a dead socket, the way a relay that closes between
     // requests does.
-    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _c, _r, record) => {
       sent += 1;
       return sent % 2 === 0
         ? { address: record.address, accepted: false, failure: 'signer', reason: 'Signer did not respond' }
@@ -166,7 +167,7 @@ describe('push queue', () => {
     });
 
     let renewals = 0;
-    const summary = await pushQueue(store, fakeSigner(), 'ws://relay.test', {
+    const summary = await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test', {
       renewSigner: async () => { renewals += 1; return fakeSigner(); }
     });
 
@@ -184,12 +185,12 @@ describe('push queue', () => {
 
     const relay = await import('../src/sync/relay');
     let attempts = 0;
-    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _c, _r, record) => {
       attempts += 1;
       return { address: record.address, accepted: false, failure: 'signer', reason: 'Signer did not respond' };
     });
 
-    const summary = await pushQueue(store, fakeSigner(), 'ws://relay.test', { renewSigner: async () => fakeSigner() });
+    const summary = await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test', { renewSigner: async () => fakeSigner() });
 
     expect(summary.uploaded).toBe(0);
     // One rebuild and one retry on the first record, then it stops rather than paying a
@@ -218,12 +219,12 @@ describe('push queue', () => {
     await store.enqueueSync(sessionsAddress('2026-08'), '2026-08-24T10:24:00.000Z');
 
     const relay = await import('../src/sync/relay');
-    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => (
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _c, _r, record) => (
       { address: record.address, accepted: true, reason: 'ok', eventId: 'id', createdAt: 1 }
     ));
 
     const seen: string[] = [];
-    await pushQueue(store, fakeSigner(), 'ws://relay.test', { onProgress: (done, total) => seen.push(`${done}/${total}`) });
+    await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test', { onProgress: (done, total) => seen.push(`${done}/${total}`) });
 
     // One queued month, several records: the count has to move within it, not jump from
     // nothing straight to done.
@@ -257,20 +258,20 @@ describe('push queue', () => {
     const relay = await import('../src/sync/relay');
     const sent: string[] = [];
     // Fails from the third part on, the way a screen lock or a lost connection does.
-    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _c, _r, record) => {
       sent.push(record.address);
       return sent.length > 2
         ? { address: record.address, accepted: false, failure: 'network', reason: 'offline' }
         : { address: record.address, accepted: true, reason: 'ok', eventId: `id-${sent.length}`, createdAt: sent.length };
     });
 
-    await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
     const firstPass = [...sent];
     expect(firstPass.length).toBeGreaterThan(2);
     expect(await store.listSyncQueue()).toHaveLength(1);
 
     sent.length = 0;
-    await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
 
     // The two that landed are not sent again, so the retry starts where it stopped.
     expect(sent).not.toContain(firstPass[0]);
@@ -293,12 +294,12 @@ describe('push queue', () => {
 
     const relay = await import('../src/sync/relay');
     const published: { address: string; deleted?: boolean }[] = [];
-    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _c, _r, record) => {
       published.push({ address: record.address, deleted: record.deleted });
       return { address: record.address, accepted: true, reason: 'ok', eventId: 'id', createdAt: 2 };
     });
 
-    const summary = await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    const summary = await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
 
     expect(summary.uploaded).toBe(1);
     // July's spare part is none of August's business: only the month being published is
@@ -318,12 +319,12 @@ describe('push queue', () => {
 
     const relay = await import('../src/sync/relay');
     const published: { address: string; deleted?: boolean }[] = [];
-    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _c, _r, record) => {
       published.push({ address: record.address, deleted: record.deleted });
       return { address: record.address, accepted: true, reason: 'ok', eventId: 'id', createdAt: 2 };
     });
 
-    await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
 
     expect(published).toEqual([
       { address: sessionsAddress('2026-08'), deleted: true },
@@ -344,19 +345,19 @@ describe('push queue', () => {
 
     const relay = await import('../src/sync/relay');
     const sent: string[] = [];
-    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _c, _r, record) => {
       sent.push(record.address);
       return sent.length === 1
         ? { address: record.address, accepted: true, reason: 'ok', eventId: 'deleted-p2', createdAt: 2 }
         : { address: record.address, accepted: false, failure: 'network', reason: 'offline' };
     });
 
-    await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
     expect(sent).toEqual([sessionsAddress('2026-08', 2), sessionsAddress('2026-08', 3)]);
     expect(await store.listSyncQueue()).toHaveLength(1);
 
     sent.length = 0;
-    await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test');
 
     expect(sent).toEqual([sessionsAddress('2026-08', 3)]);
     spy.mockRestore();
@@ -366,8 +367,8 @@ describe('push queue', () => {
     const store = await freshStore();
     for (const slug of ['a', 'b', 'c', 'd']) await store.enqueueSync(sheetAddress(slug), '2026-08-20T10:00:00.000Z');
     const relay = await import('../src/sync/relay');
-    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => ({ address: record.address, accepted: true, reason: 'ok' }));
-    const summary = await pushQueue(store, fakeSigner(), 'ws://relay.test', { limit: 2 });
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _c, _r, record) => ({ address: record.address, accepted: true, reason: 'ok' }));
+    const summary = await pushQueue(store, fakeSigner(), await testCipher(), 'ws://relay.test', { limit: 2 });
     expect(summary.attempted).toBe(2);
     expect(summary.uploaded).toBe(2);
     expect(summary.remaining).toBe(2);

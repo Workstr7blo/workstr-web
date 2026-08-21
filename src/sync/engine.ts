@@ -4,6 +4,9 @@ import { runBackfill } from './backfill';
 import { pullAndMerge } from './merge';
 import { pushQueue } from './push';
 import { SignerTimeoutError, withSignerTimeout } from '../signer/timeout';
+import { BackupKeyUnavailableError, republishBackupKey, resolveBackupKey } from '../nostr/backup-key';
+import { fetchKeyEvent, publishKeyEvent } from './relay';
+import type { RecordCipher } from '../nostr/codecs30078';
 
 // The single backup destination. Not a user preference and never announced: the relay
 // accepts only this client's encrypted records, so putting it in the user's kind:10002
@@ -93,9 +96,43 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
   let again = false;
   let failures = 0;
   let cancelTimer: (() => void) | null = null;
-  // The relay is read once per session. Every later pass is an upload: re-decrypting the
-  // whole history on a timer would put a NIP-46 round trip per record on the user's path.
+  // The relay is read once per session. Every later pass is an upload: re-reading the whole
+  // history on a timer is wasted work even now that opening a record is local.
   let pulled = false;
+  // Resolved once per run and then held: the unwrap is the only signer round trip the
+  // backup key ever costs, and every record after it is sealed and opened locally.
+  let cipher: RecordCipher | null = null;
+  // Whether this run has already confirmed the wrapped key is still on the relay. Only
+  // done when the key came from this device's cache, because that path never asks the
+  // relay anything and would not notice the one record everything else depends on
+  // going missing.
+  let keyConfirmed = false;
+
+  async function ensureCipher(signer: Signer): Promise<RecordCipher> {
+    if (cipher) return cipher;
+    const pubkey = await signer.getPublicKey();
+    const transport = {
+      fetchKeyEvent: () => fetchKeyEvent(relayUrl, pubkey),
+      publishKeyEvent: (content: string) => publishKeyEvent(signer, relayUrl, content)
+    };
+    const cached = (await ctx.store.getSettings()).backup?.key;
+    const key = await resolveBackupKey(signer, transport, {
+      read: async () => (await ctx.store.getSettings()).backup?.key,
+      write: async (raw: string) => { await ctx.store.saveBackupState({ key: raw }); }
+    });
+
+    // Cheap in the currency that matters: one relay round trip, and the two signer round
+    // trips of a republish only when the record is actually gone.
+    if (cached && !keyConfirmed) {
+      keyConfirmed = true;
+      if (!(await fetchKeyEvent(relayUrl, pubkey).catch(() => null))) {
+        await republishBackupKey(signer, transport, cached);
+      }
+    }
+
+    cipher = { key, pubkey };
+    return cipher;
+  }
 
   const report = (next: Partial<SyncStatus>): SyncStatus => {
     status = { ...status, ...next };
@@ -118,10 +155,14 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     const settings = await ctx.store.getSettings();
     const backup = settings.backup;
 
+    // Before anything reads or writes a record. Nothing in a pass can proceed without it,
+    // and it must never be improvised: see `resolveBackupKey`.
+    const active = await ensureCipher(signer);
+
     if (!pulled) {
       // Before uploading anything: a device that has just signed in may be the empty one,
       // and last-write-wins protects a populated one.
-      const merged = await pullAndMerge(ctx.store, signer, relayUrl, {
+      const merged = await pullAndMerge(ctx.store, signer, active, relayUrl, {
         onProgress: (done, total) => report({ progress: { phase: 'restore', done, total } })
       });
       pulled = true;
@@ -163,9 +204,9 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       report({ progress: undefined });
     }
 
-    // The slow half on a first run: two signer round trips per record. Reported per record
-    // so a long upload is visibly moving rather than indistinguishable from a hang.
-    const result = await pushQueue(ctx.store, signer, relayUrl, {
+    // One signer round trip per record now — the signature. Reported per record so a long
+    // upload is visibly moving rather than indistinguishable from a hang.
+    const result = await pushQueue(ctx.store, signer, active, relayUrl, {
       onProgress: (done, total) => report({ progress: { phase: 'upload', done, total } }),
       // Rebuilt through the same path a stalled signer takes between passes, so one press
       // of Sync now carries a whole month across a socket that closes partway.
@@ -213,6 +254,12 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
         // is no longer answering. Say so in words the user can act on rather than naming
         // the internal call that happened to be first, and let the caller rebuild it so
         // the retry is not aimed at the same dead socket.
+        // Never retried into a new key. The pass stops, the queue keeps its place, and the
+        // user is told — inventing a second key here is the one failure that loses data.
+        if (error instanceof BackupKeyUnavailableError) {
+          await ctx.store.saveBackupState({ lastError: error.message });
+          return report({ state: 'error', pending: (await ctx.store.listSyncQueue()).length, lastError: error.message });
+        }
         const stalled = error instanceof StalledSignerError || error instanceof SignerTimeoutError;
         if (stalled) ctx.onSignerStalled?.();
         const message = stalled ? new StalledSignerError().message : error instanceof Error ? error.message : String(error);
@@ -252,6 +299,8 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       running = false;
       again = false;
       pulled = false;
+      cipher = null;
+      keyConfirmed = false;
       clearTimer();
       ctx.store.setChangeListener(null);
       // Both sides are left intact: the queue keeps its entries and the relay keeps its

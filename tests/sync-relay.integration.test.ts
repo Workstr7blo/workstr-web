@@ -29,13 +29,20 @@ function keySigner(secret = generateSecretKey()): Signer {
   };
 }
 
+// A real backup key, so what goes over the wire is exactly what the app publishes.
+async function liveCipher(pubkey: string) {
+  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  return { key, pubkey };
+}
+
 let namespace = 0;
 const freshStore = () => WorkstrStore.open(`relay-int-${namespace += 1}`);
 
 suite('against a real strfry running the write policy', () => {
   it('round-trips an encrypted record through the relay', async () => {
     const signer = keySigner();
-    const outcome = await publishRecord(signer, RELAY!, {
+    const cipher = await liveCipher(await signer.getPublicKey());
+    const outcome = await publishRecord(signer, cipher, RELAY!, {
       address: SETTINGS_ADDRESS,
       updatedAt: '2026-08-20T10:00:00.000Z',
       payload: { unit: 'lbs', ownedEquipment: ['barbell'] }
@@ -46,17 +53,18 @@ suite('against a real strfry running the write policy', () => {
     expect(events.length).toBeGreaterThan(0);
     // The payload must be unreadable to anyone reading the open relay.
     expect(events[0].content).not.toContain('barbell');
-    const decoded = await decodePrivateRecord<{ unit: string }>(signer, events[0]);
+    const decoded = await decodePrivateRecord<{ unit: string }>(cipher, events[0]);
     expect(decoded?.payload).toEqual({ unit: 'lbs', ownedEquipment: ['barbell'] });
   }, 30000);
 
   it('another pubkey cannot read what it fetches', async () => {
     const owner = keySigner();
-    await publishRecord(owner, RELAY!, { address: SETTINGS_ADDRESS, updatedAt: '2026-08-20T10:00:00.000Z', payload: { unit: 'kg' } });
+    const ownerCipher = await liveCipher(await owner.getPublicKey());
+    await publishRecord(owner, ownerCipher, RELAY!, { address: SETTINGS_ADDRESS, updatedAt: '2026-08-20T10:00:00.000Z', payload: { unit: 'kg' } });
     const events = await fetchRecords(RELAY!, await owner.getPublicKey());
     // Reads are open by design, so the stranger gets the bytes. They stay opaque.
     const stranger = keySigner();
-    expect(await decodePrivateRecord(stranger, events[0])).toBeNull();
+    expect(await decodePrivateRecord(await liveCipher(await stranger.getPublicKey()), events[0])).toBeNull();
   }, 30000);
 
   it('pushes a whole backfilled database and empties the queue', async () => {
@@ -68,7 +76,7 @@ suite('against a real strfry running the write policy', () => {
     await store.logBody({ date: '2026-08-01', weight_kg: 80 });
 
     const { total } = await runBackfill(store);
-    const summary = await pushQueue(store, signer, RELAY!);
+    const summary = await pushQueue(store, signer, await liveCipher(await signer.getPublicKey()), RELAY!);
     expect(summary.uploaded).toBe(total);
     expect(summary.rejected).toHaveLength(0);
     expect(summary.failed).toHaveLength(0);
@@ -109,11 +117,13 @@ suite('against a real strfry running the write policy', () => {
     await phone.saveSettings({ ...(await phone.getSettings()), unit: 'lbs', ownedEquipment: ['barbell'] });
     const uid = (await phone.getSession(sessionId))!.uid!;
 
+    const shared = await liveCipher(await signer.getPublicKey());
     await runBackfill(phone);
-    expect((await pushQueue(phone, signer, RELAY!)).failed).toHaveLength(0);
+    expect((await pushQueue(phone, signer, shared, RELAY!)).failed).toHaveLength(0);
 
     expect(await laptop.listSheets()).toHaveLength(0);
-    const merged = await pullAndMerge(laptop, signer, RELAY!);
+    // The laptop opens what the phone sealed because both hold the account's backup key.
+    const merged = await pullAndMerge(laptop, signer, shared, RELAY!);
     expect(merged.applied).toBeGreaterThanOrEqual(4);
 
     const sheets = await laptop.listSheets();
@@ -136,14 +146,15 @@ suite('against a real strfry running the write policy', () => {
     // Offline: a dead relay address, so the publish genuinely fails.
     await store.saveSheet({ name: 'Logged Offline', exercises: [] });
     await new Promise((resolve) => setTimeout(resolve, 50));
-    const offline = await pushQueue(store, signer, 'ws://127.0.0.1:9');
+    const cipher = await liveCipher(await signer.getPublicKey());
+    const offline = await pushQueue(store, signer, cipher, 'ws://127.0.0.1:9');
     expect(offline.uploaded).toBe(0);
     expect(offline.failed.length).toBeGreaterThan(0);
     // The work is still queued: local logging never depends on the relay.
     expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
     expect((await store.listSheets())[0].name).toBe('Logged Offline');
 
-    const online = await pushQueue(store, signer, RELAY!);
+    const online = await pushQueue(store, signer, cipher, RELAY!);
     expect(online.uploaded).toBeGreaterThan(0);
     expect(await store.listSyncQueue()).toHaveLength(0);
   }, 60000);
