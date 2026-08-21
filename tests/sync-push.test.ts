@@ -333,6 +333,35 @@ describe('push queue', () => {
     spy.mockRestore();
   });
 
+  it('does not re-send a retired part tombstone that already landed', async () => {
+    const store = await freshStore();
+    await store.createSession({ started_at: '2026-08-05T10:00:00.000Z', sheet_name: 'Push Day' });
+    const updatedAt = '2026-08-05T10:00:00.000Z';
+    await store.noteSeen(sessionsAddress('2026-08'), 'id-1', 1, updatedAt);
+    await store.noteSeen(sessionsAddress('2026-08', 2), 'old-2', 1, '2026-08-31T10:00:00.000Z');
+    await store.noteSeen(sessionsAddress('2026-08', 3), 'old-3', 1, '2026-08-31T10:00:00.000Z');
+    await store.enqueueSync(sessionsAddress('2026-08'), updatedAt);
+
+    const relay = await import('../src/sync/relay');
+    const sent: string[] = [];
+    const spy = vi.spyOn(relay, 'publishRecord').mockImplementation(async (_s, _r, record) => {
+      sent.push(record.address);
+      return sent.length === 1
+        ? { address: record.address, accepted: true, reason: 'ok', eventId: 'deleted-p2', createdAt: 2 }
+        : { address: record.address, accepted: false, failure: 'network', reason: 'offline' };
+    });
+
+    await pushQueue(store, fakeSigner(), 'ws://relay.test');
+    expect(sent).toEqual([sessionsAddress('2026-08', 2), sessionsAddress('2026-08', 3)]);
+    expect(await store.listSyncQueue()).toHaveLength(1);
+
+    sent.length = 0;
+    await pushQueue(store, fakeSigner(), 'ws://relay.test');
+
+    expect(sent).toEqual([sessionsAddress('2026-08', 3)]);
+    spy.mockRestore();
+  });
+
   it('bounds a pass so a long backfill cannot block the UI', async () => {
     const store = await freshStore();
     for (const slug of ['a', 'b', 'c', 'd']) await store.enqueueSync(sheetAddress(slug), '2026-08-20T10:00:00.000Z');

@@ -127,9 +127,11 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, relayUrl: s
         // pass — re-sending what had already landed and never reaching the end. Earlier
         // parts stay byte-identical as a month grows, which is why they are packed
         // chronologically, so an unchanged timestamp really does mean an unchanged record.
-        if (!record.deleted && seen.get(record.address)?.updated_at === record.updatedAt) {
+        if (seen.get(record.address)?.updated_at === record.updatedAt) {
           // A part already on the relay still counts as done, so a resumed month picks up
-          // its progress where it left off rather than starting the count over.
+          // its progress where it left off rather than starting the count over. Tombstones
+          // are records too: if a retired part's deletion already landed, do not ask the
+          // signer to publish that same deletion again on every retry.
           sent += 1;
           report(batch.length - index - 1, records.length - position - 1);
           continue;
