@@ -1,3 +1,4 @@
+import type { BackupSettings } from '../../core/types';
 import type { SyncProgress, SyncStatus } from '../../sync/engine';
 import { html } from '../../app/format';
 
@@ -5,6 +6,7 @@ export interface BackupPanelState {
   signedIn: boolean;
   enabled: boolean;
   sync: SyncStatus;
+  backup?: BackupSettings;
 }
 
 // Minutes, then hours, then the date. Nobody needs "backed up 4 days and 3 hours ago" —
@@ -81,11 +83,17 @@ export function backupPanel(state: BackupPanelState): string {
     <div class="web-empty-actions"><button id="sync-now" class="button ghost" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button></div>`
     : '';
   const explainer = state.signedIn
-    ? 'Your programs, workout history, body log and preferences are encrypted on this device and copied to the Workstr relay. Only your key can read them — the relay stores ciphertext it cannot open. Sign in on another device to restore. Turning this off stops the copying and leaves both sides intact.'
-    : 'Backup needs an identity: records are encrypted to your own key and signed by it. Turning this on takes you through sign-in first.';
+    ? 'Encrypted backup protects new V2-era workouts from this device forward, plus programs, body log and preferences. Older workouts already on this device stay local and are still included in JSON export. Only your key can read relay records — the relay stores ciphertext it cannot open.'
+    : 'Backup needs an identity: new V2-era records are encrypted to your own key and signed by it. Turning this on takes you through sign-in first.';
+  const localOnly = state.backup?.localOnlyHistoryCount ?? 0;
+  const era = state.backup?.v2StartedAt ? ` Backup era started ${html(lastSyncLabel(state.backup.v2StartedAt))}.` : '';
+  const eraLine = state.signedIn
+    ? `<p class="section-help">Relay-backed V2 workouts sync from this backup era forward.${localOnly ? ` Local-only older workouts on this device: ${localOnly}.` : ''}${era} Use JSON export for a full local archive.</p>`
+    : '';
   return `<div class="panel">
     <div class="panel-head"><span>Backup</span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></div>
     <p class="section-help">${html(explainer)}</p>
+    ${eraLine}
     ${toggle}
     ${live}
     <p class="section-help">Or keep your own copy: export your whole library, programs, history, body log and settings to a JSON file, or restore from one. Import replaces everything in this account.</p>

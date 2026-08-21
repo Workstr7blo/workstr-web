@@ -1,11 +1,10 @@
 import type { BodyWeightEntry, Session, SessionSet, Sheet, SheetExercise, WorkstrSettings } from '../core/types';
 import type { WorkstrStore } from '../db/store';
-import type { SeenRecord } from '../db/sync-store';
 import type { SignedNostrEvent, Signer } from '../signer/types';
 import { decodePrivateRecord, type DecodedPrivateRecord } from '../nostr/codecs30078';
 import { fetchRecords } from './relay';
 import { resolveRecord } from './backfill';
-import { parseAddress, sessionAddress, sessionMonth, sessionsAddress } from './addresses';
+import { parseAddress, sessionAddress } from './addresses';
 import { sessionUpdatedAt, type SessionsBundlePayload, type SyncedSettings } from './records';
 
 export interface MergeSummary {
@@ -38,21 +37,13 @@ async function unreadEvents(store: WorkstrStore, relayUrl: string, signer: Signe
 
   const fetched = await fetchRecords(relayUrl, await signer.getPublicKey(), undefined, true, since);
   const unread = fetched.filter((event) => {
-    const known = seen.get(dTag(event));
+    const address = dTag(event);
+    if (!parseAddress(address)) return false;
+    const known = seen.get(address);
     return !known || known.event_id !== event.id;
   });
 
-  // Per-session events written by an earlier version stay on the relay forever, so they
-  // are separated out and read last: by then this pull knows which of them a month bundle
-  // has already superseded, and a superseded one is retired without a decrypt.
-  const legacy = unread.filter((event) => parseAddress(dTag(event))?.kind === 'session');
-  const superseded = await supersededLegacy(store, seen, legacy);
-  for (const event of legacy.filter((candidate) => superseded.has(candidate.id))) {
-    // Retired rather than ignored: recorded as read, this event never comes back in a
-    // `since` window again, so the cost of an old per-session record is paid once.
-    await store.noteSeen(dTag(event), event.id, event.created_at);
-  }
-  return [...unread.filter((event) => !legacy.includes(event)), ...legacy.filter((event) => !superseded.has(event.id))];
+  return unread;
 }
 
 // Decrypts one event at a time. Under NIP-46 every decrypt is a round trip to a remote
@@ -86,24 +77,6 @@ export async function pullRecords(store: WorkstrStore, relayUrl: string, signer:
     options.onProgress?.(index + 1, events.length);
   }
   return { records, unreadable };
-}
-
-// Which of the old per-session events this device no longer needs to read. One is
-// superseded when the session it names is held locally and the bundle for that session's
-// month was published after it: the bundle carries the same session, in newer form, and
-// re-decrypting the old event could only tell this device what it already knows.
-async function supersededLegacy(store: WorkstrStore, seen: Map<string, SeenRecord>, legacy: SignedNostrEvent[]): Promise<Set<string>> {
-  const retired = new Set<string>();
-  if (legacy.length === 0) return retired;
-  const byUid = new Map((await store.listSessions()).filter((session) => session.uid).map((session) => [String(session.uid), session]));
-  for (const event of legacy) {
-    const uid = parseAddress(dTag(event))?.id;
-    const session = uid ? byUid.get(uid) : undefined;
-    if (!session) continue;
-    const bundle = seen.get(sessionsAddress(sessionMonth(session.started_at, session.finished_at)));
-    if (bundle && bundle.created_at >= event.created_at) retired.add(event.id);
-  }
-  return retired;
 }
 
 // The local claim on an address: a pending queue entry is an edit this device has made

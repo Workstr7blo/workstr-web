@@ -77,7 +77,7 @@ suite('against a real strfry running the write policy', () => {
     const events = await fetchRecords(RELAY!, await signer.getPublicKey());
     const addresses = events.map((event) => event.tags.find((tag) => tag[0] === 'd')?.[1]);
     expect(addresses).toContain(sheetAddress('push-day'));
-    expect(addresses.every((address) => String(address).startsWith('workstr:v1:'))).toBe(true);
+    expect(addresses.every((address) => String(address).startsWith('workstr:v2:'))).toBe(true);
   }, 60000);
 
   it('is refused when it publishes something the policy rejects', async () => {

@@ -1,11 +1,12 @@
 // Every private record is addressed by the `d` tag of a kind:30078 event. The relay's
 // write policy accepts only this prefix, so an address that does not start with it is
 // rejected on arrival — the prefix is a wire contract, not a naming convention.
-export const RECORD_PREFIX = 'workstr:v1:';
+export const RECORD_PREFIX = 'workstr:v2:';
+export const LEGACY_RECORD_PREFIX = 'workstr:v1:';
 
-// `sessions` is the bundle: one record per calendar month holding every session in it.
-// `session` is the older per-session record. Both are still read, because a relay written
-// by an earlier version of this client keeps its per-session events forever.
+// V2 workout history is object-level: one record per session UID, plus a tombstone at the
+// same address when deleted. `sessions` remains for old helper/tests and future manual
+// tooling; the normal V2 relay path does not read or write monthly bundles.
 export type RecordKind = 'sheet' | 'session' | 'sessions' | 'bodyweight' | 'settings' | 'manifest';
 
 // Singletons hold the whole collection in one record; the rest are addressed per row.
@@ -64,6 +65,10 @@ export function parseSessionsId(id: string): { month: string; part: number } {
 
 export function isRecordAddress(address: string): boolean {
   return parseAddress(address) !== null;
+}
+
+export function isLegacyRecordAddress(address: string): boolean {
+  return typeof address === 'string' && address.startsWith(LEGACY_RECORD_PREFIX);
 }
 
 // Returns null rather than throwing: this parses events that arrived from an open relay,

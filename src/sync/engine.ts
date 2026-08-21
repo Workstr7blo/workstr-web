@@ -1,6 +1,6 @@
 import type { WorkstrStore } from '../db/store';
 import type { Signer } from '../signer/types';
-import { retireLegacySessionQueue, runBackfill } from './backfill';
+import { runBackfill } from './backfill';
 import { pullAndMerge } from './merge';
 import { pushQueue } from './push';
 import { SignerTimeoutError, withSignerTimeout } from '../signer/timeout';
@@ -18,13 +18,9 @@ export const RETRY_MAX_MS = 900000;
 // Logging a set writes several records in a burst; one sync afterwards is enough.
 export const CHANGE_DEBOUNCE_MS = 4000;
 
-// The record layout this client writes. Bumping it makes every device re-run its backfill
-// once, in the new shape. See `BackupSettings.recordFormat`.
-//
-// 2 bundled sessions by month. 3 is the same layout at a size a NIP-46 signer can actually
-// sign: a month published under 2 may sit on the relay in one oversized record that no
-// remote signer can decrypt either, so those months are republished rather than left.
-export const RECORD_FORMAT = 3;
+// 4 starts the fresh V2-only backup era. Existing local V1/monthly-bundle history is not
+// migrated to the relay; new sessions write object-level `workstr:v2:session:<uid>` records.
+export const RECORD_FORMAT = 4;
 
 export type SyncState = 'off' | 'idle' | 'syncing' | 'error';
 
@@ -134,19 +130,22 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       if (merged.unreadable > 0) report({ lastError: `${merged.unreadable} backup record(s) could not be read` });
     }
 
-    // A device that last synced in the per-session layout re-enqueues its history as month
-    // bundles. Its old events stay on the relay and stay readable; nothing is deleted to
-    // make this work, so an interrupted migration leaves a device that still restores.
-    const migrating = (backup?.recordFormat ?? 1) < RECORD_FORMAT;
-    if (migrating) {
-      await retireLegacySessionQueue(ctx.store);
-      await ctx.store.saveBackupState({ recordFormat: RECORD_FORMAT, backfillCursor: 0, backfillTotal: undefined });
+    if ((backup?.recordFormat ?? 0) < RECORD_FORMAT) {
+      const counts = await ctx.store.countSessionBackupEra();
+      await ctx.store.saveBackupState({
+        recordFormat: RECORD_FORMAT,
+        v2StartedAt: backup?.v2StartedAt || new Date().toISOString(),
+        localOnlyHistoryCount: counts.localOnly,
+        backfillCursor: 0,
+        backfillTotal: undefined
+      });
+      report({ progress: undefined });
     }
 
-    // Resumable: an interrupted first run continues from its cursor rather than
-    // re-enqueueing history it already sent.
-    if (migrating || backup?.backfillTotal === undefined || (backup.backfillCursor ?? 0) < backup.backfillTotal) {
-      const progress = await runBackfill(ctx.store, migrating ? 0 : backup?.backfillCursor ?? 0, async ({ cursor, total }) => {
+    const refreshed = await ctx.store.getSettings();
+    const currentBackup = refreshed.backup;
+    if (currentBackup?.backfillTotal === undefined || (currentBackup.backfillCursor ?? 0) < currentBackup.backfillTotal) {
+      const progress = await runBackfill(ctx.store, currentBackup?.backfillCursor ?? 0, async ({ cursor, total }) => {
         await ctx.store.saveBackupState({ backfillCursor: cursor, backfillTotal: total });
         report({ progress: { phase: 'prepare', done: cursor, total } });
       });

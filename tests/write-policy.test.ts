@@ -54,8 +54,8 @@ describe('write policy decisions', () => {
   it('rejects kind:30078 from another app', () => {
     // Kind 30078 is NIP-78 arbitrary app data; other clients publish it too.
     expect(decide(event({ tags: [['d', 'coracle:settings']] })).action).toBe('reject');
-    expect(decide(event({ tags: [['d', 'workstr:v2:session:1']] })).action).toBe('reject');
-    expect(decide(event({ tags: [['d', 'notworkstr:v1:session:1']] })).action).toBe('reject');
+    expect(decide(event({ tags: [['d', 'workstr:v1:session:1']] })).action).toBe('reject');
+    expect(decide(event({ tags: [['d', 'notworkstr:v2:session:1']] })).action).toBe('reject');
   });
 
   it('rejects a missing, empty, or non-string d tag', () => {

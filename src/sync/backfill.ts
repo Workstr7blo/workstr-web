@@ -47,12 +47,11 @@ export async function collectRecords(store: WorkstrStore): Promise<RecordSnapsho
     records.push(sheetRecord(sheet));
   }
 
-  // One record per training month rather than one per session. A year of training is a
-  // dozen uploads instead of hundreds, and every month but the current one is finished
-  // history that never has to be sent again.
-  const months = groupSessionsByMonth(await loadSessionEntries(store));
-  for (const month of [...months.keys()].sort()) {
-    records.push(sessionsBundleRecord(month, months.get(month) as SessionEntry[]));
+  // Existing V2-era sessions are safe to enqueue individually. Rows marked backup_version=1
+  // by the v5 migration are pre-cutover local-only history and are never uploaded.
+  const sessionEntries = await loadSessionEntries(store);
+  for (const entry of sessionEntries.filter((item) => item.session.backup_version === 2)) {
+    records.push(sessionRecord(entry.session, entry.sets));
   }
 
   const settings = await store.getSettings();

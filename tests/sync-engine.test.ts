@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { createSyncEngine, RECORD_FORMAT, RETRY_BASE_MS, type SyncStatus } from '../src/sync/engine';
-import { sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
+import { SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 import { withSignerTimeout } from '../src/signer/timeout';
 import type { PrivateRecord } from '../src/nostr/codecs30078';
@@ -179,8 +179,8 @@ describe('opening the app again', () => {
     first.engine.stop();
 
     // One record rewritten by another device, at an address this one already knows.
-    const settings = relay.events.get('workstr:v1:settings')!;
-    relay.events.set('workstr:v1:settings', { event: { ...(settings.event as Record<string, unknown>), id: 'from-another-device' } });
+    const settings = relay.events.get(SETTINGS_ADDRESS)!;
+    relay.events.set(SETTINGS_ADDRESS, { event: { ...(settings.event as Record<string, unknown>), id: 'from-another-device' } });
 
     decrypt.mockClear();
     const second = await harness(store, signer);
@@ -190,23 +190,19 @@ describe('opening the app again', () => {
   });
 });
 
-describe('a device that last synced before bundling', () => {
-  it('re-sends its history as month bundles and drops the per-session queue', async () => {
+describe('a device from the old local-only era', () => {
+  it('does not migrate local-only history into V2 relay backup', async () => {
     const store = await freshStore();
-    await populate(store);
-    const uid = (await store.listSessions())[0].uid as string;
-    // The pre-bundle client left an entry per session in the queue and recorded no
-    // record format, which is what marks the device as needing the migration.
-    await store.saveBackupState({ enabled: true, backfillCursor: 4, backfillTotal: 4 });
-    await store.enqueueSync(sessionAddress(uid), '2026-08-01T11:00:00.000Z');
+    const id = await store.createSession({ started_at: '2026-08-01T10:00:00.000Z', backup_version: 1 });
+    const uid = (await store.getSession(id))!.uid as string;
+    await store.addSessionSet({ session_id: id, exercise_slug: 'bench', set_number: 1, reps: 8, completed_at: '2026-08-01T10:05:00.000Z' });
+    await store.saveBackupState({ enabled: true, backfillCursor: 0, backfillTotal: undefined });
 
     const { engine } = await harness(store);
     await engine.start();
 
-    expect([...relay.events.keys()]).toContain(sessionsAddress('2026-08'));
-    // The per-session address is not uploaded again: the month it belongs to carries it.
+    expect([...relay.events.keys()]).not.toContain(sessionsAddress('2026-08'));
     expect([...relay.events.keys()]).not.toContain(sessionAddress(uid));
-    expect(await store.listSyncQueue()).toHaveLength(0);
     expect((await store.getSettings()).backup?.recordFormat).toBe(RECORD_FORMAT);
   });
 

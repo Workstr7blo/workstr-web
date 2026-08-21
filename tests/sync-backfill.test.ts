@@ -23,16 +23,18 @@ async function populate(store: WorkstrStore) {
 describe('record collection', () => {
   it('covers every private record kind, with local keys stripped', async () => {
     const store = await freshStore();
-    await populate(store);
+    const sessionId = await populate(store);
     const records = await collectRecords(store);
     const addresses = records.map((record) => record.address);
     expect(addresses).toContain(sheetAddress('push-day'));
     expect(addresses).toContain(BODYWEIGHT_ADDRESS);
     expect(addresses).toContain(SETTINGS_ADDRESS);
     expect(addresses).toContain(MANIFEST_ADDRESS);
-    // Sessions travel as one record per training month, not one per session.
-    expect(addresses).toContain(sessionsAddress('2026-08'));
-    expect(addresses.some((address) => address.startsWith('workstr:v1:session:'))).toBe(false);
+    // V2 sessions travel as one record per session, not mutable month bundles.
+    const uid = (await store.getSession(sessionId))!.uid!;
+    expect(addresses).toContain(sessionAddress(uid));
+    expect(addresses).not.toContain(sessionsAddress('2026-08'));
+    expect(addresses.some((address) => address.startsWith('workstr:v1:'))).toBe(false);
 
     // Autoincrement keys are meaningless on another device.
     const sheet = records.find((record) => record.address === sheetAddress('push-day'))!;
@@ -42,7 +44,7 @@ describe('record collection', () => {
     expect(payload.exercises[0].sheet_id).toBeUndefined();
   });
 
-  it('bundles sessions by the month they were trained in', async () => {
+  it('collects V2 sessions individually by uid', async () => {
     const store = await freshStore();
     const august = await store.createSession({ started_at: '2026-08-01T10:00:00.000Z' });
     await store.addSessionSet({ session_id: august, exercise_slug: 'bench', set_number: 1, reps: 8, completed_at: '2026-08-01T10:05:00.000Z' });
@@ -51,20 +53,18 @@ describe('record collection', () => {
 
     const records = await collectRecords(store);
     const addresses = records.map((record) => record.address);
-    expect(addresses).toContain(sessionsAddress('2026-08'));
-    expect(addresses).toContain(sessionsAddress('2026-09'));
+    const augustUid = (await store.getSession(august))!.uid!;
+    const septemberUid = (await store.getSession(september))!.uid!;
+    expect(addresses).toContain(sessionAddress(augustUid));
+    expect(addresses).toContain(sessionAddress(septemberUid));
+    expect(addresses).not.toContain(sessionsAddress('2026-08'));
+    expect(addresses).not.toContain(sessionsAddress('2026-09'));
 
-    const bundle = records.find((record) => record.address === sessionsAddress('2026-08'))!;
-    const payload = bundle.payload as SessionsBundlePayload;
-    expect(payload.items).toHaveLength(1);
-    expect(payload.items[0].uid).toBe((await store.getSession(august))!.uid);
-    // Each session keeps its own stamp, which is what makes a per-session merge possible.
-    expect(payload.items[0].updatedAt).toBe('2026-08-01T10:05:00.000Z');
-    expect(bundle.updatedAt).toBe('2026-08-01T10:05:00.000Z');
-    // Autoincrement keys are meaningless on another device, inside a bundle as well.
-    const session = payload.items[0].payload as { id?: number; sets: { id?: number; session_id?: number }[] };
-    expect(session.id).toBeUndefined();
-    expect(session.sets[0].session_id).toBeUndefined();
+    const record = records.find((candidate) => candidate.address === sessionAddress(augustUid))!;
+    expect(record.updatedAt).toBe('2026-08-01T10:05:00.000Z');
+    const payload = record.payload as { id?: number; sets: { id?: number; session_id?: number }[] };
+    expect(payload.id).toBeUndefined();
+    expect(payload.sets[0].session_id).toBeUndefined();
   });
 
   it('keeps device-local settings out of the synced record', async () => {
@@ -200,13 +200,12 @@ describe('change tracking', () => {
 
     const addresses = seen.map((entry) => entry.address);
     expect(addresses).toContain(sheetAddress('push-day'));
-    expect(addresses).toContain(sessionsAddress('2026-08'));
-    // Nothing addresses a session on its own any more; the month it belongs to does.
-    expect(addresses).not.toContain(sessionAddress(uid));
+    expect(addresses).toContain(sessionAddress(uid));
+    expect(addresses).not.toContain(sessionsAddress('2026-08'));
     expect(addresses).toContain(BODYWEIGHT_ADDRESS);
     expect(addresses).toContain(SETTINGS_ADDRESS);
-    // A logged set dates the month by when the set happened.
-    expect(seen.find((entry) => entry.address === sessionsAddress('2026-08'))?.updatedAt).toBe('2026-08-01T10:05:00.000Z');
+    // A logged set dates the session record by when the set happened.
+    expect(seen.find((entry) => entry.address === sessionAddress(uid))?.updatedAt).toBe('2026-08-01T10:05:00.000Z');
   });
 
   it('reports deletions before the row is gone, so the address is still knowable', async () => {
@@ -216,9 +215,9 @@ describe('change tracking', () => {
     seen = [];
     await store.deleteSheet(sheetId);
     await store.deleteSession(sessionId);
-    // A deleted session needs both: the tombstone on its own address, because a bundle
-    // that stops mentioning a session reads as no news, and the rewritten month.
-    expect(seen.map((entry) => entry.address)).toEqual([sheetAddress('push-day'), sessionAddress(uid), sessionsAddress('2026-08')]);
+    // A deleted V2 session needs only its own tombstone. Monthly bundles are no longer
+    // rewritten by normal workout-history changes.
+    expect(seen.map((entry) => entry.address)).toEqual([sheetAddress('push-day'), sessionAddress(uid)]);
   });
 
   it('resolves a deleted address to nothing, which is how a tombstone is decided', async () => {
@@ -287,11 +286,10 @@ describe('database upgrade to version 3', () => {
     for (const session of sessions) expect(session.uid).toMatch(/.+/);
     // Distinct, or two sessions would collide on one relay address.
     expect(new Set(sessions.map((session) => session.uid)).size).toBe(2);
-    // And they are addressable, which is the whole point of the upgrade.
+    // Existing rows are local-only after the V2 cutoff, so they are addressable locally but
+    // deliberately absent from relay backfill records.
+    for (const session of sessions) expect(session.backup_version).toBe(1);
     const records = await collectRecords(store);
-    const bundled = records
-      .filter((record) => record.address.startsWith('workstr:v1:sessions:'))
-      .flatMap((record) => (record.payload as SessionsBundlePayload).items.map((item) => item.uid));
-    for (const session of sessions) expect(bundled).toContain(session.uid!);
+    for (const session of sessions) expect(records.map((record) => record.address)).not.toContain(sessionAddress(session.uid!));
   });
 });

@@ -8,7 +8,7 @@
 // control and was never treated as one.
 //
 // Policy: accept an event only when it is kind 30078 AND its `d` tag starts with
-// `workstr:v1:`. Reject everything else.
+// `workstr:v2:`. Reject everything else.
 //
 // Filtering on the kind alone would not be enough. Kind 30078 is NIP-78 "arbitrary app
 // data", a shared kind that unrelated clients also publish, so a kind-only filter would
@@ -24,7 +24,7 @@ import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'no
 import { join } from 'node:path';
 
 export const ACCEPTED_KIND = 30078;
-export const REQUIRED_D_PREFIX = 'workstr:v1:';
+export const REQUIRED_D_PREFIX = 'workstr:v2:';
 
 // With neither payment nor admission bounding anything, these limits plus the kind and
 // prefix filter are the entire defence. Organic use is not the worry: 30078 is
@@ -66,7 +66,7 @@ export function decide(event, limits = null) {
 
   const address = readDTag(event);
   if (address === null) return { action: 'reject', msg: REJECT_ADDRESS };
-  // A bare prefix is not an address, so `workstr:v1:` on its own is rejected too.
+  // A bare prefix is not an address, so `workstr:v2:` on its own is rejected too.
   if (!address.startsWith(REQUIRED_D_PREFIX) || address.length === REQUIRED_D_PREFIX.length) {
     return { action: 'reject', msg: REJECT_ADDRESS };
   }

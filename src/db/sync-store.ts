@@ -60,7 +60,7 @@ export abstract class SyncAwareStore {
     const existing = session.uid ? await this.getSessionByUid(session.uid) : undefined;
     const tx = this.db.transaction(['sessions', 'session_sets'], 'readwrite');
     const sessions = tx.objectStore('sessions');
-    const value = { ...session, ...(existing?.id ? { id: existing.id } : {}) };
+    const value = { ...session, backup_version: session.backup_version ?? 2, ...(existing?.id ? { id: existing.id } : {}) };
     const id = Number(existing?.id ? await sessions.put(value) : await sessions.add(value));
     const rows = tx.objectStore('session_sets');
     for await (const cursor of rows.index('session_id').iterate(id)) await cursor.delete();

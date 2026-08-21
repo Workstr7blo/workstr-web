@@ -121,6 +121,9 @@ export interface Session {
   // devices and cannot address a session on a relay. Backfilled for older rows at
   // database version 3.
   uid?: string;
+  // V2 relay backup starts fresh from this app version. Older local rows are left on the
+  // device and are deliberately not uploaded unless created/restored as V2 records.
+  backup_version?: 1 | 2;
   sheet_id?: number;
   sheet_name?: string;
   started_at: ISODateTime;
@@ -182,10 +185,11 @@ export interface CanonCache {
 // describes this device's relationship to the relay, not a user preference to replicate.
 export interface BackupSettings {
   enabled: boolean;
-  // Which record layout this device has uploaded. 1 was one event per session; 2 bundles
-  // a training month into one. A device still on 1 re-runs the backfill once so its
-  // history is re-sent in the bundled shape, and then never again.
+  // V2 object-record backup. V1 monthly bundles are obsolete on the relay; older local
+  // history stays local unless manually exported as JSON.
   recordFormat?: number;
+  v2StartedAt?: string;
+  localOnlyHistoryCount?: number;
   // Index into the deterministic backfill list, so an interrupted first run resumes
   // instead of re-uploading everything it already sent.
   backfillCursor?: number;

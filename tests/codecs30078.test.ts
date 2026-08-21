@@ -48,7 +48,7 @@ describe('record addresses', () => {
 
   it('rejects foreign and malformed addresses instead of guessing', () => {
     for (const address of [
-      'other-app:v1:sheet:x', 'workstr:v2:sheet:x', RECORD_PREFIX, `${RECORD_PREFIX}unknown`,
+      'other-app:v1:sheet:x', 'workstr:v1:sheet:x', RECORD_PREFIX, `${RECORD_PREFIX}unknown`,
       `${RECORD_PREFIX}sheet:`, `${RECORD_PREFIX}sheet:a:b`, `${RECORD_PREFIX}bodyweight:1`, ''
     ]) {
       expect(parseAddress(address)).toBeNull();

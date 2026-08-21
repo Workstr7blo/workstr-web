@@ -3,7 +3,7 @@
 // build step and no TypeScript toolchain.
 
 export declare const ACCEPTED_KIND: 30078;
-export declare const REQUIRED_D_PREFIX: 'workstr:v1:';
+export declare const REQUIRED_D_PREFIX: 'workstr:v2:';
 export declare const DEFAULT_QUOTA_BYTES: number;
 export declare const DEFAULT_CEILING_BYTES: number;
 export declare const DEFAULT_ALERT_RATIO: number;

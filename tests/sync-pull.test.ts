@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { PULL_OVERLAP_SEC, pullAndMerge, pullRecords } from '../src/sync/merge';
-import { SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
+import { SETTINGS_ADDRESS, sheetAddress } from '../src/sync/addresses';
 import { buildPrivateRecordEvent, encodePrivateRecord } from '../src/nostr/codecs30078';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../src/signer/types';
 
@@ -103,47 +103,18 @@ describe('interrupted restore progress', () => {
   });
 });
 
-describe('per-session records written by an earlier version', () => {
-  it('retires one the month bundle has superseded, without decrypting it', async () => {
+describe('obsolete V1 relay records', () => {
+  it('ignores old V1 records without decrypting them', async () => {
     const store = await freshStore();
-    const id = await store.createSession({ started_at: '2026-08-01T10:00:00.000Z' });
-    const uid = (await store.getSession(id))!.uid as string;
-    // The bundle for that session's month was published after the per-session record, so
-    // it carries the same session in newer form and the old event has nothing to add.
-    await store.noteSeen(sessionsAddress('2026-08'), 'bundle-1', 2_000_500);
-    relay.events = [await event(signer, sessionAddress(uid), 'legacy-1', 2_000_000, { started_at: '2026-08-01T10:00:00.000Z' })];
+    relay.events = [{
+      ...buildPrivateRecordEvent('workstr:v1:session:legacy', '{}', 2_000_000),
+      id: 'legacy-1', pubkey: SELF, sig: 'sig'
+    }];
     decrypt.mockClear();
 
     const { records } = await pullRecords(store, 'ws://memory', signer);
 
     expect(records).toHaveLength(0);
     expect(decrypt).not.toHaveBeenCalled();
-    // Recorded as read, so it never costs anything again either.
-    expect(await store.listSeen()).toContainEqual({ address: sessionAddress(uid), event_id: 'legacy-1', created_at: 2_000_000 });
-  });
-
-  it('still reads one for a session this device does not hold', async () => {
-    const store = await freshStore();
-    await store.noteSeen(sessionsAddress('2026-08'), 'bundle-1', 2_000_500);
-    relay.events = [await event(signer, sessionAddress('uid-from-another-device'), 'legacy-1', 2_000_000, { started_at: '2026-08-01T10:00:00.000Z' })];
-    decrypt.mockClear();
-
-    const { records } = await pullRecords(store, 'ws://memory', signer);
-
-    expect(records).toHaveLength(1);
-    expect(decrypt).toHaveBeenCalledTimes(1);
-  });
-
-  it('still reads one the bundle predates, because the old record is the newer of the two', async () => {
-    const store = await freshStore();
-    const id = await store.createSession({ started_at: '2026-08-01T10:00:00.000Z' });
-    const uid = (await store.getSession(id))!.uid as string;
-    await store.noteSeen(sessionsAddress('2026-08'), 'bundle-1', 2_000_000);
-    relay.events = [await event(signer, sessionAddress(uid), 'legacy-1', 2_000_500, { started_at: '2026-08-01T10:00:00.000Z' })];
-    decrypt.mockClear();
-
-    const { records } = await pullRecords(store, 'ws://memory', signer);
-
-    expect(records).toHaveLength(1);
   });
 });

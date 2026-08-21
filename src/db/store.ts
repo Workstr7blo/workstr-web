@@ -4,7 +4,7 @@ import { exportDatabase, importDatabase, type WorkstrExport } from './export';
 import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, TrainingBlock, WorkstrSettings } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
-import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionMonth, sessionsAddress, sheetAddress } from '../sync/addresses';
+import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
 import { syncedSettings } from '../sync/records';
 import { SyncAwareStore } from './sync-store';
 
@@ -212,7 +212,9 @@ export class WorkstrStore extends SyncAwareStore {
 
   async createSession(session: Omit<Session, 'id'>): Promise<number> {
     // Assigned here rather than by callers so no path can create an unaddressable session.
-    return Number(await this.db.add('sessions', { ...session, uid: session.uid || newSessionUid() }));
+    // New local sessions are the start of the fresh V2 backup era; pre-upgrade rows are
+    // marked local-only by the v5 database migration.
+    return Number(await this.db.add('sessions', { ...session, uid: session.uid || newSessionUid(), backup_version: session.backup_version ?? 2 }));
   }
 
   async getSession(id: number): Promise<Session | undefined> {
@@ -222,10 +224,9 @@ export class WorkstrStore extends SyncAwareStore {
   async finishSession(id: number, finishedAt = new Date().toISOString()): Promise<void> {
     const session = await this.db.get('sessions', id);
     if (!session) return;
-    await this.db.put('sessions', { ...session, finished_at: finishedAt });
-    // The month bundle, not the session: sessions are uploaded a month at a time so one
-    // signer round trip covers every session trained in it.
-    if (session.uid) this.noteChange(sessionsAddress(sessionMonth(session.started_at, finishedAt)), finishedAt);
+    const next = { ...session, finished_at: finishedAt };
+    await this.db.put('sessions', next);
+    if (next.uid && next.backup_version === 2) this.noteChange(sessionAddress(next.uid), finishedAt);
   }
 
   async startSessionEmom(id: number, startedAt: string, keepStartedAt = false): Promise<void> {
@@ -260,13 +261,7 @@ export class WorkstrStore extends SyncAwareStore {
 
   async deleteSession(id: number): Promise<void> {
     const doomed = await this.db.get('sessions', id);
-    if (doomed?.uid) {
-      // Two records: the month bundle loses the session, and the session's own address
-      // carries the tombstone. A bundle that has simply stopped mentioning a session
-      // cannot express a deletion — another device would read it as no news.
-      this.noteChange(sessionAddress(doomed.uid));
-      this.noteChange(sessionsAddress(sessionMonth(doomed.started_at, doomed.finished_at)));
-    }
+    if (doomed?.uid && doomed.backup_version === 2) this.noteChange(sessionAddress(doomed.uid));
     const tx = this.db.transaction(['sessions', 'session_sets'], 'readwrite');
     await tx.objectStore('sessions').delete(id);
     const index = tx.objectStore('session_sets').index('session_id');
@@ -277,7 +272,7 @@ export class WorkstrStore extends SyncAwareStore {
   async addSessionSet(set: Omit<SessionSet, 'id'>): Promise<number> {
     const id = Number(await this.db.add('session_sets', set));
     const session = await this.db.get('sessions', set.session_id);
-    if (session?.uid) this.noteChange(sessionsAddress(sessionMonth(session.started_at, session.finished_at)), set.completed_at || undefined);
+    if (session?.uid && session.backup_version === 2) this.noteChange(sessionAddress(session.uid), set.completed_at || undefined);
     return id;
   }
 
@@ -290,6 +285,14 @@ export class WorkstrStore extends SyncAwareStore {
       const ex = String(a.exercise_slug || '').localeCompare(String(b.exercise_slug || ''));
       return ex || Number(a.set_number) - Number(b.set_number);
     });
+  }
+
+  async countSessionBackupEra(): Promise<{ v2: number; localOnly: number }> {
+    const sessions = await this.listSessions();
+    return {
+      v2: sessions.filter((session) => session.backup_version === 2).length,
+      localOnly: sessions.filter((session) => session.backup_version !== 2).length
+    };
   }
 
   async listBody(limit = 120): Promise<BodyWeightEntry[]> {
