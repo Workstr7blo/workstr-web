@@ -64,6 +64,19 @@ describe('WorkstrStore', () => {
     expect((await store.getSettings()).unit).toBe('lbs');
   });
 
+  it('queues synced settings changes but not device-local cache writes', async () => {
+    const store = await WorkstrStore.open('settings-queue-test-pubkey');
+    const defaults = await store.getSettings();
+    store.setChangeListener((address, updatedAt) => { void store.enqueueSync(address, updatedAt); });
+
+    await store.saveSettings({ ...defaults, canonCache: { fetchedAt: 1, events: [] } });
+    expect(await store.listSyncQueue()).toHaveLength(0);
+
+    await store.saveSettings({ ...(await store.getSettings()), unit: 'lbs' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(await store.listSyncQueue()).toEqual([{ address: 'workstr:v1:settings', updated_at: expect.any(String) }]);
+  });
+
   it('migrates retired relay and catalog source vocabulary on open', async () => {
     const raw = await openWorkstrDB('retired-vocabulary-test');
     const legacyRelayKey = ['paid', 'Relay'].join('');

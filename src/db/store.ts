@@ -5,6 +5,7 @@ import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExerci
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
 import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionMonth, sessionsAddress, sheetAddress } from '../sync/addresses';
+import { syncedSettings } from '../sync/records';
 import { SyncAwareStore } from './sync-store';
 
 export type ExerciseDraft = Omit<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'> &
@@ -323,8 +324,15 @@ export class WorkstrStore extends SyncAwareStore {
   }
 
   async saveSettings(settings: WorkstrSettings): Promise<void> {
-    await this.db.put('settings', { ...settings, unit: normalizeWeightUnit(settings.unit) }, 'settings');
-    this.noteChange(SETTINGS_ADDRESS);
+    const previous = await this.getSettings();
+    const next = { ...settings, unit: normalizeWeightUnit(settings.unit) };
+    await this.db.put('settings', next, 'settings');
+    // `settings` carries both synced preferences and device-local state. Catalog cache,
+    // signer choice, relay URL and backup progress must persist locally without creating a
+    // fresh settings event on every boot; otherwise the app rewrites the relay, then has to
+    // decrypt its own new event on the next launch. Only user-facing synced keys queue the
+    // settings record.
+    if (JSON.stringify(syncedSettings(previous)) !== JSON.stringify(syncedSettings(next))) this.noteChange(SETTINGS_ADDRESS);
   }
 
 }
