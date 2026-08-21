@@ -38,7 +38,12 @@ async function unreadEvents(store: WorkstrStore, relayUrl: string, signer: Signe
   const fetched = await fetchRecords(relayUrl, await signer.getPublicKey(), undefined, true, since);
   const unread = fetched.filter((event) => {
     const address = dTag(event);
-    if (!parseAddress(address)) return false;
+    const parsed = parseAddress(address);
+    if (!parsed) return false;
+    // The wrapped backup key is NIP-44 to the user's own pubkey, not a sealed record, and
+    // it is resolved before a pass starts. Left in, every pull would try to open it with
+    // the key it hands out and report it as a record that could not be read.
+    if (parsed.kind === 'key') return false;
     const known = seen.get(address);
     return !known || known.event_id !== event.id;
   });

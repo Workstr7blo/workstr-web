@@ -7,10 +7,10 @@ export const LEGACY_RECORD_PREFIX = 'workstr:v1:';
 // V2 workout history is object-level: one record per session UID, plus a tombstone at the
 // same address when deleted. `sessions` remains for old helper/tests and future manual
 // tooling; the normal V2 relay path does not read or write monthly bundles.
-export type RecordKind = 'sheet' | 'session' | 'sessions' | 'bodyweight' | 'settings';
+export type RecordKind = 'sheet' | 'session' | 'sessions' | 'bodyweight' | 'settings' | 'key';
 
 // Singletons hold the whole collection in one record; the rest are addressed per row.
-const SINGLETON_KINDS: RecordKind[] = ['bodyweight', 'settings'];
+const SINGLETON_KINDS: RecordKind[] = ['bodyweight', 'settings', 'key'];
 const KEYED_KINDS: RecordKind[] = ['sheet', 'session', 'sessions'];
 
 export interface RecordAddress {

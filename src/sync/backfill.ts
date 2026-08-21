@@ -124,5 +124,7 @@ export async function resolveRecord(store: WorkstrStore, address: string, entrie
   }
   const now = new Date().toISOString();
   if (parsed.kind === 'bodyweight') return bodyweightRecord(await store.listBody(Number.MAX_SAFE_INTEGER), now);
-  return settingsRecord(await store.getSettings(), now);
+  if (parsed.kind === 'settings') return settingsRecord(await store.getSettings(), now);
+  // The backup key is written by the key bootstrap, never by the queue.
+  return null;
 }

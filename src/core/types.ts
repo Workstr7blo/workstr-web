@@ -188,6 +188,13 @@ export interface BackupSettings {
   // V2 object-record backup. V1 monthly bundles are obsolete on the relay; older local
   // history stays local unless manually exported as JSON.
   recordFormat?: number;
+  // The account's backup key, unwrapped, base64. Cached so routine launches cost the
+  // signer nothing: every record is sealed and opened locally with this, and only the
+  // event signature still goes to the signer. It sits beside a database that is already
+  // readable on this device, so caching it exposes no workout data that was not already
+  // there — but it does travel in a JSON export, which is what lets an exported archive
+  // be restored and keep reading the relay.
+  key?: string;
   v2StartedAt?: string;
   localOnlyHistoryCount?: number;
   // Index into the deterministic backfill list, so an interrupted first run resumes
