@@ -9,8 +9,7 @@ That makes `write-policy.mjs` the only control on what the relay stores. It acce
 event when:
 
 - `kind` is `30078`, **and**
-- the first `d` tag starts with `workstr:v2:` (or, through the cutover, `workstr:v1:`) and
-  carries something after the prefix.
+- the first `d` tag starts with `workstr:v2:` and carries something after the prefix.
 
 Everything else is rejected, `kind:1` included. This is what stops the relay becoming a
 general-purpose relay carrying other clients' notes, and there is no second line of
