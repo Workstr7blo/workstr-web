@@ -68,3 +68,69 @@ describe('signer timeout', () => {
     expect(SIGNER_TIMEOUT_MS).toBeGreaterThanOrEqual(30000);
   });
 });
+
+describe('an answer that went missing', () => {
+  // The failure this exists for: the signer answers, the answer arrives before the client's
+  // subscription is back on the relay, and it is gone. The request landed, so the signer
+  // shows it handled while the client waits. Retrying recovers it, because the attempt that
+  // failed is what put the subscription back up.
+  function lossySigner(loseFirst: number): { signer: Signer; calls: number } {
+    const state = { calls: 0, signer: null as unknown as Signer };
+    state.signer = {
+      type: 'nip46',
+      getPublicKey: async () => 'ab'.repeat(32),
+      signEvent: async (event) => {
+        state.calls += 1;
+        // A lost answer is silence, not an error: nothing ever resolves.
+        if (state.calls <= loseFirst) return new Promise(() => {}) as never;
+        return { ...event, id: 'id', pubkey: 'ab'.repeat(32), sig: 'sig' };
+      },
+      nip44Encrypt: async (_peer, plaintext) => plaintext,
+      nip44Decrypt: async (_peer, ciphertext) => ciphertext
+    } as Signer;
+    return state as { signer: Signer; calls: number };
+  }
+
+  it('waits the whole budget on a signer that has never answered quickly', async () => {
+    const lossy = lossySigner(1);
+    // No fast answer on record, so a person may be deciding: retrying early would put a
+    // second prompt in front of them for one record.
+    const guarded = withSignerTimeout(lossy.signer, 60);
+    await expect(guarded.signEvent({ kind: 30078, created_at: 0, tags: [], content: '' }))
+      .rejects.toBeInstanceOf(SignerTimeoutError);
+    expect(lossy.calls).toBe(1);
+  });
+
+  it('retries quickly once the signer has shown it answers by itself', async () => {
+    const lossy = lossySigner(0);
+    const guarded = withSignerTimeout(lossy.signer, 900);
+    // A first answer, fast, which is what marks the signer as one that needs no human.
+    await guarded.signEvent({ kind: 30078, created_at: 0, tags: [], content: '' });
+    expect(lossy.calls).toBe(1);
+
+    // Now lose the next answer entirely.
+    let dropped = 0;
+    const original = lossy.signer.signEvent;
+    lossy.signer.signEvent = ((event) => {
+      dropped += 1;
+      return dropped === 1 ? new Promise(() => {}) : original(event);
+    }) as Signer['signEvent'];
+
+    const signed = await guarded.signEvent({ kind: 30078, created_at: 0, tags: [], content: '' });
+
+    // Recovered rather than waiting out the full budget, and without a second prompt
+    // because this signer never prompts.
+    expect(signed.sig).toBe('sig');
+    expect(dropped).toBe(2);
+  }, 20000);
+
+  it('still gives up when every retry is swallowed', async () => {
+    const lossy = lossySigner(0);
+    const guarded = withSignerTimeout(lossy.signer, 300);
+    await guarded.signEvent({ kind: 30078, created_at: 0, tags: [], content: '' });
+
+    lossy.signer.signEvent = (() => new Promise(() => {})) as Signer['signEvent'];
+    await expect(guarded.signEvent({ kind: 30078, created_at: 0, tags: [], content: '' }))
+      .rejects.toBeInstanceOf(SignerTimeoutError);
+  }, 20000);
+});

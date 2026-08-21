@@ -494,11 +494,12 @@ describe('when the relay or signer will not cooperate', () => {
     const { engine } = await harness(store, withSignerTimeout(silent, 20));
     await engine.start();
 
-    // One rebuild and one retry, because silence is usually a closed socket rather than an
-    // absent user. Then it stops: a signer that is genuinely away must not cost a timeout
+    // Silence is usually a lost answer rather than an absent user, so one record is retried
+    // a few times inside a single budget and the connection is rebuilt once. What matters
+    // is that it then stops: a signer that is genuinely away must not cost a fresh budget
     // for every record in the queue.
-    // One try and one rebuild, then it stops — not one timeout per queued record.
-    expect(attempts).toBe(2);
+    expect(attempts).toBeGreaterThan(1);
+    expect(attempts).toBeLessThan(12);
     expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
   });
 
