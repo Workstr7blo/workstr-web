@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
-import { PULL_OVERLAP_SEC, pullRecords } from '../src/sync/merge';
-import { SETTINGS_ADDRESS, sessionAddress, sessionsAddress } from '../src/sync/addresses';
+import { PULL_OVERLAP_SEC, pullAndMerge, pullRecords } from '../src/sync/merge';
+import { SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import { buildPrivateRecordEvent, encodePrivateRecord } from '../src/nostr/codecs30078';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../src/signer/types';
 
@@ -82,6 +82,24 @@ describe('reading the relay a second time', () => {
 
     expect(records).toHaveLength(1);
     expect(decrypt).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('interrupted restore progress', () => {
+  it('records each restored event as seen before moving to the next signer prompt', async () => {
+    const store = await freshStore();
+    relay.events = [
+      await event(signer, sheetAddress('a'), 'sheet-a', 2_000_001, { name: 'A', slug: 'a', exercises: [] }),
+      await event(signer, sheetAddress('b'), 'sheet-b', 2_000_002, { name: 'B', slug: 'b', exercises: [] }),
+      await event(signer, sheetAddress('c'), 'sheet-c', 2_000_003, { name: 'C', slug: 'c', exercises: [] })
+    ];
+
+    await expect(pullAndMerge(store, signer, 'ws://memory', {
+      onProgress: (done) => { if (done === 2) throw new Error('page closed'); }
+    })).rejects.toThrow('page closed');
+
+    expect((await store.listSeen()).map((entry) => entry.address).sort()).toEqual([sheetAddress('a'), sheetAddress('b')].sort());
+    expect(await store.listSheets()).toHaveLength(2);
   });
 });
 

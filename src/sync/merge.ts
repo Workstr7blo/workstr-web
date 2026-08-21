@@ -31,14 +31,7 @@ function dTag(event: SignedNostrEvent): string {
   return ((event.tags || []).find((tag) => tag[0] === 'd') || [])[1] || '';
 }
 
-// Decrypts one event at a time. Under NIP-46 every decrypt is a round trip to a remote
-// signer, so this is deliberately not parallel and callers keep it off the critical path.
-//
-// The seen ledger is what keeps a routine start cheap. The `d` tag and `created_at` of an
-// addressable event are cleartext, so an event this device has already read is recognised
-// and dropped without asking the signer anything. Without it, opening the app cost one
-// decrypt per record every single time, even when nothing had changed.
-export async function pullRecords(store: WorkstrStore, relayUrl: string, signer: Signer, options: PullOptions = {}): Promise<{ records: DecodedPrivateRecord[]; unreadable: number }> {
+async function unreadEvents(store: WorkstrStore, relayUrl: string, signer: Signer): Promise<SignedNostrEvent[]> {
   const seen = new Map((await store.listSeen()).map((entry) => [entry.address, entry]));
   const newest = [...seen.values()].reduce((latest, entry) => Math.max(latest, entry.created_at), 0);
   const since = newest > 0 ? Math.max(0, newest - PULL_OVERLAP_SEC) : undefined;
@@ -54,12 +47,23 @@ export async function pullRecords(store: WorkstrStore, relayUrl: string, signer:
   // has already superseded, and a superseded one is retired without a decrypt.
   const legacy = unread.filter((event) => parseAddress(dTag(event))?.kind === 'session');
   const superseded = await supersededLegacy(store, seen, legacy);
-  const events = [...unread.filter((event) => !legacy.includes(event)), ...legacy.filter((event) => !superseded.has(event.id))];
   for (const event of legacy.filter((candidate) => superseded.has(candidate.id))) {
     // Retired rather than ignored: recorded as read, this event never comes back in a
     // `since` window again, so the cost of an old per-session record is paid once.
     await store.noteSeen(dTag(event), event.id, event.created_at);
   }
+  return [...unread.filter((event) => !legacy.includes(event)), ...legacy.filter((event) => !superseded.has(event.id))];
+}
+
+// Decrypts one event at a time. Under NIP-46 every decrypt is a round trip to a remote
+// signer, so this is deliberately not parallel and callers keep it off the critical path.
+//
+// The seen ledger is what keeps a routine start cheap. The `d` tag and `created_at` of an
+// addressable event are cleartext, so an event this device has already read is recognised
+// and dropped without asking the signer anything. Without it, opening the app cost one
+// decrypt per record every single time, even when nothing had changed.
+export async function pullRecords(store: WorkstrStore, relayUrl: string, signer: Signer, options: PullOptions = {}): Promise<{ records: DecodedPrivateRecord[]; unreadable: number }> {
+  const events = await unreadEvents(store, relayUrl, signer);
 
   const records: DecodedPrivateRecord[] = [];
   let unreadable = 0;
@@ -284,7 +288,35 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
   return summary;
 }
 
+// Restore progress has to be durable record-by-record. Mobile browsers and remote signers
+// are routinely interrupted mid-pass; if the seen ledger is written only after every
+// decrypt finishes, the next app open repeats the same signer prompts from the beginning.
+// Processing each decoded record immediately means a phone that reached "2 of 13" starts
+// next time after those two, not at one again.
 export async function pullAndMerge(store: WorkstrStore, signer: Signer, relayUrl: string, options: PullOptions = {}): Promise<MergeSummary> {
-  const { records, unreadable } = await pullRecords(store, relayUrl, signer, options);
-  return mergeRecords(store, records, unreadable);
+  const events = (await unreadEvents(store, relayUrl, signer)).sort((a, b) => a.created_at - b.created_at || dTag(a).localeCompare(dTag(b)));
+  const summary: MergeSummary = { applied: 0, skipped: 0, deleted: 0, unreadable: 0 };
+  let consecutiveFailures = 0;
+
+  for (const [index, event] of events.entries()) {
+    const decoded = await decodePrivateRecord(signer, event);
+    if (!decoded) {
+      summary.unreadable += 1;
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= 3 && summary.applied === 0 && summary.deleted === 0 && summary.skipped === 0) {
+        throw new Error('Signer could not decrypt your backup. Open your signer app and try again.');
+      }
+      options.onProgress?.(index + 1, events.length);
+      continue;
+    }
+
+    consecutiveFailures = 0;
+    const merged = await mergeRecords(store, [decoded]);
+    summary.applied += merged.applied;
+    summary.skipped += merged.skipped;
+    summary.deleted += merged.deleted;
+    summary.unreadable += merged.unreadable;
+    options.onProgress?.(index + 1, events.length);
+  }
+  return summary;
 }
