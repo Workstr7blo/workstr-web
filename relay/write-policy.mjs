@@ -26,12 +26,11 @@ import { join } from 'node:path';
 export const ACCEPTED_KIND = 30078;
 export const REQUIRED_D_PREFIX = 'workstr:v2:';
 
-// `workstr:v1:` is still accepted so the relay and the web app do not have to be deployed
-// in the same instant. A client on either side of the cutover keeps working, which is what
-// stops the swap being a flag day where whichever ships second rejects every publish.
-// Narrow this to the v2 prefix alone once no v1 client is left.
-export const LEGACY_D_PREFIX = 'workstr:v1:';
-export const ACCEPTED_D_PREFIXES = [REQUIRED_D_PREFIX, LEGACY_D_PREFIX];
+// `workstr:v1:` was accepted alongside it while the app was being deployed, so that the
+// relay and the client did not have to change in the same instant. That window is closed:
+// nothing writes v1 any more, and a relay that keeps accepting a retired prefix is just a
+// wider target. Kept as a list so the next changeover reopens the same door.
+export const ACCEPTED_D_PREFIXES = [REQUIRED_D_PREFIX];
 
 // With neither payment nor admission bounding anything, these limits plus the kind and
 // prefix filter are the entire defence. Organic use is not the worry: 30078 is

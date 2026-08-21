@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The backup relay now accepts only the current record format.** The previous format was
+  accepted alongside it while the app was being rolled out, so the relay and the app did not
+  have to change in the same instant. That window is closed.
+
 - **Backup no longer interrupts a workout.** Logging a set used to queue a backup a few
   seconds later, which on a remote signer meant your signer app waking up over and over
   while you were still training. A workout is now held on the device and copied to the
