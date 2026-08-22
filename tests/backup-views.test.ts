@@ -60,6 +60,10 @@ describe('status line', () => {
   });
 
   it('shows the error the engine reported', () => {
+    expect(statusLine(panelState({ sync: { state: 'error', pending: 1, reconnecting: true, lastError: 'Your signer did not respond. Open your signer app, then tap Sync now.' } })))
+      .toBe('Reconnecting to your signer…');
+    expect(statusPill(panelState({ sync: { state: 'error', pending: 1, reconnecting: true } })))
+      .toEqual({ label: 'reconnecting', ok: true });
     expect(statusLine(panelState({ sync: { state: 'error', pending: 2, lastError: 'Relay rejected 1 record(s)' } })))
       .toBe('Relay rejected 1 record(s)');
   });

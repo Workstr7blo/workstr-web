@@ -69,8 +69,8 @@ or set updates would make full-root rendering inappropriate.
 | Encrypted backup: queue and first-run backfill | `src/sync/backfill.ts` | `src/db/store.ts` (change listener, `sync_queue`) | `tests/sync-backfill.test.ts` |
 | Encrypted backup: relay transport and upload | `src/sync/relay.ts`, `src/sync/push.ts` | `src/nostr/codecs30078.ts`, `relay/write-policy.mjs` | `tests/sync-push.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in, needs `WORKSTR_TEST_RELAY`) |
 | Encrypted backup: pull, decrypt and merge | `src/sync/merge.ts` | `src/sync/relay.ts`, `src/db/store.ts` (`applyRemote`, `sync_seen`) | `tests/sync-merge.test.ts`, `tests/sync-pull.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in) |
-| Encrypted backup: sync orchestration | `src/sync/engine.ts` | `src/sync/backfill.ts`, `src/sync/push.ts`, `src/sync/merge.ts` | `tests/sync-engine.test.ts` |
-| Signer call timeouts | `src/signer/timeout.ts` | `src/signer/types.ts`, `src/sync/engine.ts` | `tests/signer-timeout.test.ts` |
+| Encrypted backup: sync orchestration | `src/sync/engine.ts`, `src/sync/retry.ts` | `src/sync/backfill.ts`, `src/sync/push.ts`, `src/sync/merge.ts` | `tests/sync-engine.test.ts` |
+| Signer call timeouts | `src/signer/timeout.ts`, `src/signer/auto-approve.ts` | `src/signer/types.ts`, `src/sync/engine.ts` | `tests/signer-timeout.test.ts` |
 | Encrypted backup: the Auto-backup toggle | `src/features/backup/views.ts`, `src/app/backup-controller.ts` | `src/sync/engine.ts`, `src/app/layout.ts` | `tests/backup-views.test.ts`, `tests/sync-engine.test.ts` |
 | Sync-facing half of the store | `src/db/sync-store.ts` | `src/db/store.ts` (extends it) | `tests/sync-backfill.test.ts`, `tests/sync-merge.test.ts`, `tests/sync-pull.test.ts` |
 

@@ -35,7 +35,9 @@ export function startedOnLabel(iso: string | undefined): string {
 
 export function statusPill(state: BackupPanelState): { label: string; ok: boolean } {
   if (!state.enabled) return { label: 'off', ok: false };
-  if (state.sync.state === 'error') return { label: 'needs attention', ok: false };
+  if (state.sync.state === 'error') return state.sync.reconnecting
+    ? { label: 'reconnecting', ok: true }
+    : { label: 'needs attention', ok: false };
   if (state.sync.state === 'syncing') return { label: 'syncing', ok: true };
   return { label: state.sync.pending > 0 ? `${state.sync.pending} pending` : 'up to date', ok: true };
 }
@@ -68,6 +70,9 @@ export function progressDetail(progress: SyncProgress): string {
 export function statusLine(state: BackupPanelState): string {
   const { sync } = state;
   if (sync.progress) return PHASE_LABEL[sync.progress.phase];
+  // A stalled signer with a retry seconds away is not something to hand the user a job
+  // over: the connection is being rebuilt, which is the same thing tapping Sync now does.
+  if (sync.state === 'error' && sync.reconnecting) return 'Reconnecting to your signer…';
   if (sync.state === 'error') return sync.lastError || 'Backup could not reach the relay. It will retry on its own.';
   if (sync.state === 'syncing') return 'Syncing now…';
   const pending = sync.pending > 0 ? `${sync.pending} change${sync.pending === 1 ? '' : 's'} waiting to upload. ` : '';

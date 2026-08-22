@@ -2,6 +2,7 @@ import { renderSVG } from 'uqr';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
 import { clearCachedNip46Signer, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
+import { forgetAutoApprove } from '../signer/auto-approve';
 import type { Signer } from '../signer/types';
 import type { AppState } from './state';
 
@@ -34,6 +35,9 @@ export function createIdentityController(ctx: IdentityControllerContext) {
 async function signOut(): Promise<void> {
   activeSigner = null;
   clearCachedNip46Signer();
+  // It describes the permissions one connection was granted, not this device. The next
+  // signer may prompt for everything, and retrying early at it would prompt twice.
+  forgetAutoApprove();
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(SIGNER_TYPE_KEY);
   state.editingId = null;

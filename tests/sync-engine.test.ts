@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
-import { createSyncEngine, RECORD_FORMAT, RETRY_BASE_MS, type SyncStatus } from '../src/sync/engine';
+import { createSyncEngine, RECORD_FORMAT, type SyncStatus } from '../src/sync/engine';
+import { RETRY_BASE_MS, STALL_RETRY_MS } from '../src/sync/retry';
 import { SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 import { withSignerTimeout } from '../src/signer/timeout';
+import { forgetAutoApprove } from '../src/signer/auto-approve';
 import { decodePrivateRecord, type PrivateRecord, type RecordCipher } from '../src/nostr/codecs30078';
 
 const SELF = 'ab'.repeat(32);
@@ -140,6 +142,8 @@ beforeEach(() => {
   relay.keyEvent = null;
   relay.failure = null;
   relay.seq = 0;
+  // Remembered across page loads in the browser, and so across tests here.
+  forgetAutoApprove();
 });
 
 describe('turning backup on', () => {
@@ -429,8 +433,10 @@ describe('when the relay or signer will not cooperate', () => {
 
     expect(status.state).toBe('error');
     expect(status.lastError).toContain('signer did not respond');
-    // And it schedules a retry rather than sitting there.
-    expect(state.timers.at(-1)?.delayMs).toBe(RETRY_BASE_MS);
+    // And it schedules a retry rather than sitting there — quickly, because rebuilding
+    // the connection is the whole fix and waiting out a backoff first only shows the user
+    // an error they cannot act on.
+    expect(state.timers.at(-1)?.delayMs).toBe(STALL_RETRY_MS);
     // The queue is intact, so nothing was lost while the signer was away.
     expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
   });
@@ -454,6 +460,36 @@ describe('when the relay or signer will not cooperate', () => {
     await engine.start();
 
     expect(stalled).toHaveBeenCalled();
+  });
+
+  it('rebuilds a stalled connection within seconds rather than waiting out a backoff', async () => {
+    // The desktop complaint: the pass spends its whole budget finding out the signer went
+    // quiet, and then a full backoff on top before the retry that fixes it — long enough
+    // that the only sane move looks like pressing Sync now.
+    const store = await freshStore();
+    await populate(store);
+    const silent: Signer = {
+      type: 'nip46',
+      getPublicKey: async () => SELF,
+      signEvent: () => new Promise(() => {}),
+      nip44Encrypt: () => new Promise(() => {}),
+      nip44Decrypt: () => new Promise(() => {})
+    };
+    const { engine, state } = await harness(store, withSignerTimeout(silent, 20), vi.fn());
+
+    const first = await engine.start();
+    // Not something to hand the user a job over while the retry is four seconds away.
+    expect(first.reconnecting).toBe(true);
+    expect(state.timers.at(-1)?.delayMs).toBe(STALL_RETRY_MS);
+
+    state.timers.at(-1)!.run();
+    await until(() => engine.status().state !== 'syncing', 'the quick retry to finish');
+
+    // It did not work, so the signer is genuinely away: say so and back off from the top
+    // of the normal curve rather than skipping a rung because the first wait was short.
+    expect(engine.status().reconnecting).toBeFalsy();
+    expect(engine.status().lastError).toContain('did not respond');
+    expect(state.timers.at(-1)?.delayMs).toBe(RETRY_BASE_MS);
   });
 
   it('reports a stalled signer in words rather than naming the call that timed out', async () => {
@@ -494,11 +530,12 @@ describe('when the relay or signer will not cooperate', () => {
     const { engine } = await harness(store, withSignerTimeout(silent, 20));
     await engine.start();
 
-    // One rebuild and one retry, because silence is usually a closed socket rather than an
-    // absent user. Then it stops: a signer that is genuinely away must not cost a timeout
+    // Silence is usually a lost answer rather than an absent user, so one record is retried
+    // a few times inside a single budget and the connection is rebuilt once. What matters
+    // is that it then stops: a signer that is genuinely away must not cost a fresh budget
     // for every record in the queue.
-    // One try and one rebuild, then it stops — not one timeout per queued record.
-    expect(attempts).toBe(2);
+    expect(attempts).toBeGreaterThan(1);
+    expect(attempts).toBeLessThan(12);
     expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
   });
 

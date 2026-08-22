@@ -98,7 +98,11 @@ export function createBackupController(ctx: BackupControllerContext): BackupCont
       const active = engineFor();
       if (!active) return;
       const status = await active.syncNow();
-      if (status.state === 'error') ctx.toast(status.lastError || 'Backup could not reach the relay.', 'bad');
+      // Not while a retry is seconds away: the panel says it is reconnecting, and a red
+      // toast telling the user to go and open their signer app contradicts it.
+      if (status.state === 'error' && !status.reconnecting) {
+        ctx.toast(status.lastError || 'Backup could not reach the relay.', 'bad');
+      }
     },
 
     stop

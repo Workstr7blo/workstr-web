@@ -8,6 +8,7 @@ import { isRecordAddress, newDeviceId, parseAddress } from './addresses';
 import { SignerTimeoutError, withSignerTimeout } from '../signer/timeout';
 import { BackupKeyUnavailableError, republishBackupKey, resolveBackupKey } from '../nostr/backup-key';
 import { fetchKeyEvent, publishKeyEvent } from './relay';
+import { createRetrySchedule } from './retry';
 import type { RecordCipher } from '../nostr/codecs30078';
 
 // The single backup destination. Not a user preference and never announced: the relay
@@ -16,10 +17,6 @@ import type { RecordCipher } from '../nostr/codecs30078';
 // refuse them. It is also never mixed into the catalog or public write relay sets.
 export const WORKSTR_RELAY_URL = 'wss://relay.workstr.fit:43736';
 
-// Failure is normal on a phone: a tunnel drops, a signer sleeps. Retry gets slower
-// rather than hammering a relay that is not answering, and never gives up entirely.
-export const RETRY_BASE_MS = 30000;
-export const RETRY_MAX_MS = 900000;
 // Logging a set writes several records in a burst; one sync afterwards is enough.
 export const CHANGE_DEBOUNCE_MS = 4000;
 
@@ -44,6 +41,10 @@ export interface SyncStatus {
   lastSyncAt?: string;
   lastError?: string;
   progress?: SyncProgress;
+  // A stalled signer with the quick retry already scheduled. Nothing for the user to do:
+  // the connection is being rebuilt, and a red line telling them to go and open their
+  // signer app is how a four-second recovery gets mistaken for a broken backup.
+  reconnecting?: boolean;
 }
 
 export interface SyncEngineContext {
@@ -98,6 +99,10 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
   // the queue, so it asks for another one instead of being folded into this one.
   let again = false;
   let failures = 0;
+  // Whether the failure that ended the last pass was a signer going quiet: it is the one
+  // failure whose next attempt is worth making immediately.
+  let stalledLast = false;
+  const retry = createRetrySchedule();
   let cancelTimer: (() => void) | null = null;
   // The relay is read once per session. Every later pass is an upload: re-reading the whole
   // history on a timer is wasted work even now that opening a record is local.
@@ -284,7 +289,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     if (inFlight) { again = true; return inFlight; }
 
     clearTimer();
-    report({ state: 'syncing' });
+    report({ state: 'syncing', reconnecting: undefined });
     inFlight = (async (): Promise<SyncStatus> => {
       try {
         // Wrapped here so every downstream call — encrypt, decrypt, sign — is bounded.
@@ -293,13 +298,16 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
         const signer = resolved ? withSignerTimeout(resolved) : null;
         if (!signer) {
           failures += 1;
+          stalledLast = false;
           return report({ state: 'error', lastError: 'Signer connection was lost. Sign in again to resume backup.' });
         }
         await pass(signer);
         failures = 0;
+        stalledLast = false;
+        retry.reset();
         const lastSyncAt = new Date().toISOString();
         await ctx.store.saveBackupState({ lastSyncAt, lastError: undefined });
-        return report({ state: 'idle', pending: (await ctx.store.listSyncQueue()).length, lastSyncAt, lastError: undefined });
+        return report({ state: 'idle', pending: (await ctx.store.listSyncQueue()).length, lastSyncAt, lastError: undefined, reconnecting: undefined });
       } catch (error) {
         failures += 1;
         // A timeout on any single call means the same as a failed publish: the connection
@@ -309,15 +317,19 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
         // Never retried into a new key. The pass stops, the queue keeps its place, and the
         // user is told — inventing a second key here is the one failure that loses data.
         if (error instanceof BackupKeyUnavailableError) {
+          stalledLast = false;
           await ctx.store.saveBackupState({ lastError: error.message });
-          return report({ state: 'error', pending: (await ctx.store.listSyncQueue()).length, lastError: error.message });
+          return report({ state: 'error', pending: (await ctx.store.listSyncQueue()).length, lastError: error.message, reconnecting: undefined });
         }
         const stalled = error instanceof StalledSignerError || error instanceof SignerTimeoutError;
+        stalledLast = stalled;
         if (stalled) ctx.onSignerStalled?.();
         const message = stalled ? new StalledSignerError().message : error instanceof Error ? error.message : String(error);
         await ctx.store.saveBackupState({ lastError: message });
         // Never thrown onward: a failed backup is a status line, not an interrupted workout.
-        return report({ state: 'error', pending: (await ctx.store.listSyncQueue()).length, lastError: message });
+        // Only for the attempt the quick retry is scheduled for. Past that the signer has
+        // had its second chance and is genuinely away, which is a thing to say plainly.
+        return report({ state: 'error', pending: (await ctx.store.listSyncQueue()).length, lastError: message, reconnecting: stalled && failures === 1 });
       }
     })();
 
@@ -328,7 +340,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       inFlight = null;
       if (!running) clearTimer();
       else if (again) { again = false; scheduleSync(0); }
-      else if (failures > 0) scheduleSync(Math.min(RETRY_BASE_MS * 2 ** (failures - 1), RETRY_MAX_MS));
+      else if (failures > 0) scheduleSync(retry.delayMs(failures, stalledLast));
     }
   }
 
@@ -337,6 +349,8 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       if (running) return status;
       running = true;
       failures = 0;
+      stalledLast = false;
+      retry.reset();
       ctx.store.setChangeListener((address, updatedAt) => {
         // A log entry reports itself so a pass gets scheduled, but it is not an address:
         // which chunk it lands in is not decided until the chunk is packed. Queueing one
@@ -369,6 +383,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
 
     syncNow(): Promise<SyncStatus> {
       failures = 0;
+      retry.reset();
       return runSync();
     },
 

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Backup no longer pauses for 45 seconds at a time on a remote signer.** A signer's answer
+  can go missing on its way back — it is published before the app is listening again, and
+  the app then waits out its whole timeout before trying once more, even though the signer
+  has already done the work. The app now notices much sooner and asks again, but only on
+  signers that answer by themselves; where a signer puts the request in front of you, it
+  still waits, because asking again there would mean approving the same thing twice.
+
+- **Backup recovers in seconds on a desktop instead of looking broken.** Two waits stacked
+  up on the first sync after opening the app: what the app knows about how quickly your
+  signer answers was thrown away with every page load, so the first request — the one whose
+  answer goes missing most often, on a connection that has just been rebuilt — always waited
+  the full timeout; and the retry afterwards then sat behind the same long backoff a dead
+  relay gets. The app now remembers that your signer answers by itself, and reconnects a few
+  seconds after one stops answering rather than half a minute later. While it does, the
+  panel says it is reconnecting instead of telling you to go and open your signer app.
+
 ### Changed
 
 - **The backup relay now accepts only the current record format.** The previous format was
