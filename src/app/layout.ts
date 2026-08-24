@@ -173,8 +173,8 @@ function equipmentRows(state: AppState): string {
 function settingsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   const account = state.pubkey
-    ? `<div class="settings-row-main"><div><strong>${html(displayIdentity(state))}</strong><small>Signed in with your Nostr signer. Keys stay in your signer.</small></div><div class="settings-row-actions"><button id="sign-out-settings" class="button ghost">Sign out</button><button id="remove-account-data" class="button ghost">Remove data</button></div></div>`
-    : `<div class="settings-row-main"><div><strong>Local only</strong><small>Your training is saved on this device. Sign in to enable encrypted sync and publishing.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Sign in with signer</button>${hasNip07() ? '<button id="sign-in-nip07" class="button ghost">Use extension</button>' : ''}</div></div>`;
+    ? `<div class="settings-row-main account-row"><div><strong>${html(displayIdentity(state))}</strong><small>Keys stay in your signer.</small></div><div class="settings-row-actions"><button id="sign-out-settings" class="button ghost">Sign out</button><button id="remove-account-data" class="button ghost">Remove data</button></div></div>`
+    : `<div class="settings-row-main account-row"><div><strong>Local only</strong><small>Saved on this device.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Sign in with signer</button>${hasNip07() ? '<button id="sign-in-nip07" class="button ghost">Use extension</button>' : ''}</div></div>`;
   const relay = state.settings.workstrRelay || 'default Workstr relay';
   const signerType = state.signerType || (state.pubkey ? 'unknown' : 'none');
   return `<div class="page active settings-page"><div class="page-title">Settings</div>
