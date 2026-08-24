@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Workstr can now create or restore a device-managed Nostr sync account.** New users can
+  create an encrypted sync account from Settings, save the shown recovery key, and keep the
+  key only in this browser profile for faster signing and backup checks. Existing Nostr
+  users can still use a mobile signer or browser extension instead.
+
 ### Fixed
 
 - **Backup no longer pauses for 45 seconds at a time on a remote signer.** A signer's answer

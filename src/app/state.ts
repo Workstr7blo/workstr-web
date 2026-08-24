@@ -63,7 +63,7 @@ export interface AppState {
   store: WorkstrStore | null;
   settings: WorkstrSettings;
   support: SupportState;
-  signerType: 'nip07' | 'nip46' | null;
+  signerType: 'nip07' | 'nip46' | 'local' | null;
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
   exercises: Exercise[];
