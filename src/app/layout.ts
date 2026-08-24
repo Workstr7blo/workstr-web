@@ -155,27 +155,40 @@ function statisticsView(state: AppState): string {
 
 // Kit options come from the library plus the Workstr catalog, so equipment can
 // be ticked before any exercise using it has been imported.
-function equipmentPanel(state: AppState): string {
-  // Bodyweight is not something you own, so it gets no checkbox — it is always
-  // available and the filter treats it that way.
+function equipmentRows(state: AppState): string {
   const options = exerciseFilterValues([...state.library, ...state.discoverExercises]).equipment
     .filter((item) => !isFreeEquipment(item.key));
   const owned = new Set(ownedEquipmentKeys(state.settings.ownedEquipment));
   if (!options.length) {
-    return `<div class="panel"><div class="panel-head"><span>My equipment</span></div><p class="section-help">No equipment listed yet. Import exercises from the Workstr catalog and the equipment they use appears here.</p></div>`;
+    return `<div class="settings-row-main"><div><strong>Equipment</strong><small>No equipment listed yet. Import exercises from Discover and equipment appears here.</small></div><span class="status-pill">0 selected</span></div>`;
   }
   const boxes = options.map((item) => `<label class="equip-option"><input type="checkbox" class="equip-toggle" value="${html(item.key)}" ${owned.has(item.key) ? 'checked' : ''} />${html(item.label)}</label>`).join('');
-  return `<div class="panel">
-    <div class="panel-head"><span>My equipment</span><span class="status-pill ${owned.size ? 'ok' : ''}">${owned.size ? `${owned.size} selected` : 'not set'}</span></div>
-    <p class="section-help">Tick what you can train with. The Exercises tab then offers a "My equipment" filter, and Quick Workout stops proposing exercises you cannot do. Bodyweight exercises need nothing, so they stay visible whatever you tick.</p>
+  return `<details class="settings-details equipment-details">
+    <summary><span>Equipment</span><strong>${owned.size} selected</strong></summary>
+    <p class="section-help">Choose available equipment so Quick Workout avoids exercises you cannot do. Bodyweight exercises are always available.</p>
     <div class="equip-options">${boxes}</div>
-  </div>`;
+  </details>`;
 }
 
 function settingsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   const account = state.pubkey
-    ? `<p class="section-help">Signed in with your Nostr signer. Your training data lives in this identity's database on this device; keys stay in your signer.</p><div class="web-empty-actions"><button id="sign-out-settings" class="button ghost">Sign out</button><button id="remove-account-data" class="button ghost">Sign out and remove data from this device</button></div>`
-    : `<p class="section-help">Workstr works fully on this device without an account — everything is saved locally. Sign in with a Nostr signer to attach your training data to your identity; sync, backup and publishing build on it later. On first sign-in your local data moves under your identity — nothing is ever merged.</p><div class="web-empty-actions"><button id="sign-in-settings" class="button primary">Sign in with signer app</button>${hasNip07() ? '<button id="sign-in-nip07" class="button ghost">Use browser extension</button>' : ''}</div>`;
-  return `<div class="page active"><div class="page-title">Settings</div><div class="panel"><div class="panel-head"><span>Nostr account</span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'connected' : 'local'}</span></div>${account}<div class="terminal-mini">version: ${html(APP_VERSION)}\nsecure context: ${window.isSecureContext}\ncountdown audio: ${html(countdownAudioState())}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div><div class="panel"><div class="panel-head"><span>Preferences</span></div><label style="max-width:240px">Weight unit<select id="unit-select"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds (lbs)</option></select></label></div>${equipmentPanel(state)}${supportPanel(state.support)}${backupPanel({ signedIn: Boolean(state.pubkey), enabled: Boolean(state.settings.backup?.enabled), sync: state.backup, backup: state.settings.backup })}</div>`;
+    ? `<div class="settings-row-main"><div><strong>${html(displayIdentity(state))}</strong><small>Signed in with your Nostr signer. Keys stay in your signer.</small></div><div class="settings-row-actions"><button id="sign-out-settings" class="button ghost">Sign out</button><button id="remove-account-data" class="button ghost">Remove data</button></div></div>`
+    : `<div class="settings-row-main"><div><strong>Local only</strong><small>Your training is saved on this device. Sign in to enable encrypted sync and publishing.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Sign in with signer</button>${hasNip07() ? '<button id="sign-in-nip07" class="button ghost">Use extension</button>' : ''}</div></div>`;
+  const relay = state.settings.workstrRelay || 'default Workstr relay';
+  const signerType = state.signerType || (state.pubkey ? 'unknown' : 'none');
+  return `<div class="page active settings-page"><div class="page-title">Settings</div>
+    <div class="panel settings-card account-card"><div class="panel-head"><span>Account</span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'signed in' : 'local'}</span></div>${account}</div>
+    ${backupPanel({ signedIn: Boolean(state.pubkey), enabled: Boolean(state.settings.backup?.enabled), sync: state.backup, backup: state.settings.backup })}
+    <div class="panel settings-card training-preferences-card">
+      <div class="panel-head"><span>Training Preferences</span></div>
+      <div class="settings-row-main"><div><strong>Weight unit</strong><small>Weights are stored in kilograms and converted for display.</small></div><label class="compact-select"><select id="unit-select"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds</option></select></label></div>
+      ${equipmentRows(state)}
+    </div>
+    ${supportPanel(state.support)}
+    <details class="panel settings-card advanced-settings">
+      <summary><span>Advanced</span><small>Diagnostics, relay, signer, and technical state</small></summary>
+      <div class="terminal-mini">version: ${html(APP_VERSION)}\nsecure context: ${window.isSecureContext}\ncountdown audio: ${html(countdownAudioState())}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nsigner type: ${html(signerType)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}</div>
+    </details>
+  </div>`;
 }

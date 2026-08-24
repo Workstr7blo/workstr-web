@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Settings is now a compact control center.** Account, Data & Sync, Training Preferences,
+  Support Workstr, and Advanced are grouped in that order; encrypted relay behavior is
+  described as sync/auto-sync, JSON export/import is presented as manual backup, support
+  is compact by default, equipment lives behind a concise row, and diagnostics are tucked
+  into Advanced.
+
 - **The backup relay now accepts only the current record format.** The previous format was
   accepted alongside it while the app was being rolled out, so the relay and the app did not
   have to change in the same instant. That window is closed.

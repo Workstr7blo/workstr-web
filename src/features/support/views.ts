@@ -58,32 +58,41 @@ function fundingPanel(state: SupportState): string {
 // a minimal state — gets the zap target without a funding panel.
 export function supportPanel(state: SupportState = { status: 'idle', receipts: [] }): string {
   const npub = nip19.npubEncode(OPERATOR_PUBKEY);
-  return `<div class="panel support-panel">
-    <div class="support-hero-row">
-      <div class="support-bolt" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M13.6 2 4.8 13.2h6.4L9.9 22l8.9-12.2h-6.2L13.6 2Z" fill="currentColor"/></svg></div>
+  const totals = fundingTotals(state.receipts, MONTHLY_COST_SATS);
+  const summary = state.status === 'ready'
+    ? `${sats(totals.sats)} / ${sats(MONTHLY_COST_SATS)} sats this month`
+    : state.status === 'loading'
+      ? 'Reading zap receipts…'
+      : state.status === 'offline'
+        ? 'Receipt check offline'
+        : `Monthly target ${sats(MONTHLY_COST_SATS)} sats`;
+  return `<div class="panel support-panel compact-support">
+    <div class="panel-head"><span>Support Workstr</span><strong>zap receipts</strong></div>
+    <div class="settings-row-main support-summary-row">
       <div>
-        <div class="panel-head"><span>Support Workstr</span><strong>zap receipts</strong></div>
-        <h3>Fund the build. Keep the receipt.</h3>
-        <p class="section-help">Workstr is free and stays free. The ${sats(MONTHLY_COST_SATS)} sats monthly target is the same public operating target shown on workstr.fit/support: about 55k sats for AI credits and development, 22k for growth tests, 2k for Nostr.build media hosting, 5k for the domain, and 1k buffer. Zaps keep support public and receipt-backed.</p>
+        <strong>Fund the build. Keep the receipt.</strong>
+        <small>${html(summary)}</small>
+      </div>
+      <div class="settings-row-actions">
+        <a id="open-zap-target" class="button primary" href="${html(OPERATOR_NOSTR_URL)}" target="_blank" rel="noreferrer">Zap</a>
+        <button id="copy-npub" class="button ghost" data-copy="${html(npub)}">Copy npub</button>
       </div>
     </div>
-    <div class="support-zap-card">
-      <div class="support-zap-copy">
-        <span class="card-label">Zap target</span>
-        <strong>${html(OPERATOR_NOSTR_HANDLE)}</strong>
-        <small>${html(npub)}</small>
+    <details class="settings-details support-details">
+      <summary>Funding details and receipts</summary>
+      <p class="section-help">Workstr is free and stays free. The monthly target covers AI credits, development, growth tests, media hosting, the domain, and buffer. Zaps keep support public and receipt-backed.</p>
+      <div class="support-zap-card">
+        <div class="support-zap-copy">
+          <span class="card-label">Zap target</span>
+          <strong>${html(OPERATOR_NOSTR_HANDLE)}</strong>
+          <small>${html(npub)}</small>
+        </div>
+        <div class="support-receipt-badge">
+          <span>verified</span>
+          <strong>NIP-57</strong>
+        </div>
       </div>
-      <div class="support-receipt-badge">
-        <span>verified</span>
-        <strong>NIP-57</strong>
-      </div>
-    </div>
-    <div class="web-empty-actions support-actions">
-      <a id="open-zap-target" class="button primary" href="${html(OPERATOR_NOSTR_URL)}" target="_blank" rel="noreferrer">Zap on Nostr</a>
-      <button id="copy-npub" class="button ghost" data-copy="${html(npub)}">Copy npub</button>
-    </div>
-    <p class="section-help support-note">The only donation path is a Nostr zap. Every counted donation is transparently
-    accounted for through verified NIP-57 zap receipts in the meter below.</p>
-    ${fundingPanel(state)}
+      ${fundingPanel(state)}
+    </details>
   </div>`;
 }

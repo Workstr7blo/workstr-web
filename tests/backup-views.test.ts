@@ -44,8 +44,8 @@ describe('status line', () => {
   it('reports progress with calm phase names instead of a falling pending count', () => {
     // 400 pending falling to zero reads like a fault; the bar/detail reads like progress.
     const sync = { state: 'syncing' as const, pending: 388, progress: { phase: 'upload' as const, done: 12, total: 400 } };
-    expect(statusLine(panelState({ sync }))).toBe('Backing up local changes…');
-    expect(progressDetail(sync.progress)).toBe('12 of 400 records backed up');
+    expect(statusLine(panelState({ sync }))).toBe('Syncing local changes…');
+    expect(progressDetail(sync.progress)).toBe('12 of 400 records synced');
     expect(progressPercent(sync.progress)).toBe(3);
   });
 
@@ -53,7 +53,7 @@ describe('status line', () => {
     // Unknown encrypted events need signer decrypts before the app can know whether they
     // apply anything. The UI should describe that as checking, not restoring.
     expect(statusLine(panelState({ sync: { state: 'syncing', pending: 0, progress: { phase: 'restore', done: 3, total: 40 } } })))
-      .toBe('Checking encrypted backup…');
+      .toBe('Checking encrypted sync…');
     expect(progressDetail({ phase: 'restore', done: 3, total: 40 })).toBe('3 of 40 records checked');
     expect(statusLine(panelState({ sync: { state: 'syncing', pending: 0, progress: { phase: 'prepare', done: 5, total: 9 } } })))
       .toBe('Preparing local changes…');
@@ -70,36 +70,40 @@ describe('status line', () => {
 
   it('always answers when the last backup happened', () => {
     const line = statusLine(panelState({ sync: { state: 'idle', pending: 0, lastSyncAt: new Date().toISOString() } }));
-    expect(line).toBe('Last backup just now.');
-    expect(statusLine(panelState({ sync: { state: 'idle', pending: 1 } }))).toBe('1 change waiting to upload. Last backup not yet.');
+    expect(line).toBe('Last synced just now.');
+    expect(statusLine(panelState({ sync: { state: 'idle', pending: 1 } }))).toBe('1 change waiting to sync. Last synced not yet.');
   });
 });
 
 describe('the panel', () => {
-  it('offers the toggle unchecked and hides sync controls when backup is off', () => {
+  it('offers a turn-on action and hides sync controls when sync is off', () => {
     const html = backupPanel(panelState({ enabled: false }));
-    expect(html).toContain('id="auto-backup"');
-    expect(html).not.toContain('checked');
+    expect(html).toContain('id="enable-sync"');
+    expect(html).toContain('Turn on sync');
+    expect(html).not.toContain('id="auto-backup"');
     expect(html).not.toContain('id="sync-now"');
     // Export and import are always there: data is never hostage to the relay.
     expect(html).toContain('id="export-data"');
     expect(html).toContain('id="import-data"');
+    expect(html).toContain('Manual backup');
   });
 
   it('tells a signed-out user that sign-in comes first', () => {
-    expect(backupPanel(panelState({ signedIn: false, enabled: false }))).toContain('takes you through sign-in first');
+    const html = backupPanel(panelState({ signedIn: false, enabled: false }));
+    expect(html).toContain('Sign in to sync');
+    expect(html).not.toContain('id="auto-backup"');
   });
 
   it('shows the status line and sync-now once it is on', () => {
     const html = backupPanel(panelState({ sync: { state: 'idle', pending: 2 } }));
     expect(html).toContain('checked');
     expect(html).toContain('id="sync-now"');
-    expect(html).toContain('2 changes waiting to upload');
+    expect(html).toContain('2 changes waiting to sync');
   });
 
   it('renders active sync progress as a bar with secondary detail', () => {
     const html = backupPanel(panelState({ sync: { state: 'syncing', pending: 0, progress: { phase: 'restore', done: 2, total: 3 } } }));
-    expect(html).toContain('Checking encrypted backup…');
+    expect(html).toContain('Checking encrypted sync…');
     expect(html).toContain('class="backup-progress"');
     expect(html).toContain('aria-valuenow="67"');
     expect(html).toContain('2 of 3 records checked');
