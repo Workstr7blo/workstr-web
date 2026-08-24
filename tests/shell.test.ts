@@ -15,7 +15,18 @@ describe('shell', () => {
       root.querySelector<HTMLElement>(`[data-view="${view}"]`)?.click();
       expect(root.querySelector('.page.active'), view).toBeTruthy();
     }
-    expect(root.querySelector('#page-exercises')).toBeTruthy();
+    root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
+    const settings = root.querySelector('.settings-page') as HTMLElement;
+    expect(settings?.textContent).toContain('Account');
+    expect(settings?.textContent).toContain('Data & Sync');
+    expect(settings?.textContent).toContain('Training Preferences');
+    expect(settings?.textContent).toContain('Support Workstr');
+    expect(settings?.querySelector('.advanced-settings:not([open])')).toBeTruthy();
+    expect(settings?.querySelector('.account-card .terminal-mini')).toBeNull();
+    expect(settings?.querySelector('#enable-sync')).toBeTruthy();
+    expect(settings?.querySelector('#auto-backup')).toBeNull();
+    expect(settings?.textContent).toContain('Manual backup');
+    expect(settings?.textContent).toContain('0 selected');
   });
 });
 

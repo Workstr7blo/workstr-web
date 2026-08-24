@@ -9,19 +9,15 @@ describe('supportPanel', () => {
     const markup = supportPanel();
     const npub = nip19.npubEncode(OPERATOR_PUBKEY);
 
-    expect(markup).toContain('Zap on Nostr');
+    expect(markup).toContain('>Zap</a>');
     expect(markup).toContain(`href="${OPERATOR_NOSTR_URL}"`);
     expect(markup).toContain('Fund the build. Keep the receipt.');
     expect(markup).toContain(`>${OPERATOR_NOSTR_HANDLE}</strong>`);
     expect(markup).toContain(npub);
     expect(markup).toContain('Copy npub');
+    expect(markup).toContain('Funding details and receipts');
     expect(markup).toContain('Zaps keep support public and receipt-backed');
-    expect(markup).toContain('85,000 sats monthly target');
-    expect(markup).toContain('55k sats for AI credits and development');
-    expect(markup).toContain('workstr.fit/support');
-    expect(markup).toContain('The only donation path is a Nostr zap');
-    expect(markup).toContain('transparently');
-    expect(markup).toContain('verified NIP-57 zap receipts in the meter below');
+    expect(markup).toContain('Monthly target 85,000 sats');
     expect(markup).toContain('NIP-57');
 
     expect(markup).not.toContain('Plain Lightning and on-chain routes are not shown here');

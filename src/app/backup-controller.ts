@@ -67,7 +67,7 @@ export function createBackupController(ctx: BackupControllerContext): BackupCont
       if (localStorage.getItem(INTENT_KEY)) {
         localStorage.removeItem(INTENT_KEY);
         await enable();
-        ctx.toast('Auto-backup is on.');
+        ctx.toast('Auto-sync is on.');
         return;
       }
       if (ctx.state.settings.backup?.enabled) await engineFor()?.start();
@@ -87,7 +87,7 @@ export function createBackupController(ctx: BackupControllerContext): BackupCont
       if (!ctx.state.pubkey) {
         localStorage.setItem(INTENT_KEY, '1');
         ctx.render();
-        ctx.toast('Sign in to turn on backup.');
+        ctx.toast('Sign in to turn on sync.');
         ctx.requestSignIn();
         return;
       }

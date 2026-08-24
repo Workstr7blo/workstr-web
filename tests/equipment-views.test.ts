@@ -92,7 +92,7 @@ describe('My equipment settings panel', () => {
   it('summarises how many are selected, ignoring bodyweight', () => {
     expect(settingsState({ ownedEquipment: ['dumbbell', 'barbell'] })).toContain('2 selected');
     expect(settingsState({ ownedEquipment: ['dumbbell', 'body weight'] })).toContain('1 selected');
-    expect(settingsState()).toContain('not set');
+    expect(settingsState()).toContain('0 selected');
   });
 
   it('explains itself when nothing in the library lists equipment', () => {

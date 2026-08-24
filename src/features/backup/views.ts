@@ -43,15 +43,15 @@ export function statusPill(state: BackupPanelState): { label: string; ok: boolea
 }
 
 const PHASE_LABEL: Record<SyncProgress['phase'], string> = {
-  restore: 'Checking encrypted backup…',
+  restore: 'Checking encrypted sync…',
   prepare: 'Preparing local changes…',
-  upload: 'Backing up local changes…'
+  upload: 'Syncing local changes…'
 };
 
 const PHASE_DETAIL: Record<SyncProgress['phase'], string> = {
   restore: 'records checked',
   prepare: 'records queued',
-  upload: 'records backed up'
+  upload: 'records synced'
 };
 
 export function progressPercent(progress: SyncProgress): number {
@@ -73,10 +73,10 @@ export function statusLine(state: BackupPanelState): string {
   // A stalled signer with a retry seconds away is not something to hand the user a job
   // over: the connection is being rebuilt, which is the same thing tapping Sync now does.
   if (sync.state === 'error' && sync.reconnecting) return 'Reconnecting to your signer…';
-  if (sync.state === 'error') return sync.lastError || 'Backup could not reach the relay. It will retry on its own.';
+  if (sync.state === 'error') return sync.lastError || 'Sync could not reach the relay. It will retry on its own.';
   if (sync.state === 'syncing') return 'Syncing now…';
-  const pending = sync.pending > 0 ? `${sync.pending} change${sync.pending === 1 ? '' : 's'} waiting to upload. ` : '';
-  return `${pending}Last backup ${lastSyncLabel(sync.lastSyncAt)}.`;
+  const pending = sync.pending > 0 ? `${sync.pending} change${sync.pending === 1 ? '' : 's'} waiting to sync. ` : '';
+  return `${pending}Last synced ${lastSyncLabel(sync.lastSyncAt)}.`;
 }
 
 function progressMarkup(progress: SyncProgress | undefined): string {
@@ -90,31 +90,37 @@ function progressMarkup(progress: SyncProgress | undefined): string {
 
 export function backupPanel(state: BackupPanelState): string {
   const pill = statusPill(state);
-  const toggle = `<label class="equip-option"><input type="checkbox" id="auto-backup" ${state.enabled ? 'checked' : ''} />Auto-backup to the Workstr relay</label>`;
-  // Only shown once it is on: an explanation of syncing is noise to someone who has not
-  // turned it on, and a manual button is a fallback, not the normal path.
-  const live = state.enabled
-    ? `<div class="backup-live" id="backup-status"><p class="section-help">${html(statusLine(state))}</p>${progressMarkup(state.sync.progress)}</div>
-    <div class="web-empty-actions"><button id="sync-now" class="button ghost" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button></div>`
-    : '';
-  const explainer = state.signedIn
-    ? 'Your programs, workout history, body log and preferences are encrypted on this device and copied to the Workstr relay. Only your key can read them — the relay stores ciphertext it cannot open. Sign in on another device to restore. Turning this off stops the copying and leaves both sides intact.'
-    : 'Backup needs an identity: records are encrypted to your own key and signed by it. Turning this on takes you through sign-in first.';
   const localOnly = state.backup?.localOnlyHistoryCount ?? 0;
-  // Only when there is something to say, and only once backup is actually on. The count is
-  // the one fact the user cannot work out for themselves: which of their workouts this
-  // relay will never hold. The date is absolute — "started 12 min ago" reads as a status,
-  // and this is a boundary in their history, not a status.
   const eraLine = state.signedIn && state.enabled && localOnly > 0
-    ? `<p class="section-help">${localOnly} workout${localOnly === 1 ? '' : 's'} logged before ${html(startedOnLabel(state.backup?.v2StartedAt))} stay${localOnly === 1 ? 's' : ''} on this device only and ${localOnly === 1 ? 'is' : 'are'} not copied to the relay. Export to JSON to keep a full archive of those.</p>`
+    ? `<div class="settings-subtle-row"><span>Local-only older workouts</span><strong>${localOnly}</strong></div>`
     : '';
-  return `<div class="panel">
-    <div class="panel-head"><span>Backup</span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></div>
-    <p class="section-help">${html(explainer)}</p>
-    ${eraLine}
-    ${toggle}
+  const syncCopy = !state.signedIn
+    ? 'Sign in to turn on encrypted sync across devices.'
+    : state.enabled
+      ? 'Auto-sync is on. New training data is encrypted on this device and kept current through the Workstr relay.'
+      : 'Turn on encrypted sync to keep new training data current across devices.';
+  const syncAction = !state.signedIn
+    ? '<button id="enable-sync" class="button primary">Sign in to sync</button>'
+    : state.enabled
+      ? `<label class="settings-switch"><input type="checkbox" id="auto-backup" checked />Auto-sync</label><button id="sync-now" class="button ghost" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button>`
+      : '<button id="enable-sync" class="button primary">Turn on sync</button>';
+  const live = state.enabled
+    ? `<div class="backup-live" id="backup-status"><p class="section-help">${html(statusLine(state))}</p>${progressMarkup(state.sync.progress)}</div>${eraLine}`
+    : '';
+  const olderNote = state.signedIn && state.enabled && localOnly > 0
+    ? `<p class="section-help">Those older workouts stay on this device and are included when you export JSON.</p>`
+    : '';
+  return `<div class="panel settings-card data-sync-card">
+    <div class="panel-head"><span>Data &amp; Sync</span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></div>
+    <div class="settings-row-main">
+      <div><strong>Encrypted sync</strong><small>${html(syncCopy)}</small></div>
+      <div class="settings-row-actions">${syncAction}</div>
+    </div>
     ${live}
-    <p class="section-help">Or keep your own copy: export your whole library, programs, history, body log and settings to a JSON file, or restore from one. Import replaces everything in this account.</p>
-    <div class="web-empty-actions"><button id="export-data" class="button ghost">Export data</button><button id="import-data" class="button ghost">Import data…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
+    ${olderNote}
+    <div class="settings-row-main manual-backup-row">
+      <div><strong>Manual backup</strong><small>Export a full JSON archive, or import one. Import replaces everything in this account.</small></div>
+      <div class="settings-row-actions"><button id="export-data" class="button ghost">Export JSON</button><button id="import-data" class="button ghost">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
+    </div>
   </div>`;
 }

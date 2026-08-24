@@ -184,7 +184,7 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#remove-account-data')?.addEventListener('click', () => { void identity.signOutAndRemoveData(); });
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void preferences.saveUnitPreference((event.target as HTMLSelectElement).value); });
     root.querySelectorAll('.equip-toggle').forEach((box) => box.addEventListener('change', () => { void preferences.saveOwnedEquipment(); }));
-    root.querySelector('#auto-backup')?.addEventListener('change', (event) => { void backup.setEnabled((event.target as HTMLInputElement).checked); });
+    root.querySelector('#auto-backup')?.addEventListener('change', (event) => { void backup.setEnabled((event.target as HTMLInputElement).checked); }); root.querySelector('#enable-sync')?.addEventListener('click', () => { void backup.setEnabled(true); });
     root.querySelector('#sync-now')?.addEventListener('click', () => { void backup.syncNow(); });
     root.querySelector('#export-data')?.addEventListener('click', () => { void preferences.exportUserData(); });
     root.querySelector('#import-data')?.addEventListener('click', () => root.querySelector<HTMLInputElement>('#import-file')?.click());
