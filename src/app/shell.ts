@@ -178,7 +178,7 @@ export function renderShell(root: HTMLElement): void {
       void navigator.clipboard.writeText(button.dataset.copy || '')
         .then(() => toast('Copied'), () => toast('Could not copy', 'bad'));
     }));
-    root.querySelector('#sign-in-settings')?.addEventListener('click', identity.startRemoteSignerRequest);
+    root.querySelector('#create-account-settings')?.addEventListener('click', identity.startLocalAccount); root.querySelector('#restore-account-settings')?.addEventListener('click', identity.startRestoreLocalAccount); root.querySelector('#sign-in-settings')?.addEventListener('click', identity.startAccountChoice);
     root.querySelector('#sign-in-nip07')?.addEventListener('click', () => { void identity.connectNip07(); });
     root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void identity.signOut(); });
     root.querySelector('#remove-account-data')?.addEventListener('click', () => { void identity.signOutAndRemoveData(); });
@@ -372,7 +372,7 @@ export function renderShell(root: HTMLElement): void {
     getSigner: identity.getActiveSigner,
     onSignerStalled: identity.dropActiveSigner,
     onRestored: () => { void refreshFromStore(); },
-    requestSignIn: () => { void identity.startRemoteSignerRequest(); }
+    requestSignIn: () => { identity.startAccountChoice(); }
   });
 
   function unitLabel(): string { return normalizeWeightUnit(state.settings.unit); }

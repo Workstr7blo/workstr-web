@@ -2,9 +2,11 @@ import { renderSVG } from 'uqr';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
 import { clearCachedNip46Signer, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
+import { clearLocalKey, createCachedLocalKeySigner, createLocalAccount, importLocalAccount } from '../signer/local-key';
 import { forgetAutoApprove } from '../signer/auto-approve';
 import type { Signer } from '../signer/types';
 import type { AppState } from './state';
+import { html } from './format';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
@@ -35,6 +37,7 @@ export function createIdentityController(ctx: IdentityControllerContext) {
 async function signOut(): Promise<void> {
   activeSigner = null;
   clearCachedNip46Signer();
+  clearLocalKey();
   // It describes the permissions one connection was granted, not this device. The next
   // signer may prompt for everything, and retrying early at it would prompt twice.
   forgetAutoApprove();
@@ -106,6 +109,10 @@ async function getActiveSigner(): Promise<Signer | null> {
     activeSigner = createCachedNip46Signer(state.pubkey || undefined, { onAuthUrl: launchSignerRequest });
     return activeSigner;
   }
+  if (state.signerType === 'local') {
+    activeSigner = createCachedLocalKeySigner();
+    return activeSigner;
+  }
   return null;
 }
 
@@ -125,6 +132,7 @@ async function connectNip07(): Promise<void> {
     const signer = createNip07Signer();
     const pubkey = await signer.getPublicKey();
     activeSigner = signer;
+    clearLocalKey();
     await completeSignIn(pubkey, 'nip07');
   } catch (error) {
     state.signInStatus = `extension signer error ${(error as Error).message}`;
@@ -143,6 +151,7 @@ async function startRemoteSignerRequest(): Promise<void> {
     if (mobile) launchSignerRequest(request.uri);
     const connected = await request.signer;
     activeSigner = connected.signer;
+    clearLocalKey();
     closeModal();
     await completeSignIn(connected.pubkey, 'nip46');
   } catch (error) {
@@ -150,6 +159,74 @@ async function startRemoteSignerRequest(): Promise<void> {
     state.signInStatus = `signer error ${(error as Error).message}`;
     render();
   }
+}
+
+
+function startAccountChoice(): void {
+  openModal(`<div class="page-title">Create or connect account</div>
+    <p class="section-help">Use Workstr locally, create a fast encrypted sync account, or connect an existing Nostr signer.</p>
+    <div class="settings-auth-options">
+      <button id="create-local-account" class="button primary" type="button">Create encrypted sync account</button>
+      <button id="restore-local-account" class="button ghost" type="button">Restore with recovery key</button>
+      <button id="connect-remote-signer" class="button ghost" type="button">Use mobile signer</button>
+      ${hasNip07() ? '<button id="connect-extension-signer" class="button ghost" type="button">Use browser extension</button>' : ''}
+    </div>
+    <p class="section-help">Device-managed keys are convenient and faster for sync. A dedicated signer is more protected if you already use one.</p>`);
+  root.querySelector('#create-local-account')?.addEventListener('click', createLocalAccountFlow);
+  root.querySelector('#restore-local-account')?.addEventListener('click', showRestoreLocalAccountModal);
+  root.querySelector('#connect-remote-signer')?.addEventListener('click', () => { closeModal(); void startRemoteSignerRequest(); });
+  root.querySelector('#connect-extension-signer')?.addEventListener('click', () => { closeModal(); void connectNip07(); });
+}
+
+function createLocalAccountFlow(): void {
+  try {
+    const account = createLocalAccount();
+    activeSigner = account.signer;
+    showRecoveryKeyModal(account.pubkey, account.nsec);
+  } catch (error) {
+    state.signInStatus = `local account error ${(error as Error).message}`;
+    render();
+  }
+}
+
+function showRecoveryKeyModal(pubkey: string, nsec: string): void {
+  openModal(`<div class="page-title">Save your recovery key</div>
+    <p class="section-help">This key restores your encrypted training data on another device. Workstr cannot recover it for you. Store it in a password manager and never share it.</p>
+    <div class="terminal-mini recovery-key-box">${html(nsec)}</div>
+    <div class="web-empty-actions">
+      <button id="copy-recovery-key" class="button ghost" type="button">Copy recovery key</button>
+      <button id="continue-local-account" class="button primary" type="button">I saved it</button>
+    </div>
+    <p class="section-help">Workstr saves this key only in this browser profile on this device. This is convenient, but less protected than a dedicated signer.</p>`);
+  root.querySelector('#copy-recovery-key')?.addEventListener('click', (event) => {
+    void navigator.clipboard.writeText(nsec);
+    (event.currentTarget as HTMLButtonElement).textContent = 'Copied';
+  });
+  root.querySelector('#continue-local-account')?.addEventListener('click', () => { closeModal(); void completeSignIn(pubkey, 'local'); });
+}
+
+function showRestoreLocalAccountModal(): void {
+  openModal(`<div class="page-title">Restore with recovery key</div>
+    <p class="section-help">Paste an nsec recovery key. It stays in this browser profile on this device so sync can run without signer prompts.</p>
+    <textarea id="local-key-input" class="auth-key-input" rows="4" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="nsec1..."></textarea>
+    <p class="section-help">Only use this on a device you trust. For maximum key protection, use a dedicated signer instead.</p>
+    <div class="web-empty-actions">
+      <button id="restore-local-key" class="button primary" type="button">Use this key</button>
+      <button id="restore-use-signer" class="button ghost" type="button">Use signer instead</button>
+    </div>`);
+  root.querySelector('#restore-local-key')?.addEventListener('click', () => {
+    const input = root.querySelector<HTMLTextAreaElement>('#local-key-input')?.value || '';
+    try {
+      const account = importLocalAccount(input);
+      activeSigner = account.signer;
+      closeModal();
+      void completeSignIn(account.pubkey, 'local');
+    } catch (error) {
+      state.signInStatus = `recovery key error ${(error as Error).message}`;
+      showRestoreLocalAccountModal();
+    }
+  });
+  root.querySelector('#restore-use-signer')?.addEventListener('click', () => { closeModal(); void startRemoteSignerRequest(); });
 }
 
 function showSignerConnectModal(uri: string, mobile: boolean): void {
@@ -185,7 +262,7 @@ async function openAndRender(pubkey: string, signerType: AppState['signerType'] 
   render();
 }
   return {
-    signOut, signOutAndRemoveData, connectNip07, startRemoteSignerRequest, getActiveSigner, dropActiveSigner,
+    signOut, signOutAndRemoveData, connectNip07, startRemoteSignerRequest, startAccountChoice, startLocalAccount: createLocalAccountFlow, startRestoreLocalAccount: showRestoreLocalAccountModal, getActiveSigner, dropActiveSigner,
     renderIfPending: () => { if (pendingConnect) renderConnectModal(); },
     clearPending: () => { pendingConnect = null; }
   };

@@ -27,6 +27,9 @@
 .connection-chip.ok { border-color: rgba(0, 208, 132, 0.32); }
 .connection-chip.error { border-color: rgba(255, 56, 100, 0.32); }
 .web-empty-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.settings-auth-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.auth-key-input { margin-top: 14px; min-height: 96px; font: 700 13px/1.5 ui-monospace, monospace; resize: vertical; }
+.recovery-key-box { user-select: all; }
 .backup-live { margin-top: 8px; }
 .backup-live .section-help { margin-bottom: 8px; }
 .backup-progress { height: 7px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.075); border: 1px solid rgba(188,151,255,.12); }
@@ -163,6 +166,7 @@
 
 @media (max-width: 700px) {
   input, textarea, select, button { font-size: 16px; }
+  .settings-auth-options { grid-template-columns: 1fr; }
   .support-panel { padding: 20px; }
   .support-hero-row { grid-template-columns: 42px minmax(0,1fr); gap: 12px; }
   .support-bolt { width: 40px; height: 40px; border-radius: 13px; font-size: 21px; }

@@ -50,7 +50,7 @@ or set updates would make full-root rendering inappropriate.
 | Exercise library UI | `src/features/library/views.ts` | shell library handlers, `src/app/format.ts`, `src/db/store.ts` | `tests/equipment-views.test.ts`, `tests/shell.test.ts`, `tests/store.test.ts` |
 | Discover exercise/program UI | `src/features/discover/views.ts` | `src/nostr/canon.ts`, `programImport.ts`, shell import handlers | `tests/discover.test.ts`, `tests/canon.test.ts`, `tests/programImport.test.ts` |
 | Catalog event parsing/fetch/cache | `src/nostr/canon.ts` | `src/nostr/pool.ts`, `src/core/types.ts` | `tests/canon.test.ts` |
-| NIP-07 signing | `src/signer/nip07.ts` | `src/signer/types.ts` | shell/share tests use fakes |
+| NIP-07 signing and device-local keys | `src/signer/nip07.ts`, `src/signer/local-key.ts` | `src/signer/types.ts` | `tests/local-key-signer.test.ts`, shell/share tests use fakes |
 | NIP-46 remote signing | `src/signer/nip46.ts` | `src/signer/types.ts`, shell sign-in flow | `tests/shell.test.ts` plus browser validation |
 | Workout-summary event and relay publish | `src/nostr/share.ts` | `src/features/train/session-summary.ts`, signer contract | `tests/share.test.ts` |
 | Zap receipts and support totals | `src/nostr/zaps.ts` | `src/core/funding.ts`, `src/features/support/views.ts` | `tests/zaps.test.ts`, `tests/support-views.test.ts` |
@@ -169,7 +169,8 @@ targets, or muscle metadata solely from the current exercise library.
 
 - `src/signer/types.ts` is the common signing/encryption contract.
 - `nip07.ts` wraps `window.nostr`; `nip46.ts` owns remote/bunker connections and cached
-  connection metadata.
+  connection metadata; `local-key.ts` owns device-managed NSEC signup/restore and keeps
+  that key local to this browser profile.
 - `src/nostr/share.ts` builds and publishes public workout summaries, requiring actual
   relay acknowledgement/verification before reporting success.
 - Local training must remain usable when every relay operation fails.

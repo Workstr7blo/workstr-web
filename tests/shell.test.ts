@@ -24,8 +24,11 @@ describe('shell', () => {
     expect(settings?.textContent).toContain('Support Workstr');
     expect(settings?.querySelector('.advanced-settings:not([open])')).toBeTruthy();
     expect(settings?.querySelector('.account-card .terminal-mini')).toBeNull();
+    expect(settings?.querySelector('#create-account-settings')).toBeTruthy();
+    expect(settings?.querySelector('#restore-account-settings')).toBeTruthy();
     expect(settings?.querySelector('#enable-sync')).toBeTruthy();
     expect(settings?.querySelector('#auto-backup')).toBeNull();
+    expect(settings?.textContent).toContain('Create sync account');
     expect(settings?.textContent).toContain('Manual backup');
     expect(settings?.textContent).toContain('0 selected');
   });

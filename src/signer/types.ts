@@ -13,7 +13,7 @@ export interface SignedNostrEvent extends UnsignedNostrEvent {
 }
 
 export interface Signer {
-  readonly type: 'nip07' | 'nip46' | 'idenstr';
+  readonly type: 'nip07' | 'nip46' | 'idenstr' | 'local';
   getPublicKey(): Promise<string>;
   signEvent(event: UnsignedNostrEvent): Promise<SignedNostrEvent>;
   nip44Encrypt(peerPubkey: string, plaintext: string): Promise<string>;

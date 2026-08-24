@@ -172,9 +172,10 @@ function equipmentRows(state: AppState): string {
 
 function settingsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
+  const keyLine = state.signerType === 'local' ? 'Device-managed key for faster sync.' : 'Keys stay in your signer.';
   const account = state.pubkey
-    ? `<div class="settings-row-main account-row"><div><strong>${html(displayIdentity(state))}</strong><small>Keys stay in your signer.</small></div><div class="settings-row-actions"><button id="sign-out-settings" class="button ghost">Sign out</button><button id="remove-account-data" class="button ghost">Remove data</button></div></div>`
-    : `<div class="settings-row-main account-row"><div><strong>Local only</strong><small>Saved on this device.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Sign in with signer</button>${hasNip07() ? '<button id="sign-in-nip07" class="button ghost">Use extension</button>' : ''}</div></div>`;
+    ? `<div class="settings-row-main account-row"><div><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></div><div class="settings-row-actions"><button id="sign-out-settings" class="button ghost">Sign out</button><button id="remove-account-data" class="button ghost">Remove data</button></div></div>`
+    : `<div class="settings-row-main account-row"><div><strong>Local only</strong><small>Use Workstr now, add encrypted sync when ready.</small></div><div class="settings-row-actions"><button id="create-account-settings" class="button primary">Create sync account</button><button id="restore-account-settings" class="button ghost">Restore account</button><button id="sign-in-settings" class="button ghost">Signer options</button>${hasNip07() ? '<button id="sign-in-nip07" class="button ghost">Use extension</button>' : ''}</div></div>`;
   const relay = state.settings.workstrRelay || 'default Workstr relay';
   const signerType = state.signerType || (state.pubkey ? 'unknown' : 'none');
   return `<div class="page active settings-page"><div class="page-title">Settings</div>
