@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { execFile } from 'node:child_process';
-import { resolve } from 'node:path';
-import { ACCEPTED_KIND, REQUIRED_D_PREFIX, createLedger, decide, handleLine } from '../relay/write-policy.mjs';
+import { PassThrough, Readable } from 'node:stream';
+import { ACCEPTED_KIND, REQUIRED_D_PREFIX, createLedger, decide, handleLine, runPolicy } from '../relay/write-policy.mjs';
 import { ledgerFromEvents } from '../relay/relay-admin.mjs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-
-// jsdom gives import.meta.url an http origin, so resolve from the vitest root instead.
-const PLUGIN = resolve('relay/write-policy.mjs');
 
 function event(overrides: Record<string, unknown> = {}) {
   return {
@@ -129,13 +125,16 @@ describe('strfry line protocol', () => {
 });
 
 describe('plugin process', () => {
-  // Drives the real executable the way strfry does, so a break in the stdin loop,
-  // the shebang, or the import-guard is caught here rather than on the relay.
-  function run(lines: string[]): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const child = execFile('node', [PLUGIN], (error, stdout) => (error ? reject(error) : resolve(stdout)));
-      child.stdin?.end(lines.join('\n') + '\n');
-    });
+  // Drives the exact stream loop used by the executable. Keeping this in-process makes
+  // the protocol test reliable in sandboxes that suppress nested Node executables.
+  async function run(lines: string[]): Promise<string> {
+    const output = new PassThrough();
+    let stdout = '';
+    output.setEncoding('utf8');
+    output.on('data', (chunk) => { stdout += chunk; });
+    const input = runPolicy(Readable.from(lines.map((line) => line + '\n')), output, createLedger().load());
+    await new Promise<void>((resolve) => input.once('close', resolve));
+    return stdout;
   }
 
   it('streams a decision per request and survives junk between them', async () => {

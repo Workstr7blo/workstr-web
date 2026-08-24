@@ -19,9 +19,9 @@
 // rejections. strfry waits `relay.writePolicy.timeoutSeconds` for each response.
 
 import { createInterface } from 'node:readline';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 export const ACCEPTED_KIND = 30078;
 export const REQUIRED_D_PREFIX = 'workstr:v2:';
@@ -271,6 +271,17 @@ function numberFromEnv(name, fallback) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+export function runPolicy(inputStream, outputStream, ledger) {
+  const input = createInterface({ input: inputStream, terminal: false });
+  input.on('line', (line) => {
+    const response = handleLine(line, ledger);
+    if (response !== null) outputStream.write(response + '\n');
+  });
+  // The debounced write may still be pending when strfry stops the plugin.
+  input.on('close', () => ledger.flush());
+  return input;
+}
+
 function main() {
   const ledger = createLedger({
     stateDir: process.env.WORKSTR_POLICY_STATE || null,
@@ -281,14 +292,11 @@ function main() {
   // Nothing here prints a path or a pubkey: this goes to the container log.
   process.stderr.write(`[write-policy] ready, tracking ${ledger.snapshot().authors.length} author(s)\n`);
 
-  const input = createInterface({ input: process.stdin, terminal: false });
-  input.on('line', (line) => {
-    const response = handleLine(line, ledger);
-    if (response !== null) process.stdout.write(response + '\n');
-  });
-  // The debounced write may still be pending when strfry stops the plugin.
-  input.on('close', () => ledger.flush());
+  runPolicy(process.stdin, process.stdout, ledger);
   for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => { ledger.flush(); process.exit(0); });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+// Compare normalized filesystem paths rather than URL strings. Node may preserve a
+// relative or otherwise differently encoded argv path when the plugin is launched as a
+// child process, even though both values name the same executable file.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

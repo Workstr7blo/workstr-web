@@ -76,3 +76,8 @@ export declare function decide(event: PolicyEvent | null | undefined, limits?: P
 
 /** Returns the response line for one strfry request line, or null when none is owed. */
 export declare function handleLine(line: string, ledger?: Ledger | null): string | null;
+export declare function runPolicy(
+  inputStream: NodeJS.ReadableStream,
+  outputStream: NodeJS.WritableStream,
+  ledger: Ledger
+): import('node:readline').Interface;
