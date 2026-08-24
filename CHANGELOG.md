@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Mobile signer connection waits until Workstr is listening on the Nostr Connect relay.** This avoids the loop where Clave shows a successful Connect activity, but Workstr misses the answer and returns to Settings still signed out.
+
 - **Backup no longer pauses for 45 seconds at a time on a remote signer.** A signer's answer
   can go missing on its way back — it is published before the app is listening again, and
   the app then waits out its whole timeout before trying once more, even though the signer

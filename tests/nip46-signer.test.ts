@@ -129,4 +129,23 @@ describe('what the app asks a signer for', () => {
     expect(perms.split(',')).toEqual(SIGNER_PERMS);
     request.signer.catch(() => {});
   });
+
+  it('exposes relay readiness so mobile does not launch the signer before the subscription is listening', async () => {
+    let openTheRelay = (): void => {};
+    const opened = new Promise<void>((resolve) => { openTheRelay = resolve; });
+    const ensure = vi.spyOn(SimplePool.prototype, 'ensureRelay')
+      .mockImplementation((() => opened.then(() => ({ subscribe: () => ({ close: () => {} }), publish: async () => 'ok' }))) as never);
+
+    const request = createNostrConnectSignerRequest(['wss://relay.test']);
+    request.signer.catch(() => {});
+    let ready = false;
+    void request.ready.then(() => { ready = true; });
+    for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
+    expect(ready).toBe(false);
+
+    openTheRelay();
+    for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+    expect(ready).toBe(true);
+    ensure.mockRestore();
+  });
 });

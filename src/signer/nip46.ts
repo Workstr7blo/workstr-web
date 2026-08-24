@@ -43,6 +43,7 @@ interface CachedConnection {
 interface NostrConnectRequest {
   uri: string;
   relays: string[];
+  ready: Promise<void>;
   signer: Promise<ConnectedBunkerSigner>;
 }
 
@@ -177,9 +178,11 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
     perms: SIGNER_PERMS
   });
   const pool = new SimplePool();
+  const ready = openRelays(pool, cleanRelays);
   return {
     uri,
     relays: cleanRelays,
+    ready,
     signer: BunkerSigner.fromURI(secret, uri, { pool, onauth: options.onAuthUrl }, 300000).then((signer) => {
       cacheConnection(secret, signer.bp);
       return {

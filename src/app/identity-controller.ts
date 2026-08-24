@@ -148,6 +148,7 @@ async function startRemoteSignerRequest(): Promise<void> {
     state.signInStatus = `waiting for signer approval on ${request.relays.join(', ')}`;
     render();
     showSignerConnectModal(request.uri, mobile);
+    await request.ready;
     if (mobile) launchSignerRequest(request.uri);
     const connected = await request.signer;
     activeSigner = connected.signer;
