@@ -95,10 +95,10 @@ export function backupPanel(state: BackupPanelState): string {
     ? `<div class="settings-subtle-row"><span>Local-only older workouts</span><strong>${localOnly}</strong></div>`
     : '';
   const syncCopy = !state.signedIn
-    ? 'Sign in to turn on encrypted sync across devices.'
+    ? 'Sign in to sync across devices.'
     : state.enabled
-      ? 'Auto-sync is on. New training data is encrypted on this device and kept current through the Workstr relay.'
-      : 'Turn on encrypted sync to keep new training data current across devices.';
+      ? 'Encrypted across your devices.'
+      : 'Keep training current across devices.';
   const syncAction = !state.signedIn
     ? '<button id="enable-sync" class="button primary">Sign in to sync</button>'
     : state.enabled
@@ -119,7 +119,7 @@ export function backupPanel(state: BackupPanelState): string {
     ${live}
     ${olderNote}
     <div class="settings-row-main manual-backup-row">
-      <div><strong>Manual backup</strong><small>Export a full JSON archive, or import one. Import replaces everything in this account.</small></div>
+      <div><strong>Manual backup</strong><small>Export or import a full JSON archive.</small></div>
       <div class="settings-row-actions"><button id="export-data" class="button ghost">Export JSON</button><button id="import-data" class="button ghost">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
     </div>
   </div>`;

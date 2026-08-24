@@ -346,6 +346,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .terminal-mini { margin-top: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 16px; background: rgba(0,0,0,.32); color: #d7caf7; font: 13px/1.6 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .settings-page .panel { margin: 12px 0; }
 .settings-row-main, .settings-details > summary { display: flex; justify-content: space-between; gap: 14px; align-items: center; padding: 13px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,.03); }
+.settings-row-main > div:first-child { min-width: 0; }
 .settings-row-main strong, .settings-details > summary span { display: block; color: var(--text); font-weight: 850; }
 .settings-row-main small, .settings-details > summary small { display: block; color: var(--muted); margin-top: 4px; line-height: 1.4; }
 .settings-row-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
@@ -650,4 +651,23 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
   .content { left: 0; bottom: calc(58px + env(safe-area-inset-bottom)); padding-bottom: 24px; }
   /* sit above the bottom nav bar instead of behind it */
   .bulk-bar { left: 0; bottom: calc(58px + env(safe-area-inset-bottom)); padding-bottom: 12px; }
+}
+
+@media (max-width: 700px) {
+  .settings-page .panel { margin: 10px 0; padding: 18px; }
+  .settings-row-main { align-items: stretch; flex-direction: column; gap: 12px; padding: 14px; }
+  .settings-row-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); justify-content: stretch; width: 100%; }
+  .settings-row-actions .button, .settings-switch { justify-content: center; width: 100%; min-width: 0; }
+  .settings-switch { padding: 12px 10px; }
+  .settings-switch input { flex: 0 0 auto; }
+  .settings-row-main small { max-width: 34ch; }
+  .data-sync-card .settings-row-actions, .manual-backup-row .settings-row-actions { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 430px) {
+  .settings-page .panel { padding: 16px; border-radius: 22px; }
+  .settings-row-main { border-radius: 15px; }
+  .settings-row-main strong { font-size: 18px; line-height: 1.08; }
+  .settings-row-main small { font-size: 14px; line-height: 1.35; }
+  .settings-row-actions { gap: 8px; }
 }
