@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { SimplePool } from 'nostr-tools';
+import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import { encrypt as nip44EncryptPayload, getConversationKey } from 'nostr-tools/nip44';
+import { BunkerSigner } from 'nostr-tools/nip46';
 import { SIGNER_PERMS, createCachedNip46Signer, createNostrConnectSignerRequest } from '../src/signer/nip46';
 
 const CLIENT_SECRET = '11'.repeat(32);
@@ -147,5 +150,25 @@ describe('what the app asks a signer for', () => {
     for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
     expect(ready).toBe(true);
     ensure.mockRestore();
+  });
+
+  it('recovers a connect response that arrived while the live subscription was closed', async () => {
+    const bunkerSecret = generateSecretKey();
+    const fromURI = vi.spyOn(BunkerSigner, 'fromURI').mockRejectedValue(new Error('subscription closed before connection was established.'));
+    const fromBunker = vi.spyOn(BunkerSigner, 'fromBunker').mockImplementation(((_secret: Uint8Array, bp: { pubkey: string }) => ({ bp, switchRelays: async () => false })) as never);
+    let request!: ReturnType<typeof createNostrConnectSignerRequest>;
+    const query = vi.spyOn(SimplePool.prototype, 'querySync').mockImplementation((async (_relays: string[], filter: Record<string, unknown>) => {
+      const clientPubkey = (filter['#p'] as string[])[0];
+      const secret = new URL(request.uri).searchParams.get('secret') || '';
+      const content = nip44EncryptPayload(JSON.stringify({ result: secret }), getConversationKey(bunkerSecret, clientPubkey));
+      return [finalizeEvent({ kind: 24133, created_at: Math.floor(Date.now() / 1000), tags: [['p', clientPubkey]], content }, bunkerSecret)];
+    }) as never);
+
+    request = createNostrConnectSignerRequest(['wss://relay.test']);
+    await expect(request.signer).resolves.toMatchObject({ pubkey: getPublicKey(bunkerSecret) });
+    expect(fromBunker).toHaveBeenCalled();
+    fromURI.mockRestore();
+    fromBunker.mockRestore();
+    query.mockRestore();
   });
 });
