@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { collectRecords, resolveRecord, runBackfill, seedJournal } from '../src/sync/backfill';
-import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
-import { parseSessionsId } from '../src/sync/addresses';
-import { MAX_BUNDLE_BYTES, sessionsBundleRecords, sessionUpdatedAt, syncedSettings, type SessionsBundlePayload } from '../src/sync/records';
+import { SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
+import { sessionUpdatedAt, syncedSettings } from '../src/sync/records';
 
 let namespace = 0;
 async function freshStore(): Promise<WorkstrStore> {
@@ -31,7 +30,7 @@ describe('record collection', () => {
     // Neither workout history nor the body log is here: it travels in the append-only log, packed at push time.
     const uid = (await store.getSession(sessionId))!.uid!;
     expect(addresses).not.toContain(sessionAddress(uid));
-    expect(addresses).not.toContain(sessionsAddress('2026-08'));
+    expect(addresses.some((address) => address.includes(':sessions:'))).toBe(false);
     expect(addresses.some((address) => address.startsWith('workstr:v1:'))).toBe(false);
 
     // Autoincrement keys are meaningless on another device.
@@ -87,55 +86,6 @@ describe('record collection', () => {
       [{ session_id: 1, set_number: 1, reps: 5, completed_at: '2026-08-01T12:00:00.000Z' }]
     );
     expect(stamp).toBe('2026-08-01T12:00:00.000Z');
-  });
-});
-
-describe('a month too heavy for one event', () => {
-  // strfry refuses an event over its size limit, so a month has to be split before it is
-  // encrypted rather than discovered to be too big at the relay.
-  function month(days: number, setsPerDay: number) {
-    const entries = [];
-    for (let day = 1; day <= days; day += 1) {
-      const date = `2026-08-${String(day).padStart(2, '0')}`;
-      entries.push({
-        session: { id: day, uid: `uid-${day}`, started_at: `${date}T10:00:00.000Z`, sheet_name: 'Upper Body Hypertrophy Block A' },
-        sets: Array.from({ length: setsPerDay }, (_unused, n) => ({
-          session_id: day, exercise_slug: 'barbell-bench-press-medium-grip', set_number: n + 1,
-          reps: 8, weight_kg: 82.5, completed_at: `${date}T10:${String(n + 1).padStart(2, '0')}:00.000Z`
-        }))
-      });
-    }
-    return entries;
-  }
-
-  it('splits into parts that each fit, and leaves a light month whole', async () => {
-    const heavy = sessionsBundleRecords('2026-08', month(24, 24));
-    expect(heavy.length).toBeGreaterThan(1);
-    expect(heavy[0].address).toBe(sessionsAddress('2026-08'));
-    expect(heavy[1].address).toBe(sessionsAddress('2026-08', 2));
-    for (const part of heavy) expect(JSON.stringify(part.payload).length).toBeLessThan(MAX_BUNDLE_BYTES * 1.2);
-    // Nothing is lost in the split.
-    expect(heavy.flatMap((part) => (part.payload as SessionsBundlePayload).items)).toHaveLength(24);
-
-    const light = sessionsBundleRecords('2026-08', month(4, 6));
-    expect(light).toHaveLength(1);
-    expect(light[0].address).toBe(sessionsAddress('2026-08'));
-  });
-
-  // The point of packing chronologically: training today must not rewrite, and re-upload,
-  // every part of the month behind it.
-  it('leaves the earlier parts untouched when a session is added', async () => {
-    const before = sessionsBundleRecords('2026-08', month(24, 24));
-    const after = sessionsBundleRecords('2026-08', month(25, 24));
-    expect(after.length).toBeGreaterThanOrEqual(before.length);
-    for (let index = 0; index < before.length - 1; index += 1) {
-      expect(JSON.stringify(after[index])).toBe(JSON.stringify(before[index]));
-    }
-  });
-
-  it('reads a part address back as its month', () => {
-    expect(parseSessionsId('2026-08')).toEqual({ month: '2026-08', part: 1 });
-    expect(parseSessionsId('2026-08-p3')).toEqual({ month: '2026-08', part: 3 });
   });
 });
 
@@ -195,7 +145,7 @@ describe('change tracking', () => {
     const addresses = seen.map((entry) => entry.address);
     expect(addresses).toContain(sheetAddress('push-day'));
     expect(addresses).toContain(`log:${uid}`);
-    expect(addresses).not.toContain(sessionsAddress('2026-08'));
+    expect(addresses.some((address) => address.includes(':sessions:'))).toBe(false);
     // A weigh-in reports the date it belongs to, not the whole collection.
     expect(addresses).toContain('body:2026-08-02');
     expect(addresses).toContain(SETTINGS_ADDRESS);

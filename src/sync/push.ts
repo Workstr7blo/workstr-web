@@ -2,8 +2,7 @@ import { SimplePool } from 'nostr-tools';
 import type { WorkstrStore } from '../db/store';
 import type { Signer } from '../signer/types';
 import type { RecordCipher } from '../nostr/codecs30078';
-import { loadSessionEntries, resolveMonthRecords, resolveRecord, type SessionEntry } from './backfill';
-import { parseAddress, parseSessionsId, sessionsAddress } from './addresses';
+import { loadSessionEntries, resolveRecord, type SessionEntry } from './backfill';
 import { publishRecord, type PublishOutcome } from './relay';
 import type { PrivateRecord } from '../nostr/codecs30078';
 
@@ -33,43 +32,11 @@ export interface PushOptions {
 // a signer that is genuinely away costs minutes of timeouts before it says so.
 const MAX_RECONNECTS = 6;
 
-// What one queue entry actually publishes as, and the timestamp that covers it. A month
-// resolves to its parts; everything else is a single record. `updatedAt` is what the
-// dequeue is checked against, so it has to describe the whole entry, not one part of it.
-// Part addresses already on the relay for this month that the month no longer fills. A
-// month shrinks when sessions are deleted from it, and a part it has stopped writing would
-// otherwise sit on the relay forever holding sessions that no longer exist.
-function orphanedParts(published: Iterable<string>, month: string, keep: number): string[] {
-  const orphans: string[] = [];
-  for (const address of published) {
-    const parsed = parseAddress(address);
-    if (parsed?.kind !== 'sessions') continue;
-    const part = parseSessionsId(String(parsed.id));
-    if (part.month === month && part.part > keep) orphans.push(address);
-  }
-  return orphans.sort();
-}
-
 async function recordsFor(
   store: WorkstrStore,
   entry: { address: string; updated_at: string },
-  sessions: SessionEntry[],
-  published: Iterable<string>
+  sessions: SessionEntry[]
 ): Promise<{ records: PrivateRecord[]; updatedAt: string }> {
-  const parsed = parseAddress(entry.address);
-  if (parsed?.kind === 'sessions') {
-    const { month } = parseSessionsId(String(parsed.id));
-    const parts = await resolveMonthRecords(store, month, sessions);
-    const updatedAt = parts.length > 0
-      ? parts.reduce((latest, part) => (part.updatedAt > latest ? part.updatedAt : latest), parts[0].updatedAt)
-      : entry.updated_at;
-    const records: PrivateRecord[] = parts.map((part) => ({ address: part.address, updatedAt: part.updatedAt, payload: part.payload }));
-    // An emptied month tombstones its first part too, since nothing is left to overwrite it.
-    const retired = new Set(orphanedParts(published, month, parts.length));
-    if (parts.length === 0) retired.add(sessionsAddress(month));
-    for (const address of retired) records.push({ address, updatedAt, deleted: true });
-    return { records, updatedAt };
-  }
   const snapshot = await resolveRecord(store, entry.address, sessions);
   // Gone locally means deleted: publish a tombstone rather than dropping the entry,
   // because an addressable event cannot be withdrawn from an open relay.
@@ -91,17 +58,10 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, cipher: Rec
   // and `dequeueSync` refuses to clear an entry newer than what was actually published,
   // so a snapshot taken here can never swallow a change made during the upload.
   const sessions = await loadSessionEntries(store);
-  // What this device has already put on the relay, by address. A month reads it twice: to
-  // find the parts it published when it was bigger than it is now, and to skip the parts
-  // it has already sent unchanged.
+  // What this device has already put on the relay, by address.
   const seen = new Map((await store.listSeen()).map((entry) => [entry.address, entry]));
-  const published = new Set(seen.keys());
 
-  // Counted in records rather than queue entries. A month is several records and each one
-  // is two signer round trips, so counting entries meant a heavy month reported nothing at
-  // all for minutes: the status line said "Syncing now…" with no count beside it, which
-  // reads exactly like a hang. The total grows as months are resolved, because how many
-  // records a month becomes is not known until it is packed.
+  // Counted in records so the status reflects accepted relay writes.
   let sent = 0;
   const report = (remainingEntries: number, remainingHere: number): void =>
     options.onProgress?.(sent, sent + remainingHere + remainingEntries);
@@ -113,34 +73,21 @@ export async function pushQueue(store: WorkstrStore, signer: Signer, cipher: Rec
 
   try {
     for (const [index, entry] of batch.entries()) {
-      const { records, updatedAt } = await recordsFor(store, entry, sessions, published);
+      const { records, updatedAt } = await recordsFor(store, entry, sessions);
       report(batch.length - index - 1, records.length);
       let complete = true;
       let signerIsGone = false;
 
-      // A month can publish as more than one event. The queue entry clears only when all
-      // of them are in, so an interrupted month is retried whole rather than left half
-      // uploaded with nothing recording which half made it.
       for (const [position, record] of records.entries()) {
-        // Already on the relay, unchanged since it went there. A month of real training is
-        // several parts and each one costs two signer round trips, so without this a month
-        // that ran out of time or lost its connection partway restarted from part one every
-        // pass — re-sending what had already landed and never reaching the end. Earlier
-        // parts stay byte-identical as a month grows, which is why they are packed
-        // chronologically, so an unchanged timestamp really does mean an unchanged record.
+        // Already on the relay, unchanged since it went there.
         if (seen.get(record.address)?.updated_at === record.updatedAt) {
-          // A part already on the relay still counts as done, so a resumed month picks up
-          // its progress where it left off rather than starting the count over. Tombstones
-          // are records too: if a retired part's deletion already landed, do not ask the
-          // signer to publish that same deletion again on every retry.
           sent += 1;
           report(batch.length - index - 1, records.length - position - 1);
           continue;
         }
         let outcome = await publishRecord(active, cipher, relayUrl, record, pool, false);
-        // A silent signer is usually a closed socket rather than an absent user, and the
-        // record after it would meet the same one. Rebuild and try this record once more:
-        // one press of Sync now should upload a month, not one record of it.
+        // A silent signer is usually a closed socket rather than an absent user. Rebuild
+        // and retry this record once before leaving it queued.
         if (!outcome.accepted && outcome.failure === 'signer' && options.renewSigner && reconnects < MAX_RECONNECTS) {
           reconnects += 1;
           const renewed = await options.renewSigner();

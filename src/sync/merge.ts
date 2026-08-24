@@ -5,7 +5,7 @@ import { decodePrivateRecord, type DecodedPrivateRecord, type RecordCipher } fro
 import { fetchRecords } from './relay';
 import { resolveRecord } from './backfill';
 import { parseAddress, sessionAddress } from './addresses';
-import { sessionUpdatedAt, type SessionsBundlePayload, type SyncedSettings } from './records';
+import { sessionUpdatedAt, type SyncedSettings } from './records';
 import { isLogEntry, type ChunkPayload } from './chunks';
 
 export interface MergeSummary {
@@ -91,9 +91,7 @@ async function localUpdatedAt(store: WorkstrStore, address: string, pending: Map
   const queued = pending.get(address);
   if (queued) return queued;
   // Singletons are rebuilt with a read timestamp, which says nothing about when they last
-  // changed, and a month bundle is compared one session at a time rather than as a whole.
-  // Only per-row records carry a timestamp worth comparing — and asking for any of the
-  // others would rebuild the record just to throw the answer away.
+  // changed. Only per-row records carry a timestamp worth comparing.
   const kind = parseAddress(address)?.kind;
   if (kind !== 'sheet' && kind !== 'session') return null;
   const snapshot = await resolveRecord(store, address);
@@ -128,52 +126,6 @@ async function applySessionPayload(store: WorkstrStore, uid: string, raw: unknow
 
 async function applySession(store: WorkstrStore, record: DecodedPrivateRecord): Promise<void> {
   await applySessionPayload(store, String(record.parsed.id), record.payload);
-}
-
-// A month bundle is merged one session at a time rather than as a whole. Two devices that
-// both train in the same month write the same address, so taking the newer event entire
-// would delete whatever the other device logged that month. Each session carries its own
-// timestamp precisely so this comparison can be made per session.
-async function applySessionsBundle(
-  store: WorkstrStore,
-  record: DecodedPrivateRecord,
-  pending: Map<string, string>,
-  tombstoned: Map<string, string>,
-  summary: MergeSummary
-): Promise<void> {
-  const payload = record.payload as SessionsBundlePayload | undefined;
-  if (!payload?.items?.length) return;
-  // Read once per bundle. Every uid in a bundle is distinct, so no item can be invalidated
-  // by another item's write, and looking each one up against the whole session table was
-  // quadratic on exactly the full-history restore this exists to make fast.
-  const held = new Map((await store.listSessions()).filter((session) => session.uid).map((session) => [String(session.uid), session]));
-  for (const item of payload.items) {
-    if (!item?.uid || typeof item.updatedAt !== 'string') { summary.skipped += 1; continue; }
-    // Deleted through its own address after this part was written. A part the relay kept
-    // when its month shrank below the split threshold still lists sessions that are gone,
-    // and without this the resurrection would come down to which record merged first.
-    const buried = tombstoned.get(item.uid);
-    if (buried && buried >= item.updatedAt) { summary.skipped += 1; continue; }
-    const existing = held.get(item.uid);
-    if (!existing || existing.id == null) {
-      // Queued against the session's own address with nothing behind it locally: this
-      // device has deleted the session and not yet uploaded the tombstone. Writing the
-      // session back would undo a deletion the user has already made.
-      if (item.deleted || pending.has(sessionAddress(item.uid))) { summary.skipped += 1; continue; }
-      await applySessionPayload(store, item.uid, item.payload);
-      summary.applied += 1;
-      continue;
-    }
-    const local = sessionUpdatedAt(existing, await store.listSessionSets(existing.id));
-    if (local >= item.updatedAt) { summary.skipped += 1; continue; }
-    if (item.deleted) {
-      await store.applyRemote(() => store.deleteSession(existing.id as number));
-      summary.deleted += 1;
-      continue;
-    }
-    await applySessionPayload(store, item.uid, item.payload);
-    summary.applied += 1;
-  }
 }
 
 // One chunk of the append-only log, merged an entry at a time.
@@ -282,26 +234,11 @@ async function applyTombstone(store: WorkstrStore, record: DecodedPrivateRecord)
   return false;
 }
 
-// Which sessions this pull carries a deletion for, and when it was made. A tombstone and a
-// stale bundle part can name the same session, so the answer has to be known before either
-// is applied rather than decided by the order the relay happened to return them in.
-function tombstonedSessions(records: DecodedPrivateRecord[]): Map<string, string> {
-  const tombstoned = new Map<string, string>();
-  for (const record of records) {
-    if (!record.deleted || record.parsed.kind !== 'session' || !record.parsed.id) continue;
-    const uid = String(record.parsed.id);
-    const known = tombstoned.get(uid);
-    if (!known || record.updatedAt > known) tombstoned.set(uid, record.updatedAt);
-  }
-  return tombstoned;
-}
-
 export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateRecord[], unreadable = 0): Promise<MergeSummary> {
   const summary: MergeSummary = { applied: 0, skipped: 0, deleted: 0, unreadable };
   // Read once rather than per record: a full-history restore is exactly the case this
   // function exists for, and re-reading the queue inside the loop makes it quadratic.
   const pending = new Map((await store.listSyncQueue()).map((entry) => [entry.address, entry.updated_at]));
-  const tombstoned = tombstonedSessions(records);
   for (const record of records) {
     const local = await localUpdatedAt(store, record.address, pending);
     if (local !== null && local >= record.updatedAt) {
@@ -316,8 +253,6 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
         await applyLogChunk(store, record, summary);
       } else if (record.parsed.kind === 'body') {
         await applyBodyChunk(store, record, summary);
-      } else if (record.parsed.kind === 'sessions') {
-        await applySessionsBundle(store, record, pending, tombstoned, summary);
       } else if (record.parsed.kind === 'sheet') {
         await applySheet(store, record);
         summary.applied += 1;

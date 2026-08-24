@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { openWorkstrDB } from '../src/db/schema';
 import { exportDatabase, importDatabase, EXPORT_SCHEMA } from '../src/db/export';

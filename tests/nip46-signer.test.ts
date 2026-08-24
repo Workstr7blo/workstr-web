@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { SimplePool } from 'nostr-tools';
 import { SIGNER_PERMS, createCachedNip46Signer, createNostrConnectSignerRequest } from '../src/signer/nip46';

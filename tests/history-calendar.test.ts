@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { historyCalendar, historyCalendarPanel } from '../src/features/train/history-calendar';
 import { buildHistoryModel } from '../src/features/train/history-model';

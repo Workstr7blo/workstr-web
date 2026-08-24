@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { createProgramBuilder } from '../src/app/program-builder';
 import type { AppState } from '../src/app/state';

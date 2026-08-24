@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { createSyncEngine, RECORD_FORMAT, type SyncStatus } from '../src/sync/engine';
 import { RETRY_BASE_MS, STALL_RETRY_MS } from '../src/sync/retry';
-import { SETTINGS_ADDRESS, sessionAddress, sessionsAddress, sheetAddress } from '../src/sync/addresses';
+import { SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 import { withSignerTimeout } from '../src/signer/timeout';
 import { forgetAutoApprove } from '../src/signer/auto-approve';
@@ -269,7 +269,7 @@ describe('a device from the old local-only era', () => {
     const { engine } = await harness(store);
     await engine.start();
 
-    expect([...relay.events.keys()]).not.toContain(sessionsAddress('2026-08'));
+    expect([...relay.events.keys()].some((address) => address.includes(':sessions:'))).toBe(false);
     expect([...relay.events.keys()]).not.toContain(sessionAddress(uid));
     expect((await store.getSettings()).backup?.recordFormat).toBe(RECORD_FORMAT);
   });

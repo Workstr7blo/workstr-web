@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { canRepeat, repeatBlockedReason, repeatSeed } from '../src/features/train/repeat-workout';
 import { repeatWorkoutButton } from '../src/features/train/views';

@@ -6,13 +6,13 @@ export const LEGACY_RECORD_PREFIX = 'workstr:v1:';
 
 // `log` is the append-only journal workout history travels in: a sealed chunk of entries
 // that is never rewritten once full. `body` is the same mechanism for the body log.
-// `session` and `sessions` are read but no longer written — one address per workout leaked
-// an exact public count of how often the user trains, which is what the log replaces.
-export type RecordKind = 'sheet' | 'session' | 'sessions' | 'bodyweight' | 'settings' | 'key' | 'log' | 'body';
+// `session` is read but no longer written — one address per workout leaked an exact public
+// count of how often the user trains, which is what the log replaces.
+export type RecordKind = 'sheet' | 'session' | 'bodyweight' | 'settings' | 'key' | 'log' | 'body';
 
 // Singletons hold the whole collection in one record; the rest are addressed per row.
 const SINGLETON_KINDS: RecordKind[] = ['bodyweight', 'settings', 'key'];
-const KEYED_KINDS: RecordKind[] = ['sheet', 'session', 'sessions'];
+const KEYED_KINDS: RecordKind[] = ['sheet', 'session'];
 // Addressed by the device that wrote them and a sequence number within that device.
 const CHUNKED_KINDS: RecordKind[] = ['log', 'body'];
 
@@ -42,30 +42,6 @@ export function sheetAddress(slug: string): string {
 
 export function sessionAddress(uid: string): string {
   return `${RECORD_PREFIX}session:${assertId('session', uid)}`;
-}
-
-// Sessions are bundled by the month they were trained in, which is the one grouping that
-// is both stable and mostly immutable: a finished month never changes again, so only the
-// current one is rewritten as the user trains. A `YYYY-MM` in a cleartext `d` tag says no
-// more than the relay already learns from the event's own timestamp.
-export const UNDATED_SESSION_MONTH = '0000-00';
-
-export function sessionMonth(startedAt?: string | null, finishedAt?: string | null): string {
-  const month = String(startedAt || finishedAt || '').slice(0, 7);
-  return /^\d{4}-\d{2}$/.test(month) ? month : UNDATED_SESSION_MONTH;
-}
-
-// A month that will not fit in one event is split into parts. Part 1 keeps the plain
-// month address so the common case has no suffix, and packing is chronological so a new
-// session lands at the end and the earlier parts stay byte-identical.
-export function sessionsAddress(month: string, part = 1): string {
-  const id = part > 1 ? `${month}-p${part}` : month;
-  return `${RECORD_PREFIX}sessions:${assertId('sessions', id)}`;
-}
-
-export function parseSessionsId(id: string): { month: string; part: number } {
-  const match = /^(\d{4}-\d{2}|0000-00)-p(\d+)$/.exec(id);
-  return match ? { month: match[1], part: Number(match[2]) } : { month: id, part: 1 };
 }
 
 // A device only ever writes its own sequence, so two devices can append at the same moment

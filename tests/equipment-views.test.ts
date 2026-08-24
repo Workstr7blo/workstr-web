@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { libraryPanel } from '../src/features/library/views';
 import { discoverPanel } from '../src/features/discover/views';

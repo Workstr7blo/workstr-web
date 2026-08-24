@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { workoutHistory } from '../src/features/train/history-timeline';
 import { sessionDetail } from '../src/features/train/views';
