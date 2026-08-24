@@ -71,7 +71,7 @@ or set updates would make full-root rendering inappropriate.
 | Encrypted backup: pull, decrypt and merge | `src/sync/merge.ts` | `src/sync/relay.ts`, `src/db/store.ts` (`applyRemote`, `sync_seen`) | `tests/sync-merge.test.ts`, `tests/sync-pull.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in) |
 | Encrypted backup: sync orchestration | `src/sync/engine.ts`, `src/sync/retry.ts` | `src/sync/backfill.ts`, `src/sync/push.ts`, `src/sync/merge.ts` | `tests/sync-engine.test.ts` |
 | Signer call timeouts | `src/signer/timeout.ts`, `src/signer/auto-approve.ts` | `src/signer/types.ts`, `src/sync/engine.ts` | `tests/signer-timeout.test.ts` |
-| Encrypted backup: the Auto-backup toggle | `src/features/backup/views.ts`, `src/app/backup-controller.ts` | `src/sync/engine.ts`, `src/app/layout.ts` | `tests/backup-views.test.ts`, `tests/sync-engine.test.ts` |
+| Encrypted sync controls and status | `src/features/backup/views.ts`, `src/app/backup-controller.ts` | `src/sync/engine.ts`, `src/app/layout.ts` | `tests/backup-views.test.ts`, `tests/sync-engine.test.ts` |
 | Sync-facing half of the store | `src/db/sync-store.ts` | `src/db/store.ts` (extends it) | `tests/sync-backfill.test.ts`, `tests/sync-merge.test.ts`, `tests/sync-pull.test.ts` |
 
 ## Important module groups
@@ -179,7 +179,7 @@ targets, or muscle metadata solely from the current exercise library.
 - `relay/write-policy.mjs` is the strfry write-policy plugin that runs on the relay host,
   not in the browser. It is plain JavaScript because the relay host has no build step;
   `relay/write-policy.d.mts` carries its type contract so the tests can import it.
-- Policy: accept `kind:30078` whose first `d` tag starts with `workstr:v1:`, reject
+- Policy: accept `kind:30078` whose first `d` tag starts with `workstr:v2:`, reject
   everything else. The relay is open — no allowlist, no NIP-42 — so this plugin is the
   only control over what the relay stores.
 - It is stateless and per-event. Quotas, the storage ceiling, and the block list are

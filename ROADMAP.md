@@ -60,7 +60,8 @@ deployed to the domain and tagged through v1.3.0 (2026-08-19).
 
 **Next**
 
-v2.0-alpha encrypted backup. Every v1 milestone is tagged and on the domain.
+Stabilize and release the shipped V2 encrypted-sync implementation, then complete the
+measured funding numbers and EMOM transition tone tracked for v2.2.
 
 ---
 
@@ -144,25 +145,23 @@ milestone does not duplicate them.
 Deferred on purpose, recorded in `docs/RELEASE-QA.md`: year heatmap, monthly recap,
 history search, save-a-repeat-as-a-program, progressive overload, and virtualisation.
 
-## v2.0-alpha — Encrypted backup
+## v2.0-alpha — Encrypted sync
 
-One **Auto-backup** toggle in Settings, open to every pubkey. No allowlist, no access
-request, no cap, no NIP-42. The client remains local-first: the sync engine is inert until
-the toggle is on, and everything behaves exactly as it does today if the relay is
-unreachable or the user never enables it.
+Implemented on `main`, not yet promoted to a versioned release. Settings presents
+**Auto-sync** to signed-in users and manual JSON backup to everyone. There is no
+allowlist, access request, subscription, or NIP-42. The client remains local-first and
+sync failures never block training.
 
-The relay is already running. What it does not yet have is the write policy, and that
-policy is the whole security model: the relay accepts `kind:30078` events whose `d` tag
-starts with `workstr:v1:` and rejects everything else, so it never becomes a
-general-purpose relay carrying other clients' notes. Open reads are an accepted trade —
-payloads are ciphertext, `d` tags are not.
-
-Detailed execution plan: `docs/plans/v2-encrypted-backup-alpha.md`.
+The relay write policy accepts `kind:30078` under `workstr:v2:` only. The client uses a
+signer-wrapped account backup key, compressed AES-GCM envelopes, replaceable object
+records, append-only device journals for workout/body history, and incremental restore.
+The authoritative protocol is `docs/encrypted-sync-architecture.md`; the detailed alpha
+plan is retained as historical issue-sequence context.
 
 **Server**
 
-1. strfry write policy — kind `30078` plus the `workstr:v1:` `d` prefix, everything else
-   rejected.
+1. ~~strfry write policy — kind `30078` plus the `workstr:v2:` `d` prefix, everything
+   else rejected.~~ — done, including V1 cutover removal.
 2. ~~Abuse controls — per-pubkey quota, total storage ceiling with an alert, block list.~~
    — done. Usage is counted per record address rather than per publish, because `30078` is
    addressable and charging every upload would bill a daily sync for storage that never
@@ -176,12 +175,11 @@ Detailed execution plan: `docs/plans/v2-encrypted-backup-alpha.md`.
 
 **Client**
 
-4. `nostr/codecs30078.ts` — NIP-44 encrypted `kind:30078` private-record codecs.
-5. `sync/engine.ts` — write queue, manifest, tombstones, LWW merge, push, pull, lazy
-   restore, and the first-run backfill that uploads existing history when the toggle is
-   first turned on.
-6. `features/backup/` — the Auto-backup toggle in the Settings → Backup panel, its status
-   line, and automatic non-blocking sync with retry and a manual sync-now fallback.
+4. ~~Account key, compressed authenticated envelope, and `kind:30078` codecs.~~ — done.
+5. ~~Replaceable-object queue, append-only journals, tombstones, deterministic replay,
+   incremental pull, retry, and V2-era cutover.~~ — done.
+6. ~~Data & Sync control center with Auto-sync, status/progress, retry, Sync now, and
+   manual JSON backup.~~ — done, including the iOS layout follow-up.
 
 **Done when:** phone toggles backup on → relay → laptop restore works after decryption,
 with no operator step at any point, no plaintext private training data leaving the

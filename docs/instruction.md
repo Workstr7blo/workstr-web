@@ -1,5 +1,10 @@
 # Workstr Web — Build Instructions
 
+> **Living product specification.** Some protocol sections below preserve the original
+> build plan and are intentionally historical. For the shipped encrypted-sync wire
+> contract, `docs/encrypted-sync-architecture.md` is authoritative. Source, tests,
+> `MODULES.md`, and `CHANGELOG.md` establish what exists today.
+
 > A complete, self-contained specification for building the web version of Workstr.
 > A developer (human or AI) with no prior knowledge of the project should be able to
 > build the entire product from this document alone.
@@ -187,7 +192,7 @@ rules out open exercise publishing does not apply the same way.
 | **NIP-07** | Browser-extension signer (`window.nostr`): `getPublicKey()`, `signEvent()`, `nip44.encrypt/decrypt`. Primary desktop login. |
 | **NIP-46** | Remote signer ("bunker"/Amber): same operations over an encrypted relay channel. Primary mobile login. Connect via `bunker://` URI or `nostrconnect://` QR. |
 | **NIP-44** | Versioned encryption used to encrypt **all private data events** to the user's *own* pubkey (self-encryption: conversation key of user↔user). |
-| **NIP-78 (kind 30078)** | Arbitrary app data, addressable-replaceable. Carrier for every private encrypted record (sessions, sheets, body-weight, settings, library overrides). `d` tag = record address (Section 7.3). Because 30078 is a *shared* kind other apps also publish, the Workstr relay's write policy filters on the `workstr:v1:` `d` prefix as well as the kind. Phase 2a. |
+| **NIP-78 (kind 30078)** | Arbitrary app data, addressable-replaceable. Carrier for private encrypted objects, journal chunks, and the wrapped account backup key. `d` tag = V2 record address (Section 7.3). Because 30078 is a shared kind, the Workstr relay filters on `workstr:v2:` as well as the kind. Phase 2a. |
 | **NIP-101e (kind 33401)** | Exercise template. **Read-only for the client**: the app imports these, it never authors them. Written only by the operator key. Tag layout as the self-hosted app emits it: `d`, `title`, `format`, `format_units`, `equipment`, `t` topics, Workstr's granular `workstr_muscle` tags, a `workstr_meta` JSON tag, and `imeta` for media. |
 | **NIP-101e (kind 33402)** | Workout template (program). References exercises via `a` tags: `33401:<pubkey>:<d>`. Read-only today; user-authored programs are a Phase 3 item. |
 | **kind 1** | Public workout summary note (social sharing). The only event type the client currently signs on the user's behalf. |
@@ -240,19 +245,20 @@ there is nothing to be admitted to.
 2. Store module writes to IndexedDB immediately. UI reads only from IndexedDB.
 3. If auto-backup is on, the record is queued for encrypted sync (below).
 
-**Encrypted sync (phase 2)**
-1. Sync engine serializes the changed record to canonical JSON.
-2. `signer.nip44Encrypt(ownPubkey, json)` → ciphertext. (Self-encryption: only the
-   user's key can decrypt.)
-3. Wrap in `kind:30078`, tags: `[["d", "<address>"], ["client", "workstr"]]`,
-   `content = ciphertext`. `signer.signEvent(event)`.
-4. Publish to the Workstr relay. No AUTH step: the relay accepts any correctly signed
-   `kind:30078` whose `d` tag starts with `workstr:v1:`, and rejects everything else.
-5. On another device: REQ `{kinds:[30078], authors:[pubkey], since:<lastSync>}` →
-   decrypt each event via `signer.nip44Decrypt` → merge into IndexedDB
-   (last-write-wins on `updated_at`, per record).
-6. Decrypted results are cached in IndexedDB so decryption is a once-per-device cost
-   (NIP-46 round-trips are slow; batch and lazy-decrypt oldest history on demand).
+**Encrypted sync (phase 2, shipped)**
+1. The account owns one random backup key. The signer NIP-44-wraps or unwraps that key
+   once; it does not encrypt every private record.
+2. The engine serializes canonical JSON, compresses it when useful, and encrypts it
+   locally in an authenticated AES-GCM envelope bound to the pubkey and record address.
+3. The ciphertext is wrapped in a signed `kind:30078` event under `workstr:v2:`.
+   Replaceable objects keep stable addresses; workout and body history travel in
+   append-only, device-owned chunks.
+4. The Workstr relay accepts only correctly signed `kind:30078` events whose `d` tag
+   begins `workstr:v2:`. There is no AUTH step.
+5. Another device unwraps the account key, fetches unknown V2 events, decrypts locally,
+   and deterministically replays objects, journal entries, and tombstones into IndexedDB.
+6. A seen-event ledger makes subsequent restores incremental. The full wire contract and
+   conflict rules live in `docs/encrypted-sync-architecture.md`.
 
 **Share a session summary (free)**
 1. Render summary text (kg or lb per user setting; canonical storage is kg): program
@@ -327,15 +333,16 @@ other client can read it. Curation is a quality decision, not a lock (Section 11
    zap flow. In v2, Workstr can add custom in-app zaps: sign zap request, fetch invoice,
    pay via NWC, then verify the receipt before claiming success.
 
-**Turn on auto-backup (Phase 2a)**
-1. User flips the **Auto-backup** toggle in Settings → Backup. That is the entire
+**Turn on encrypted sync (Phase 2a)**
+1. A signed-in user turns on **Auto-sync** in Settings → Data & Sync. That is the entire
    ceremony: no request, no approval, no waiting, no status screen.
 2. The toggle needs a signer, because records are NIP-44 encrypted to the user's own
    pubkey and signed by it. Flipping it while signed out routes through sign-in first;
    this is the one unavoidable step and it already exists.
-3. On first enable the client enqueues **everything already in IndexedDB** — every past
-   session, sheet, body-weight entry and synced setting — not just subsequent changes.
-   A toggle labelled backup that silently skips existing history is a lie.
+3. On first enable the client establishes the V2 backup era. Replaceable private objects
+   join sync, while workouts already completed before that era remain local-only and in
+   JSON export. New workouts and explicit JSON imports join the encrypted journal. The UI
+   states the local-only count rather than implying that older history was uploaded.
 4. From then on the sync engine runs automatically: on app open, and after local changes,
    with backoff on failure. A manual "sync now" exists as a fallback, not as the normal path.
 5. Flipping it off stops syncing and leaves both sides intact. It does not delete what is
@@ -456,36 +463,24 @@ Every imported row in every user's library stores the full address
 would orphan every existing import the day it changed — the schema evolves through tags
 inside the event, never through the address.
 
-**Private sync records (Phase 2a, self-encrypted):**
+**Private sync records (Phase 2a, shipped V2):**
 
-One `kind:30078` event per logical record, addressable and replaceable. The `d` tag
-encodes the record type and identity; edits republish the same `d` (relay keeps only
-the latest). Deletions publish a tombstone payload (`{"deleted":true}`).
+Every private relay event is `kind:30078` with a `workstr:v2:` address. Stable objects
+such as sheets and settings are replaceable. Workout and body history are entries in
+compressed, size-bounded, append-only chunks owned by the writing device; deletions are
+explicit journal tombstones. A wrapped account backup key makes record encryption and
+restore local after one signer round trip.
 
-```
-workstr:v1:exercise:<slug>        → one exercise (only user-created/modified ones)
-workstr:v1:sheet:<slug>           → one program, including its exercise rows
-workstr:v1:session:<uuid>         → one session including all its sets
-workstr:v1:bodyweight             → the whole body-weight log (append-heavy but tiny)
-workstr:v1:settings               → user settings worth syncing
-workstr:v1:manifest               → index of all record addresses + updated_at, for fast diff sync
-```
-
-Here `v1` *is* wanted: these addresses are private, single-author, and rewritable in
-bulk by the client that owns them, so a format break is a migration the app can perform
-against its own data.
-
-Granularity rationale: per-set events would be chatty (NIP-46 signing round-trips);
-one blob for everything would exceed relay event-size limits (typically 64–256 KB)
-and force full rewrites. **Per-session / per-sheet is the sweet spot** (~5 KB
-ciphertext per session). The `manifest` lets a fresh device fetch one event to learn
-what exists before pulling history lazily (most recent first).
+This replaced the original V1 per-session/monthly-bundle and manifest designs. The exact
+addresses, envelope, replay order, compaction rules, and cutover behavior are specified in
+`docs/encrypted-sync-architecture.md` and tested by the sync suites listed in `MODULES.md`.
 
 ### 7.4 Sizing (for the operator)
 
-~200 sessions/user/year × ~5 KB ≈ **1 MB per active user per year** on the relay.
-Curated library images ≈ 100 MB total. A 2 vCPU / 2–4 GB RAM / 40 GB disk machine
-(VPS or home VM) carries this product for years; strfry idles in a few hundred MB.
+Capacity is measured from the deployed V2 format rather than the original per-session
+estimate. Compression and chunking reduce normal workout storage substantially; quotas,
+the total ceiling, and the usage ledger remain the operational bounds. Curated library
+images are public catalog assets and are not part of private relay usage.
 
 ---
 
@@ -528,10 +523,10 @@ src/
                        #   offline cache
     programImport.ts   # program import + dependency walk, import-state resolution
     share.ts           # kind:1 summary composition, publish, acknowledgement check
-    codecs30078.ts     # [planned, Phase 2a] 30078 encrypt/decrypt wrappers (uses signer)
+    codecs30078.ts     # V2 private-record envelope/event codecs
   sync/
-    engine.ts          # [stub] LWW comparison only. Phase 2a fills in queue, manifest
-                       #   diff, push/pull, lazy decrypt.
+    engine.ts          # encrypted-sync orchestration: account key, pull/replay,
+                       #   object queue, journals, retry, and progress
   features/
     library/           # exercise library UI
     sheets/            # program builder UI
@@ -543,10 +538,8 @@ src/
     support/           # zap-first support UI, funding panel (reads kind:9735 receipts),
                        #   and later NWC custom-zap flow. Paid relay invoicing lands here
                        #   only if the Section 11 fallback fires.
-    backup/            # [planned, Phase 2a] the auto-backup toggle and its status line,
-                       #   composed into the existing Settings → Backup panel next to
-                       #   JSON export/import. Backup is a data-durability control, not
-                       #   a funding one — it does not live in support/.
+    backup/            # encrypted-sync controls, progress, and status, composed into
+                       #   Settings → Data & Sync beside manual JSON backup
   app/
     shell.ts           # root state, namespace boot, navigation, controller composition
     catalog-controller.ts      # catalog cache/profile and library actions
@@ -727,7 +720,7 @@ No payment service and no admission service are built in this phase.
 
 Server side:
 1. **strfry** with a **write-policy plugin** and no AUTH. The policy accepts an event only
-   when its kind is `30078` *and* its `d` tag starts with `workstr:v1:`; everything else is
+   when its kind is `30078` *and* its `d` tag starts with `workstr:v2:`; everything else is
    rejected, `kind:1` included. This is what stops the relay becoming a general-purpose
    relay carrying other clients' notes, and it is the only thing that stops it — the relay
    URL ships in public JavaScript and relay crawlers index it whether or not anyone
@@ -746,11 +739,12 @@ Server side:
    funding panel. Rule 3.4 is not optional.
 
 Client side:
-7. **Toggle block:** `features/backup/` — the Auto-backup toggle and its status line,
-   composed into the existing Settings → Backup panel beside JSON export/import. Turning
-   it on backfills everything already in IndexedDB, then syncs automatically.
-8. **Sync block:** `sync/engine.ts` — 30078 encrypt/publish on change, manifest diff
-   pull on login, LWW merge, lazy decryption (recent first), decrypted cache.
+7. **Toggle block:** `features/backup/` — Auto-sync, progress, and status in Settings →
+   Data & Sync beside JSON export/import. Turning it on establishes the V2 era and syncs
+   eligible private data automatically.
+8. **Sync block:** `sync/engine.ts` — account-key bootstrap, compressed authenticated
+   envelopes, replaceable object queue, append-only journals, incremental pull/replay,
+   tombstones, retry, and restore.
 9. *(No auth block and no access block — neither exists under this design.)*
 10. **Catalog growth:** the operator key keeps publishing the curated 33401/33402 catalog
     to **public relays**, readable by everyone including other Nostr clients. Authored
@@ -762,7 +756,7 @@ Client side:
     Retention now means the encrypted records only. Restoring the perk would mean widening
     the policy, which is exactly what keeps other clients' notes off the relay.)
 
-**Exit criteria:** flip Auto-backup on from a phone → no operator action of any kind →
+**Exit criteria:** turn Auto-sync on from a phone → no operator action of any kind →
 open laptop, sign in, entire history appears after decryption. A `kind:1` publish attempt
 against the Workstr relay is rejected by the write policy. Funding panel shows real
 donations against a published real cost.
@@ -979,8 +973,9 @@ Recommended setup on a home server / VM:
 5. **Home-hosted relay fragility** (if Option A): residential uptime, VPN IP
    reputation, some networks block VPN ranges. Acceptable at launch; revisit when the
    relay approaches its total storage ceiling.
-6. **Addressable-event size limits.** Keep every 30078 under ~64 KB; per-session
-   granularity guarantees this.
+6. **Addressable-event size limits.** Keep every 30078 under the tested signer/relay
+   budget. The chunk packer measures the sealed envelope and deliberately leaves NIP-46
+   headroom; never substitute a raw-JSON estimate.
 7. **Legal/boring:** ToS + privacy page (short, honest: "we store ciphertext"), and local
    tax registration once income crosses the relevant small-supplier threshold. Donations
    are not automatically tax-free income — check the local rule before the first

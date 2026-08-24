@@ -1,6 +1,13 @@
 # v2.0-alpha Encrypted Backup Implementation Plan
 
-> **For Hermes:** Use the `subagent-driven-development` skill to implement this plan issue-by-issue. This plan implements `docs/instruction.md` Phase 2a; if it conflicts with `docs/instruction.md`, `docs/instruction.md` wins.
+> **Historical plan — superseded.** This records the issue sequence and design that led
+> to the alpha; it is not the current wire contract. The shipped implementation replaced
+> per-session/monthly records, manifest diffing, and per-record signer encryption with an
+> account backup key, compressed AES-GCM envelopes, append-only device journals, and a
+> V2-only namespace. See `docs/encrypted-sync-architecture.md` for the authoritative
+> architecture and `CHANGELOG.md` for shipped behavior.
+
+> Do not implement this plan issue-by-issue. It remains only as a decision-history record.
 
 **Goal:** A signed-in Workstr-web user flips one **Auto-backup** toggle in Settings and every private training record is encrypted and backed up to the Workstr relay from then on, with no request, no approval, and no waiting.
 
