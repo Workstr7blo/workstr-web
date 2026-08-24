@@ -1,8 +1,8 @@
 # Workstr relay backup and restore
 
-The relay stores users' encrypted training backups. Once the Auto-backup toggle is open to
-anyone, it holds the only copy of data a user believes is safe — so this has to exist
-before the toggle does. A toggle labelled backup that loses data is worse than no toggle.
+The relay stores users' encrypted sync records. Once Auto-sync is open to anyone, it may
+hold the only remote copy of data a user believes is safe — so host-level backup and
+restore must exist before the control does. Sync that loses data is worse than no sync.
 
 Two scripts, one on each side:
 

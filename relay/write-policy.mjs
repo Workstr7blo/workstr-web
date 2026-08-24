@@ -39,7 +39,7 @@ export const DEFAULT_QUOTA_BYTES = 50 * 1024 * 1024;
 export const DEFAULT_CEILING_BYTES = 20 * 1024 * 1024 * 1024;
 export const DEFAULT_ALERT_RATIO = 0.8;
 
-const REJECT_KIND = `blocked: this relay only stores Workstr encrypted backup records (kind ${ACCEPTED_KIND})`;
+const REJECT_KIND = `blocked: this relay only stores Workstr encrypted sync records (kind ${ACCEPTED_KIND})`;
 const REJECT_ADDRESS = `blocked: kind ${ACCEPTED_KIND} events must carry a d tag starting with ${REQUIRED_D_PREFIX}`;
 const REJECT_MALFORMED = 'blocked: malformed event';
 const REJECT_BLOCKED = 'blocked: this pubkey may not write to this relay';

@@ -38,7 +38,7 @@ delegates signing to a companion app (Idenstr). The web version keeps the same p
 | SQLite (`workstr.db`)          | IndexedDB (same logical schema)                  |
 | Idenstr (server-side signer)   | User-owned signer: NIP-07 extension or NIP-46 remote signer |
 | LAN / Tailscale boundary       | Public website, keyless by design                |
-| Private data stays on server   | Private data stays in browser; optionally backed up **encrypted** to the Workstr relay |
+| Private data stays on server   | Private data stays in browser; optionally kept in **encrypted sync** on the Workstr relay |
 
 Long-term vision: the client is a complete free product and stays free. The **service
 around it** — encrypted sync/backup, retention guarantees, a curated exercise library,
@@ -75,17 +75,18 @@ Rules that govern every technical decision:
    *physically impossible* client-side (cross-user shared state, work while the user's
    browser is closed, secrets, payment verification).
 2. **The relay is the cost center, not the paywall.** Free = local + public relays. The
-   operator's relay adds encrypted backup and retention — it is what donations pay for.
+   operator's relay adds encrypted sync and retention — it is what donations pay for.
    Phase 2a has **no admission step at all**: any pubkey may back up, and turning the
-   auto-backup toggle on is the whole of it. What the relay enforces is a *write policy*
+   Auto-sync control on is the whole of it. What the relay enforces is a *write policy*
    on content, not on identity — it accepts Workstr's own encrypted records and rejects
    everything else, so it never becomes a general-purpose relay carrying other clients'
    notes. Identity-based admission is a thing this design deliberately does not have; if
    the Section 11 fallback ever fires it has to be *introduced* (Phase 2b), and that is a
    real delta, not a config change.
-3. **Keys never touch the app.** All signing and NIP-44 encryption/decryption is
-   delegated to the user's signer through a signer abstraction. The app never asks for,
-   stores, or transmits an `nsec`. Pasting an nsec is not offered, ever.
+3. **Private identity keys never touch the app.** Signing and NIP-44 wrapping/unwrapping
+   of the account backup key are delegated to the user's signer. Record encryption uses
+   that random backup key locally with AES-GCM. The app never asks for, stores, or
+   transmits an `nsec`. Pasting an nsec is not offered, ever.
 4. **Local-first.** IndexedDB is the source of truth for the UI. The relay is an
    encrypted replica. The app must be fully usable offline (PWA service worker).
 5. **Data is never hostage.** Free users get JSON export/import. Relay data is standard
@@ -126,8 +127,8 @@ Rules that govern every technical decision:
     one exists.
   - Support the project: zap the operator npub, with the app and landing page aligned
     around public zap receipts as the funding/accounting trail (Section 11).
-- **Workstr relay (Phase 2a)**: encrypted multi-device sync of all private data; retention
-  guarantee. Available to anyone who turns on auto-backup.
+- **Workstr relay (Phase 2a)**: encrypted multi-device sync of eligible private data;
+  retention guarantee. Available to anyone who turns on Auto-sync.
 
 **Deliberately not in the product** (each was specified, evaluated, and dropped — do not
 reintroduce without revisiting the reasoning):
@@ -207,8 +208,8 @@ rules out open exercise publishing does not apply the same way.
 *wallet* (payments). They are separate connections with separate permissions.
 
 **Terminology (used consistently from here on)**: a **supporter** is someone who has
-donated. A **backup user** is someone who has turned auto-backup on. These are
-deliberately *not* the same set — backup is open to everyone and supporting is voluntary;
+donated. A **sync user** is someone who has turned Auto-sync on. These are deliberately
+*not* the same set — encrypted sync is open to everyone and supporting is voluntary;
 neither one buys the other. Do not use "subscriber", "paying user", "premium",
 "allowlist", or "access request" anywhere in the product or the code — under this design
 there is nothing to be admitted to.
@@ -243,7 +244,7 @@ there is nothing to be admitted to.
 **Save (free, always)**
 1. User edits a sheet / logs a set / finishes a session.
 2. Store module writes to IndexedDB immediately. UI reads only from IndexedDB.
-3. If auto-backup is on, the record is queued for encrypted sync (below).
+3. If Auto-sync is on, eligible changes join the object queue or append-only journal.
 
 **Encrypted sync (phase 2, shipped)**
 1. The account owns one random backup key. The signer NIP-44-wraps or unwraps that key
@@ -336,8 +337,8 @@ other client can read it. Curation is a quality decision, not a lock (Section 11
 **Turn on encrypted sync (Phase 2a)**
 1. A signed-in user turns on **Auto-sync** in Settings → Data & Sync. That is the entire
    ceremony: no request, no approval, no waiting, no status screen.
-2. The toggle needs a signer, because records are NIP-44 encrypted to the user's own
-   pubkey and signed by it. Flipping it while signed out routes through sign-in first;
+2. Sync needs a signer to unwrap the account backup key and sign relay events. Turning it
+   on while signed out routes through sign-in first;
    this is the one unavoidable step and it already exists.
 3. On first enable the client establishes the V2 backup era. Replaceable private objects
    join sync, while workouts already completed before that era remain local-only and in
@@ -391,7 +392,7 @@ Consequences to design around:
 |---|---|---|---|
 | **Local** | IndexedDB, per namespace, per device | Everything: exercises, sheets, sessions, sets, body-weight, settings, catalog cache, caches of decrypted sync data | Everyone |
 | **Public relays** | Catalog relays for reads, write relays for shares (Section 6.2) | Inbound: the operator-signed `33401`/`33402` catalog. Outbound: only `kind:1` summaries the user explicitly shares. Plaintext by design. | Everyone |
-| **Workstr relay** | Operator's strfry (write-policy filtered) | `kind:30078` NIP-44 ciphertext of all private records, and nothing else | Anyone with auto-backup on |
+| **Workstr relay** | Operator's strfry (write-policy filtered) | Encrypted V2 `kind:30078` objects, journal chunks, and wrapped account keys | Anyone with Auto-sync on |
 
 Note that the curated exercise library is **not** in that table: it is published to public
 relays like any other catalog (Section 10, Phase 2a). Locking curation behind the relay
@@ -715,7 +716,7 @@ operator hosting zero infrastructure.
 
 ### Phase 2a — The Workstr relay (donation-funded)
 
-**Goal:** encrypted backup and retention for anyone who turns it on, funded by donations.
+**Goal:** encrypted sync and retention for anyone who turns it on, funded by donations.
 No payment service and no admission service are built in this phase.
 
 Server side:
@@ -843,7 +844,7 @@ The target mirrors the public support page: about 55k sats for AI credits and de
 | Domain infrastructure | paid annually | ~5k sats |
 | Buffer / rounding | ongoing | ~1k sats |
 | GitHub Pages hosting | Phase 0 | 0 |
-| Relay host / encrypted backup | later | separate targeted asks when incurred |
+| Relay host / encrypted sync | later | separate targeted asks when incurred |
 
 **Denominated in sats on purpose.** Donations arrive in sats, so a sats budget compares
 directly and the funding panel never needs a price feed to tell the truth. A fiat budget
@@ -952,8 +953,9 @@ Recommended setup on a home server / VM:
 5. **Release QA pass.** The checks no automation reaches — real iPhone, real signer apps,
    real relays, real network failure — live in `docs/RELEASE-QA.md` as a checklist with
    an expected result per line and a stated blocking rule. It runs against the deployed
-   site before every tag. Phase 2a adds fresh-device restore (manifest → lazy decrypt) to
-   it; keep the checklist the single copy of that matrix rather than restating it here.
+   site before every tag. Phase 2a adds account-key bootstrap, incremental V2 replay, and
+   fresh-device restore; keep the checklist the single copy of that matrix rather than
+   restating it here.
 
 ---
 
@@ -1043,7 +1045,7 @@ kind cannot be satisfied before a release exists.
 - **Phase 1 — proven** (field evidence gathered *after* the tag; gates nothing, informs
   what comes next): 30 days of real training logged by real users with zero operator
   infrastructure, including at least one who never signed in.
-- **Phase 2a:** toggle auto-backup on → cross-device restore, hands-off; the write policy
+- **Phase 2a:** turn Auto-sync on → cross-device restore, hands-off; the write policy
   rejects everything that is not a Workstr encrypted record; LMDB backups restorable;
   curated library fetchable by anyone from public relays; storage quotas enforced. The real
   monthly cost and the 11.4 threshold follow in v2.2 (issue #59) rather than gating this

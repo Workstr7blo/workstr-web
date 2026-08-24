@@ -136,26 +136,30 @@ a real thumb, a real screen reader, and a device whose clock is not the build ma
       body log all return.
 - [ ] **Cross-device.** Export from the phone, import on desktop. Same result.
 
-## 6b. Encrypted backup (from v2.0-alpha)
+## 6b. Encrypted sync (from v2.0-alpha)
 
-Needs **two real devices and a real signer**. Everything else about backup is covered by
+Needs **two real devices and a real signer**. Everything else about sync is covered by
 automation (see the evidence section below); this section exists for what a browser driver
 and an integration suite cannot reach — a real NIP-46 signer round trip on a phone, an
 installed PWA that has been backgrounded, and a genuinely offline radio.
 
-- [ ] **Turning it on.** Phone, signed out, Settings → Backup → Auto-backup. Sign-in is
-      offered, and after signing in the toggle is on by itself.
-- [ ] **Backfill.** Existing history uploads. The status line counts up through the first
-      run rather than showing a pending count that falls, and it settles on "up to date".
+- [ ] **Turning it on.** Phone, signed out, Settings → Data & Sync → Sign in to sync.
+      Sign-in is offered, and Auto-sync is on after the identity flow completes.
+- [ ] **First sync and era boundary.** Eligible programs/settings upload and the status
+      settles on "up to date". Workouts completed before the V2 era remain local-only,
+      their count is shown calmly, and JSON export includes them. No V1 or monthly record
+      is published.
 - [ ] **A new workout.** Log one on the phone; within a minute the status line says the
-      backup is current.
-- [ ] **Restore.** Laptop, same identity, no local data for it. Sign in, turn Auto-backup
-      on, and the phone's programs, history, body log and unit preference come back.
+      sync is current. It uploads after the workout finishes, not after every set.
+- [ ] **Restore.** Laptop, same identity, no local data for it. Sign in, turn Auto-sync
+      on, and the phone's synced programs, V2-era history, body log and unit preference
+      come back. Local-only pre-era history is not invented on the laptop.
 - [ ] **Offline.** Put the phone in airplane mode, log a full workout. Nothing blocks, and
       no error interrupts training. Restore the network; pending changes upload.
-- [ ] **NIP-46 specifically.** A remote signer sleeps and the tab is backgrounded. Backup
-      reports a readable error rather than hanging, and recovers after signing in again.
-- [ ] **Off is off.** Turn Auto-backup off, log a workout, confirm nothing new reaches the
+- [ ] **NIP-46 specifically.** A remote signer sleeps and the tab is backgrounded. Sync
+      reports a readable error rather than hanging, reconnects, and does not repeatedly
+      ask for approval while a workout is running.
+- [ ] **Off is off.** Turn Auto-sync off, log a workout, confirm nothing new reaches the
       relay (`relay-admin usage <pubkey>` does not grow), and that turning it back on does
       not duplicate anything.
 
@@ -248,30 +252,34 @@ below the fold on short screens.
 
 ---
 
-## Automated evidence: v2.0-alpha encrypted backup
+## Required evidence: v2.0-alpha encrypted sync
 
-Run against the **production relay** on 2026-08-20, not a local stand-in.
+The 2026-08-20 V1 policy drill is historical and does not validate the current V2
+namespace. Before a release, run the following against the **production relay**, record
+the date in sign-off, remove the throwaway event, and rebuild the usage ledger if the
+verification changed it.
 
 **The relay's own policy** — verified by publishing directly at it and reading the NIP-20
 reason back:
 
 | Case | Result |
 |---|---|
-| `kind:30078` with a `workstr:v1:` `d` tag | accepted |
-| `kind:1` note | rejected — *"this relay only stores Workstr encrypted backup records"* |
+| `kind:30078` with a valid `workstr:v2:` `d` tag | accepted |
+| `kind:30078` with a `workstr:v1:` `d` tag | rejected |
+| `kind:1` note | rejected — *"this relay only stores Workstr encrypted sync records"* |
 | `kind:30078` with a foreign `d` prefix | rejected |
 | `kind:30078` with no `d` tag | rejected |
 | Blocked pubkey | rejected, and restored by `unblock` without a restart |
 | Over quota | rejected — *"storage quota reached (…). Existing records are kept"* |
 
-That covers checklist items 7 and 8 of the phone-to-laptop plan; they do not need redoing
-by hand.
+Record the event id and cleanup result. A local policy unit test is not evidence that the
+deployed relay is running the same policy.
 
 **The client loop** — `tests/sync-relay.integration.test.ts` run with
-`WORKSTR_TEST_RELAY=wss://relay.workstr.fit:43736`, all six green: real NIP-44 ciphertext
-on the wire, a full phone → relay → laptop restore, and offline logging uploading after
-reconnect. This exercises the same modules the app runs, so what section 6b adds is the
-device surface around them, not the sync logic itself.
+`WORKSTR_TEST_RELAY=wss://relay.workstr.fit:43736`: all six must be green. The suite covers
+an encrypted V2 event on the wire, account isolation, a full phone → relay → laptop
+restore, policy rejection, queue drain, and offline logging uploading after reconnect.
+Section 6b adds the real-device and signer surface around that sync logic.
 
 **What automation could not reach.** Browser WebSockets to the relay are blocked in the
 build sandbox, so the headless pass drives the UI (toggle, sign-in routing, status line,

@@ -121,7 +121,7 @@ export interface Session {
   // devices and cannot address a session on a relay. Backfilled for older rows at
   // database version 3.
   uid?: string;
-  // V2 relay backup starts fresh from this app version. Older local rows are left on the
+  // V2 encrypted sync starts fresh from this app version. Older local rows stay on the
   // device and are deliberately not uploaded unless created/restored as V2 records.
   backup_version?: 1 | 2;
   sheet_id?: number;
@@ -188,7 +188,7 @@ export interface CanonCache {
 // describes this device's relationship to the relay, not a user preference to replicate.
 export interface BackupSettings {
   enabled: boolean;
-  // V2 object-record backup. V1 monthly bundles are obsolete on the relay; older local
+  // V2 encrypted-sync record format. V1 monthly bundles are obsolete on the relay; older local
   // history stays local unless manually exported as JSON.
   recordFormat?: number;
   // The account's backup key, unwrapped, base64. Cached so routine launches cost the

@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { mergeRecords } from '../src/sync/merge';
-import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
+import { BODYWEIGHT_ADDRESS, RECORD_PREFIX, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
 import type { DecodedPrivateRecord } from '../src/nostr/codecs30078';
 
 let namespace = 0;
 const freshStore = () => WorkstrStore.open(`merge-${namespace += 1}`);
 
 function record(address: string, updatedAt: string, payload: unknown, deleted = false): DecodedPrivateRecord {
-  const rest = address.slice('workstr:v1:'.length);
+  const rest = address.slice(RECORD_PREFIX.length);
   const separator = rest.indexOf(':');
   const parsed = separator === -1
     ? { kind: rest as never }

@@ -110,7 +110,7 @@ describe('a reconnected bunker signer', () => {
 // over, because each record is encrypted and then signed. Permission has to be granted
 // once, at connection, or the flow is unusable.
 describe('what the app asks a signer for', () => {
-  it('names the encrypted backup kind rather than asking to sign anything', () => {
+  it('names the encrypted sync kind rather than asking to sign anything', () => {
     expect(SIGNER_PERMS).toContain('sign_event:30078');
     // The workout summary a user chooses to share is the only other thing it signs.
     expect(SIGNER_PERMS).toContain('sign_event:1');

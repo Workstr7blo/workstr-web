@@ -10,7 +10,7 @@ import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from './types';
 // about every request instead, and a backup is one request per record — several per month
 // of training, twice over, since each record is encrypted and then signed.
 //
-// The two kinds are the whole surface: 30078 is the encrypted backup record
+// The two kinds are the whole surface: 30078 is the encrypted sync record
 // (`src/nostr/codecs30078.ts`), kind 1 the workout summary a user chooses to share
 // (`src/nostr/share.ts`). Naming them rather than asking for blanket `sign_event` means a
 // signer can show what it is granting, and Workstr cannot quietly sign anything else.
