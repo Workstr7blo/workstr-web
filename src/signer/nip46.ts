@@ -1,5 +1,6 @@
 import { SimplePool, type VerifiedEvent } from 'nostr-tools';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import { decrypt as nip44DecryptPayload, getConversationKey } from 'nostr-tools/nip44';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { BunkerSigner, createNostrConnectURI, parseBunkerInput, type BunkerPointer } from 'nostr-tools/nip46';
 import { PRIVATE_RECORD_KIND } from '../nostr/codecs30078';
@@ -25,6 +26,9 @@ export const SIGNER_PERMS = [
 const CLIENT_SECRET_KEY = 'workstr.nip46.clientSecret';
 const CACHED_CONNECTION_KEY = 'workstr.nip46.connection';
 const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol'];
+const NOSTR_CONNECT_KIND = 24133;
+const CONNECT_WAIT_MS = 300000;
+const CONNECT_POLL_MS = 2000;
 
 interface BunkerOptions {
   onAuthUrl?: (url: string) => void;
@@ -86,6 +90,36 @@ async function openRelays(pool: SimplePool, relays: string[]): Promise<void> {
     Promise.any(opening).catch(() => null),
     new Promise((resolve) => setTimeout(resolve, RELAY_OPEN_TIMEOUT_MS))
   ]);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function connectionPointerFromEvent(event: VerifiedEvent, clientSecret: Uint8Array, connectionSecret: string, relays: string[]): BunkerPointer | null {
+  try {
+    const decrypted = nip44DecryptPayload(event.content, getConversationKey(clientSecret, event.pubkey));
+    const response = JSON.parse(decrypted) as { result?: string };
+    return response.result === connectionSecret ? { pubkey: event.pubkey, relays, secret: connectionSecret } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function waitForStoredConnectResponse(pool: SimplePool, clientSecret: Uint8Array, relays: string[], clientPubkey: string, connectionSecret: string, since: number, options: BunkerOptions): Promise<BunkerSigner> {
+  const deadline = Date.now() + CONNECT_WAIT_MS;
+  while (Date.now() < deadline) {
+    const events = await pool.querySync(relays, { kinds: [NOSTR_CONNECT_KIND], '#p': [clientPubkey], since }, { maxWait: CONNECT_POLL_MS }).catch(() => [] as VerifiedEvent[]);
+    for (const event of events as VerifiedEvent[]) {
+      const pointer = connectionPointerFromEvent(event, clientSecret, connectionSecret, relays);
+      if (!pointer) continue;
+      const signer = BunkerSigner.fromBunker(clientSecret, pointer, { pool, onauth: options.onAuthUrl });
+      await Promise.race([sleep(1000), signer.switchRelays()]);
+      return signer;
+    }
+    await sleep(CONNECT_POLL_MS);
+  }
+  throw new Error('signer did not answer within 5 minutes');
 }
 
 // `knownPubkey` is the key this device is already signed in as. Asking the bunker to
@@ -168,6 +202,7 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
   const secret = clientSecretKey();
   const clientPubkey = getPublicKey(secret);
   const connectionSecret = bytesToHex(generateSecretKey());
+  const createdSince = Math.floor(Date.now() / 1000) - 60;
   const cleanRelays = relays.map((relay) => relay.trim()).filter(Boolean);
   const uri = createNostrConnectURI({
     clientPubkey,
@@ -183,7 +218,9 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
     uri,
     relays: cleanRelays,
     ready,
-    signer: BunkerSigner.fromURI(secret, uri, { pool, onauth: options.onAuthUrl }, 300000).then((signer) => {
+    signer: BunkerSigner.fromURI(secret, uri, { pool, onauth: options.onAuthUrl }, CONNECT_WAIT_MS)
+      .catch(() => waitForStoredConnectResponse(pool, secret, cleanRelays, clientPubkey, connectionSecret, createdSince, options))
+      .catch(() => { throw new Error('signer did not answer within 5 minutes'); }).then((signer) => {
       cacheConnection(secret, signer.bp);
       return {
         pubkey: signer.bp.pubkey,
