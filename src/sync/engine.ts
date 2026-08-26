@@ -1,5 +1,5 @@
 import type { WorkstrStore } from '../db/store';
-import type { Signer } from '../signer/types';
+import type { SignedNostrEvent, Signer } from '../signer/types';
 import { runBackfill, seedJournal } from './backfill';
 import { pullAndMerge } from './merge';
 import { pushQueue } from './push';
@@ -10,6 +10,7 @@ import { BackupKeyUnavailableError, republishBackupKey, resolveBackupKey } from 
 import { fetchKeyEvent, publishKeyEvent } from './relay';
 import { createRetrySchedule } from './retry';
 import type { RecordCipher } from '../nostr/codecs30078';
+import { repairCachedKeyIfOlderBackupWasSeen } from './key-repair';
 
 // The single backup destination. Not a user preference and never announced: the relay
 // accepts only this client's encrypted records, so putting it in the user's kind:10002
@@ -110,6 +111,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
   // Resolved once per run and then held: the unwrap is the only signer round trip the
   // backup key ever costs, and every record after it is sealed and opened locally.
   let cipher: RecordCipher | null = null;
+  let cachedKeyRaw: string | undefined, relayKeyEvent: SignedNostrEvent | null = null, relayKeyRaw: string | undefined;
   // Whether this run has already confirmed the wrapped key is still on the relay. Only
   // done when the key came from this device's cache, because that path never asks the
   // relay anything and would not notice the one record everything else depends on
@@ -127,6 +129,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       await ctx.store.saveBackupState({ device: newDeviceId() });
     }
     const cached = (await ctx.store.getSettings()).backup?.key;
+    cachedKeyRaw = cached;
     const key = await resolveBackupKey(signer, transport, {
       read: async () => (await ctx.store.getSettings()).backup?.key,
       write: async (raw: string) => { await ctx.store.saveBackupState({ key: raw }); }
@@ -136,7 +139,9 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     // trips of a republish only when the record is actually gone.
     if (cached && !keyConfirmed) {
       keyConfirmed = true;
-      if (!(await fetchKeyEvent(relayUrl, pubkey).catch(() => null))) {
+      relayKeyEvent = await fetchKeyEvent(relayUrl, pubkey).catch(() => null);
+      relayKeyRaw = relayKeyEvent ? await signer.nip44Decrypt(relayKeyEvent.pubkey, relayKeyEvent.content).catch(() => undefined) : undefined;
+      if (!relayKeyEvent) {
         await republishBackupKey(signer, transport, cached);
       }
     }
@@ -144,6 +149,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     cipher = { key, pubkey };
     return cipher;
   }
+
 
   const report = (next: Partial<SyncStatus>): SyncStatus => {
     status = { ...status, ...next };
@@ -169,6 +175,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     // Before anything reads or writes a record. Nothing in a pass can proceed without it,
     // and it must never be improvised: see `resolveBackupKey`.
     const active = await ensureCipher(signer);
+    if (await repairCachedKeyIfOlderBackupWasSeen({ store: ctx.store, signer, relayUrl, cachedKeyRaw, relayKeyRaw, relayKeyEvent })) relayKeyRaw = cachedKeyRaw;
 
     if (!pulled) {
       // Before uploading anything: a device that has just signed in may be the empty one,
@@ -176,6 +183,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       const merged = await pullAndMerge(ctx.store, signer, active, relayUrl, {
         onProgress: (done, total) => report({ progress: { phase: 'restore', done, total } })
       });
+      if (await repairCachedKeyIfOlderBackupWasSeen({ store: ctx.store, signer, relayUrl, cachedKeyRaw, relayKeyRaw, relayKeyEvent, readableBeforeKey: Boolean(relayKeyEvent?.created_at && merged.earliestReadableCreatedAt && merged.earliestReadableCreatedAt < relayKeyEvent.created_at) })) relayKeyRaw = cachedKeyRaw;
       pulled = true;
       report({ progress: undefined });
       if (merged.applied > 0 || merged.deleted > 0) ctx.onRestored?.();
@@ -319,7 +327,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
         if (error instanceof BackupKeyUnavailableError) {
           stalledLast = false;
           await ctx.store.saveBackupState({ lastError: error.message });
-          return report({ state: 'error', pending: (await ctx.store.listSyncQueue()).length, lastError: error.message, reconnecting: undefined });
+          return report({ state: 'error', pending: (await ctx.store.listSyncQueue()).length, lastError: error.message, reconnecting: undefined, progress: undefined });
         }
         const stalled = error instanceof StalledSignerError || error instanceof SignerTimeoutError;
         stalledLast = stalled;
@@ -329,7 +337,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
         // Never thrown onward: a failed backup is a status line, not an interrupted workout.
         // Only for the attempt the quick retry is scheduled for. Past that the signer has
         // had its second chance and is genuinely away, which is a thing to say plainly.
-        return report({ state: 'error', pending: (await ctx.store.listSyncQueue()).length, lastError: message, reconnecting: stalled && failures === 1 });
+        return report({ state: 'error', pending: (await ctx.store.listSyncQueue()).length, lastError: message, reconnecting: stalled && failures === 1, progress: undefined });
       }
     })();
 
@@ -371,8 +379,8 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     stop(): void {
       running = false;
       again = false;
-      pulled = false;
-      cipher = null;
+      pulled = false; cipher = null;
+      cachedKeyRaw = undefined; relayKeyEvent = null; relayKeyRaw = undefined;
       keyConfirmed = false;
       clearTimer();
       ctx.store.setChangeListener(null);
