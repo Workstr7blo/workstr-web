@@ -16,7 +16,7 @@ const relay = vi.hoisted(() => ({
   events: new Map<string, { event: unknown }>(),
   // The wrapped backup key, held apart from the records because it is not one: it is
   // NIP-44 to the user's own pubkey and is resolved before a pass can start.
-  keyEvent: null as null | { content: string },
+  keyEvent: null as null | { content: string; created_at?: number },
   failure: null as null | 'policy' | 'network',
   // Real event ids are content hashes, so republishing an address produces a different
   // one. The seen ledger keys on that, so a double that reused ids would never be tested.
@@ -53,12 +53,12 @@ vi.mock('../src/sync/relay', async () => {
     async fetchKeyEvent() {
       if (relay.failure === 'network') throw new Error('relay query timed out');
       return relay.keyEvent
-        ? { ...relay.keyEvent, id: 'key-event', pubkey: SELF, sig: 'sig', kind: 30078, created_at: 1, tags: [['d', 'workstr:v2:key']] }
+        ? { ...relay.keyEvent, id: 'key-event', pubkey: SELF, sig: 'sig', kind: 30078, created_at: relay.keyEvent.created_at ?? 1, tags: [['d', 'workstr:v2:key']] }
         : null;
     },
     async publishKeyEvent(_signer: Signer, _url: string, content: string) {
       if (relay.failure) return { accepted: false, reason: `${relay.failure} failure` };
-      relay.keyEvent = { content };
+      relay.keyEvent = { content, created_at: relay.seq += 1 };
       return { accepted: true, reason: 'ok' };
     }
   };
@@ -194,11 +194,34 @@ describe('turning backup on', () => {
 });
 
 describe('opening the app again', () => {
-  it('does not ask the signer to decrypt a backup it has already read', async () => {
+  it('republishes a cached key when a newer relay key would orphan records this device already read', async () => {
+    const store = await freshStore();
+    await store.noteSeen(SETTINGS_ADDRESS, 'old-settings', 10);
+    relay.keyEvent = { content: btoa(String.fromCharCode(...new Uint8Array(32).fill(9))), created_at: 20 };
+
+    const { engine } = await harness(store);
+    await engine.start();
+
+    expect(relay.keyEvent?.content).toBe(CACHED_KEY);
+  });
+
+  it('does not let a fresh device overwrite an existing relay key just because its cache differs', async () => {
+    const store = await freshStore();
+    const relayKey = btoa(String.fromCharCode(...new Uint8Array(32).fill(9)));
+    relay.keyEvent = { content: relayKey, created_at: 20 };
+
+    const { engine } = await harness(store);
+    await engine.start();
+
+    expect(relay.keyEvent?.content).toBe(relayKey);
+  });
+
+  it('does not open a backup record it has already read', async () => {
     const store = await freshStore();
     await populate(store);
     const signer = fakeSigner();
     const decrypt = vi.spyOn(signer, 'nip44Decrypt');
+    const opens = vi.spyOn(crypto.subtle, 'decrypt');
 
     const first = await harness(store, signer);
     await first.engine.start();
@@ -208,11 +231,15 @@ describe('opening the app again', () => {
     // A fresh engine, exactly as a reopened PWA builds one. Everything on the relay is
     // this device's own upload, and the seen ledger recognises all of it.
     decrypt.mockClear();
+    opens.mockClear();
     const second = await harness(store, signer);
     const status = await second.engine.start();
 
     expect(status.state).toBe('idle');
-    expect(decrypt).not.toHaveBeenCalled();
+    // The cached key may be checked against the relay key, but record bodies stay unopened.
+    expect(decrypt).toHaveBeenCalledTimes(1);
+    expect(opens).not.toHaveBeenCalled();
+    opens.mockRestore();
   });
 
   it('reads only what changed elsewhere', async () => {

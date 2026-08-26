@@ -15,6 +15,7 @@ export interface MergeSummary {
   // Events that could not be read at all. Surfaced rather than swallowed: a rising count
   // means a key changed or the data is damaged, which the user needs to know.
   unreadable: number;
+  earliestReadableCreatedAt?: number;
 }
 
 export interface PullOptions {
@@ -297,6 +298,7 @@ export async function pullAndMerge(store: WorkstrStore, signer: Signer, cipher: 
     }
 
     consecutiveFailures = 0;
+    summary.earliestReadableCreatedAt = Math.min(summary.earliestReadableCreatedAt ?? event.created_at, event.created_at);
     const merged = await mergeRecords(store, [decoded]);
     summary.applied += merged.applied;
     summary.skipped += merged.skipped;

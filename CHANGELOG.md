@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Encrypted sync can recover when the relay's wrapped backup key was replaced after records already existed.** A device that still has the older working key cached now republishes it when it sees that the newer relay key would orphan records it had already read, and sync errors no longer leave a stale progress bar stuck on the screen.
+
 - **Mobile signer connection waits until Workstr is listening on the Nostr Connect relay, and recovers a stored reply if the phone backgrounds the app.** This avoids the loop where Clave shows a successful Connect activity, but Workstr misses the answer and returns to Settings still signed out.
 
 - **Backup no longer pauses for 45 seconds at a time on a remote signer.** A signer's answer
