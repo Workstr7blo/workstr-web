@@ -78,7 +78,8 @@ describe('shell', () => {
 
     expect(markup).toContain('class="connection-avatar" src="https://example.com/avatar.png"');
     expect(markup).toContain('>Settebello</span>');
-    expect(markup).toContain('>Connected</span>');
+    expect(markup).toContain('aria-label="Signed in"');
+    expect(markup).not.toContain('>Connected</span>');
     expect(markup).not.toContain('connection-chip-label">Account');
   });
 });
