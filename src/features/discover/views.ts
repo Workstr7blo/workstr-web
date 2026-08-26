@@ -75,17 +75,19 @@ export function discoverPanel(state: AppState): string {
         <button class="button ghost small" id="discover-select-toggle"${importable.length ? '' : ' disabled'}>Select</button>
         <button class="button ghost small" id="discover-refresh">Refresh catalog</button>
       </span>`;
-  return `<div class="panel">
+  return `<div class="panel discover-exercise-panel">
     <div class="panel-head"><span>Discover exercises</span>${headActions}</div>
-    <p class="section-help">The official Workstr catalog, signed by the Workstr key and fetched from public relays. Importing an exercise copies it into your local library; when the catalog version is newer than your copy, an Update button appears.</p>
-    <div class="filter-bar">
+    <p class="section-help">Official Workstr catalog. Import exercises into your local library; updates appear when catalog versions are newer.</p>
+    <div class="filter-bar discover-filter-bar">
       <input class="grow" id="discover-search" placeholder="Search exercises..." autocomplete="off" value="${html(state.discoverFilter.q)}" />
-      ${fillSelectHtml('discover-cat', filters.categories, 'All categories', state.discoverFilter.cat)}
-      ${fillSelectHtml('discover-muscle', filters.muscles, 'All muscles', state.discoverFilter.muscle)}
-      ${fillSelectHtml('discover-diff', filters.difficulties, 'All levels', state.discoverFilter.diff)}
-      ${equipmentSelectHtml('discover-equip', filters.equipment, state.discoverFilter.equip, owned.length)}
+      <div class="discover-filter-chips">
+        ${fillSelectHtml('discover-cat', filters.categories, 'All categories', state.discoverFilter.cat)}
+        ${fillSelectHtml('discover-muscle', filters.muscles, 'All muscles', state.discoverFilter.muscle)}
+        ${fillSelectHtml('discover-diff', filters.difficulties, 'All levels', state.discoverFilter.diff)}
+        ${equipmentSelectHtml('discover-equip', filters.equipment, state.discoverFilter.equip, owned.length)}
+      </div>
     </div>
     <div id="discover-status" class="discover-status">${html(state.exerciseStatus)}</div>
-    <div id="discover-grid" class="ex-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => discoverCardHtml(exercise, state)).join('') || '<div class="empty">No exercises match.</div>'}</div>
+    <div id="discover-grid" class="ex-grid discover-exercise-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => discoverCardHtml(exercise, state)).join('') || '<div class="empty">No exercises match.</div>'}</div>
   </div>`;
 }
