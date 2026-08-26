@@ -23,6 +23,11 @@ const navItems: Array<{ view: View; label: string; icon: string }> = [
 ];
 
 export function shellMarkup(state: AppState): string {
+  const identity = displayIdentity(state);
+  const initial = identity.trim().slice(0, 1).toUpperCase() || 'W';
+  const avatar = state.pubkey && state.profilePicture
+    ? `<img class="connection-avatar" src="${html(state.profilePicture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="connection-avatar fallback" hidden>${html(initial)}</span>`
+    : `<span class="connection-avatar fallback">${html(initial)}</span>`;
   return `
     <div class="noise"></div>
     <div class="cyber-grid"></div>
@@ -36,11 +41,12 @@ export function shellMarkup(state: AppState): string {
       </div>
       <div class="topbar-actions">
         <button class="connection-chip ${state.pubkey ? 'ok' : ''}" id="account-chip" type="button" title="Open settings" aria-label="Open settings">
+          ${avatar}
           <span class="connection-chip-main">
-            <span class="connection-chip-label">Account</span>
+            <span class="connection-chip-label">${state.pubkey ? html(identity) : 'Local'}</span>
             <span class="connection-chip-status">
               <span class="connection-dot"></span>
-              <span class="connection-chip-text">${state.pubkey ? html(displayIdentity(state)) : 'Local — this device'}</span>
+              <span class="connection-chip-text">${state.pubkey ? 'Connected' : 'This device'}</span>
             </span>
           </span>
           <svg class="connection-chip-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>

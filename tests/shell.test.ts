@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { launchSignerUri, renderShell } from '../src/app/shell';
+import { shellMarkup } from '../src/app/layout';
+import type { AppState } from '../src/app/state';
 
 describe('shell', () => {
   it('renders the app chrome and all views without a signer', () => {
@@ -31,6 +33,53 @@ describe('shell', () => {
     expect(settings?.textContent).toContain('Create sync account');
     expect(settings?.textContent).toContain('Manual backup');
     expect(settings?.textContent).toContain('0 selected');
+  });
+
+  it('renders a compact kind 0 identity chip when signed in', () => {
+    const markup = shellMarkup({
+      pubkey: 'f'.repeat(64),
+      npub: null,
+      profileName: 'Settebello',
+      profilePicture: 'https://example.com/avatar.png',
+      profileNames: {},
+      authorProfiles: {},
+      store: null,
+      settings: { unit: 'kg', publicRelays: [] },
+      support: { status: 'idle', receipts: [] },
+      signerType: 'local',
+      view: 'exercises',
+      subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
+      exercises: [],
+      programs: [],
+      activeSession: null,
+      finishedSessions: [],
+      publishingSessionId: null,
+      publishingStatus: null,
+      editingId: null,
+      filter: '',
+      programFilter: '',
+      expandedProgramAddress: null,
+      exerciseStatus: '',
+      programStatus: '',
+      signInStatus: null,
+      backup: { state: 'off', pending: 0 },
+      expandedSessionId: null,
+      history: { monthKey: null, selectedDate: null },
+      qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false },
+      bodyEntries: [],
+      sheets: [],
+      library: [],
+      librarySelect: { active: false, slugs: new Set() },
+      discoverSelect: { active: false, addresses: new Set() },
+      discoverExercises: [],
+      exFilter: { cat: '', muscle: '', diff: '', equip: '' },
+      discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' }
+    } as AppState);
+
+    expect(markup).toContain('class="connection-avatar" src="https://example.com/avatar.png"');
+    expect(markup).toContain('>Settebello</span>');
+    expect(markup).toContain('>Connected</span>');
+    expect(markup).not.toContain('connection-chip-label">Account');
   });
 });
 

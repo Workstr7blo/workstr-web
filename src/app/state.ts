@@ -58,6 +58,7 @@ export interface AppState {
   pubkey: string | null;
   npub: string | null;
   profileName: string | null;
+  profilePicture?: string | null;
   profileNames: Record<string, string>;
   authorProfiles?: Record<string, RelayProfile>;
   store: WorkstrStore | null;

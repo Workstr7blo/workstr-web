@@ -63,7 +63,7 @@ async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<Rela
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -93,14 +93,14 @@ export function renderShell(root: HTMLElement): void {
       if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
     }
     await loadNamespace(pubkey);
-    state.profileName = profileName(await fetchProfile(pubkey));
+    const profile = await fetchProfile(pubkey); state.profileName = profileName(profile); state.profilePicture = profile?.picture || null;
   }
 
   // Anonymous local account — the default; no signer involved.
   async function openLocal(): Promise<void> {
     state.pubkey = null;
     state.npub = null;
-    state.profileName = null;
+    state.profileName = null; state.profilePicture = null;
     state.signerType = null;
     state.signInStatus = null;
     await loadNamespace(LOCAL_NAMESPACE);

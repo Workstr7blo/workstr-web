@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The header account control is now a compact Nostr identity chip.** Signed-in users see
+  their kind 0 profile avatar, nickname, and connected status in the top-right instead of a
+  heavier Account card.
+
 - **Settings is now a compact control center.** Account, Data & Sync, Training Preferences,
   Support Workstr, and Advanced are grouped in that order; encrypted relay behavior is
   described as sync/auto-sync, JSON export/import is presented as manual backup, support
