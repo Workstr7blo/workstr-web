@@ -2,7 +2,7 @@
 
 .topbar-actions .button.small { padding: 8px 11px; font-size: 12px; }
 
-/* Compact identity chip: profile avatar + name/status, opens Settings. */
+/* Compact identity chip: profile avatar + name + ambient status dot, opens Settings. */
 .topbar-actions .connection-chip { max-width: min(46vw, 260px); }
 .connection-chip {
   display: flex; align-items: center; justify-content: space-between; gap: 9px;

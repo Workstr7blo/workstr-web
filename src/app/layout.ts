@@ -28,6 +28,9 @@ export function shellMarkup(state: AppState): string {
   const avatar = state.pubkey && state.profilePicture
     ? `<img class="connection-avatar" src="${html(state.profilePicture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="connection-avatar fallback" hidden>${html(initial)}</span>`
     : `<span class="connection-avatar fallback">${html(initial)}</span>`;
+  const status = state.pubkey
+    ? '<span class="connection-dot" aria-label="Signed in"></span>'
+    : '<span class="connection-chip-status"><span class="connection-dot"></span><span class="connection-chip-text">This device</span></span>';
   return `
     <div class="noise"></div>
     <div class="cyber-grid"></div>
@@ -44,11 +47,9 @@ export function shellMarkup(state: AppState): string {
           ${avatar}
           <span class="connection-chip-main">
             <span class="connection-chip-label">${state.pubkey ? html(identity) : 'Local'}</span>
-            <span class="connection-chip-status">
-              <span class="connection-dot"></span>
-              <span class="connection-chip-text">${state.pubkey ? 'Connected' : 'This device'}</span>
-            </span>
+            ${state.pubkey ? '' : status}
           </span>
+          ${state.pubkey ? status : ''}
           <svg class="connection-chip-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
