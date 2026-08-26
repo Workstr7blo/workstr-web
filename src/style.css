@@ -98,6 +98,51 @@
 .program-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .program-tags .tag-pill { padding: 4px 8px; font-size: 10px; }
 
+/* Exercise library polish: keep the purple atmosphere, but make browsing feel lighter
+   than a full-height showcase card stack. */
+.library-panel {
+  padding: clamp(16px, 3.5vw, 20px);
+  border-color: rgba(188,151,255,.14);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(124,60,255,.16), transparent 34%),
+    linear-gradient(180deg, rgba(20,12,35,.84), rgba(7,4,13,.68));
+  box-shadow: 0 18px 54px rgba(0,0,0,.32);
+}
+.library-panel .panel-head { margin-bottom: 10px; }
+.library-filter-bar { display: grid; gap: 8px; margin-top: 4px; }
+.library-filter-chips { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.library-filter-chips::-webkit-scrollbar { display: none; }
+.library-filter-bar input,
+.library-filter-bar select {
+  min-height: 40px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.22);
+  font-size: 13px;
+}
+.library-filter-bar .grow { width: 100%; min-width: 0; }
+.library-filter-bar select { flex: 0 0 auto; width: auto; min-width: 142px; }
+.exercise-library-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 14px; }
+.library-panel .ex-card { border-radius: 16px; background: rgba(255,255,255,.026); }
+.library-panel .card-img { aspect-ratio: 16 / 10; }
+.library-panel .card-body { padding: 10px 12px 12px; }
+.library-panel .card-name { margin-bottom: 7px; font-size: 15px; line-height: 1.16; }
+.library-panel .card-meta { gap: 6px; }
+
+@media (max-width: 760px) {
+  .library-panel { margin-top: 10px; }
+  .library-filter-bar input,
+  .library-filter-bar select { min-height: 38px; padding: 8px 11px; }
+  .library-filter-bar select { min-width: 148px; }
+  .exercise-library-grid { gap: 11px; margin-top: 12px; }
+}
+
+@media (max-width: 430px) {
+  .library-panel { padding: 15px; border-radius: 20px; }
+  .library-filter-bar select { min-width: 142px; }
+  .library-panel .card-body { padding: 9px 11px 11px; }
+}
+
 /* Session logger: size is intentionally inherited from the self-hosted Workstr CSS in workstr-reference.css.
    Keep only functional web fixes here so the UI does not drift larger than self-hosted. */
 .session-progress { display: block; }

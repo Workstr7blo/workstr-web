@@ -42,6 +42,15 @@ function state(partial: Partial<AppState> = {}, settings: Partial<WorkstrSetting
 }
 
 describe('equipment filter in the grids', () => {
+  it('marks the exercise library with compact polish hooks without changing Discover', () => {
+    const html = libraryPanel(state());
+    expect(html).toContain('class="panel library-panel"');
+    expect(html).toContain('class="filter-bar library-filter-bar"');
+    expect(html).toContain('class="library-filter-chips"');
+    expect(html).toContain('id="ex-grid" class="ex-grid exercise-library-grid"');
+    expect(discoverPanel(state({ discoverExercises: library }))).not.toContain('library-panel');
+  });
+
   it('renders an equipment select in both filter bars', () => {
     expect(libraryPanel(state())).toContain('id="ex-equip"');
     expect(discoverPanel(state({ discoverExercises: library }))).toContain('id="discover-equip"');
