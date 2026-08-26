@@ -22,16 +22,18 @@ export function libraryPanel(state: AppState): string {
     : `<span class="head-actions">
         <button class="button ghost small" id="lib-select-toggle"${state.library.length ? '' : ' disabled'}>Select</button>
       </span>`;
-  return `<div class="panel">
+  return `<div class="panel library-panel">
     <div class="panel-head"><span>Exercise library</span>${headActions}</div>
-    <div class="filter-bar">
+    <div class="filter-bar library-filter-bar">
       <input class="grow" id="ex-search" placeholder="Search exercises..." autocomplete="off" value="${html(state.filter)}" />
-      ${fillSelectHtml('ex-cat', filters.categories, 'All categories', state.exFilter.cat)}
-      ${fillSelectHtml('ex-muscle', filters.muscles, 'All muscles', state.exFilter.muscle)}
-      ${fillSelectHtml('ex-diff', filters.difficulties, 'All levels', state.exFilter.diff)}
-      ${equipmentSelectHtml('ex-equip', filters.equipment, state.exFilter.equip, owned.length)}
+      <div class="library-filter-chips">
+        ${fillSelectHtml('ex-cat', filters.categories, 'All categories', state.exFilter.cat)}
+        ${fillSelectHtml('ex-muscle', filters.muscles, 'All muscles', state.exFilter.muscle)}
+        ${fillSelectHtml('ex-diff', filters.difficulties, 'All levels', state.exFilter.diff)}
+        ${equipmentSelectHtml('ex-equip', filters.equipment, state.exFilter.equip, owned.length)}
+      </div>
     </div>
-    <div id="ex-grid" class="ex-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => exerciseCardHtml(exercise, sel.active, sel.slugs.has(exercise.slug))).join('')}</div>
+    <div id="ex-grid" class="ex-grid exercise-library-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => exerciseCardHtml(exercise, sel.active, sel.slugs.has(exercise.slug))).join('')}</div>
     <div id="ex-empty" class="empty" style="display:${list.length ? 'none' : 'block'}">${emptyText}</div>
   </div>`;
 }
