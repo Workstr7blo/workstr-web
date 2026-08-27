@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { getRecovery } from '../src/features/recovery/recovery';
 import { getQuickWorkout } from '../src/features/recovery/quickWorkout';
+import { quickWorkoutPanel, recoveryView } from '../src/features/recovery/views';
 import type { Exercise } from '../src/core/types';
+import type { AppState } from '../src/app/state';
 
 const libraryExercise = (slug: string, muscleGroup: string, equipment: string[] = []) =>
   ({ slug, name: slug, muscle_group: muscleGroup, muscles: [muscleGroup], tags: [], equipment } as unknown as Exercise);
@@ -19,6 +21,15 @@ function makeSession(finishedAt: string, slug: string, muscleGroup: string, setC
       exerciseSlug: slug, setNumber: index + 1, reps: 10, weight: 50, done: true, completedAt: finishedAt
     }))
   };
+}
+
+function appState(overrides: Partial<AppState> = {}): AppState {
+  return {
+    finishedSessions: [],
+    exercises: [],
+    qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false },
+    ...overrides
+  } as AppState;
 }
 
 describe('getRecovery', () => {
@@ -53,6 +64,37 @@ describe('getRecovery', () => {
     const data = getRecovery([makeSession(hoursAgo(11 * 24), 'squat', 'Quadriceps')], []);
     const quads = data.muscleGroups.find((group) => group.name === 'Quadriceps')!;
     expect(quads.status).toBe('untrained');
+  });
+});
+
+describe('recoveryView', () => {
+  it('uses dashboard copy and labels untrained groups as fresh', () => {
+    const markup = recoveryView(appState());
+    expect(markup).toContain('100%');
+    expect(markup).toContain('10 of 10');
+    expect(markup).toContain('Readiness from your last 10 days of training.');
+    expect(markup).toContain('Other muscles');
+    expect(markup).toContain('Fresh');
+    expect(markup).toContain('not logged recently');
+    expect(markup).not.toContain('not trained recently');
+    expect(markup).not.toContain('Estimated readiness per muscle group');
+  });
+
+  it('separates recently trained muscles from fresh muscles', () => {
+    const markup = recoveryView(appState({ finishedSessions: [makeSession(hoursAgo(36), 'bench-press', 'Chest')] }));
+    expect(markup).toContain('Recently trained');
+    expect(markup).toContain('Other muscles');
+    expect(markup).toContain('Chest');
+    expect(markup).toContain('71%');
+  });
+});
+
+describe('quickWorkoutPanel', () => {
+  it('uses compact action copy', () => {
+    const markup = quickWorkoutPanel(appState());
+    expect(markup).toContain('Uses ready muscles. Edit before starting.');
+    expect(markup).toContain('Build quick workout');
+    expect(markup).not.toContain('Generate from recovered muscles');
   });
 });
 

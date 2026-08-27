@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Recovery now reads like a readiness dashboard.** The Recovery tab has shorter copy, a
+  compact ready summary, a smaller body-map layout, Recently trained/Other muscles sections,
+  Fresh labels for muscles not logged recently, and a shorter Build quick workout action.
+
 - **Workout history cards now read like finished-session receipts.** Collapsed history cards
   separate date/duration from set, exercise, and volume chips; expanded cards add a compact
   summary panel, numbered exercise rows, and a stronger repeat-workout action.

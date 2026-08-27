@@ -6,7 +6,27 @@ import { getRecovery, type RecoveryGroup } from './recovery';
 export const RECOVERY_COLORS: Record<RecoveryGroup['status'], string> = { ready: '#00d084', partial: '#f7931a', recovering: '#ff3864', untrained: '#3a3052' };
 
 function recoveryNote(group: RecoveryGroup): string {
-  return group.status === 'untrained' ? 'not trained recently' : group.percent >= 100 ? 'fully recovered' : `${group.hoursRemaining}h to full`;
+  if (group.status === 'untrained') return 'not logged recently';
+  return group.percent >= 100 ? 'fully recovered' : `${group.hoursRemaining}h to full`;
+}
+
+function recoveryBadge(group: RecoveryGroup): string {
+  if (group.status === 'untrained') return 'Fresh';
+  if (group.status === 'ready') return 'Ready';
+  return `${group.percent}%`;
+}
+
+function recoveryRows(groups: RecoveryGroup[]): string {
+  return groups.map((group) => {
+    const track = group.status === 'untrained'
+      ? '<div class="rtrack fresh"></div>'
+      : `<div class="rtrack"><div class="rfill" style="width:${group.percent}%"></div></div>`;
+    return `<div class="recovery-row ${group.status}">
+      <div class="rname">${html(group.name)}</div>
+      ${track}
+      <div class="rmeta"><strong>${html(recoveryBadge(group))}</strong><small>${recoveryNote(group)}</small></div>
+    </div>`;
+  }).join('');
 }
 
 const RECOVERY_LABEL_TEXT = (x: number, label: string) => `<text x="${x}" y="225" text-anchor="middle" font-size="6" font-family="Jost,sans-serif" fill="#c0a880" letter-spacing="1.5" font-weight="600">${label}</text>`;
@@ -28,27 +48,32 @@ export function recoveryView(state: AppState): string {
   for (const group of data.muscleGroups) byMuscle[group.name] = group;
   const order: Record<RecoveryGroup['status'], number> = { recovering: 0, partial: 1, ready: 2, untrained: 3 };
   const sorted = [...data.muscleGroups].sort((a, b) => (order[a.status] - order[b.status]) || a.percent - b.percent);
-  return `<div class="panel">
+  const trained = sorted.filter((group) => group.status !== 'untrained');
+  const fresh = sorted.filter((group) => group.status === 'untrained');
+  const statusLine = data.readyCount === data.totalCount ? 'All trained groups are ready.' : `${data.readyCount} of ${data.totalCount} groups ready.`;
+  const trainedSection = trained.length ? `<div class="recovery-section"><div class="recovery-section-title">Recently trained</div>${recoveryRows(trained)}</div>` : '';
+  const freshSection = fresh.length ? `<div class="recovery-section fresh-section"><div class="recovery-section-title">Other muscles</div>${recoveryRows(fresh)}</div>` : '';
+  return `<div class="panel recovery-panel">
     <div class="panel-head"><span>Muscle recovery</span><strong id="recovery-overall">${data.overallReadiness}%</strong></div>
-    <p class="section-help">Estimated readiness per muscle group from your completed sessions over the last 10 days. Bigger groups recover slower; higher training volume extends recovery. <span id="recovery-ready" class="section-label">${data.readyCount}/${data.totalCount} ready</span></p>
-    <div class="recovery-layout">
+    <div class="recovery-summary">
+      <strong><span id="recovery-ready">${data.readyCount} of ${data.totalCount}</span> ready</strong>
+      <small>${html(statusLine)}</small>
+    </div>
+    <p class="section-help">Readiness from your last 10 days of training.</p>
+    <div class="recovery-layout compact">
       <div class="recovery-map">
         ${recoveryBodySvg(byMuscle)}
         <div class="recovery-legend">
           <span class="rl ready">Ready</span>
           <span class="rl partial">Partial</span>
           <span class="rl recovering">Recovering</span>
-          <span class="rl untrained">Untrained</span>
+          <span class="rl untrained">Fresh</span>
         </div>
         <div id="recovery-tip" class="recovery-tip" hidden></div>
       </div>
-      <div id="recovery-list" class="recovery">${sorted.map((group) => `
-        <div class="recovery-row ${group.status}">
-          <div class="rname">${html(group.name)}</div>
-          <div class="rtrack"><div class="rfill" style="width:${group.percent}%"></div></div>
-          <div class="rmeta"><strong>${group.percent}%</strong><small>${recoveryNote(group)}</small></div>
-        </div>`).join('')}</div>
+      <div id="recovery-list" class="recovery">${trainedSection}${freshSection}</div>
     </div>
+    <details class="recovery-explainer"><summary>How this works</summary><p class="section-help">Bigger groups recover slower, and higher set volume extends recovery. Muscles not logged recently are marked Fresh so they stay available for quick workouts.</p></details>
   </div>`;
 }
 
@@ -61,8 +86,8 @@ export function quickWorkoutPanel(state: AppState): string {
         <span class="qw-dur-unit">min</span>
       </div>
     </div>
-    <p class="section-help">Generates a balanced session from exercises whose muscle groups are recovered (ready, ≥80%). Pick a duration, then swap or drop any exercise before you start.</p>
-    <button class="button primary" id="qw-generate" style="width:100%">Generate from recovered muscles</button>
+    <p class="section-help">Uses ready muscles. Edit before starting.</p>
+    <button class="button primary" id="qw-generate" style="width:100%">Build quick workout</button>
     <div id="qw-result" class="qw-result" ${qw.visible && qw.exercises.length ? '' : 'hidden'}>
       <div class="qw-meta" id="qw-meta">${html(qw.meta)}</div>
       <div class="qw-list" id="qw-list">${qw.exercises.map((exercise, index) => {
