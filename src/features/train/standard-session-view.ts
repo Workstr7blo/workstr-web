@@ -51,6 +51,11 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   const restSec = Number(exercise.restSec) || 90;
   const targetSets = Number(exercise.sets) || setCounts[slug] || 1;
   const targetReps = exercise.reps || '';
+  const repsInputValue = (reps: string | number | null | undefined): string => {
+    if (reps == null) return '';
+    const raw = String(reps);
+    return /^\d+(\.\d+)?$/.test(raw) ? raw : raw.match(/\d+(?:\.\d+)?/)?.[0] || '';
+  };
   const logged = session.sets.filter((set) => set.exerciseSlug === slug);
   nav.innerHTML = exercises.map((candidate, index) => {
     const target = Number(candidate.sets) || setCounts[candidate.exerciseSlug] || 1;
@@ -62,17 +67,17 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   const setPlan = Array.from({ length: setCounts[slug] }, (_, index) => {
     const done = logged.find((set) => Number(set.setNumber) === index + 1);
     const previous = input.previousSets[index];
-    const defaultReps = String(done?.reps ?? (targetReps || previous?.reps || ''));
+    const defaultReps = done?.reps != null ? String(done.reps) : repsInputValue(targetReps || previous?.reps);
     const defaultWeight = done?.weight != null ? input.weightDisplay(done.weight) : (previous?.weight != null ? input.weightDisplay(previous.weight) : input.weightDisplay(exercise.weight));
     return { index, done, previous, defaultReps, defaultWeight };
   });
   const current = setPlan[activeSetIndex];
   const currentHints = current?.previous ? `<div class="session-current-hints"><span>Previous: ${html(input.formatSetHint(current.previous))}</span><span>${input.suggestedSetHint(current.previous, targetReps)}</span></div>` : '';
   const currentSet = current && !allSetsDone ? `<div class="session-current-set" data-set-block="${current.index}">
-    <div class="session-current-head"><span>Set ${current.index + 1} of ${setCounts[slug]}</span><strong>${html(targetReps || current.previous?.reps || 'Free')} reps</strong></div>
+    <div class="session-current-head"><span>Log set ${current.index + 1} of ${setCounts[slug]}</span><strong>${html(targetReps || current.previous?.reps || 'Free')} reps</strong></div>
     <div class="session-current-inputs">
-      <label><span>Reps</span><input class="session-set-input" data-session-reps="${current.index}" type="number" inputmode="numeric" placeholder="${html(targetReps || current.previous?.reps || 'reps')}" value="${html(current.defaultReps)}"></label>
-      <label><span>Weight</span><input class="session-set-input" data-session-weight="${current.index}" type="number" inputmode="decimal" step="0.5" placeholder="${html(current.defaultWeight || input.unitLabel())}" value="${html(current.defaultWeight)}"></label>
+      <label><span>Reps to log</span><input class="session-set-input" data-session-reps="${current.index}" type="number" inputmode="numeric" placeholder="${html(targetReps || current.previous?.reps || 'reps')}" value="${html(current.defaultReps)}"></label>
+      <label><span>${html(input.unitLabel())} load</span><input class="session-set-input" data-session-weight="${current.index}" type="number" inputmode="decimal" step="0.5" placeholder="${html(current.defaultWeight || input.unitLabel())}" value="${html(current.defaultWeight)}"></label>
     </div>${currentHints}
   </div>` : '<div class="session-current-set complete"><span>Exercise complete</span><strong>All sets logged</strong></div>';
   const rows = setPlan.map(({ index, done, previous, defaultReps, defaultWeight }) => {
@@ -81,8 +86,8 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
     return `<div class="session-set-block ${state}" data-set-block="${index}">
       <div class="session-set-row">
         <div class="session-set-num ${done ? 'done' : ''}" data-set-num="${index}">${index + 1}</div>
-        <div class="session-set-summary"><strong>${state === 'active' ? 'Current set' : done ? 'Logged' : 'Upcoming'}</strong><span>${html(summary)}</span></div>
-        ${done ? `<button class="session-log-btn done" data-set-log-btn="${index}" disabled type="button">Done</button>` : ''}
+        <div class="session-set-summary"><strong>${state === 'active' ? 'Current set' : done ? 'Done' : 'Upcoming'}</strong><span>${html(summary)}</span></div>
+        ${done ? `<span class="session-set-status done" data-set-log-btn="${index}">Done</span>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -105,7 +110,8 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   body.innerHTML = `<div class="session-focus-card">
       ${exercise.imageUrl ? `<img class="session-ex-image compact" src="${html(exercise.imageUrl)}" alt="${html(name)}" loading="eager" onerror="this.classList.add('placeholder');this.removeAttribute('src');this.textContent='No image'">` : '<div class="session-ex-image compact placeholder">No image</div>'}
       <div class="session-focus-copy">
-        <div class="session-ex-name">${html(name)}</div>
+        <span class="sr-only">${html(name)}</span>
+        <div class="session-focus-label">Target</div>
         <div class="session-ex-target"><b>${targetSets}</b> sets <span class="dot"></span> <b>${html(targetReps || 'free')}</b> reps <span class="dot"></span> <b>${restSec}s</b> rest</div>
       </div>
     </div>
