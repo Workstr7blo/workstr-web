@@ -199,6 +199,7 @@ export class StandardSessionController {
     }
     const allDone = this.loggedSetCount(session, slug) >= (this.setCounts[slug] || 1);
     const next = allDone ? exercises[this.exerciseIndex + 1] : null;
+    void this.render(session);
     this.rest.start(restSeconds, allDone, next?.exerciseName || next?.exerciseSlug || '');
   }
 

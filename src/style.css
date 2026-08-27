@@ -171,10 +171,54 @@
   .discover-exercise-panel .card-body { padding: 9px 11px 11px; }
 }
 
-/* Session logger: size is intentionally inherited from the self-hosted Workstr CSS in workstr-reference.css.
-   Keep only functional web fixes here so the UI does not drift larger than self-hosted. */
+/* Session logger: focus the standard live screen on the next set instead of a tall
+   exercise-detail page. EMOM keeps its own live-card overrides below. */
 .session-progress { display: block; }
 .session-progress-fill { min-width: 4px; }
+.session-header { align-items: center; padding-top: calc(14px + env(safe-area-inset-top)); padding-bottom: 12px; }
+.session-eyebrow { margin-bottom: 6px; font-size: 9px; letter-spacing: .16em; }
+.session-title { font-size: clamp(22px, 5vw, 30px); }
+.session-meta-line { margin-top: 7px; gap: 8px; }
+.session-meta { letter-spacing: .04em; }
+.session-elapsed-chip { padding: 4px 9px; }
+.session-close-btn { padding: 10px 13px; }
+.session-ex-nav { padding-top: 9px; padding-bottom: 9px; }
+.session-ex-dot { width: 36px; height: 36px; border-radius: 11px; font-size: 13px; }
+.session-body { padding-top: 14px; }
+.session-focus-card { display: grid; grid-template-columns: 96px minmax(0,1fr); gap: 13px; align-items: center; margin-bottom: 13px; }
+.session-ex-image.compact { aspect-ratio: 1 / 1; height: auto; margin: 0; border-radius: 14px; }
+.session-ex-image.compact.placeholder { min-height: 96px; }
+.session-focus-copy { min-width: 0; }
+.session-focus-card .session-ex-name { margin-bottom: 8px; font-size: clamp(24px, 6vw, 34px); }
+.session-focus-card .session-ex-target { margin-bottom: 0; font-size: 11px; }
+.session-current-set { display: grid; gap: 12px; margin-bottom: 14px; padding: 15px; border: 1px solid rgba(188,151,255,.22); border-radius: 18px; background: radial-gradient(circle at 8% 0%, rgba(124,60,255,.18), transparent 62%), rgba(0,0,0,.26); box-shadow: 0 18px 44px rgba(0,0,0,.22); }
+.session-current-set.complete { gap: 5px; text-align: center; color: var(--success-green); }
+.session-current-set.complete span { color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.session-current-set.complete strong { color: var(--text); font-size: 20px; }
+.session-current-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.session-current-head span { color: var(--purple-2); font: 900 11px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.session-current-head strong { color: var(--text); font: 900 18px/1 Inter, ui-sans-serif, sans-serif; letter-spacing: -.03em; }
+.session-current-inputs { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+.session-current-inputs label { display: grid; gap: 6px; color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.session-current-hints { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--dim); font: 800 11px/1.25 ui-monospace, monospace; }
+.session-current-hints span:last-child { color: var(--bitcoin-gold); }
+.session-set-plan { display: grid; gap: 7px; margin-top: 2px; }
+.session-sets { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.session-sets::-webkit-scrollbar { display: none; }
+.session-sets-label { color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.session-set-block { flex: 0 0 126px; padding: 7px 8px; border: 1px solid rgba(188,151,255,.10); border-radius: 13px; background: rgba(255,255,255,.024); }
+.session-set-block.active { border-color: rgba(124,60,255,.38); background: rgba(124,60,255,.09); }
+.session-set-block.done { border-color: rgba(54,224,160,.24); }
+.session-set-block.upcoming { opacity: .68; }
+.session-set-row { grid-template-columns: 30px minmax(0,1fr) auto; gap: 7px; }
+.session-set-summary { min-width: 0; display: grid; gap: 3px; }
+.session-set-summary strong { font: 900 10px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.session-set-summary span { color: var(--muted); font: 700 11px/1.25 ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-add-set { margin-top: 10px; padding: 9px 12px; }
+.session-instructions { margin-top: 16px; }
+.session-instructions-toggle { padding: 11px 13px; }
+.session-footer { padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+.session-log-primary { background: linear-gradient(135deg, var(--bitcoin-gold), #ffb347); color: #1d1202; box-shadow: 0 0 28px rgba(247,147,26,.28); }
 .session-rest-overlay,
 .session-overlay > .session-rest-overlay {
   position: fixed !important;
@@ -258,14 +302,16 @@
 }
 
 @media (max-width: 390px) {
-  .session-header { padding-left: 22px !important; padding-right: 22px !important; }
-  .session-body { padding-left: 22px !important; padding-right: 22px !important; }
-  .session-ex-nav { padding-left: 22px !important; padding-right: 22px !important; }
-  .session-ex-dot { width: 58px !important; height: 58px !important; }
+  .session-header { padding-left: 18px !important; padding-right: 18px !important; }
+  .session-body { padding-left: 18px !important; padding-right: 18px !important; }
+  .session-ex-nav { padding-left: 18px !important; padding-right: 18px !important; }
+  .session-ex-dot { width: 34px !important; height: 34px !important; }
+  .session-focus-card { grid-template-columns: 82px minmax(0,1fr); gap: 11px; }
+  .session-ex-image.compact.placeholder { min-height: 82px; }
   .emom-round-nav { padding-left: 8px !important; padding-right: 8px !important; }
   .emom-round-nav .session-ex-dot { width: 40px !important; height: 40px !important; }
-  .session-set-row { grid-template-columns: 44px minmax(0,1fr) minmax(0,1fr) 70px !important; gap: 10px !important; }
-  .session-footer { padding-left: 22px !important; padding-right: 22px !important; }
+  .session-set-row { grid-template-columns: 34px minmax(0,1fr) auto !important; gap: 8px !important; }
+  .session-footer { padding-left: 18px !important; padding-right: 18px !important; }
 }
 
 .builder-picker { margin-top: 8px; max-height: 264px; overflow-y: auto; border: 1px solid var(--border); border-radius: 14px; scrollbar-width: thin; }

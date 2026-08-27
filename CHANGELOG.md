@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Live workout logging is now focused on the current set.** Standard workout sessions use
+  a compact exercise header, thumbnail-sized form image, current-set input card, lighter set
+  plan, and a sticky Log set action before showing Next or Finish.
+
 - **Recovery now reads like a readiness dashboard.** The Recovery tab has shorter copy, a
   compact ready summary, a smaller body-map layout, Recently trained/Other muscles sections,
   Fresh labels for muscles not logged recently, and a shorter Build quick workout action.

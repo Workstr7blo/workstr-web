@@ -360,6 +360,12 @@ describe('session runner', () => {
 
   it('finishes the session and opens the recap modal', async () => {
     await runner.startTrainingSession(oneExerciseProgram());
+    (root.querySelector('[data-session-reps="0"]') as HTMLInputElement).value = '8';
+    (root.querySelector('[data-set-log-btn="0"]') as HTMLButtonElement).click();
+    await tick();
+    (root.querySelector('[data-session-reps="1"]') as HTMLInputElement).value = '8';
+    (root.querySelector('[data-set-log-btn="1"]') as HTMLButtonElement).click();
+    await tick();
     (root.querySelector('#finish-session') as HTMLButtonElement).click();
     await tick();
     expect(finished).toEqual([1]);
@@ -415,23 +421,24 @@ describe('session runner', () => {
     expect(root.querySelector('#emom-start')).toBeTruthy();
   });
 
-  it('makes the EMOM section the advance step of a mixed session rather than a rival to finishing', async () => {
+  it('keeps the current set primary while offering the mixed-session EMOM handoff', async () => {
     await runner.startTrainingSession(mixedProgram());
     const handoff = root.querySelector('#start-emom-section') as HTMLButtonElement;
-    expect(handoff.textContent).toBe('Next: EMOM');
+    expect(handoff.textContent).toBe('Start EMOM');
+    expect(root.querySelector('[data-set-log-btn="0"]')?.textContent).toBe('Log set 1');
     expect(root.querySelector('.session-finish-btn')).toBeFalsy();
     const finish = root.querySelector('#finish-session') as HTMLButtonElement;
     expect(finish.className).toContain('session-finish-early');
     expect(finish.textContent).toBe('Finish early');
-    expect(root.querySelector('#session-meta')?.textContent).toBe('Strength · Exercise 1 of 1 · EMOM next');
+    expect(root.querySelector('#session-meta')?.textContent).toBe('Strength then EMOM · Exercise 1/1 · EMOM next');
   });
 
-  it('keeps the terminal finish button on the last card of a session with no EMOM section', async () => {
+  it('keeps the set log primary until every set is done on the last exercise', async () => {
     await runner.startTrainingSession(oneExerciseProgram());
-    expect(root.querySelector('.session-finish-btn')?.textContent).toBe('Finish session');
+    expect(root.querySelector('[data-set-log-btn="0"]')?.textContent).toBe('Log set 1');
     expect(root.querySelector('.session-finish-early')).toBeFalsy();
     expect(root.querySelector('#start-emom-section')).toBeFalsy();
-    expect(root.querySelector('#session-meta')?.textContent).toBe('Exercise 1 of 1');
+    expect(root.querySelector('#session-meta')?.textContent).toBe('Test Program · Exercise 1/1');
   });
 
   it('names the EMOM section once a mixed session hands over to the clock', async () => {

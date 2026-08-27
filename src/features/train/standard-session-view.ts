@@ -57,21 +57,33 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
     const cls = index === exerciseIndex ? 'current' : input.loggedSetCount(candidate.exerciseSlug) >= target ? 'done' : '';
     return `<button class="session-ex-dot ${cls}" data-jump-ex="${index}" type="button">${index + 1}</button>`;
   }).join('');
-  const rows = Array.from({ length: setCounts[slug] }, (_, index) => {
+  const activeSetIndex = Math.max(0, Array.from({ length: setCounts[slug] }, (_, index) => index).find((index) => !logged.find((set) => Number(set.setNumber) === index + 1)) ?? setCounts[slug] - 1);
+  const allSetsDone = input.loggedSetCount(slug) >= setCounts[slug];
+  const setPlan = Array.from({ length: setCounts[slug] }, (_, index) => {
     const done = logged.find((set) => Number(set.setNumber) === index + 1);
     const previous = input.previousSets[index];
-    const locked = !done && index > 0 && !logged.find((set) => Number(set.setNumber) === index);
-    const previousHint = previous ? `<div class="session-set-hint prev">prev: ${html(input.formatSetHint(previous))}</div>` : '';
-    const suggestedHint = previous ? `<div class="session-set-hint suggest">${input.suggestedSetHint(previous, targetReps)}</div>` : '';
     const defaultReps = String(done?.reps ?? (targetReps || previous?.reps || ''));
     const defaultWeight = done?.weight != null ? input.weightDisplay(done.weight) : (previous?.weight != null ? input.weightDisplay(previous.weight) : input.weightDisplay(exercise.weight));
-    return `<div class="session-set-block ${locked ? 'locked' : ''}" data-set-block="${index}">
+    return { index, done, previous, defaultReps, defaultWeight };
+  });
+  const current = setPlan[activeSetIndex];
+  const currentHints = current?.previous ? `<div class="session-current-hints"><span>Previous: ${html(input.formatSetHint(current.previous))}</span><span>${input.suggestedSetHint(current.previous, targetReps)}</span></div>` : '';
+  const currentSet = current && !allSetsDone ? `<div class="session-current-set" data-set-block="${current.index}">
+    <div class="session-current-head"><span>Set ${current.index + 1} of ${setCounts[slug]}</span><strong>${html(targetReps || current.previous?.reps || 'Free')} reps</strong></div>
+    <div class="session-current-inputs">
+      <label><span>Reps</span><input class="session-set-input" data-session-reps="${current.index}" type="number" inputmode="numeric" placeholder="${html(targetReps || current.previous?.reps || 'reps')}" value="${html(current.defaultReps)}"></label>
+      <label><span>Weight</span><input class="session-set-input" data-session-weight="${current.index}" type="number" inputmode="decimal" step="0.5" placeholder="${html(current.defaultWeight || input.unitLabel())}" value="${html(current.defaultWeight)}"></label>
+    </div>${currentHints}
+  </div>` : '<div class="session-current-set complete"><span>Exercise complete</span><strong>All sets logged</strong></div>';
+  const rows = setPlan.map(({ index, done, previous, defaultReps, defaultWeight }) => {
+    const state = done ? 'done' : index === activeSetIndex && !allSetsDone ? 'active' : 'upcoming';
+    const summary = done ? `${done.reps ?? '—'} reps${done.weight == null ? '' : ` · ${input.weightDisplay(done.weight)} ${input.unitLabel()}`}` : `${targetReps || previous?.reps || 'free'} reps${defaultWeight ? ` · ${defaultWeight} ${input.unitLabel()}` : ''}`;
+    return `<div class="session-set-block ${state}" data-set-block="${index}">
       <div class="session-set-row">
         <div class="session-set-num ${done ? 'done' : ''}" data-set-num="${index}">${index + 1}</div>
-        <input class="session-set-input" data-session-reps="${index}" type="number" inputmode="numeric" placeholder="${html(targetReps || previous?.reps || 'reps')}" value="${html(defaultReps)}" ${done || locked ? 'disabled' : ''}>
-        <input class="session-set-input" data-session-weight="${index}" type="number" inputmode="decimal" step="0.5" placeholder="${html(defaultWeight || input.unitLabel())}" value="${html(defaultWeight)}" ${done || locked ? 'disabled' : ''}>
-        ${done ? `<button class="session-log-btn done" data-set-log-btn="${index}" disabled type="button">Done</button>` : `<button class="session-log-btn" data-session-log="${html(slug)}" data-set-index="${index}" data-set-log-btn="${index}" data-rest="${restSec}" ${locked ? 'disabled' : ''} type="button">Log</button>`}
-      </div>${previousHint}${suggestedHint}
+        <div class="session-set-summary"><strong>${state === 'active' ? 'Current set' : done ? 'Logged' : 'Upcoming'}</strong><span>${html(summary)}</span></div>
+        ${done ? `<button class="session-log-btn done" data-set-log-btn="${index}" disabled type="button">Done</button>` : ''}
+      </div>
     </div>`;
   }).join('');
   const instructions = exercise.instructions || [];
@@ -82,30 +94,38 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
     </div>
     <div class="session-instructions-body">${instructions.map((step, index) => `<div class="session-instructions-step"><b>${index + 1}</b>${html(step)}</div>`).join('')}</div>
   </div>` : '';
-  title.textContent = session.sheetName || 'Freestyle';
+  title.textContent = name;
   // A mixed session names its section on every card, so reaching the last strength
   // exercise never reads as reaching the end of the workout.
   const sectionPrefix = input.emomPending ? 'Strength · ' : '';
   const sectionSuffix = input.emomPending ? ' · EMOM next' : '';
   meta.textContent = input.superset
-    ? `${sectionPrefix}Superset · Round ${input.superset.roundIndex + 1} of ${input.superset.rounds} · Move ${input.superset.stepIndex + 1} of ${input.superset.stepCount}${sectionSuffix}`
-    : `${sectionPrefix}Exercise ${exerciseIndex + 1} of ${exercises.length}${sectionSuffix}`;
-  body.innerHTML = `${exercise.imageUrl ? `<img class="session-ex-image" src="${html(exercise.imageUrl)}" alt="${html(name)}" loading="eager" onerror="this.classList.add('placeholder');this.removeAttribute('src');this.textContent='No exercise image'">` : '<div class="session-ex-image placeholder">No exercise image</div>'}
-    <div class="session-ex-name">${html(name)}</div>
-    <div class="session-ex-target"><b>${targetSets}</b> sets <span class="dot"></span> <b>${html(targetReps || 'free')}</b> reps <span class="dot"></span> <b>${restSec}s</b> rest</div>
-    <div class="session-sets">${rows}</div>
+    ? `${sectionPrefix}${session.sheetName || 'Workout'} · Round ${input.superset.roundIndex + 1} of ${input.superset.rounds} · Move ${input.superset.stepIndex + 1} of ${input.superset.stepCount}${sectionSuffix}`
+    : `${session.sheetName || 'Workout'} · Exercise ${exerciseIndex + 1}/${exercises.length}${sectionSuffix}`;
+  body.innerHTML = `<div class="session-focus-card">
+      ${exercise.imageUrl ? `<img class="session-ex-image compact" src="${html(exercise.imageUrl)}" alt="${html(name)}" loading="eager" onerror="this.classList.add('placeholder');this.removeAttribute('src');this.textContent='No image'">` : '<div class="session-ex-image compact placeholder">No image</div>'}
+      <div class="session-focus-copy">
+        <div class="session-ex-name">${html(name)}</div>
+        <div class="session-ex-target"><b>${targetSets}</b> sets <span class="dot"></span> <b>${html(targetReps || 'free')}</b> reps <span class="dot"></span> <b>${restSec}s</b> rest</div>
+      </div>
+    </div>
+    ${currentSet}
+    <div class="session-set-plan"><div class="session-sets-label">Set plan</div><div class="session-sets">${rows}</div></div>
     <button class="session-add-set" data-add-session-set="${html(slug)}" type="button">+ Add set</button>${instructionsMarkup}`;
   const isLast = exerciseIndex >= exercises.length - 1;
-  const nextLabel = input.superset && !input.superset.roundComplete ? 'Next move' : 'Next';
+  const nextLabel = input.superset && !input.superset.roundComplete ? 'Next move' : 'Next exercise';
   const prev = exerciseIndex > 0 ? `<button class="session-prev-btn" data-jump-ex="${exerciseIndex - 1}" type="button">Prev</button>` : '';
+  const logCurrent = current && !allSetsDone ? `<button class="session-next-btn session-log-primary" data-session-log="${html(slug)}" data-set-index="${current.index}" data-set-log-btn="${current.index}" data-rest="${restSec}" type="button">Log set ${current.index + 1}</button>` : '';
   // The EMOM section is the next page of the same workout, so on the last strength card it
   // takes the advance slot outright. Offered early it is a shortcut, so it sits beside Next.
-  const handoffEarly = input.startEmom && !isLast ? '<button class="session-emom-btn" id="start-emom-section" type="button">Start EMOM</button>' : '';
-  const advance = input.startEmom && isLast
-    ? '<button class="session-emom-btn" id="start-emom-section" type="button">Next: EMOM</button>'
-    : isLast
-      ? '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>'
-      : `<button class="session-next-btn" data-jump-ex="${exerciseIndex + 1}" type="button">${nextLabel}</button>`;
+  const handoffEarly = input.startEmom && !(allSetsDone && isLast) ? '<button class="session-emom-btn" id="start-emom-section" type="button">Start EMOM</button>' : '';
+  const advance = !allSetsDone
+    ? logCurrent
+    : input.startEmom && isLast
+      ? '<button class="session-emom-btn" id="start-emom-section" type="button">Next: EMOM</button>'
+      : isLast
+        ? '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>'
+        : `<button class="session-next-btn" data-jump-ex="${exerciseIndex + 1}" type="button">${nextLabel}</button>`;
   // Stopping here abandons the EMOM section, so it is the exception rather than a peer of
   // the handoff — same wording and weight as the EMOM half's own early exit.
   const finishEarly = input.emomPending && isLast ? '<button class="session-finish-early" id="finish-session" type="button">Finish early</button>' : '';
