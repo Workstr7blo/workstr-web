@@ -26,13 +26,37 @@ describe('shell', () => {
     expect(settings?.textContent).toContain('Support Workstr');
     expect(settings?.querySelector('.advanced-settings:not([open])')).toBeTruthy();
     expect(settings?.querySelector('.account-card .terminal-mini')).toBeNull();
-    expect(settings?.querySelector('#create-account-settings')).toBeTruthy();
-    expect(settings?.querySelector('#restore-account-settings')).toBeTruthy();
-    expect(settings?.querySelector('#enable-sync')).toBeTruthy();
+    expect(settings?.querySelector('#sign-in-settings')).toBeTruthy();
+    expect(settings?.querySelector('#create-account-settings')).toBeNull();
+    expect(settings?.querySelector('#restore-account-settings')).toBeNull();
+    expect(settings?.querySelector('#enable-sync')).toBeNull();
     expect(settings?.querySelector('#auto-backup')).toBeNull();
-    expect(settings?.textContent).toContain('Create sync account');
+    expect(settings?.textContent).not.toContain('Create sync account');
+    expect(settings?.textContent).toContain('Use Account above');
     expect(settings?.textContent).toContain('Manual backup');
     expect(settings?.textContent).toContain('0 selected');
+  });
+
+  it('opens a single tabbed account modal from the signed-out chip', () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    renderShell(root);
+
+    root.querySelector<HTMLElement>('#account-chip')?.click();
+    const modal = root.querySelector('#modal.open') as HTMLElement;
+    expect(modal).toBeTruthy();
+    expect(modal.textContent).toContain('Workstr account');
+    expect(modal.querySelector('#auth-tab-login[aria-selected="true"]')).toBeTruthy();
+    expect(modal.querySelector('#auth-tab-create[aria-selected="false"]')).toBeTruthy();
+    expect(modal.querySelector('#restore-local-account')).toBeTruthy();
+    expect(modal.querySelector('#connect-remote-signer')).toBeTruthy();
+    expect(modal.querySelector('#create-local-account')).toBeNull();
+
+    modal.querySelector<HTMLElement>('#auth-tab-create')?.click();
+    const createModal = root.querySelector('#modal.open') as HTMLElement;
+    expect(createModal.querySelector('#auth-tab-create[aria-selected="true"]')).toBeTruthy();
+    expect(createModal.querySelector('#create-local-account')).toBeTruthy();
+    expect(createModal.querySelector('#restore-local-account')).toBeNull();
   });
 
   it('renders a compact kind 0 identity chip when signed in', () => {

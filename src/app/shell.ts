@@ -173,12 +173,12 @@ export function renderShell(root: HTMLElement): void {
         if (parent === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
       }
     }));
-    root.querySelector('#account-chip')?.addEventListener('click', () => { state.view = 'settings'; render({ toTop: true }); void preferences.refreshFunding(); });
+    root.querySelector('#account-chip')?.addEventListener('click', () => { if (!state.pubkey) { identity.startAccountChoice(); return; } state.view = 'settings'; render({ toTop: true }); void preferences.refreshFunding(); });
     root.querySelectorAll<HTMLElement>('[data-copy]').forEach((button) => button.addEventListener('click', () => {
       void navigator.clipboard.writeText(button.dataset.copy || '')
         .then(() => toast('Copied'), () => toast('Could not copy', 'bad'));
     }));
-    root.querySelector('#create-account-settings')?.addEventListener('click', identity.startLocalAccount); root.querySelector('#restore-account-settings')?.addEventListener('click', identity.startRestoreLocalAccount); root.querySelector('#sign-in-settings')?.addEventListener('click', identity.startAccountChoice);
+    root.querySelector('#sign-in-settings')?.addEventListener('click', () => identity.startAccountChoice());
     root.querySelector('#sign-in-nip07')?.addEventListener('click', () => { void identity.connectNip07(); });
     root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void identity.signOut(); });
     root.querySelector('#remove-account-data')?.addEventListener('click', () => { void identity.signOutAndRemoveData(); });

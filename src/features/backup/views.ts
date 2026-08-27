@@ -100,7 +100,7 @@ export function backupPanel(state: BackupPanelState): string {
       ? 'Encrypted across your devices.'
       : 'Keep training current across devices.';
   const syncAction = !state.signedIn
-    ? '<button id="enable-sync" class="button primary">Sign in to sync</button>'
+    ? '<span class="settings-muted-action">Use Account above</span>'
     : state.enabled
       ? `<label class="settings-switch"><input type="checkbox" id="auto-backup" checked />Auto-sync</label><button id="sync-now" class="button ghost" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button>`
       : '<button id="enable-sync" class="button primary">Turn on sync</button>';

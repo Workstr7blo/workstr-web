@@ -1,7 +1,7 @@
 import { renderSVG } from 'uqr';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
-import { clearCachedNip46Signer, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
+import { clearCachedNip46Signer, createBunkerSigner, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
 import { clearLocalKey, createCachedLocalKeySigner, createLocalAccount, importLocalAccount } from '../signer/local-key';
 import { forgetAutoApprove } from '../signer/auto-approve';
 import type { Signer } from '../signer/types';
@@ -163,20 +163,46 @@ async function startRemoteSignerRequest(): Promise<void> {
 }
 
 
-function startAccountChoice(): void {
-  openModal(`<div class="page-title">Create or connect account</div>
-    <p class="section-help">Use Workstr locally, create a fast encrypted sync account, or connect an existing Nostr signer.</p>
-    <div class="settings-auth-options">
-      <button id="create-local-account" class="button primary" type="button">Create encrypted sync account</button>
-      <button id="restore-local-account" class="button ghost" type="button">Restore with recovery key</button>
-      <button id="connect-remote-signer" class="button ghost" type="button">Use mobile signer</button>
-      ${hasNip07() ? '<button id="connect-extension-signer" class="button ghost" type="button">Use browser extension</button>' : ''}
+function startAccountChoice(tab: 'login' | 'create' = 'login'): void {
+  const isLogin = tab === 'login';
+  openModal(`<div class="page-title">Workstr account</div>
+    <p class="section-help">Use Workstr locally, or connect a private encrypted sync account when you want training on every device.</p>
+    <div class="auth-tabs" role="tablist" aria-label="Account flow">
+      <button id="auth-tab-login" class="auth-tab ${isLogin ? 'active' : ''}" type="button" role="tab" aria-selected="${isLogin}">Log in</button>
+      <button id="auth-tab-create" class="auth-tab ${!isLogin ? 'active' : ''}" type="button" role="tab" aria-selected="${!isLogin}">Create account</button>
     </div>
-    <p class="section-help">Device-managed keys are convenient and faster for sync. A dedicated signer is more protected if you already use one.</p>`);
+    ${isLogin ? loginTabMarkup() : createTabMarkup()}`);
+  root.querySelector('#auth-tab-login')?.addEventListener('click', () => startAccountChoice('login'));
+  root.querySelector('#auth-tab-create')?.addEventListener('click', () => startAccountChoice('create'));
   root.querySelector('#create-local-account')?.addEventListener('click', createLocalAccountFlow);
   root.querySelector('#restore-local-account')?.addEventListener('click', showRestoreLocalAccountModal);
   root.querySelector('#connect-remote-signer')?.addEventListener('click', () => { closeModal(); void startRemoteSignerRequest(); });
   root.querySelector('#connect-extension-signer')?.addEventListener('click', () => { closeModal(); void connectNip07(); });
+  root.querySelector('#continue-local')?.addEventListener('click', closeModal);
+}
+
+function loginTabMarkup(): string {
+  return `<div class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-login">
+    <p class="section-help">Restore an existing Workstr account with your recovery key, or connect a mobile signer.</p>
+    <div class="settings-auth-options single-column">
+      <button id="restore-local-account" class="button primary" type="button">Restore with recovery key</button>
+      <button id="connect-remote-signer" class="button ghost" type="button">Use mobile signer</button>
+      ${hasNip07() ? '<button id="connect-extension-signer" class="button ghost" type="button">Use browser extension</button>' : ''}
+    </div>
+    <button id="continue-local" class="auth-link-button" type="button">Continue locally on this device</button>
+  </div>`;
+}
+
+function createTabMarkup(): string {
+  return `<div class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-create">
+    <p class="section-help">Create a device-managed account for fast encrypted sync. Workstr will show a recovery key next — save it in your password manager.</p>
+    <div class="settings-auth-options single-column">
+      <button id="create-local-account" class="button primary" type="button">Create encrypted sync account</button>
+      <button id="connect-remote-signer" class="button ghost" type="button">Use mobile signer instead</button>
+      ${hasNip07() ? '<button id="connect-extension-signer" class="button ghost" type="button">Use browser extension instead</button>' : ''}
+    </div>
+    <button id="continue-local" class="auth-link-button" type="button">Continue locally for now</button>
+  </div>`;
 }
 
 function createLocalAccountFlow(): void {
@@ -238,20 +264,43 @@ function showSignerConnectModal(uri: string, mobile: boolean): void {
 function renderConnectModal(): void {
   if (!pendingConnect) return;
   const { uri, mobile } = pendingConnect;
-  openModal(`<div class="page-title">Connect signer</div>
+  openModal(`<div class="page-title">Connect mobile signer</div>
     <p class="section-help">${mobile
       ? 'Approve the request in your signer app, then return to this tab. You can also scan the QR code from another device.'
       : 'Scan the QR code with your NIP-46 signer app (Clave, Amber, ...). Once you approve, this tab signs in automatically.'}</p>
     <div class="signer-qr">${renderSVG(uri, { border: 2 })}</div>
     <div class="web-empty-actions">
-      <button id="connect-copy" class="button ghost" type="button">Copy connect link</button>
+      <button id="connect-copy" class="button ghost" type="button">Copy secret</button>
       <button id="connect-open" class="button ghost" type="button">Open signer app</button>
-    </div>`);
+    </div>
+    <details class="auth-bunker-details">
+      <summary>Paste bunker URL instead</summary>
+      <textarea id="bunker-input" class="auth-key-input" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="bunker://... or signer@example.com"></textarea>
+      <button id="connect-bunker" class="button primary" type="button">Connect bunker</button>
+    </details>`);
   root.querySelector('#connect-copy')?.addEventListener('click', (event) => {
     void navigator.clipboard.writeText(uri);
     (event.currentTarget as HTMLButtonElement).textContent = 'Copied';
   });
   root.querySelector('#connect-open')?.addEventListener('click', () => launchSignerRequest(uri));
+  root.querySelector('#connect-bunker')?.addEventListener('click', () => { void connectBunkerInput(); });
+}
+
+async function connectBunkerInput(): Promise<void> {
+  const input = root.querySelector<HTMLTextAreaElement>('#bunker-input')?.value || '';
+  try {
+    state.signInStatus = 'connecting bunker signer...';
+    const signer = await createBunkerSigner(input, { onAuthUrl: launchSignerRequest });
+    const pubkey = await signer.getPublicKey();
+    activeSigner = signer;
+    clearLocalKey();
+    pendingConnect = null;
+    closeModal();
+    await completeSignIn(pubkey, 'nip46');
+  } catch (error) {
+    state.signInStatus = `bunker signer error ${(error as Error).message}`;
+    renderConnectModal();
+  }
 }
 
 function launchSignerRequest(uri: string): void {

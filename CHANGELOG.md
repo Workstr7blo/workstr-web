@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Account setup now uses one focused login flow.** The signed-out account chip and Settings
+  account row open a tabbed Account modal with Log in as the default and Create account as
+  the second tab, while Data & Sync points back to that single Account action instead of
+  adding another sign-in button.
+
 - **The header account control is now a compact Nostr identity chip.** Signed-in users see
   their kind 0 profile avatar, nickname, and a small green status dot in the top-right
   instead of a heavier Account card.
