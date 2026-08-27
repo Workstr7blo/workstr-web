@@ -454,11 +454,22 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .workout-card-actions .button:not(.start-workout-action) { justify-content: center; }
 
 /* History (completed sessions) */
+.history-session-card .workout-card-meta { color: var(--text); }
+.history-stat-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.history-stat-pill { padding: 4px 7px; border: 1px solid rgba(188,151,255,.14); border-radius: 999px; background: rgba(0,0,0,.2); color: var(--muted); font: 800 9px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; }
 .session-detail { padding-top: 12px; border-top: 1px solid var(--border); }
-.session-detail-ex { padding: 9px 0; border-bottom: 1px solid var(--border); }
+.session-receipt-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.session-receipt-summary div { min-width: 0; padding: 10px 8px; border-radius: 12px; border: 1px solid rgba(188,151,255,.14); background: linear-gradient(135deg, rgba(124,60,255,.10), rgba(0,0,0,.24)); text-align: center; }
+.session-receipt-summary strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 900 17px/1 Inter, ui-sans-serif, sans-serif; letter-spacing: -.04em; }
+.session-receipt-summary span { display: block; margin-top: 5px; color: var(--dim); font: 800 9px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
+.session-detail-ex { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .session-detail-ex:last-of-type { border-bottom: none; }
-.session-detail-ex-name { font-weight: 700; font-size: 14px; margin-bottom: 7px; }
+.session-detail-ex-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 800; font-size: 14px; margin-bottom: 7px; }
+.session-detail-index { color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .08em; }
 .session-detail-sets { display: flex; flex-wrap: wrap; gap: 6px; }
+.session-actions { grid-template-columns: 1fr; }
+.session-actions .button { justify-content: center; }
+.session-actions .repeat-workout-action { justify-content: center; min-height: 40px; }
 .set-pill { font: 700 12px/1 ui-monospace, monospace; color: var(--muted); padding: 5px 9px; border: 1px solid var(--border); border-radius: 999px; background: rgba(0,0,0,.24); }
 
 /* Quick workout (recovery tab) */

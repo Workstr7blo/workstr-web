@@ -146,22 +146,25 @@ describe('calendar selection', () => {
 });
 
 describe('session card contents', () => {
-  it('keeps name, date, duration, sets, volume and muscle labels', () => {
+  it('keeps name, date, duration, set/exercise/volume receipt pills and muscle labels', () => {
     const trained = session(1, at(2026, 8, 19, 12), 'Push Day', 3);
     trained.startedAt = at(2026, 8, 19, 11);
     const doc = parse(workoutHistory(state([trained]), now));
     expect(doc.querySelector('.workout-card-name')?.textContent).toBe('Push Day');
     const meta = doc.querySelector('.workout-card-meta')?.textContent || '';
-    expect(meta).toContain('3 sets');
     expect(meta).toContain('1h 0m');
-    expect(meta).toContain('1440 kg volume');
+    expect(meta).not.toContain('1440 kg volume');
+    expect([...doc.querySelectorAll('.history-stat-pill')].map((node) => node.textContent)).toEqual(['3 sets', '1 exercise', '1440 kg volume']);
     expect(doc.querySelector('.workout-card-muscles')?.textContent).toBe('Chest');
     expect(doc.querySelector('[data-session-map="1"]')).not.toBeNull();
   });
 
-  it('still exposes toggle, publish and delete for the right session', () => {
+  it('renders a receipt summary, numbered exercises, publish and delete for the right session', () => {
     const doc = parse(workoutHistory(state([session(7, at(2026, 8, 19))], { expandedSessionId: 7, pubkey: 'ab'.repeat(32) }), now));
     expect(doc.querySelector('[data-toggle-session="7"]')).not.toBeNull();
+    expect(doc.querySelector('.session-receipt-summary')?.textContent).toContain('Sets');
+    expect(doc.querySelector('.session-detail-index')?.textContent).toBe('01');
+    expect(doc.querySelector('.repeat-workout-action')?.getAttribute('data-repeat-session')).toBe('7');
     expect(doc.querySelector('[data-publish-session="7"]')).not.toBeNull();
     expect(doc.querySelector('[data-delete-session="7"]')).not.toBeNull();
   });

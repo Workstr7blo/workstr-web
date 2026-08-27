@@ -61,33 +61,44 @@ export function publishSummaryButton(session: ActiveSession, canPublish: boolean
 export function repeatWorkoutButton(session: ActiveSession): string {
   const blocked = repeatBlockedReason(session);
   return blocked
-    ? `<button class="button ghost small" disabled title="${html(blocked)}">Repeat workout</button>`
-    : `<button class="button primary small" data-repeat-session="${session.id}">Repeat workout</button>`;
+    ? `<button class="button ghost small repeat-workout-action" disabled title="${html(blocked)}">Repeat workout</button>`
+    : `<button class="button primary small repeat-workout-action" data-repeat-session="${session.id}">Repeat workout</button>`;
 }
 
 export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPublish = false, publishing = false, publishingLabel = 'Waiting for signer...'): string {
+  const doneSets = session.sets.filter((item) => item.done);
   const byEx = new Map<string, SessionSetLog[]>();
-  for (const set of session.sets.filter((item) => item.done)) {
+  for (const set of doneSets) {
     if (!byEx.has(set.exerciseSlug)) byEx.set(set.exerciseSlug, []);
     byEx.get(set.exerciseSlug)!.push(set);
   }
+  const duration = sessionDuration(session);
+  const volume = workoutVolume(session);
+  const exerciseCount = byEx.size || sessionExercises(session).length;
+  const summary = `<div class="session-receipt-summary">
+    <div><strong>${duration || 'Done'}</strong><span>Duration</span></div>
+    <div><strong>${doneSets.length}</strong><span>Sets</span></div>
+    <div><strong>${exerciseCount}</strong><span>Exercises</span></div>
+    <div><strong>${volume > 0 ? html(formatWeightKg(volume, unit)) : '—'}</strong><span>Volume</span></div>
+  </div>`;
   const exName = (slug: string) => sessionExercises(session).find((member) => member.exerciseSlug === slug)?.exerciseName || slug;
   const supersetFor = (slug: string) => (session.blocks || [])
     .map((block, index) => ({ block, index }))
     .find(({ block }) => block.type === 'straight' && block.steps.length > 1 && block.steps.some((step) => step.exerciseSlug === slug));
-  const rows = [...byEx.entries()].map(([slug, sets]) => {
+  const rows = [...byEx.entries()].map(([slug, sets], index) => {
     const superset = supersetFor(slug);
     const pills = [...sets].sort((a, b) => a.setNumber - b.setNumber).map((set) =>
       `<span class="set-pill">${set.reps ?? '?'}${set.weight != null ? ` × ${html(formatWeightKg(set.weight, unit))}` : ''}</span>`
     ).join('');
     return `<div class="session-detail-ex">
-      <div class="session-detail-ex-name">${html(exName(slug))}${superset ? ` <span class="session-superset-badge">Superset ${superset.index + 1}</span>` : ''}</div>
+      <div class="session-detail-ex-name"><span class="session-detail-index">${String(index + 1).padStart(2, '0')}</span>${html(exName(slug))}${superset ? ` <span class="session-superset-badge">Superset ${superset.index + 1}</span>` : ''}</div>
       <div class="session-detail-sets">${pills}</div>
     </div>`;
   }).join('');
   return `<div class="session-detail">
+    ${summary}
     ${rows || '<p class="empty" style="padding:6px 0 12px">No sets were logged in this session.</p>'}
-    <div class="workout-card-actions">
+    <div class="workout-card-actions session-actions">
       ${repeatWorkoutButton(session)}
       ${publishSummaryButton(session, canPublish, publishing, 'small', publishingLabel)}
     </div>
