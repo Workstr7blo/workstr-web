@@ -186,9 +186,9 @@
 .session-ex-nav { padding-top: 7px; padding-bottom: 7px; }
 .session-ex-dot { width: 34px; height: 34px; border-radius: 10px; font-size: 13px; }
 .session-body { padding-top: 10px; }
-.session-focus-card { display: grid; grid-template-columns: 78px minmax(0,1fr); gap: 12px; align-items: center; margin-bottom: 10px; }
+.session-focus-card { display: grid; grid-template-columns: 104px minmax(0,1fr); gap: 14px; align-items: center; margin-bottom: 12px; }
 .session-ex-image.compact { aspect-ratio: 1 / 1; height: auto; margin: 0; border-radius: 14px; }
-.session-ex-image.compact.placeholder { min-height: 78px; }
+.session-ex-image.compact.placeholder { min-height: 104px; }
 .session-focus-copy { min-width: 0; }
 .session-focus-label { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 7px; }
 .session-focus-card .session-ex-name { margin-bottom: 8px; font-size: clamp(24px, 6vw, 34px); }
@@ -205,10 +205,10 @@
 .session-current-hints { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--dim); font: 800 11px/1.25 ui-monospace, monospace; }
 .session-current-hints span:last-child { color: var(--bitcoin-gold); }
 .session-set-plan { display: grid; gap: 7px; margin-top: 2px; }
-.session-sets { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.session-sets { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; padding-bottom: 2px; }
 .session-sets::-webkit-scrollbar { display: none; }
 .session-sets-label { color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
-.session-set-block { flex: 0 0 108px; padding: 7px 8px; border: 1px solid rgba(188,151,255,.10); border-radius: 13px; background: rgba(255,255,255,.024); }
+.session-set-block { min-width: 0; padding: 8px 9px; border: 1px solid rgba(188,151,255,.10); border-radius: 13px; background: rgba(255,255,255,.024); }
 .session-set-block.active { border-color: rgba(124,60,255,.38); background: rgba(124,60,255,.09); }
 .session-set-block.done { border-color: rgba(54,224,160,.24); }
 .session-set-block.upcoming { opacity: .68; }
@@ -314,8 +314,8 @@
   .session-body { padding-left: 18px !important; padding-right: 18px !important; padding-top: 8px; }
   .session-ex-nav { padding: 5px 18px !important; gap: 7px; }
   .session-ex-dot { width: 30px !important; height: 30px !important; border-radius: 9px; font-size: 12px; }
-  .session-focus-card { grid-template-columns: 76px minmax(0,1fr); gap: 10px; }
-  .session-ex-image.compact.placeholder { min-height: 76px; }
+  .session-focus-card { grid-template-columns: 108px minmax(0,1fr); gap: 12px; }
+  .session-ex-image.compact.placeholder { min-height: 108px; }
   .emom-round-nav { padding-left: 8px !important; padding-right: 8px !important; }
   .emom-round-nav .session-ex-dot { width: 40px !important; height: 40px !important; }
   .session-set-row { grid-template-columns: 28px minmax(0,1fr) !important; gap: 7px !important; }
