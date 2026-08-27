@@ -242,25 +242,20 @@ export function programCard(program: RelayProgram, state: AppState): string {
   const supersetCount = program.blocks?.filter((block) => block.type === 'straight' && block.steps.length > 1).length || 0;
   const groups = programGroups(program, state.exercises);
   const map = programMuscleMap(program, state.exercises);
-  const emomLabel = emomBlocks.length > 1 ? `EMOM · ${emomBlocks.length} sections` : emom ? `EMOM · ${emom.rounds} rounds` : '';
-  const trainingLabel = [
-    emomLabel,
-    supersetCount ? `${supersetCount} superset${supersetCount === 1 ? '' : 's'}` : '',
-    exerciseCount || !emomLabel ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}` : ''
-  ].filter(Boolean).join(' · ');
-  const meta = [trainingLabel, program.description ? html(program.description) : '', time ? `~${time}` : ''].filter(Boolean).join(' · ');
-  const tagPills = (program.tags || []).length ? `<div class="program-tags">${program.tags.map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('')}</div>` : '';
+  const emomLabel = emomBlocks.length > 1 ? `${emomBlocks.length}-section EMOM` : emom ? `${emom.rounds}-round EMOM` : '';
+  const trainingLabel = [time || '', emomLabel, supersetCount ? `${supersetCount} superset${supersetCount === 1 ? '' : 's'}` : '', exerciseCount || !emomLabel ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+  const tagPills = (program.tags || []).map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('');
   const isExpanded = state.expandedProgramAddress === program.address;
   const statusCls = isLocalProgram(program) ? 'local' : 'published';
   return `<div class="workout-card ${isExpanded ? 'expanded' : ''}" data-program-address="${html(program.address)}">
     <div class="workout-card-header" data-toggle-program="${html(program.address)}">
       <div class="workout-card-map ${map ? 'has-map' : ''}">${map || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg>'}</div>
       <div class="workout-card-info">
-        <div class="workout-card-name">${html(program.name)}<span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(program.difficulty)}</span>` : ''}</div>
-        <div class="workout-card-meta">${meta}</div>
+        <div class="workout-card-name">${html(program.name)}</div>
+        <div class="workout-card-meta">${trainingLabel}</div>
+        ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(' · '))}</div>` : ''}
+        <div class="program-chip-row"><span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(program.difficulty)}</span>` : ''}${tagPills}</div>
         ${program.pubkey ? `<div class="workout-card-author">${programAuthorPill(program, state)}</div>` : ''}
-        ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(', '))}</div>` : ''}
-        ${tagPills}
       </div>
       <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
     </div>
@@ -322,6 +317,7 @@ export function programBody(program: RelayProgram, state: AppState): string {
     }
     return `<div class="wk-ex-item" data-exitem="${html(program.address)}-${index}">
       <div class="wk-ex-header" data-toggle-exitem="${html(program.address)}-${index}">
+        <span class="wk-ex-index">${String(index + 1).padStart(2, '0')}</span>
         ${image}
         <div class="wk-ex-info">
           <div class="wk-ex-name">${html(name)}</div>
@@ -356,9 +352,15 @@ export function programBody(program: RelayProgram, state: AppState): string {
     ? `<div class="program-section-summary"><strong>${split ? 'EMOM · ' : ''}${emomBlocks.length} ${split ? `section${emomBlocks.length === 1 ? '' : 's'}` : `EMOM section${emomBlocks.length === 1 ? '' : 's'}`} · ${formatMinutes(emomSeconds(emomBlocks))}</strong>${emomBlocks.map((block, index) => `<span>Section ${index + 1}: ${block.rounds} round${block.rounds === 1 ? '' : 's'} · ${formatMinutes(block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0))}</span>`).join('')}</div>`
     : '';
   const emomSection = emomBlocks.length ? `${emomHead}${timed.length ? `<div class="wk-ex-list">${timed.map(exerciseRow).join('')}</div>` : ''}` : '';
+  const total = formatMinutes(estimateProgramMin(program.exercises, program.blocks));
+  const focus = programGroups(program, state.exercises).join(' · ') || `${program.exercises.length} exercise${program.exercises.length === 1 ? '' : 's'}`;
+  const plan = emomBlocks.length
+    ? `<div class="program-timeline">${emomBlocks.map((block, index) => `<span><strong>${formatMinutes(block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0))}</strong><small>Section ${index + 1}</small></span>`).join('')}</div>`
+    : '';
+  const overview = `<div class="program-preview"><div class="program-preview-main"><strong>${total}</strong><span>${html(focus)}</span></div>${plan}</div>`;
 
   // Strength first, then EMOM: the same order the live runner trains them in.
-  return `${strengthSection}${emomSection}
+  return `${overview}${strengthSection}${emomSection}
     <div class="workout-card-actions">
       ${programActions(program, state)}
     </div>`;
@@ -367,7 +369,7 @@ export function programBody(program: RelayProgram, state: AppState): string {
 function programActions(program: RelayProgram, state: AppState): string {
   const importState = isLocalProgram(program) ? null : programImportState(program, state.sheets);
   return importState === null
-    ? `<button class="button gold small" type="button" data-start-program="${html(program.address)}">Start workout</button>
+    ? `<button class="button gold small start-workout-action" type="button" data-start-program="${html(program.address)}">Start workout</button>
       <button class="button ghost small" type="button" data-edit-sheet="${localSheetId(program)}">Edit</button>
       <button class="button danger small" type="button" data-del-sheet="${localSheetId(program)}">Delete</button>`
     : importState === 'in-library'

@@ -190,6 +190,12 @@ describe('sheetToProgram', () => {
     expect(card).toContain('diff-beast');
     expect(card).toContain('hypertrophy');
   });
+  it('keeps collapsed program card metadata concise', () => {
+    const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState);
+    expect(card).toContain('exercise');
+    expect(card).not.toContain('chest &amp; tris');
+    expect(card).not.toContain('~');
+  });
   it('labels the source by whether the sheet is published', () => {
     expect(sheetToProgram(baseSheet).sourceLabel).toBe('local');
     expect(sheetToProgram({ ...baseSheet, nostr_address: 'workstr:program:push-day' }).sourceLabel).toBe('in library');
@@ -222,7 +228,7 @@ describe('emomBlockFromBuilder', () => {
     ], [{ rounds: 10, intervalSec: 60 }, { rounds: 15, intervalSec: 60 }, { rounds: 10, intervalSec: 60 }]);
     expect(blocks.map((block) => block.rounds)).toEqual([10, 15, 10]);
     expect(estimateProgramMin([], blocks)).toBe(2100);
-    expect(programCard(prog({ blocks }), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState)).toContain('~35 min');
+    expect(programCard(prog({ blocks }), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState)).toContain('35 min · 3-section EMOM');
     const body = programBody(prog({ blocks }), { exercises: [], settings: { unit: 'kg' }, sheets: [] } as unknown as AppState);
     expect(body).toContain('Section 1: 10 rounds · 10 min');
     expect(body).toContain('Section 2: 15 rounds · 15 min');
@@ -251,7 +257,7 @@ describe('programBody mixed programs', () => {
     expect(body).toContain('Strength · 2 exercises · 11 min');
     expect(body).toContain('EMOM · 1 section · 10 min');
     expect(estimateProgramMin(program.exercises, program.blocks)).toBe(1230);
-    expect(card).toContain('~21 min');
+    expect(card).toContain('21 min');
   });
 
   it('renders the strength half before the EMOM half', () => {

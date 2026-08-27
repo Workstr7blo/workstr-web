@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Workout program cards have a more polished training-app preview.** The Programs intro is
+  shorter, collapsed cards now show concise duration/format/focus metadata instead of long
+  descriptions, expanded cards add a compact program preview/timeline, exercise rows are
+  numbered, and Start workout is promoted to a full-width primary action.
+
 - **Account setup now uses one focused login flow.** The signed-out account chip and Settings
   account row open a tabbed Account modal with Log in as the default and Create account as
   the second tab, while Data & Sync points back to that single Account action instead of
