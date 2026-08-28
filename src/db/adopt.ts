@@ -13,7 +13,8 @@ const USER_DATA_STORES = ['sessions', 'session_sets', 'bodyweight', 'blobs'] as 
 // own or imported programs, body entries, imported exercises, or starter rows
 // they favourited, edited or deleted). A fresh or seed-only namespace reports
 // false, so sign-in right after a clean boot never triggers the adoption
-// prompt.
+// prompt. An existing-but-empty database file alone proves nothing — a bare
+// `WorkstrStore.open()` creates every namespace it touches.
 export async function namespaceHasUserData(namespace: string): Promise<boolean> {
   const db = await openWorkstrDB(namespace);
   try {

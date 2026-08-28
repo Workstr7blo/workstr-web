@@ -36,6 +36,12 @@ export function createLocalAccount(): { nsec: string; pubkey: string; signer: Si
 }
 
 export function importLocalAccount(input: string): { pubkey: string; signer: Signer } {
+  // Restore UI is nsec-only on purpose: accepting bare hex invites users to paste
+  // something hex-looking that isn't their key. The stored representation stays hex.
+  const value = input.trim();
+  if (/^[0-9a-fA-F]{64}$/.test(value)) {
+    throw new Error('That looks like a raw hex key. Use the nsec recovery key instead (it starts with nsec1).');
+  }
   const secretKey = normalizeSecretKey(input);
   persistLocalSecretKey(secretKey);
   return { pubkey: getPublicKey(secretKey), signer: createLocalKeySigner(secretKey) };

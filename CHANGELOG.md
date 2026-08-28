@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Sign-out now wipes the NIP-46 client secret along with the cached connection, so a
+  later Nostr Connect on the same browser profile never reuses the previous session's
+  client identity.
+- Restore with recovery key accepts nsec only (raw hex is rejected with guidance), and a
+  failed paste keeps the key in the box with the error shown inline instead of clearing it.
+
 ### Changed
 
 - Removed the jokey `Beast Mode` program difficulty; program creation now offers only

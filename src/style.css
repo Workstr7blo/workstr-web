@@ -38,6 +38,7 @@
 .auth-link-button { display: block; margin: 16px auto 0; border: 0; background: transparent; color: var(--purple-2); font: 800 13px/1.2 inherit; cursor: pointer; }
 .auth-link-button:hover { color: var(--text); }
 .auth-key-input { margin-top: 14px; min-height: 96px; font: 700 13px/1.5 ui-monospace, monospace; resize: vertical; }
+.auth-error { margin: 10px 0 0; color: #ff6b8b; font: 800 12px/1.4 inherit; }
 .auth-bunker-details { margin-top: 16px; padding: 13px; border: 1px solid var(--border); border-radius: 14px; background: rgba(0,0,0,.18); }
 .auth-bunker-details summary { cursor: pointer; color: var(--purple-2); font-weight: 800; }
 .auth-bunker-details .button { width: 100%; justify-content: center; margin-top: 10px; }

@@ -38,4 +38,14 @@ describe('device-local Nostr key signer', () => {
     clearLocalKey();
     expect(createCachedLocalKeySigner()).toBeNull();
   });
+
+  it('rejects a raw 64-character hex key at restore time', () => {
+    const account = createLocalAccount();
+    const hex = localStorage.getItem('workstr.localNsec.hex')!;
+    clearLocalKey();
+    expect(() => importLocalAccount(hex)).toThrow(/raw hex key/);
+    expect(createCachedLocalKeySigner()).toBeNull();
+    const restored = importLocalAccount(account.nsec);
+    expect(restored.pubkey).toBe(account.pubkey);
+  });
 });

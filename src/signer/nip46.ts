@@ -170,6 +170,14 @@ export function clearCachedNip46Signer(): void {
   localStorage.removeItem(CACHED_CONNECTION_KEY);
 }
 
+// Sign-out wipes every trace of the NIP-46 client: the cached connection, and the
+// standalone client secret `clientSecretKey()` would otherwise keep reusing for the next
+// connection — dead key material tied to the previous user's client identity.
+export function clearNip46State(): void {
+  localStorage.removeItem(CACHED_CONNECTION_KEY);
+  localStorage.removeItem(CLIENT_SECRET_KEY);
+}
+
 export async function createBunkerSigner(input: string, options: BunkerOptions = {}): Promise<Signer> {
   const pointer = await parseBunkerInput(input.trim());
   if (!pointer) {
