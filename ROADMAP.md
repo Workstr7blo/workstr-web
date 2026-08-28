@@ -31,7 +31,7 @@ Milestones are releases. A milestone is done when it is tagged and on the domain
 
 All four Phase 1 pillars are shipped and the app is public. It is a complete offline
 tracker with a working Nostr read path, optional identity, and live training modes,
-deployed to the domain and tagged through v1.3.0 (2026-08-19).
+deployed to the domain and tagged through v2.0.0 (2026-08-28).
 
 **Shipped**
 
@@ -60,8 +60,8 @@ deployed to the domain and tagged through v1.3.0 (2026-08-19).
 
 **Next**
 
-Stabilize and release the shipped V2 encrypted-sync implementation, then complete the
-measured funding numbers and EMOM transition tone tracked for v2.2.
+Complete the measured funding numbers and EMOM transition tone tracked for v2.2,
+then scope v3 growth work.
 
 ---
 
@@ -145,9 +145,9 @@ milestone does not duplicate them.
 Deferred on purpose, recorded in `docs/RELEASE-QA.md`: year heatmap, monthly recap,
 history search, save-a-repeat-as-a-program, progressive overload, and virtualisation.
 
-## v2.0-alpha — Encrypted sync
+## v2.0 — Encrypted sync
 
-Implemented on `main`, not yet promoted to a versioned release. Settings presents
+Released 2026-08-28 as v2.0.0. Settings presents
 **Auto-sync** to signed-in users and manual JSON backup to everyone. There is no
 allowlist, access request, subscription, or NIP-42. The client remains local-first and
 sync failures never block training.
