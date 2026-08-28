@@ -25,7 +25,7 @@ const program = (members: RelayProgramExercise[], extra: Partial<RelayProgram> =
   slug: 'push-day',
   name: 'Push Day',
   description: 'Chest and triceps',
-  difficulty: 'Beast Mode',
+  difficulty: 'advanced',
   tags: ['hypertrophy', 'push'],
   exercises: members,
   sourceLabel: 'Workstr',
@@ -120,7 +120,7 @@ describe('planProgramImport', () => {
     expect(plan.sheet).toMatchObject({
       name: 'Push Day',
       notes: 'Chest and triceps',
-      difficulty: 'Beast Mode',
+      difficulty: 'advanced',
       tags: ['hypertrophy', 'push'],
       nostr_address: '33402:op:workstr:program:push-day',
       nostr_pubkey: 'op',

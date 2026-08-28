@@ -6,7 +6,7 @@ import { emomBlocksFromBuilder, straightBlocksFromBuilder, type BuilderState } f
 import { html } from './format';
 import type { AppState } from './state';
 
-const PROGRAM_DIFFICULTIES = ['beginner', 'intermediate', 'advanced', 'Beast Mode'];
+const PROGRAM_DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
 const tagsFromCsv = (value: string): string[] => [...new Set(value.split(',').map((tag) => tag.trim()).filter(Boolean))];
 
 export interface ProgramBuilderContext {

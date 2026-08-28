@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Removed the jokey `Beast Mode` program difficulty; program creation now offers only
+  beginner, intermediate, and advanced levels.
+
 ## [2.0.0] - 2026-08-28
 
 ### Added

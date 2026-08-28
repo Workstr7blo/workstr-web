@@ -7,7 +7,7 @@ describe('WorkstrStore sheets', () => {
     const id = await store.saveSheet({
       name: 'Push Day',
       notes: 'chest focus',
-      difficulty: 'Beast Mode',
+      difficulty: 'advanced',
       tags: ['hypertrophy', 'push', 'push'],
       exercises: [
         { exercise_slug: 'bench-press', exercise_name: 'Bench Press', muscle_group: 'Chest', sets: 4, reps: '6-8', rest: 120, weight: 80, position: 0 },
@@ -16,7 +16,7 @@ describe('WorkstrStore sheets', () => {
     });
     let sheets = await store.listSheets();
     expect(sheets).toHaveLength(1);
-    expect(sheets[0]).toMatchObject({ id, name: 'Push Day', notes: 'chest focus', difficulty: 'Beast Mode', tags: ['hypertrophy', 'push'], slug: 'push-day' });
+    expect(sheets[0]).toMatchObject({ id, name: 'Push Day', notes: 'chest focus', difficulty: 'advanced', tags: ['hypertrophy', 'push'], slug: 'push-day' });
     expect(sheets[0].exercises.map((row) => row.exercise_slug)).toEqual(['bench-press', 'lateral-raise']);
 
     // Edit: rename, reorder — slug must stay stable, rows fully replaced

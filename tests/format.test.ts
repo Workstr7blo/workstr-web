@@ -54,7 +54,7 @@ describe('difficultyBadgeClass', () => {
   it('maps known difficulties and defaults to unknown', () => {
     expect(difficultyBadgeClass('Beginner')).toBe('diff-beginner');
     expect(difficultyBadgeClass('advanced')).toBe('diff-advanced');
-    expect(difficultyBadgeClass('Beast Mode')).toBe('diff-beast');
+    expect(difficultyBadgeClass('Beast Mode')).toBe('diff-unknown');
     expect(difficultyBadgeClass('')).toBe('diff-unknown');
     expect(difficultyBadgeClass(undefined)).toBe('diff-unknown');
   });
