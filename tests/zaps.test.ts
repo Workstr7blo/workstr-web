@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
-import { collectZapReceipts, fundingTotals, monthStartUnix, parseZapReceipt } from '../src/nostr/zaps';
+import { collectZapReceipts, fundingTotals, monthStartUnix, parseZapReceipt, resolveWorkoutProgramZapRecipient, type WorkoutProgramZapSource } from '../src/nostr/zaps';
+import { buildNwcZapPaymentPayload, buildWorkoutProgramZapRequestPayload } from '../src/nostr/zap-request';
 import { OPERATOR_PUBKEY } from '../src/nostr/canon';
 
 // The amount lives in the bolt11 human-readable prefix. The decoder needs at
@@ -37,6 +38,137 @@ function receipt(overrides: {
     content: ''
   }, overrides.secret ?? providerSecret);
 }
+
+function program(overrides: Partial<WorkoutProgramZapSource> = {}): WorkoutProgramZapSource {
+  return {
+    slug: 'push-day',
+    name: 'Push Day',
+    description: '',
+    tags: [],
+    exercises: [],
+    sourceLabel: 'Workstr',
+    eventId: 'e'.repeat(64),
+    pubkey: OPERATOR_PUBKEY,
+    address: `33402:${OPERATOR_PUBKEY}:workstr:program:push-day`,
+    createdAt: 1_800_000_000,
+    lud16: 'coach@example.com',
+    ...overrides
+  };
+}
+
+function validRecipient() {
+  const result = resolveWorkoutProgramZapRecipient(program({ zapRecipient: { relays: ['wss://relay.example', 'wss://relay.example'] } }));
+  if (!result.ok) throw new Error(result.error.message);
+  return result.recipient;
+}
+
+describe('resolveWorkoutProgramZapRecipient', () => {
+  it('returns a validated descriptor for a zappable workout program', () => {
+    const result = resolveWorkoutProgramZapRecipient(program({ zapRecipient: { relays: ['wss://relay.example'] } }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.recipient).toMatchObject({
+      pubkey: OPERATOR_PUBKEY,
+      relay: 'wss://relay.example',
+      relays: ['wss://relay.example'],
+      lnurl: 'coach@example.com',
+      lud16: 'coach@example.com',
+      app: 'workstr',
+      programAddress: `33402:${OPERATOR_PUBKEY}:workstr:program:push-day`
+    });
+  });
+
+  it('uses lud06 metadata when no lightning address is present', () => {
+    const result = resolveWorkoutProgramZapRecipient(program({ lud16: undefined, lud06: 'lnurl1dp68gurn8ghj7mrww4exctnrdakj7' }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.recipient.lnurl).toBe('lnurl1dp68gurn8ghj7mrww4exctnrdakj7');
+    expect(result.recipient.lud06).toBe('lnurl1dp68gurn8ghj7mrww4exctnrdakj7');
+  });
+
+  it('returns a structured error for missing zap metadata', () => {
+    const result = resolveWorkoutProgramZapRecipient(program({ lud16: undefined, lud06: undefined, zapRecipient: undefined }));
+    expect(result).toEqual({ ok: false, error: { code: 'missing-lnurl', message: 'Workout program author is missing lud16/lud06 zap metadata.', field: 'lnurl' } });
+  });
+
+  it('returns a structured error when the program has no author pubkey', () => {
+    const result = resolveWorkoutProgramZapRecipient(program({ pubkey: '', address: '33402::workstr:program:push-day' }));
+    expect(result).toMatchObject({ ok: false, error: { code: 'missing-pubkey', field: 'pubkey' } });
+  });
+
+  it('returns structured errors for malformed values instead of throwing', () => {
+    expect(resolveWorkoutProgramZapRecipient(program({ pubkey: 'not-a-pubkey' }))).toMatchObject({ ok: false, error: { code: 'malformed-pubkey' } });
+    expect(resolveWorkoutProgramZapRecipient(program({ lud16: 'not a lightning address' }))).toMatchObject({ ok: false, error: { code: 'malformed-lnurl' } });
+    expect(resolveWorkoutProgramZapRecipient(program({ zapRecipient: { relay: 'https://relay.example' } }))).toMatchObject({ ok: false, error: { code: 'malformed-relay' } });
+  });
+
+  it('rejects local or mismatched workout programs as unsupported/malformed', () => {
+    expect(resolveWorkoutProgramZapRecipient(program({ address: 'local:1' }))).toMatchObject({ ok: false, error: { code: 'unsupported-program' } });
+    expect(resolveWorkoutProgramZapRecipient(program({ address: `33402:${'a'.repeat(64)}:workstr:program:push-day` }))).toMatchObject({ ok: false, error: { code: 'malformed-address' } });
+  });
+});
+
+describe('buildWorkoutProgramZapRequestPayload', () => {
+  it('builds a NIP-57 kind:9734 request payload with the workout program reference', () => {
+    const recipient = validRecipient();
+    const result = buildWorkoutProgramZapRequestPayload(recipient, {
+      amountSats: 21,
+      comment: ' Great workout ',
+      senderPubkey: 'f'.repeat(64),
+      createdAt: 1_800_000_123
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.payload.amountMsat).toBe(21_000);
+    expect(result.payload.comment).toBe('Great workout');
+    expect(result.payload.relays).toEqual(['wss://relay.example']);
+    expect(result.payload.event).toEqual({
+      kind: 9734,
+      created_at: 1_800_000_123,
+      pubkey: 'f'.repeat(64),
+      content: 'Great workout',
+      tags: [
+        ['relays', 'wss://relay.example'],
+        ['amount', '21000'],
+        ['p', OPERATOR_PUBKEY],
+        ['a', `33402:${OPERATOR_PUBKEY}:workstr:program:push-day`],
+        ['lnurl', 'coach@example.com'],
+        ['client', 'workstr'],
+        ['app', 'workstr']
+      ]
+    });
+  });
+
+  it('lets the caller override receipt relays and dedupes them', () => {
+    const result = buildWorkoutProgramZapRequestPayload(validRecipient(), {
+      amountSats: 100,
+      relays: ['wss://one.example', 'wss://one.example', 'wss://two.example']
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.payload.event.tags[0]).toEqual(['relays', 'wss://one.example', 'wss://two.example']);
+  });
+
+  it('rejects invalid amount/comment/recipient/relays with structured errors', () => {
+    const recipient = validRecipient();
+    expect(buildWorkoutProgramZapRequestPayload(recipient, { amountSats: 0 })).toMatchObject({ ok: false, error: { code: 'invalid-amount', field: 'amountSats' } });
+    expect(buildWorkoutProgramZapRequestPayload(recipient, { amountSats: 1.5 })).toMatchObject({ ok: false, error: { code: 'invalid-amount' } });
+    expect(buildWorkoutProgramZapRequestPayload(recipient, { amountSats: 1, comment: 'x'.repeat(501) })).toMatchObject({ ok: false, error: { code: 'invalid-comment', field: 'comment' } });
+    expect(buildWorkoutProgramZapRequestPayload(null, { amountSats: 1 })).toMatchObject({ ok: false, error: { code: 'missing-recipient' } });
+    expect(buildWorkoutProgramZapRequestPayload(recipient, { amountSats: 1, relays: ['https://bad.example'] })).toMatchObject({ ok: false, error: { code: 'invalid-relays', field: 'relays' } });
+  });
+});
+
+describe('buildNwcZapPaymentPayload', () => {
+  it('creates the NWC pay_invoice payload after verifying the invoice amount', () => {
+    expect(buildNwcZapPaymentPayload(BOLT11_21_SATS, 21)).toEqual({ ok: true, payload: { method: 'pay_invoice', params: { invoice: BOLT11_21_SATS } } });
+  });
+
+  it('rejects missing, malformed, and amount-mismatched invoices', () => {
+    expect(buildNwcZapPaymentPayload('', 21)).toMatchObject({ ok: false, error: { code: 'invalid-invoice', field: 'invoice' } });
+    expect(buildNwcZapPaymentPayload('not-an-invoice', 21)).toMatchObject({ ok: false, error: { code: 'invalid-invoice', field: 'invoice' } });
+    expect(buildNwcZapPaymentPayload(BOLT11_1000_SATS, 21)).toMatchObject({ ok: false, error: { code: 'invalid-invoice', field: 'invoice' } });
+  });
+});
 
 describe('parseZapReceipt', () => {
   it('accepts a receipt signed by the wallet provider and reads the amount', () => {
