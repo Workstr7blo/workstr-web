@@ -73,8 +73,13 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
   }
   const slot = position.slot;
   const block = blocks[slot.blockIndex];
+  const activeStep = slot.steps[position.activeStepIndex ?? 0] || slot.steps[0];
+  const activeExercise = session.exercises.find((candidate) => candidate.exerciseSlug === activeStep?.exerciseSlug);
+  const activeName = activeStep?.exerciseName || activeExercise?.exerciseName || activeStep?.exerciseSlug || 'EMOM';
+  const activeTarget = activeStep ? [activeStep.targetDurationSec ? `${activeStep.targetDurationSec}s` : '', activeStep.targetReps ? `${html(activeStep.targetReps)} reps` : ''].filter(Boolean).join(' · ') : '';
   // Name the section in a mixed workout, matching the "Strength · …" line the first half shows.
   meta.textContent = `${input.paused ? 'Paused · ' : ''}${input.mixed ? 'EMOM · ' : ''}${blocks.length > 1 ? `Section ${slot.blockIndex + 1} of ${blocks.length} · ` : ''}Round ${slot.roundIndex + 1} of ${block.rounds} · Interval ${slot.intervalIndex + 1} of ${block.intervals.length}`;
+  title.textContent = activeName;
   nav.innerHTML = input.roundNav(slot, false);
   const steps = slot.steps.map((step, stepIndex) => {
     const exercise = session.exercises.find((candidate) => candidate.exerciseSlug === step.exerciseSlug);
@@ -92,19 +97,19 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
       </button><div class="session-instructions-body">${instructions.map((instruction, index) => `<div class="session-instructions-step"><b>${index + 1}</b>${html(instruction)}</div>`).join('')}</div>
     </div>` : '';
     return `<div class="emom-step emom-workout-card ${active ? 'active' : ''} ${logged ? 'done' : ''}" data-emom-step="${stepIndex}">
-      ${exercise?.imageUrl ? `<img class="session-ex-image" src="${html(exercise.imageUrl)}" alt="${html(name)}">` : ''}
-      <div class="session-ex-name">${html(name)}</div>
-      <div class="session-ex-target"><b>${target || 'Open target'}</b><span class="dot"></span><span>Every ${slot.durationSec}s</span></div>
-      <div class="emom-log-row"><input class="session-set-input" data-emom-reps type="number" inputmode="numeric" placeholder="actual reps" ${logged ? `value="${logged.reps ?? ''}" disabled` : ''}><input class="session-set-input" data-emom-weight type="number" inputmode="decimal" step="0.5" placeholder="${input.unitLabel()}" ${logged ? `value="${logged.weight == null ? '' : input.weightDisplay(logged.weight)}" disabled` : ''}><button class="session-log-btn ${logged ? 'done' : ''}" data-log-emom="${stepIndex}" type="button" ${logged ? 'disabled' : ''}>${logged ? 'Done' : 'Log'}</button></div>${instructionsMarkup}
+      <div class="emom-step-label">${logged ? 'Logged interval' : active ? 'Log this interval' : 'Upcoming movement'}</div>
+      <div class="emom-step-title"><strong>${target || 'Open target'} · every ${slot.durationSec}s</strong></div>
+      <div class="emom-log-row"><label><span>Actual reps</span><input class="session-set-input" data-emom-reps type="number" inputmode="numeric" placeholder="reps" ${logged ? `value="${logged.reps ?? ''}" disabled` : ''}></label><label><span>${html(input.unitLabel())} load</span><input class="session-set-input" data-emom-weight type="number" inputmode="decimal" step="0.5" placeholder="${input.unitLabel()}" ${logged ? `value="${logged.weight == null ? '' : input.weightDisplay(logged.weight)}" disabled` : ''}></label><button class="session-log-btn ${logged ? 'done' : ''}" data-log-emom="${stepIndex}" type="button" ${logged ? 'disabled' : ''}>${logged ? 'Done' : 'Log'}</button></div>${instructionsMarkup}
     </div>`;
   }).join('');
   const nextSlot = schedule[slot.index + 1];
   const nextStep = nextSlot?.steps[0];
-  body.innerHTML = `<div class="emom-live-layout"><div class="emom-timer-panel ${input.paused ? 'paused' : ''} ${timerPhase ? `has-work-timer ${timerPhase.mode}` : ''}">
-    <div class="emom-badge">${input.paused ? 'Paused' : 'EMOM'}</div>
+  body.innerHTML = `<div class="emom-live-layout"><div class="emom-live-hero"><div class="emom-timer-panel ${input.paused ? 'paused' : ''} ${timerPhase ? `has-work-timer ${timerPhase.mode}` : ''}">
+    <div class="emom-badge">${input.paused ? 'Paused' : timerPhase?.mode === 'work' ? 'Work' : timerPhase?.mode === 'recovery' ? 'Recover' : 'EMOM'}</div>
     <div class="rest-timer-wrap emom-timer-wrap"><svg class="rest-ring" viewBox="0 0 120 120"><circle class="rest-ring-bg" cx="60" cy="60" r="54" stroke-width="8"/><circle id="emom-ring-fg" class="rest-ring-fg" cx="60" cy="60" r="54" stroke-width="8" stroke-dasharray="339.3" stroke-dashoffset="${339.3 * (1 - position.secondsRemaining / slot.durationSec)}"/>${timerPhase ? `<circle class="emom-work-ring-bg" cx="60" cy="60" r="42" stroke-width="6"/><circle id="emom-work-ring-fg" class="emom-work-ring-fg" cx="60" cy="60" r="42" stroke-width="6" stroke-dasharray="263.9" stroke-dashoffset="${263.9 * (1 - timerPhase.secondsRemaining / timerPhase.durationSec)}"/>` : ''}</svg><div class="emom-countdown" id="emom-countdown">${timerPhase?.secondsRemaining ?? position.secondsRemaining}</div></div>
-    <div class="emom-phase-label">${timerPhase ? timerPhase.mode === 'work' ? `Work · ${html(slot.steps[timerPhase.stepIndex ?? 0]?.exerciseName || slot.steps[timerPhase.stepIndex ?? 0]?.exerciseSlug || 'Exercise')}` : 'Recover' : 'Interval'}</div>
-    <div class="emom-caption"><span id="emom-interval-countdown">${position.secondsRemaining}</span>s interval left · ${slot.index + 1} of ${schedule.length}</div></div>
+    <div class="emom-phase-label">${timerPhase ? timerPhase.mode === 'work' ? 'Work now' : 'Recover' : 'Interval'}</div>
+    <div class="emom-caption"><span id="emom-interval-countdown">${position.secondsRemaining}</span>s left · ${slot.index + 1}/${schedule.length}</div></div>
+    <div class="emom-now-card">${activeExercise?.imageUrl ? `<img class="session-ex-image compact" src="${html(activeExercise.imageUrl)}" alt="${html(activeName)}">` : '<div class="session-ex-image compact placeholder">No image</div>'}<div class="emom-now-copy"><span>Now</span><strong>${html(activeName)}</strong><small>${activeTarget || 'Open target'} · every ${slot.durationSec}s</small></div></div></div>
     <div class="emom-steps">${steps}</div><div class="emom-next-card"><span>Next up</span><strong>${nextStep ? html(nextStep.exerciseName || nextStep.exerciseSlug) : 'Finish session'}</strong><small>${nextSlot ? `Round ${nextSlot.roundIndex + 1} · ${nextSlot.durationSec}s interval` : 'Workout complete'}</small></div></div>`;
   footer.classList.add('emom-live-controls');
   footer.innerHTML = `<button class="emom-pause-btn" id="emom-pause" type="button" aria-label="${input.paused ? 'Resume EMOM' : 'Pause EMOM'}" title="${input.paused ? 'Resume' : 'Pause'}">${input.paused ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>' : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>'}</button><button class="emom-finish-action" id="finish-session" type="button">Finish early</button>`;

@@ -245,13 +245,14 @@
 .emom-step-head > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: rgba(124,60,255,.2); font: 900 13px/1 ui-monospace, monospace; }
 .emom-step-head strong, .emom-step-head small { display: block; }
 .emom-step-head small { margin-top: 4px; color: var(--muted); }
-.emom-log-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) 84px; gap: 10px; }
+.emom-log-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) 82px; gap: 9px; align-items: end; }
 .emom-next { color: var(--muted); font: 800 12px/1 ui-monospace, monospace; }
-.emom-live-layout { display: grid; gap: 22px; max-width: 760px; margin: 0 auto; }
-.emom-timer-panel { display: grid; justify-items: center; gap: 9px; padding: 4px 0 10px; }
+.emom-live-layout { display: grid; gap: 11px; max-width: 760px; margin: 0 auto; }
+.emom-live-hero { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 12px; align-items: stretch; }
+.emom-timer-panel { display: grid; justify-items: center; align-content: center; gap: 6px; padding: 11px 9px; border: 1px solid rgba(188,151,255,.16); border-radius: 18px; background: rgba(0,0,0,.22); }
 .emom-timer-panel.paused { opacity: .78; }
-.emom-timer-wrap, .emom-timer-wrap .rest-ring { width: 112px; height: 112px; }
-.emom-timer-wrap .emom-countdown { position: relative; margin: 0; font-size: 42px; letter-spacing: -.05em; }
+.emom-timer-wrap, .emom-timer-wrap .rest-ring { width: 88px; height: 88px; }
+.emom-timer-wrap .emom-countdown { position: relative; margin: 0; font-size: 35px; letter-spacing: -.05em; }
 .emom-work-ring-bg, .emom-work-ring-fg { fill: none; transform: rotate(-90deg); transform-origin: 50% 50%; }
 .emom-work-ring-bg { stroke: rgba(247,147,26,.14); }
 .emom-work-ring-fg { stroke: var(--bitcoin-gold); stroke-linecap: round; transition: stroke-dashoffset .25s linear, stroke .2s ease; }
@@ -259,11 +260,20 @@
 .emom-timer-panel.recovery .emom-work-ring-fg { stroke: var(--success-green); }
 .emom-phase-label { color: var(--purple-2); font: 900 11px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
 .emom-timer-panel.recovery .emom-phase-label { color: var(--success-green); }
-.emom-step.emom-workout-card { opacity: .72; padding: 0; border: 0; border-radius: 0; background: transparent; }
-.emom-step.emom-workout-card.active { opacity: 1; border: 0; background: transparent; }
-.emom-step.emom-workout-card.done { background: transparent; }
-.emom-workout-card .session-ex-image { max-height: 260px; object-fit: cover; margin-bottom: 16px; }
-.emom-workout-card .session-ex-name { font-size: clamp(25px, 5vw, 36px); }
+.emom-now-card { display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; border: 1px solid rgba(188,151,255,.16); border-radius: 18px; background: rgba(0,0,0,.24); }
+.emom-now-card .session-ex-image.compact { width: 100%; height: 104px; min-height: 0; object-fit: contain; background: #050309; border: 0; border-radius: 0; box-shadow: none; }
+.emom-now-card .session-ex-image.placeholder { display: grid; place-items: center; color: var(--dim); }
+.emom-now-copy { display: grid; gap: 4px; padding: 9px 11px 10px; }
+.emom-now-copy span { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.emom-now-copy strong { font-size: 17px; line-height: 1.05; letter-spacing: -.03em; }
+.emom-now-copy small { color: var(--muted); font: 800 11px/1.3 ui-monospace, monospace; }
+.emom-step.emom-workout-card { opacity: .78; display: grid; gap: 9px; padding: 12px; border: 1px solid rgba(188,151,255,.16); border-radius: 18px; background: rgba(0,0,0,.24); }
+.emom-step.emom-workout-card.active { opacity: 1; border-color: rgba(247,147,26,.34); background: radial-gradient(circle at 92% 0%, rgba(247,147,26,.13), transparent 55%), rgba(0,0,0,.26); }
+.emom-step.emom-workout-card.done { background: rgba(0,208,132,.055); border-color: rgba(0,208,132,.24); }
+.emom-step-label { color: var(--bitcoin-gold); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.emom-step-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.emom-step-title strong { color: var(--muted); font: 900 11px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .05em; }
+.emom-log-row label { display: grid; gap: 6px; color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
 .emom-next-card { display: grid; gap: 5px; padding: 4px 0; border-top: 1px solid rgba(188,151,255,.12); }
 .emom-next-card span { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
 .emom-next-card strong { font-size: 18px; }
@@ -318,6 +328,15 @@
   .session-ex-image.compact.placeholder { min-height: 108px; }
   .emom-round-nav { padding-left: 8px !important; padding-right: 8px !important; }
   .emom-round-nav .session-ex-dot { width: 40px !important; height: 40px !important; }
+  .emom-live-hero { grid-template-columns: 126px minmax(0, 1fr); gap: 10px; }
+  .emom-timer-panel { padding: 10px 8px; }
+  .emom-timer-wrap, .emom-timer-wrap .rest-ring { width: 84px; height: 84px; }
+  .emom-timer-wrap .emom-countdown { font-size: 34px; }
+  .emom-now-card .session-ex-image.compact { height: 98px; }
+  .emom-log-row { grid-template-columns: minmax(0,1fr) minmax(0,1fr) 76px; gap: 8px; }
+  .session-footer.emom-live-controls { min-height: 78px; padding-top: 6px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .emom-pause-btn { width: 58px; height: 58px; flex-basis: 58px; }
+  .emom-finish-action { right: 18px; }
   .session-set-row { grid-template-columns: 28px minmax(0,1fr) !important; gap: 7px !important; }
   .session-footer { padding-left: 18px !important; padding-right: 18px !important; }
 }

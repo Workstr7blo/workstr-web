@@ -400,6 +400,11 @@ describe('session runner', () => {
     await tick();
     expect(root.querySelector('#emom-countdown')?.textContent).toBe('20');
     expect(root.querySelector('#emom-interval-countdown')?.textContent).toBe('60');
+    expect(root.querySelector('#session-title')?.textContent).toBe('Bench Press');
+    expect(root.querySelector('.emom-now-card')?.textContent).toContain('Now');
+    expect(root.querySelector('.emom-now-card')?.textContent).toContain('20s · 8 reps · every 60s');
+    expect(root.querySelector('.emom-step-label')?.textContent).toBe('Log this interval');
+    expect(root.querySelector('.emom-log-row label')?.textContent).toContain('Actual reps');
     expect(root.querySelector('#emom-work-ring-fg')).toBeTruthy();
     const step = root.querySelector<HTMLElement>('[data-emom-step="0"]')!;
     (step.querySelector('[data-emom-reps]') as HTMLInputElement).value = '9';

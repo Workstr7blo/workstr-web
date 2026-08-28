@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **EMOM live sessions now use a compact workout cockpit.** The active movement moves into
+  the session header, the timer sits beside a balanced Now card, logging gets explicit
+  Actual reps/load labels, and the pause/finish controls stay lighter at the bottom.
+
 - **Live workout logging is now focused on the current set.** Standard workout sessions use
   a compact exercise header, thumbnail-sized form image, current-set input card, lighter set
   plan, and a sticky Log set action before showing Next or Finish.
