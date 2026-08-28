@@ -2,12 +2,47 @@ import type { StraightBlock } from '../core/types';
 import { normalizeWeightUnit, storeWeightInput } from '../core/units';
 import type { SheetWithExercises } from '../db/store';
 import { builderRowsMarkup } from '../features/sheets/builder-views';
-import { emomBlocksFromBuilder, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
+import { emomBlocksFromBuilder, inferProgramLabels, PROGRAM_GOALS, selectedProgramGoals, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
 import { html } from './format';
 import type { AppState } from './state';
 
 const PROGRAM_DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
-const tagsFromCsv = (value: string): string[] => [...new Set(value.split(',').map((tag) => tag.trim()).filter(Boolean))];
+function tagLabel(tag: string): string {
+  return tag.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
+function builderProgram(current: BuilderState) {
+  const normalRows = current.rows.filter((row) => row.sectionIndex < 0);
+  const emomRows = current.rows.filter((row) => row.sectionIndex >= 0);
+  const blocks = [
+    ...(current.mode !== 'emom' ? straightBlocksFromBuilder(normalRows) : []),
+    ...(current.mode !== 'normal' ? emomBlocksFromBuilder(emomRows, current.emomSections) : [])
+  ];
+  return {
+    slug: 'preview',
+    name: current.name || 'New program',
+    description: current.desc,
+    difficulty: current.difficulty,
+    tags: current.tags,
+    sourceLabel: 'local',
+    eventId: '',
+    pubkey: '',
+    address: 'local:preview',
+    createdAt: 0,
+    blocks,
+    exercises: current.rows.map((row) => ({ address: '', name: row.exerciseName, muscleGroup: row.muscleGroup, sets: row.sets, reps: row.reps, restSec: row.restSec, weight: row.weight != null ? String(row.weight) : undefined }))
+  };
+}
+
+function builderAutoLabelMarkup(current: BuilderState): string {
+  const autoLabels = inferProgramLabels(builderProgram(current), current.library).filter((tag) => !PROGRAM_GOALS.includes(tag));
+  return autoLabels.length ? autoLabels.map((tag) => `<span class="tag-pill auto">${html(tag)}</span>`).join('') : '<span class="builder-auto-empty">Add exercises to detect split, equipment, and format.</span>';
+}
+
+function refreshAutoLabels(current: BuilderState): void {
+  const host = document.getElementById('builder-auto-label-values');
+  if (host) host.innerHTML = builderAutoLabelMarkup(current);
+}
 
 export interface ProgramBuilderContext {
   root: HTMLElement;
@@ -90,6 +125,9 @@ function renderModal(): void {
   const current = builder;
   if (!current) return;
   const difficultyOptions = [''].concat(PROGRAM_DIFFICULTIES).map((difficulty) => `<option value="${html(difficulty)}" ${current.difficulty === difficulty ? 'selected' : ''}>${difficulty ? html(difficulty) : 'Choose level'}</option>`).join('');
+  const goals = selectedProgramGoals(current.tags);
+  const goalChips = PROGRAM_GOALS.map((goal) => `<button class="goal-chip ${goals.includes(goal) ? 'active' : ''}" type="button" data-goal="${html(goal)}" aria-pressed="${goals.includes(goal) ? 'true' : 'false'}">${html(tagLabel(goal))}</button>`).join('');
+  const autoLabelMarkup = builderAutoLabelMarkup(current);
   openModal(`
     <div class="program-builder">
     <h3>${current.sheetId ? 'Edit program' : 'New program'}</h3>
@@ -97,9 +135,10 @@ function renderModal(): void {
       <label class="span-2">Name<input id="sheet-name" value="${html(current.name)}" placeholder="Push Day" /></label>
       <label class="span-2">Description<input id="sheet-desc" value="${html(current.desc)}" placeholder="optional" /></label>
       <label>Difficulty<select id="sheet-difficulty">${difficultyOptions}</select></label>
-      <label>Tags (comma)<input id="sheet-tags" value="${html(current.tags.join(', '))}" placeholder="strength, hypertrophy" /></label>
       <label>Training mode<select id="sheet-mode"><option value="normal" ${current.mode === 'normal' ? 'selected' : ''}>Normal sets</option><option value="emom" ${current.mode === 'emom' ? 'selected' : ''}>EMOM</option><option value="mixed" ${current.mode === 'mixed' ? 'selected' : ''}>Mixed sections</option></select></label>
     </div>
+    <div class="builder-goals"><div class="subsection-head"><span>Goal</span><small>Choose up to two. Workstr detects split and equipment.</small></div><div class="builder-goal-grid">${goalChips}</div></div>
+    <div class="builder-auto-labels"><span>Auto labels</span><div id="builder-auto-label-values">${autoLabelMarkup}</div></div>
     ${current.mode !== 'emom'
       ? `<div class="subsection-head"><span>Add normal exercises from your library</span></div>
         <div class="builder-search-wrap"><input id="builder-search" class="builder-search" placeholder="Filter your library..." autocomplete="off" /></div>
@@ -114,7 +153,14 @@ function renderModal(): void {
   root.querySelector('#sheet-name')?.addEventListener('input', (event) => { current.name = (event.target as HTMLInputElement).value; });
   root.querySelector('#sheet-desc')?.addEventListener('input', (event) => { current.desc = (event.target as HTMLInputElement).value; });
   root.querySelector('#sheet-difficulty')?.addEventListener('change', (event) => { current.difficulty = (event.target as HTMLSelectElement).value; });
-  root.querySelector('#sheet-tags')?.addEventListener('input', (event) => { current.tags = tagsFromCsv((event.target as HTMLInputElement).value); });
+  root.querySelectorAll<HTMLElement>('[data-goal]').forEach((button) => button.addEventListener('click', () => {
+    const goal = button.dataset.goal || '';
+    const selected = selectedProgramGoals(current.tags);
+    current.tags = selected.includes(goal)
+      ? selected.filter((tag) => tag !== goal)
+      : [...selected, goal].slice(0, 2);
+    renderModal();
+  }));
   root.querySelector('#sheet-mode')?.addEventListener('change', (event) => {
     const mode = (event.target as HTMLSelectElement).value;
     current.mode = mode === 'emom' || mode === 'mixed' ? mode : 'normal';
@@ -286,7 +332,7 @@ function renderModal(): void {
       name,
       notes: builder.desc.trim(),
       difficulty: builder.difficulty,
-      tags: builder.tags,
+      tags: [...new Set([...selectedProgramGoals(builder.tags), ...inferProgramLabels(builderProgram(builder), builder.library)])],
       blocks,
       exercises: builder.rows.map((row, index) => ({
         exercise_slug: row.exerciseSlug,
@@ -316,6 +362,7 @@ function renderRows(): void {
   const current = builder;
   if (!host || !current) return;
   host.innerHTML = builderRowsMarkup(current, normalizeWeightUnit(state.settings.unit));
+  refreshAutoLabels(current);
 }
 
   return { open, renderIfOpen: renderModal, clear: () => { builder = null; } };

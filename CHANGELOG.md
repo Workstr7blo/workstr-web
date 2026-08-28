@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the jokey `Beast Mode` program difficulty; program creation now offers only
   beginner, intermediate, and advanced levels.
+- Replaced freeform program tags with goal chips and automatic labels for split,
+  format, equipment, and quick-session discovery filters.
 
 ## [2.0.0] - 2026-08-28
 

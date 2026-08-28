@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   estimateProgramMin, resolveProgramExercise, programExerciseName, inferProgramMuscle,
-  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, programBody, emomBlockFromBuilder, emomBlocksFromBuilder, straightBlocksFromBuilder, standardProgramExercises
+  programGroups, programMuscleSets, programAuthor, isLocalProgram, localSheetId, sheetToProgram, programCard, programBody, emomBlockFromBuilder, emomBlocksFromBuilder, straightBlocksFromBuilder, standardProgramExercises, inferProgramLabels, programDisplayTags
 } from '../src/features/sheets/views';
 import type { Exercise } from '../src/core/types';
 import type { RelayProgram, RelayProgramExercise } from '../src/nostr/canon';
@@ -148,6 +148,22 @@ describe('programGroups / programMuscleSets', () => {
     const { primary, secondary } = programMuscleSets(program, lib);
     expect([...primary]).toEqual(['Chest']);
     expect([...secondary]).toEqual(['Triceps']);
+  });
+});
+
+describe('program labels', () => {
+  it('infers split, format, equipment, and keeps chosen goals first', () => {
+    const lib = [
+      ex({ slug: 'bench', name: 'Bench Press', muscle_group: 'Chest', equipment: ['Dumbbell'] }),
+      ex({ slug: 'row', name: 'Row', muscle_group: 'Back', equipment: ['Dumbbell'] })
+    ];
+    const program = prog({
+      tags: ['hypertrophy', 'random-note'],
+      exercises: [member({ name: 'Bench Press' }), member({ name: 'Row' })],
+      blocks: [{ type: 'straight', rounds: 3, steps: [{ exerciseSlug: 'bench' }, { exerciseSlug: 'row' }], restAfterRoundSec: 90 }]
+    });
+    expect(inferProgramLabels(program, lib)).toEqual(expect.arrayContaining(['normal', 'superset', 'upper-body', 'push', 'pull', 'dumbbell', 'minimal-equipment', 'quick']));
+    expect(programDisplayTags(program, lib).slice(0, 1)).toEqual(['hypertrophy']);
   });
 });
 

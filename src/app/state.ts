@@ -89,6 +89,7 @@ export interface AppState {
   editingId: number | null;
   filter: string;
   programFilter: string;
+  programFilters?: { goal: string; focus: string; format: string; equipment: string };
   expandedProgramAddress: string | null;
   exerciseStatus: string;
   programStatus: string;

@@ -40,6 +40,7 @@ describe('program builder controller', () => {
     const { root, controller, saveSheet, render, closeModal } = setup();
     await controller.open();
     (root.querySelector('[data-pick-slug="squat"]') as HTMLElement).click();
+    (root.querySelector('[data-goal="strength"]') as HTMLElement).click();
     const name = root.querySelector<HTMLInputElement>('#sheet-name')!;
     name.value = 'Leg Day';
     name.dispatchEvent(new Event('input'));
@@ -48,10 +49,34 @@ describe('program builder controller', () => {
 
     expect(saveSheet).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Leg Day',
+      tags: expect.arrayContaining(['strength', 'lower-body', 'legs', 'normal']),
       exercises: [expect.objectContaining({ exercise_slug: 'squat', sets: 3, reps: '8' })]
     }), undefined);
     expect(closeModal).toHaveBeenCalled();
     expect(render).toHaveBeenCalled();
+  });
+
+  it('replaces the comma tag field with capped goal chips and detected labels', async () => {
+    const { root, controller, saveSheet } = setup();
+    await controller.open();
+    expect(root.querySelector('#sheet-tags')).toBeNull();
+    (root.querySelector('[data-pick-slug="push-up"]') as HTMLElement).click();
+    expect(root.querySelector('.builder-auto-labels')?.textContent).toContain('push');
+    for (const goal of ['strength', 'hypertrophy', 'conditioning']) {
+      (root.querySelector(`[data-goal="${goal}"]`) as HTMLElement).click();
+    }
+    const name = root.querySelector<HTMLInputElement>('#sheet-name')!;
+    name.value = 'Goal Test';
+    name.dispatchEvent(new Event('input'));
+    (root.querySelector('#sheet-save') as HTMLButtonElement).click();
+    await tick();
+
+    expect(saveSheet).toHaveBeenCalledWith(expect.objectContaining({
+      tags: expect.arrayContaining(['strength', 'hypertrophy', 'upper-body', 'push', 'normal'])
+    }), undefined);
+    expect(saveSheet).toHaveBeenCalledWith(expect.objectContaining({
+      tags: expect.not.arrayContaining(['conditioning'])
+    }), undefined);
   });
 
   it('keeps invalid empty programs open with a useful error', async () => {
