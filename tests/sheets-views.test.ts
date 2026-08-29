@@ -163,7 +163,7 @@ describe('program labels', () => {
       blocks: [{ type: 'straight', rounds: 3, steps: [{ exerciseSlug: 'bench' }, { exerciseSlug: 'row' }], restAfterRoundSec: 90 }]
     });
     expect(inferProgramLabels(program, lib)).toEqual(expect.arrayContaining(['normal', 'superset', 'upper-body', 'push', 'pull', 'dumbbell', 'minimal-equipment', 'quick']));
-    expect(programDisplayTags(program, lib).slice(0, 1)).toEqual(['hypertrophy']);
+    expect(programDisplayTags(program, lib)).toEqual(['hypertrophy', 'superset', 'upper-body', 'dumbbell']);
   });
 });
 
@@ -215,6 +215,13 @@ describe('sheetToProgram', () => {
   it('labels the source by whether the sheet is published', () => {
     expect(sheetToProgram(baseSheet).sourceLabel).toBe('local');
     expect(sheetToProgram({ ...baseSheet, nostr_address: 'workstr:program:push-day' }).sourceLabel).toBe('in library');
+  });
+  it('keeps the imported program author pubkey so creator zaps are discoverable locally', () => {
+    const pubkey = 'f'.repeat(64);
+    const imported = { ...baseSheet, nostr_address: `33402:${pubkey}:workstr:program:push-day`, nostr_pubkey: pubkey };
+    const program = sheetToProgram(imported);
+    expect(program.pubkey).toBe(pubkey);
+    expect(programCard(program, { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: program.address, sheets: [imported], programZapAttempts: [] } as unknown as AppState)).toContain('Zap creator');
   });
 });
 

@@ -30,6 +30,7 @@ export default defineConfig({
     // Pure logic, crypto, IndexedDB and protocol suites do not need a browser DOM.
     // DOM-facing suites opt into jsdom with a file-level environment annotation.
     environment: 'node',
-    setupFiles: ['./tests/setup.ts']
+    setupFiles: ['./tests/setup.ts'],
+    exclude: ['node_modules/**', 'dist/**', '.worktrees/**']
   }
 });

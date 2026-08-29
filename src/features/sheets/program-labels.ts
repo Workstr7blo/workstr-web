@@ -69,5 +69,14 @@ export function inferProgramLabels(program: RelayProgram, exercises: Exercise[])
 }
 
 export function programDisplayTags(program: RelayProgram, exercises: Exercise[]): string[] {
+  const labels = inferProgramLabels(program, exercises);
+  const goals = selectedProgramGoals(program.tags || []);
+  const format = labels.find((tag) => ['emom', 'superset', 'circuit'].includes(tag));
+  const focus = labels.find((tag) => ['full-body', 'upper-body', 'lower-body', 'push', 'pull', 'legs', 'core'].includes(tag));
+  const equipment = labels.find((tag) => ['dumbbell', 'barbell', 'kettlebell', 'bands', 'machine', 'bodyweight'].includes(tag));
+  return uniqueTags([...goals, format || '', focus || '', equipment || '']).slice(0, 4);
+}
+
+export function programSearchTags(program: RelayProgram, exercises: Exercise[]): string[] {
   return uniqueTags([...selectedProgramGoals(program.tags || []), ...inferProgramLabels(program, exercises)]);
 }
