@@ -6,6 +6,7 @@ import { parseNwcConnectionString, type NwcConnection } from '../src/nostr/nwc';
 import { executeWorkoutProgramZapWithStatus } from '../src/nostr/program-zap-status';
 import type { NwcClientTransport, NwcRequestPayload, NwcResponsePayload } from '../src/nostr/nwc-client';
 import type { WorkoutProgramZapSource } from '../src/nostr/zaps';
+import { decodeLnurl } from '../src/nostr/lnurl';
 
 const invoice = (hrp: string) => `${hrp}1${'q'.repeat(60)}`;
 const BOLT11_21_SATS = invoice('lnbc210n');
@@ -85,11 +86,12 @@ describe('workout program zap status persistence', () => {
       programName: 'Push Day',
       amountSats: 21,
       recipientPubkey: OPERATOR_PUBKEY,
-      recipientLnurl: 'coach@example.com',
       invoice: BOLT11_21_SATS,
       paymentHash: 'h'.repeat(64),
       feesPaidMsat: 7
     });
+    expect(attempt.recipientLnurl).not.toBe('coach@example.com');
+    expect(decodeLnurl(attempt.recipientLnurl || '')).toBe('https://example.com/.well-known/lnurlp/coach');
     expect(JSON.stringify(attempt)).not.toContain('preimage');
     store.close();
 

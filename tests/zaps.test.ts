@@ -3,6 +3,7 @@ import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
 import { collectZapReceipts, fundingTotals, monthStartUnix, parseZapReceipt, resolveWorkoutProgramZapRecipient, type WorkoutProgramZapSource } from '../src/nostr/zaps';
 import { buildNwcZapPaymentPayload, buildWorkoutProgramZapRequestPayload } from '../src/nostr/zap-request';
 import { OPERATOR_PUBKEY } from '../src/nostr/canon';
+import { decodeLnurl } from '../src/nostr/lnurl';
 
 // The amount lives in the bolt11 human-readable prefix. The decoder needs at
 // least 50 characters and locates the separator with lastIndexOf('1'), which
@@ -71,11 +72,12 @@ describe('resolveWorkoutProgramZapRecipient', () => {
       pubkey: OPERATOR_PUBKEY,
       relay: 'wss://relay.example',
       relays: ['wss://relay.example'],
-      lnurl: 'coach@example.com',
       lud16: 'coach@example.com',
       app: 'workstr',
       programAddress: `33402:${OPERATOR_PUBKEY}:workstr:program:push-day`
     });
+    expect(result.recipient.lnurl).not.toBe('coach@example.com');
+    expect(decodeLnurl(result.recipient.lnurl)).toBe('https://example.com/.well-known/lnurlp/coach');
   });
 
   it('uses lud06 metadata when no lightning address is present', () => {
@@ -132,11 +134,13 @@ describe('buildWorkoutProgramZapRequestPayload', () => {
         ['amount', '21000'],
         ['p', OPERATOR_PUBKEY],
         ['a', `33402:${OPERATOR_PUBKEY}:workstr:program:push-day`],
-        ['lnurl', 'coach@example.com'],
+        ['lnurl', recipient.lnurl],
         ['client', 'workstr'],
         ['app', 'workstr']
       ]
     });
+    expect(result.payload.event.tags).not.toContainEqual(['lnurl', 'coach@example.com']);
+    expect(decodeLnurl(result.payload.event.tags.find((tag) => tag[0] === 'lnurl')?.[1] || '')).toBe('https://example.com/.well-known/lnurlp/coach');
   });
 
   it('lets the caller override receipt relays and dedupes them', () => {

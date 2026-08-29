@@ -5,6 +5,7 @@ import { OPERATOR_PUBKEY } from '../src/nostr/canon';
 import { parseNwcConnectionString, type NwcConnection } from '../src/nostr/nwc';
 import { executeWorkoutProgramZap } from '../src/nostr/program-zap';
 import type { NwcClientTransport, NwcRequestPayload, NwcResponsePayload } from '../src/nostr/nwc-client';
+import { encodeLnurl } from '../src/nostr/lnurl';
 
 const invoice = (hrp: string) => `${hrp}1${'q'.repeat(60)}`;
 const BOLT11_21_SATS = invoice('lnbc210n');
@@ -148,5 +149,41 @@ describe('executeWorkoutProgramZap', () => {
     }, { fetchInvoice: vi.fn(async () => { throw new Error('callback exploded with details'); }) });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'invoice-request-failed', message: 'Could not request a zap invoice from the program author.' } });
+  });
+
+  it('resolves lud06-only recipients through the default LNURL invoice flow', async () => {
+    const endpoint = 'https://wallet.example/lnurlp/coach';
+    const callback = 'https://wallet.example/zap/callback';
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === endpoint) {
+        return new Response(JSON.stringify({ callback, allowsNostr: true, minSendable: 1_000, maxSendable: 100_000 }), { status: 200 });
+      }
+      const parsed = new URL(url);
+      expect(`${parsed.origin}${parsed.pathname}`).toBe(callback);
+      expect(parsed.searchParams.get('amount')).toBe('21000');
+      expect(parsed.searchParams.get('nostr')).toContain('9734');
+      expect(parsed.searchParams.get('comment')).toBe('lud06 zap');
+      return new Response(JSON.stringify({ pr: BOLT11_21_SATS }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const transport = fakeTransport({ result_type: 'pay_invoice', result: { preimage: 'p'.repeat(64), fees_paid: 0, payment_hash: 'h'.repeat(64) } });
+      const result = await executeWorkoutProgramZap({
+        program: program({ lud16: undefined, lud06: encodeLnurl(endpoint) }),
+        amountSats: 21,
+        comment: 'lud06 zap',
+        signer: signer(),
+        nwcConnection: connection()
+      }, { nwc: { transport } });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.error.message);
+      expect(result.value.recipient.lud06).toBe(encodeLnurl(endpoint));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(transport.request).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

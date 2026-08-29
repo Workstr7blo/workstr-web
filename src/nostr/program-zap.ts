@@ -3,6 +3,7 @@ import type { RelayProgram } from './canon';
 import { NwcError, toNwcError, type NwcConnection, type NwcErrorCode, type NwcFailureKind } from './nwc';
 import { payInvoice, type NwcClientOptions, type NwcPaymentResult } from './nwc-client';
 import { buildNwcZapPaymentPayload, buildWorkoutProgramZapRequestPayload } from './zap-request';
+import { decodeLnurl, lud16ToLnurlPayEndpoint } from './lnurl';
 import { resolveWorkoutProgramZapRecipient, type RecipientDescriptor, type WorkoutProgramZapSource, type ZapRecipientResolutionError } from './zaps';
 
 export type WorkoutProgramZapFailureCode =
@@ -68,10 +69,15 @@ function failure(code: WorkoutProgramZapFailureCode, message: string, extra: Par
 
 function zapEndpointFromRecipient(recipient: RecipientDescriptor): string | null {
   const lud16 = recipient.lud16 || (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient.lnurl) ? recipient.lnurl : '');
-  if (!lud16) return null;
-  const [name, domain] = lud16.split('@');
-  if (!name || !domain) return null;
-  return `https://${domain}/.well-known/lnurlp/${encodeURIComponent(name)}`;
+  if (lud16) return lud16ToLnurlPayEndpoint(lud16);
+  const endpoint = decodeLnurl(recipient.lud06 || recipient.lnurl);
+  if (!endpoint) return null;
+  try {
+    const parsed = new URL(endpoint);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 async function defaultFetchInvoice(request: ZapInvoiceRequest): Promise<ZapInvoiceResponse> {

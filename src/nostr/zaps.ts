@@ -3,6 +3,7 @@ import { SimplePool, verifyEvent } from 'nostr-tools';
 import { getSatoshisAmountFromBolt11 } from 'nostr-tools/nip57';
 import { ZAP_RECEIPT_SIGNER_PUBKEY, ZAP_RELAYS } from '../core/funding';
 import { OPERATOR_PUBKEY, type RelayProgram } from './canon';
+import { encodeLnurl, lud16ToLnurlPayEndpoint } from './lnurl';
 import { DEFAULT_PUBLIC_RELAYS } from './pool';
 
 const QUERY_TIMEOUT_MS = 7000;
@@ -125,7 +126,13 @@ function resolveLnurl(program: WorkoutProgramZapSource): { lnurl: string; lud16?
   const lud06 = (program.zapRecipient?.lud06 || program.lud06 || '').trim();
   const lnurl = (program.zapRecipient?.lnurl || lud16 || lud06).trim();
   if (!lnurl) return null;
-  return { lnurl, lud16: lud16 || (LUD16.test(lnurl) ? lnurl : undefined), lud06: lud06 || (LUD06.test(lnurl) ? lnurl : undefined) };
+  const resolvedLud16 = lud16 || (LUD16.test(lnurl) ? lnurl : undefined);
+  if (resolvedLud16) {
+    const endpoint = lud16ToLnurlPayEndpoint(resolvedLud16);
+    if (!endpoint) return { lnurl, lud16: resolvedLud16, lud06: lud06 || undefined };
+    return { lnurl: encodeLnurl(endpoint), lud16: resolvedLud16, lud06: lud06 || undefined };
+  }
+  return { lnurl, lud06: lud06 || (LUD06.test(lnurl) ? lnurl : undefined) };
 }
 
 export function resolveWorkoutProgramZapRecipient(program: WorkoutProgramZapSource): ZapRecipientResolutionResult {
