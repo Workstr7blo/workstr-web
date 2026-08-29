@@ -70,6 +70,7 @@ describe('shell', () => {
       store: null,
       settings: { unit: 'kg', publicRelays: [] },
       support: { status: 'idle', receipts: [] },
+      nwc: { active: false, status: 'idle' },
       signerType: 'local',
       view: 'exercises',
       subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },

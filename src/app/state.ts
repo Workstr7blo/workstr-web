@@ -5,6 +5,15 @@ import type { RelayProfile } from '../nostr/pool';
 import type { SupportState } from '../features/support/views';
 import type { SyncStatus } from '../sync/engine';
 
+export interface NwcViewState {
+  active: boolean;
+  walletLabel?: string;
+  relayLabel?: string;
+  savedAt?: number;
+  status: 'idle' | 'connecting' | 'paying' | 'success' | 'error';
+  message?: string;
+}
+
 export type View = 'exercises' | 'workouts' | 'statistics' | 'settings';
 export type SubView = 'library' | 'discover' | 'programs' | 'history' | 'recovery' | 'training' | 'body';
 
@@ -64,6 +73,7 @@ export interface AppState {
   store: WorkstrStore | null;
   settings: WorkstrSettings;
   support: SupportState;
+  nwc: NwcViewState;
   signerType: 'nip07' | 'nip46' | 'local' | null;
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };

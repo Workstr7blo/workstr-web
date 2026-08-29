@@ -26,7 +26,8 @@ or set updates would make full-root rendering inappropriate.
 | Boot and application coordination | `src/main.ts`, `src/app/shell.ts` | `src/app/state.ts`, `src/app/layout.ts` | `tests/shell.test.ts` |
 | Identity, signer connection, and adoption | `src/app/identity-controller.ts` | `src/signer/types.ts`, `src/db/adopt.ts` | `tests/shell.test.ts`, `tests/adopt.test.ts`, browser verification |
 | Catalog/library actions and cache | `src/app/catalog-controller.ts` | `src/nostr/canon.ts`, `src/nostr/programImport.ts`, `src/db/store.ts` | `tests/discover.test.ts`, `tests/programImport.test.ts`, browser verification |
-| Preferences, recovery, history actions, and backup controls | `src/app/preferences-controller.ts` | `src/db/export.ts`, recovery modules, `src/nostr/zaps.ts` | feature tests, `tests/export.test.ts`, browser verification |
+| Preferences, recovery, history actions, and backup controls | `src/app/preferences-controller.ts` | `src/db/export.ts`, recovery modules, `src/nostr/zaps.ts` | feature tests, `tests/export.test.ts` |
+| NWC wallet connection and in-app support zaps | `src/app/nwc-controller.ts`, `src/nostr/support-zap.ts` | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts`, `src/features/support/views.ts` | `tests/nwc-ui.test.ts`, `tests/support-zap.test.ts`, NWC tests |
 | Stored/live session adaptation | `src/app/session-persistence.ts` | `src/db/store.ts`, `src/app/state.ts` | `tests/session-runner.test.ts`, `tests/store.test.ts` |
 | Top-level navigation and page markup | `src/app/layout.ts` | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
 | Redrawing without losing the reader's place | `src/app/scroll.ts` | `src/app/shell.ts` (`render`), the `.content` pane in `src/app/layout.ts` | `tests/scroll.test.ts` |
@@ -93,6 +94,8 @@ or set updates would make full-root rendering inappropriate.
   and the NIP-46 connection modal lifecycle.
 - `src/app/preferences-controller.ts` owns settings persistence, body/history actions,
   backup controls, support funding refresh, and Quick Workout/recovery handlers.
+- `src/app/nwc-controller.ts` owns zap-wallet connection modals, active NWC restore,
+  disconnect, and in-app support zap UI execution.
 - `src/app/session-persistence.ts` adapts stored session rows into live/history state.
 - `src/app/layout.ts` composes top-level pages from feature view functions. It does not
   persist data.
@@ -174,6 +177,8 @@ targets, or muscle metadata solely from the current exercise library.
   that key local to this browser profile.
 - `src/nostr/share.ts` builds and publishes public workout summaries, requiring actual
   relay acknowledgement/verification before reporting success.
+- `src/nostr/support-zap.ts` builds the operator NIP-57 zap request, obtains the LNURL
+  invoice, verifies the invoice amount, and sends `pay_invoice` through NWC.
 - Local training must remain usable when every relay operation fails.
 
 ### Relay-side policy (not client code)

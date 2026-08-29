@@ -12,7 +12,7 @@ const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0
 function makeState(store: WorkstrStore): AppState {
   return {
     pubkey: null, npub: null, profileName: null, profileNames: {}, store,
-    settings: { unit: 'kg', publicRelays: [] }, support: { status: 'idle', receipts: [] },
+    settings: { unit: 'kg', publicRelays: [] }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' },
     signerType: null, view: 'workouts',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     exercises: [], programs: [], activeSession: null, finishedSessions: [],
