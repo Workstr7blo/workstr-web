@@ -123,7 +123,7 @@ A successful workout-program creator zap performs these steps:
 6. The user's Workstr identity signer signs the kind `9734` zap request. The NWC client secret is not used as the identity signer.
 7. Workstr fetches the recipient LNURL-pay metadata and requests an invoice from the callback with `amount=<millisats>` and `nostr=<serialized zap request>`; comment is included when present.
 8. `buildNwcZapPaymentPayload()` checks the returned BOLT11 invoice parses and matches the requested sat amount.
-9. `payInvoice()` sends a NIP-47 `pay_invoice` request to the wallet relay(s), encrypted with NIP-44 to the wallet pubkey and signed by the NWC client secret.
+9. `payInvoice()` sends a NIP-47 `pay_invoice` request to the wallet relay(s), encrypted with NIP-04 to the wallet pubkey and signed by the NWC client secret.
 10. On successful wallet response, Workstr records a succeeded attempt with safe metadata such as amount, program address, recipient pubkey/LNURL, invoice, payment hash, and fees paid. It does not persist the preimage in attempt status.
 
 ## Missing recipient behavior

@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http';
 import { AddressInfo } from 'node:net';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
-import { decrypt as nip44DecryptPayload, encrypt as nip44EncryptPayload, getConversationKey } from 'nostr-tools/nip44';
+import { decrypt as nip04DecryptPayload, encrypt as nip04EncryptPayload } from 'nostr-tools/nip04';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import type { Event as NostrEvent } from 'nostr-tools';
 import type { UnsignedNostrEvent, Signer } from '../src/signer/types';
@@ -75,7 +75,7 @@ async function startMockWalletRelay(): Promise<MockWalletRelay> {
 
   wss.on('connection', (socket) => {
     subscriptions.set(socket, []);
-    socket.on('message', (raw) => {
+    socket.on('message', async (raw) => {
       const message = JSON.parse(String(raw)) as unknown[];
       const kind = message[0];
       if (kind === 'REQ') {
@@ -95,8 +95,7 @@ async function startMockWalletRelay(): Promise<MockWalletRelay> {
       socket.send(JSON.stringify(['OK', event.id, true, '']));
       if (event.kind !== NWC_REQUEST_KIND) return;
 
-      const key = getConversationKey(hexToBytes(WALLET_SECRET), event.pubkey);
-      const request = JSON.parse(nip44DecryptPayload(event.content, key)) as { method: string; params?: Record<string, unknown> };
+      const request = JSON.parse(await nip04DecryptPayload(hexToBytes(WALLET_SECRET), event.pubkey, event.content)) as { method: string; params?: Record<string, unknown> };
       methods.push(request.method);
       const response = request.method === 'get_info'
         ? { result_type: 'get_info', result: { alias: 'Local Mock Wallet', methods: ['get_info', 'pay_invoice'], notifications: [] } }
@@ -107,7 +106,7 @@ async function startMockWalletRelay(): Promise<MockWalletRelay> {
         kind: NWC_RESPONSE_KIND,
         created_at: Math.floor(Date.now() / 1000),
         tags: [['p', event.pubkey], ['e', event.id]],
-        content: nip44EncryptPayload(JSON.stringify(response), key)
+        content: await nip04EncryptPayload(hexToBytes(WALLET_SECRET), event.pubkey, JSON.stringify(response))
       }, hexToBytes(WALLET_SECRET));
       publish(responseEvent);
     });

@@ -21,7 +21,7 @@ To avoid using or exposing a funded wallet credential, the successful-payment ve
 
 - The mock NWC wallet runs a local WebSocket relay on `127.0.0.1`.
 - The connection string uses deterministic test-only hex keys from the test file, not user or production wallet material.
-- The app client still uses the production NWC relay transport (`SimplePool`, kind `23194` requests, NIP-44 encryption, kind `23195` responses).
+- The app client still uses the production NWC relay transport (`SimplePool`, kind `23194` requests, NIP-04 encryption, kind `23195` responses).
 - The mock LNURL-pay server runs a local HTTP endpoint and returns a 21-sat invoice string used by the existing invoice parser path.
 - The mock wallet can switch between a success response and a `PAYMENT_FAILED` response.
 
