@@ -1,6 +1,4 @@
-import { OPERATOR_LUD16 } from '../core/funding';
 import { LOCAL_NAMESPACE } from '../db/adopt';
-import { OPERATOR_PUBKEY } from '../nostr/canon';
 import { executeSupportZap } from '../nostr/support-zap';
 import { executeWorkoutProgramZapWithStatus } from '../nostr/program-zap-status';
 import { validateNwcConnection } from '../nostr/nwc-client';
@@ -128,9 +126,10 @@ function zapModal(nwc: NwcViewState, message = ''): string {
 }
 
 function programZapRecipientLabel(program: WorkoutProgramZapSource): string {
-  if (program.pubkey?.toLowerCase() === OPERATOR_PUBKEY) return OPERATOR_LUD16;
   if (program.zapRecipient?.lud16) return program.zapRecipient.lud16;
   if (program.lud16) return program.lud16;
+  if (program.zapRecipient?.lud06) return 'creator LNURL';
+  if (program.lud06) return 'creator LNURL';
   return 'the creator wallet';
 }
 
@@ -263,10 +262,6 @@ export function createNwcController(ctx: NwcControllerContext) {
     }
   }
 
-  function workstrProgramLud16(pubkey: string, profile?: { lud16?: string }): string | undefined {
-    return pubkey.toLowerCase() === OPERATOR_PUBKEY ? OPERATOR_LUD16 : profile?.lud16;
-  }
-
   function programFromAddress(address: string): WorkoutProgramZapSource | null {
     const local = state.sheets.map(sheetToProgram).find((item) => item.address === address);
     if (local) {
@@ -277,14 +272,14 @@ export function createNwcController(ctx: NwcControllerContext) {
         pubkey: sheet?.nostr_pubkey || local.pubkey,
         address: sheet?.nostr_address || local.address,
         eventId: sheet?.nostr_event_id || local.eventId,
-        lud16: workstrProgramLud16(sheet?.nostr_pubkey || local.pubkey, profile),
+        lud16: profile?.lud16,
         lud06: profile?.lud06
       };
     }
     const remote = state.programs.find((item) => item.address === address);
     if (!remote) return null;
     const profile = state.authorProfiles?.[remote.pubkey];
-    return { ...remote, lud16: workstrProgramLud16(remote.pubkey, profile), lud06: profile?.lud06 };
+    return { ...remote, lud16: profile?.lud16, lud06: profile?.lud06 };
   }
 
   function bindProgramZapModal(address: string): void {

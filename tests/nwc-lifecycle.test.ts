@@ -8,7 +8,6 @@ import type { NwcClientTransport, NwcInfo } from '../src/nostr/nwc-client';
 import type { StoredNwcConnection } from '../src/nostr/nwc-storage';
 import type { RelayProgram } from '../src/nostr/canon';
 import { OPERATOR_PUBKEY } from '../src/nostr/canon';
-import { OPERATOR_LUD16 } from '../src/core/funding';
 
 vi.mock('../src/nostr/nwc-client', async () => {
   const actual = await vi.importActual<typeof import('../src/nostr/nwc-client')>('../src/nostr/nwc-client');
@@ -319,7 +318,7 @@ describe('NWC workout-program zap modal', () => {
     createdAt: 1
   };
 
-  it('shows and uses the Workstr wallet target for operator-authored programs', () => {
+  it('shows and uses the creator kind:0 wallet target for operator-authored programs', () => {
     const active = stored();
     const { root } = harness({
       view: 'workouts',
@@ -331,8 +330,7 @@ describe('NWC workout-program zap modal', () => {
 
     root.querySelector<HTMLElement>('[data-zap-program]')?.click();
 
-    expect(root.textContent).toContain(`Recipient: ${OPERATOR_LUD16}`);
-    expect(root.textContent).not.toContain('workstr@rizful.com');
+    expect(root.textContent).toContain('Recipient: workstr@rizful.com');
   });
 });
 
