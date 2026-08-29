@@ -163,7 +163,7 @@ describe('program labels', () => {
       blocks: [{ type: 'straight', rounds: 3, steps: [{ exerciseSlug: 'bench' }, { exerciseSlug: 'row' }], restAfterRoundSec: 90 }]
     });
     expect(inferProgramLabels(program, lib)).toEqual(expect.arrayContaining(['normal', 'superset', 'upper-body', 'push', 'pull', 'dumbbell', 'minimal-equipment', 'quick']));
-    expect(programDisplayTags(program, lib).slice(0, 1)).toEqual(['hypertrophy']);
+    expect(programDisplayTags(program, lib)).toEqual(['hypertrophy', 'superset', 'upper-body', 'dumbbell']);
   });
 });
 

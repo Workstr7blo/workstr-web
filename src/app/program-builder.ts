@@ -2,7 +2,7 @@ import type { StraightBlock } from '../core/types';
 import { normalizeWeightUnit, storeWeightInput } from '../core/units';
 import type { SheetWithExercises } from '../db/store';
 import { builderRowsMarkup } from '../features/sheets/builder-views';
-import { emomBlocksFromBuilder, inferProgramLabels, PROGRAM_GOALS, selectedProgramGoals, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
+import { emomBlocksFromBuilder, PROGRAM_GOALS, programDisplayTags, selectedProgramGoals, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
 import { html } from './format';
 import type { AppState } from './state';
 
@@ -35,7 +35,7 @@ function builderProgram(current: BuilderState) {
 }
 
 function builderAutoLabelMarkup(current: BuilderState): string {
-  const autoLabels = inferProgramLabels(builderProgram(current), current.library).filter((tag) => !PROGRAM_GOALS.includes(tag));
+  const autoLabels = programDisplayTags(builderProgram(current), current.library).filter((tag) => !PROGRAM_GOALS.includes(tag));
   return autoLabels.length ? autoLabels.map((tag) => `<span class="tag-pill auto">${html(tag)}</span>`).join('') : '<span class="builder-auto-empty">Add exercises to detect split, equipment, and format.</span>';
 }
 
@@ -332,7 +332,7 @@ function renderModal(): void {
       name,
       notes: builder.desc.trim(),
       difficulty: builder.difficulty,
-      tags: [...new Set([...selectedProgramGoals(builder.tags), ...inferProgramLabels(builderProgram(builder), builder.library)])],
+      tags: selectedProgramGoals(builder.tags),
       blocks,
       exercises: builder.rows.map((row, index) => ({
         exercise_slug: row.exerciseSlug,

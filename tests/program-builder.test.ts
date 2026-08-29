@@ -49,7 +49,7 @@ describe('program builder controller', () => {
 
     expect(saveSheet).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Leg Day',
-      tags: expect.arrayContaining(['strength', 'lower-body', 'legs', 'normal']),
+      tags: ['strength'],
       exercises: [expect.objectContaining({ exercise_slug: 'squat', sets: 3, reps: '8' })]
     }), undefined);
     expect(closeModal).toHaveBeenCalled();
@@ -61,7 +61,7 @@ describe('program builder controller', () => {
     await controller.open();
     expect(root.querySelector('#sheet-tags')).toBeNull();
     (root.querySelector('[data-pick-slug="push-up"]') as HTMLElement).click();
-    expect(root.querySelector('.builder-auto-labels')?.textContent).toContain('push');
+    expect(root.querySelector('.builder-auto-labels')?.textContent).toContain('upper-body');
     for (const goal of ['strength', 'hypertrophy', 'conditioning']) {
       (root.querySelector(`[data-goal="${goal}"]`) as HTMLElement).click();
     }
@@ -72,7 +72,7 @@ describe('program builder controller', () => {
     await tick();
 
     expect(saveSheet).toHaveBeenCalledWith(expect.objectContaining({
-      tags: expect.arrayContaining(['strength', 'hypertrophy', 'upper-body', 'push', 'normal'])
+      tags: ['strength', 'hypertrophy']
     }), undefined);
     expect(saveSheet).toHaveBeenCalledWith(expect.objectContaining({
       tags: expect.not.arrayContaining(['conditioning'])

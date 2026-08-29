@@ -12,7 +12,7 @@ import { historyCalendarPanel } from '../features/train/history-calendar';
 import { workoutHistory } from '../features/train/history-timeline';
 import { bodyView, trainingStatsView } from '../features/progress/views';
 import { quickWorkoutPanel, recoveryView } from '../features/recovery/views';
-import { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, programCard, programDisplayTags, sheetToProgram } from '../features/sheets/views';
+import { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, programCard, programSearchTags, sheetToProgram } from '../features/sheets/views';
 import { backupPanel } from '../features/backup/views';
 
 const navItems: Array<{ view: View; label: string; icon: string }> = [
@@ -146,7 +146,7 @@ function workoutsView(state: AppState): string {
   const active = state.subState.workouts;
   const query = state.programFilter.toLowerCase();
   const programMatches = (program: { name: string; description: string; difficulty?: string; tags: string[]; exercises: unknown[]; blocks?: unknown[] }) => {
-    const labels = programDisplayTags(program as never, state.exercises);
+    const labels = programSearchTags(program as never, state.exercises);
     const filter = state.programFilters || { goal: '', focus: '', format: '', equipment: '' };
     return [program.name, program.description, program.difficulty || '', ...labels].join(' ').toLowerCase().includes(query)
       && (!filter.goal || labels.includes(filter.goal))

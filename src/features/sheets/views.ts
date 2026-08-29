@@ -8,7 +8,7 @@ import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 import { programDisplayTags } from './program-labels';
-export { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, inferProgramLabels, programDisplayTags, selectedProgramGoals } from './program-labels';
+export { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, inferProgramLabels, programDisplayTags, programSearchTags, selectedProgramGoals } from './program-labels';
 
 export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; sectionIndex: number; intervalIndex: number; durationSec: number; supersetWithPrevious?: boolean }
 
