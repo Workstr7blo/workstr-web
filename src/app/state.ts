@@ -1,9 +1,18 @@
 import type { WorkstrStore, SheetWithExercises } from '../db/store';
-import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings } from '../core/types';
+import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings, WorkoutProgramZapAttempt } from '../core/types';
 import type { RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import type { SupportState } from '../features/support/views';
 import type { SyncStatus } from '../sync/engine';
+
+export interface NwcViewState {
+  active: boolean;
+  walletLabel?: string;
+  relayLabel?: string;
+  savedAt?: number;
+  status: 'idle' | 'connecting' | 'paying' | 'success' | 'error';
+  message?: string;
+}
 
 export type View = 'exercises' | 'workouts' | 'statistics' | 'settings';
 export type SubView = 'library' | 'discover' | 'programs' | 'history' | 'recovery' | 'training' | 'body';
@@ -64,11 +73,13 @@ export interface AppState {
   store: WorkstrStore | null;
   settings: WorkstrSettings;
   support: SupportState;
+  nwc: NwcViewState;
   signerType: 'nip07' | 'nip46' | 'local' | null;
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
   exercises: Exercise[];
   programs: RelayProgram[];
+  programZapAttempts: WorkoutProgramZapAttempt[];
   expandedSessionId: number | null;
   // Calendar navigation is transient on purpose: month and day selection reset with the
   // session rather than persisting as a setting. Null month means "the current month".

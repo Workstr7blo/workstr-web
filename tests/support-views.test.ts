@@ -9,7 +9,8 @@ describe('supportPanel', () => {
     const markup = supportPanel();
     const npub = nip19.npubEncode(OPERATOR_PUBKEY);
 
-    expect(markup).toContain('>Zap</a>');
+    expect(markup).toContain('>External zap</a>');
+    expect(markup).toContain('>Zap with wallet</button>');
     expect(markup).toContain(`href="${OPERATOR_NOSTR_URL}"`);
     expect(markup).toContain('Fund the build. Keep the receipt.');
     expect(markup).toContain(`>${OPERATOR_NOSTR_HANDLE}</strong>`);

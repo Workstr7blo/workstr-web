@@ -28,9 +28,20 @@ export async function exportDatabase(db: IDBPDatabase<WorkstrDB>, pubkeyNamespac
   for (const name of KV_STORES) {
     const keys = await db.getAllKeys(name);
     const values = await db.getAll(name);
-    stores[name] = keys.map((key, index) => ({ key, value: values[index] }));
+    stores[name] = keys.map((key, index) => ({ key, value: exportValue(name, values[index]) }));
   }
   return { schema: EXPORT_SCHEMA, app: 'workstr-web', exportedAt: new Date().toISOString(), pubkeyNamespace, stores };
+}
+
+// The settings row mixes user preferences with device-local state. NWC credentials are
+// intentionally not stored here at all: `src/nostr/nwc-storage.ts` keeps them encrypted
+// in a dedicated secure-storage database. Keep this scrubber for old/dev rows and as a
+// defense-in-depth guard before writing any manual JSON archive.
+function exportValue(store: KvStore, value: unknown): unknown {
+  if (store !== 'settings' || !value || typeof value !== 'object') return value;
+  const copy = { ...(value as Record<string, unknown>) };
+  delete copy.nwc;
+  return copy;
 }
 
 // Wipe-and-replace the current namespace's stores from an export. Destructive by

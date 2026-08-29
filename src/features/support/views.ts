@@ -2,7 +2,9 @@ import { nip19 } from 'nostr-tools';
 import { MONTHLY_COST_SATS, OPERATOR_NOSTR_HANDLE, OPERATOR_NOSTR_URL } from '../../core/funding';
 import { OPERATOR_PUBKEY } from '../../nostr/canon';
 import { fundingTotals, type ZapReceipt } from '../../nostr/zaps';
+import { redactNwcSecrets } from '../../nostr/nwc';
 import { html } from '../../app/format';
+import type { NwcViewState } from '../../app/state';
 
 export type FundingStatus = 'idle' | 'loading' | 'ready' | 'offline';
 
@@ -56,7 +58,7 @@ function fundingPanel(state: SupportState): string {
 
 // Defaults to idle so a caller that has not fetched yet — or a test rendering
 // a minimal state — gets the zap target without a funding panel.
-export function supportPanel(state: SupportState = { status: 'idle', receipts: [] }): string {
+export function supportPanel(state: SupportState = { status: 'idle', receipts: [] }, nwc: NwcViewState = { active: false, status: 'idle' }, signedIn = false): string {
   const npub = nip19.npubEncode(OPERATOR_PUBKEY);
   const totals = fundingTotals(state.receipts, MONTHLY_COST_SATS);
   const summary = state.status === 'ready'
@@ -74,9 +76,14 @@ export function supportPanel(state: SupportState = { status: 'idle', receipts: [
         <small>${html(summary)}</small>
       </div>
       <div class="settings-row-actions">
-        <a id="open-zap-target" class="button primary" href="${html(OPERATOR_NOSTR_URL)}" target="_blank" rel="noreferrer">Zap</a>
+        <button id="open-nwc-zap" class="button primary" ${nwc.active && signedIn ? '' : 'disabled'}>Zap with wallet</button>
+        <a id="open-zap-target" class="button ghost" href="${html(OPERATOR_NOSTR_URL)}" target="_blank" rel="noreferrer">External zap</a>
         <button id="copy-npub" class="button ghost" data-copy="${html(npub)}">Copy npub</button>
       </div>
+    </div>
+    <div class="nwc-support-status ${nwc.active ? 'ok' : ''}">
+      <strong>${nwc.active ? 'NWC wallet ready' : signedIn ? 'Connect a zap wallet in Settings for in-app zaps.' : 'Sign in and connect a zap wallet for in-app zaps.'}</strong>
+      <small>${html(redactNwcSecrets(nwc.message || (nwc.active ? `${nwc.walletLabel || 'Wallet'} · ${nwc.relayLabel || 'wallet relay'}` : 'The external zap link still works without an in-app wallet.')))}</small>
     </div>
     <details class="settings-details support-details">
       <summary>Funding details and receipts</summary>
