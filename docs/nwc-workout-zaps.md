@@ -105,13 +105,16 @@ A successful workout-program creator zap performs these steps:
 1. User opens a published program card and chooses `Zap creator`.
 2. UI requires an active NWC wallet. If none is active, it routes the user to connect one first.
 3. `executeWorkoutProgramZapWithStatus()` writes a pending local attempt so the UI can show in-flight state and recover state after navigation.
-4. `resolveWorkoutProgramZapRecipient()` validates the program can receive a zap:
+4. `programFromAddress()` resolves the zap target shown in the modal:
+   - Workstr-operator catalog programs route to the configured operator wallet (`workstr@coinos.io`) so program support lands in the same Workstr donation account.
+   - Third-party creator programs use the creator metadata (`lud16`/`lud06`) once available.
+5. `resolveWorkoutProgramZapRecipient()` validates the program can receive a zap:
    - Program must be a published Nostr workout program, not a purely local draft.
    - Address must be a NIP-101e kind `33402:<author-pubkey>:<d-tag>` address.
    - Author pubkey must be 64-hex and must match the address author.
-   - Author metadata must expose `lud16`, `lud06`, or explicit zap-recipient LNURL metadata.
+   - Workstr/operator programs use `workstr@coinos.io`; other authors must expose `lud16`, `lud06`, or explicit zap-recipient LNURL metadata.
    - Recipient relays must be `ws://` or `wss://` URLs.
-5. `buildWorkoutProgramZapRequestPayload()` creates an unsigned NIP-57 kind `9734` zap request with:
+6. `buildWorkoutProgramZapRequestPayload()` creates an unsigned NIP-57 kind `9734` zap request with:
    - `relays` tag for zap receipt discovery.
    - `amount` tag in millisats.
    - `p` tag for the program author.
@@ -120,11 +123,11 @@ A successful workout-program creator zap performs these steps:
    - `client` tag set to `workstr`.
    - `app` tag set to `workstr`.
    - Comment as event content, after trimming and validation.
-6. The user's Workstr identity signer signs the kind `9734` zap request. The NWC client secret is not used as the identity signer.
-7. Workstr fetches the recipient LNURL-pay metadata and requests an invoice from the callback with `amount=<millisats>` and `nostr=<serialized zap request>`; comment is included when present.
-8. `buildNwcZapPaymentPayload()` checks the returned BOLT11 invoice parses and matches the requested sat amount.
-9. `payInvoice()` sends a NIP-47 `pay_invoice` request to the wallet relay(s), encrypted with NIP-04 to the wallet pubkey and signed by the NWC client secret.
-10. On successful wallet response, Workstr records a succeeded attempt with safe metadata such as amount, program address, recipient pubkey/LNURL, invoice, payment hash, and fees paid. It does not persist the preimage in attempt status.
+7. The user's Workstr identity signer signs the kind `9734` zap request. The NWC client secret is not used as the identity signer.
+8. Workstr fetches the recipient LNURL-pay metadata and requests an invoice from the callback with `amount=<millisats>` and `nostr=<serialized zap request>`; comment is included when present.
+9. `buildNwcZapPaymentPayload()` checks the returned BOLT11 invoice parses and matches the requested sat amount.
+10. `payInvoice()` sends a NIP-47 `pay_invoice` request to the wallet relay(s), encrypted with NIP-04 to the wallet pubkey and signed by the NWC client secret.
+11. On successful wallet response, Workstr records a succeeded attempt with safe metadata such as amount, program address, recipient pubkey/LNURL, invoice, payment hash, and fees paid. It does not persist the preimage in attempt status.
 
 ## Missing recipient behavior
 

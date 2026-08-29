@@ -6,6 +6,9 @@ import type { AppState } from '../src/app/state';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 import type { NwcClientTransport, NwcInfo } from '../src/nostr/nwc-client';
 import type { StoredNwcConnection } from '../src/nostr/nwc-storage';
+import type { RelayProgram } from '../src/nostr/canon';
+import { OPERATOR_PUBKEY } from '../src/nostr/canon';
+import { OPERATOR_LUD16 } from '../src/core/funding';
 
 vi.mock('../src/nostr/nwc-client', async () => {
   const actual = await vi.importActual<typeof import('../src/nostr/nwc-client')>('../src/nostr/nwc-client');
@@ -292,6 +295,44 @@ describe('NWC support zap payment UI', () => {
     expect(root.textContent).toContain(message);
     expect(allVisibleTextAndStorage(root)).not.toContain(SECRET);
     expect(allVisibleTextAndStorage(root)).toContain('[REDACTED]');
+  });
+});
+
+describe('NWC workout-program zap modal', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    vi.mocked(loadNwcConnection).mockResolvedValue(stored());
+  });
+
+  const workstrProgram: RelayProgram = {
+    slug: 'push-day',
+    name: 'Push Day',
+    description: '',
+    difficulty: 'beginner',
+    tags: ['strength'],
+    exercises: [],
+    sourceLabel: 'Workstr',
+    eventId: 'e'.repeat(64),
+    pubkey: OPERATOR_PUBKEY,
+    address: `33402:${OPERATOR_PUBKEY}:workstr:program:push-day`,
+    createdAt: 1
+  };
+
+  it('shows and uses the Workstr wallet target for operator-authored programs', () => {
+    const active = stored();
+    const { root } = harness({
+      view: 'workouts',
+      expandedProgramAddress: workstrProgram.address,
+      nwc: { active: true, status: 'idle', walletLabel: active.connection.lud16, relayLabel: 'relay.example.com' },
+      programs: [workstrProgram],
+      authorProfiles: { [OPERATOR_PUBKEY]: { pubkey: OPERATOR_PUBKEY, name: 'Workstr', lud16: 'workstr@rizful.com' } }
+    });
+
+    root.querySelector<HTMLElement>('[data-zap-program]')?.click();
+
+    expect(root.textContent).toContain(`Recipient: ${OPERATOR_LUD16}`);
+    expect(root.textContent).not.toContain('workstr@rizful.com');
   });
 });
 
