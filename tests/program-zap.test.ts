@@ -56,11 +56,16 @@ function fakeTransport(input: NwcResponsePayload | ((payload: NwcRequestPayload)
 
 describe('executeWorkoutProgramZap', () => {
   it('resolves the program recipient, signs a zap request, requests an invoice, and pays through NWC', async () => {
+    const testSigner = signer();
     const fetchInvoice = vi.fn(async ({ zapRequest, amountMsat }) => {
       expect(zapRequest.kind).toBe(9734);
+      expect(zapRequest.created_at).toBe(1_800_000_123);
       expect(zapRequest.pubkey).toBe(SENDER_PUBKEY);
+      expect(zapRequest.content).toBe('great set');
       expect(zapRequest.tags).toContainEqual(['p', OPERATOR_PUBKEY]);
       expect(zapRequest.tags).toContainEqual(['a', `33402:${OPERATOR_PUBKEY}:workstr:program:push-day`]);
+      expect(zapRequest.tags).toContainEqual(['lnurl', 'coach@example.com']);
+      expect(zapRequest.tags).toContainEqual(['amount', '21000']);
       expect(amountMsat).toBe(21_000);
       return { invoice: BOLT11_21_SATS };
     });
@@ -73,7 +78,7 @@ describe('executeWorkoutProgramZap', () => {
       program: program({ zapRecipient: { relays: ['wss://relay.example'] } }),
       amountSats: 21,
       comment: 'great set',
-      signer: signer(),
+      signer: testSigner,
       nwcConnection: connection(),
       createdAt: 1_800_000_123
     }, { fetchInvoice, nwc: { transport } });
@@ -82,16 +87,35 @@ describe('executeWorkoutProgramZap', () => {
     if (!result.ok) throw new Error(result.error.message);
     expect(result.value.invoice).toBe(BOLT11_21_SATS);
     expect(result.value.amountSats).toBe(21);
+    expect(result.value.programAddress).toBe(`33402:${OPERATOR_PUBKEY}:workstr:program:push-day`);
+    expect(result.value.recipient).toMatchObject({ pubkey: OPERATOR_PUBKEY, lnurl: 'coach@example.com', relays: ['wss://relay.example'] });
     expect(result.value.payment).toEqual({ preimage: 'p'.repeat(64), feesPaidMsat: 7, paymentHash: 'h'.repeat(64) });
+    expect(testSigner.getPublicKey).toHaveBeenCalledTimes(1);
+    expect(testSigner.signEvent).toHaveBeenCalledTimes(1);
     expect(fetchInvoice).toHaveBeenCalledTimes(1);
+    expect(fetchInvoice).toHaveBeenCalledWith(expect.objectContaining({
+      recipient: expect.objectContaining({ pubkey: OPERATOR_PUBKEY, lnurl: 'coach@example.com' }),
+      amountMsat: 21_000,
+      comment: 'great set'
+    }));
     expect(transport.request).toHaveBeenCalledTimes(1);
   });
 
   it('returns a graceful failure when no NWC wallet is connected', async () => {
     const fetchInvoice = vi.fn(async () => ({ invoice: BOLT11_21_SATS }));
-    const result = await executeWorkoutProgramZap({ program: program(), amountSats: 21, signer: signer(), nwcConnection: null }, { fetchInvoice });
+    const testSigner = signer();
+    const result = await executeWorkoutProgramZap({ program: program(), amountSats: 21, signer: testSigner, nwcConnection: null }, { fetchInvoice });
 
-    expect(result).toMatchObject({ ok: false, error: { code: 'missing-wallet-connection', field: 'nwcConnection' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'missing-wallet-connection',
+        field: 'nwcConnection',
+        message: 'Connect a Nostr Wallet Connect wallet before zapping programs.'
+      }
+    });
+    expect(testSigner.getPublicKey).not.toHaveBeenCalled();
+    expect(testSigner.signEvent).not.toHaveBeenCalled();
     expect(fetchInvoice).not.toHaveBeenCalled();
   });
 
@@ -128,7 +152,10 @@ describe('executeWorkoutProgramZap', () => {
   });
 
   it('maps NWC wallet failures into structured payment failures', async () => {
-    const transport = fakeTransport({ result_type: 'pay_invoice', error: { code: 'UNAUTHORIZED', message: 'user denied payment' } });
+    const transport = fakeTransport((payload) => {
+      expect(payload).toEqual({ method: 'pay_invoice', params: { invoice: BOLT11_21_SATS } });
+      return { result_type: 'pay_invoice', error: { code: 'UNAUTHORIZED', message: 'user denied payment' } };
+    });
 
     const result = await executeWorkoutProgramZap({
       program: program(),
@@ -137,7 +164,16 @@ describe('executeWorkoutProgramZap', () => {
       nwcConnection: connection()
     }, { fetchInvoice: vi.fn(async () => ({ invoice: BOLT11_21_SATS })), nwc: { transport } });
 
-    expect(result).toMatchObject({ ok: false, error: { code: 'payment-failed', nwcCode: 'rejected_unauthorized', nwcKind: 'rejected_unauthorized' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'payment-failed',
+        message: 'user denied payment',
+        nwcCode: 'rejected_unauthorized',
+        nwcKind: 'rejected_unauthorized'
+      }
+    });
+    expect(transport.request).toHaveBeenCalledTimes(1);
   });
 
   it('returns invoice-request-failed when the recipient cannot issue an invoice', async () => {
