@@ -112,7 +112,13 @@
 .workout-card-map.has-map svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 14px rgba(124,60,255,.12)); }
 .workout-card-map.has-map polygon { vector-effect: non-scaling-stroke; }
 .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 148px minmax(0,1fr) 22px; align-items: center; }
+.workout-card-media { display: grid; gap: 9px; align-content: start; }
+.workout-card-media .program-zap-cta { width: 100%; justify-content: center; min-height: 38px; border-color: rgba(247,147,26,.62); background: linear-gradient(135deg, var(--bitcoin-gold), #ffbd4a); color: #1b0f02; box-shadow: 0 0 22px rgba(247,147,26,.24); }
+.workout-card-media .program-zap-cta:hover { filter: brightness(1.05); box-shadow: 0 0 28px rgba(247,147,26,.34); }
 .diff-badge.inline { position: static; display: inline-flex; align-items: center; padding: 4px 7px; }
+.program-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.program-tag-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; max-width: 230px; }
+.program-tag-grid .tag-pill { min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .program-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .program-tags .tag-pill { padding: 4px 8px; font-size: 10px; }
 .program-filter-panel { display: grid; gap: 9px; margin: 12px 0 14px; }
@@ -333,8 +339,11 @@
   .support-receipt-badge strong { margin-top: 0; }
   .support-actions .button { justify-content: center; }
   .support-stats { grid-template-columns: 1fr; }
-  .workout-card-map.has-map { width: 112px; height: 112px; padding: 4px; }
-  .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 112px minmax(0,1fr) 22px; gap: 10px; }
+  .workout-card-map.has-map { width: 104px; height: 104px; padding: 4px; }
+  .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 104px minmax(0,1fr) 22px; gap: 10px; }
+  .workout-card-media .program-zap-cta { min-height: 36px; padding: 8px 7px; font-size: 14px; }
+  .program-tag-grid { gap: 6px; max-width: none; }
+  .program-tag-grid .tag-pill { padding: 6px 7px; font-size: 10px; letter-spacing: .02em; }
   .workout-card-name { font-size: 15px; }
   .workout-card-meta { font-size: 11px; }
 }

@@ -204,7 +204,9 @@ describe('sheetToProgram', () => {
     const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState);
     expect(card).toContain('advanced');
     expect(card).toContain('diff-advanced');
+    expect(card).toContain('program-tag-grid');
     expect(card).toContain('hypertrophy');
+    expect(card).toContain('upper-body');
   });
   it('keeps collapsed program card metadata concise', () => {
     const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState);
@@ -220,8 +222,10 @@ describe('sheetToProgram', () => {
     const pubkey = 'f'.repeat(64);
     const imported = { ...baseSheet, nostr_address: `33402:${pubkey}:workstr:program:push-day`, nostr_pubkey: pubkey };
     const program = sheetToProgram(imported);
+    const card = programCard(program, { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: program.address, sheets: [imported], programZapAttempts: [] } as unknown as AppState);
     expect(program.pubkey).toBe(pubkey);
-    expect(programCard(program, { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: program.address, sheets: [imported], programZapAttempts: [] } as unknown as AppState)).toContain('Zap creator');
+    expect(card).toContain('program-zap-cta');
+    expect(card).toContain('⚡ Zap');
   });
 });
 
