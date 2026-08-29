@@ -3,11 +3,11 @@ import type { EmomBlock, Exercise, StraightBlock, TrainingStep } from '../../cor
 import { displayWeightKg, normalizeWeightUnit } from '../../core/units';
 import type { SheetWithExercises } from '../../db/store';
 import type { RelayProgram } from '../../nostr/canon';
-import { programImportState } from '../../nostr/programImport';
 import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 import { programDisplayTags } from './program-labels';
+import { programActions, programZapStatus } from './program-zap-view';
 export { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, inferProgramLabels, programDisplayTags, programSearchTags, selectedProgramGoals } from './program-labels';
 
 export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; sectionIndex: number; intervalIndex: number; durationSec: number; supersetWithPrevious?: boolean }
@@ -219,7 +219,7 @@ export function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
     blocks: sheet.blocks,
     sourceLabel: sheet.nostr_address ? 'in library' : 'local',
     eventId: sheet.nostr_event_id || '',
-    pubkey: '',
+    pubkey: sheet.nostr_pubkey || '',
     address: `local:${sheet.id}`,
     createdAt: Math.floor(new Date(sheet.created_at).getTime() / 1000) || 0,
     exercises: sheet.exercises.map((row) => ({
@@ -338,7 +338,7 @@ export function programBody(program: RelayProgram, state: AppState): string {
   };
 
   if (!program.exercises.length && !emomBlocks.length) {
-    return `<div class="wk-ex-list"><p class="empty" style="padding:10px 0">No exercises yet.</p></div>
+    return `${programZapStatus(program, state)}<div class="wk-ex-list"><p class="empty" style="padding:10px 0">No exercises yet.</p></div>
     <div class="workout-card-actions">
       ${programActions(program, state)}
     </div>`;
@@ -360,21 +360,11 @@ export function programBody(program: RelayProgram, state: AppState): string {
     ? `<div class="program-timeline">${emomBlocks.map((block, index) => `<span><strong>${formatMinutes(block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0))}</strong><small>Section ${index + 1}</small></span>`).join('')}</div>`
     : '';
   const overview = `<div class="program-preview"><div class="program-preview-main"><strong>${total}</strong><span>${html(focus)}</span></div>${plan}</div>`;
+  const zapStatus = programZapStatus(program, state);
 
   // Strength first, then EMOM: the same order the live runner trains them in.
-  return `${overview}${strengthSection}${emomSection}
+  return `${overview}${zapStatus}${strengthSection}${emomSection}
     <div class="workout-card-actions">
       ${programActions(program, state)}
     </div>`;
-}
-
-function programActions(program: RelayProgram, state: AppState): string {
-  const importState = isLocalProgram(program) ? null : programImportState(program, state.sheets);
-  return importState === null
-    ? `<button class="button gold small start-workout-action" type="button" data-start-program="${html(program.address)}">Start workout</button>
-      <button class="button ghost small" type="button" data-edit-sheet="${localSheetId(program)}">Edit</button>
-      <button class="button danger small" type="button" data-del-sheet="${localSheetId(program)}">Delete</button>`
-    : importState === 'in-library'
-      ? '<button class="button ghost small" type="button" disabled>In library</button>'
-      : `<button class="button ${importState === 'update' ? 'gold' : 'primary'} small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>`;
 }
