@@ -105,14 +105,12 @@ A successful workout-program creator zap performs these steps:
 1. User opens a published program card and chooses `Zap creator`.
 2. UI requires an active NWC wallet. If none is active, it routes the user to connect one first.
 3. `executeWorkoutProgramZapWithStatus()` writes a pending local attempt so the UI can show in-flight state and recover state after navigation.
-4. `programFromAddress()` resolves the zap target shown in the modal:
-   - Workstr-operator catalog programs route to the configured operator wallet (`workstr@coinos.io`) so program support lands in the same Workstr donation account.
-   - Third-party creator programs use the creator metadata (`lud16`/`lud06`) once available.
+4. `programFromAddress()` resolves the zap target shown in the modal from the program author's live kind:0 metadata (`lud16`/`lud06`). Workstr-authored catalog programs are not special-cased: if the Workstr npub advertises `workstr@rizful.com`, program zaps go to `workstr@rizful.com`.
 5. `resolveWorkoutProgramZapRecipient()` validates the program can receive a zap:
    - Program must be a published Nostr workout program, not a purely local draft.
    - Address must be a NIP-101e kind `33402:<author-pubkey>:<d-tag>` address.
    - Author pubkey must be 64-hex and must match the address author.
-   - Workstr/operator programs use `workstr@coinos.io`; other authors must expose `lud16`, `lud06`, or explicit zap-recipient LNURL metadata.
+   - Author metadata must expose `lud16`, `lud06`, or explicit zap-recipient LNURL metadata.
    - Recipient relays must be `ws://` or `wss://` URLs.
 6. `buildWorkoutProgramZapRequestPayload()` creates an unsigned NIP-57 kind `9734` zap request with:
    - `relays` tag for zap receipt discovery.
