@@ -54,6 +54,7 @@ or set updates would make full-root rendering inappropriate.
 | NIP-46 remote signing | `src/signer/nip46.ts` | `src/signer/types.ts`, shell sign-in flow | `tests/shell.test.ts` plus browser validation |
 | Workout-summary event and relay publish | `src/nostr/share.ts` | `src/features/train/session-summary.ts`, signer contract | `tests/share.test.ts` |
 | Zap receipts and support totals | `src/nostr/zaps.ts` | `src/core/funding.ts`, `src/features/support/views.ts` | `tests/zaps.test.ts`, `tests/support-views.test.ts` |
+| Nostr Wallet Connect parsing, client, and secure wallet link | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts` | `src/db/export.ts`, payment/support UI | `tests/nwc.test.ts`, `tests/nwc-client.test.ts`, `tests/nwc-storage.test.ts` |
 | IndexedDB schema | `src/db/schema.ts` | `src/core/types.ts`, `src/db/store.ts` | `tests/store.test.ts`, `tests/export.test.ts`, `tests/adopt.test.ts` |
 | IndexedDB repository operations | `src/db/store.ts` | schema and domain types | `tests/store.test.ts` |
 | Anonymous/signed-in namespace adoption | `src/db/adopt.ts` | schema, shell sign-in flow | `tests/adopt.test.ts`, `tests/shell.test.ts` |
