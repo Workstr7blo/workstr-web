@@ -225,7 +225,9 @@ describe('sheetToProgram', () => {
     const card = programCard(program, { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: program.address, sheets: [imported], programZapAttempts: [] } as unknown as AppState);
     expect(program.pubkey).toBe(pubkey);
     expect(card).toContain('program-zap-cta');
-    expect(card).toContain('⚡ Zap');
+    expect(card).toContain('program-zap-icon');
+    expect(card).toContain('program-zap-label');
+    expect(card).toContain('>Zap</span>');
   });
 });
 

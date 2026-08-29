@@ -101,7 +101,9 @@ describe('NWC workout-program zap UI', () => {
   it('exposes a creator zap action on published program cards even before a wallet is connected', () => {
     const card = programCard(program, state({ expandedProgramAddress: program.address, nwc: { active: false, status: 'idle' } }));
 
-    expect(card).toContain('⚡ Zap');
+    expect(card).toContain('program-zap-icon');
+    expect(card).toContain('program-zap-label');
+    expect(card).toContain('>Zap</span>');
     expect(card).toContain(`data-zap-program="${program.address}"`);
   });
 

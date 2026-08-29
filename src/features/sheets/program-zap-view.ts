@@ -43,7 +43,7 @@ export function canZapProgram(program: RelayProgram, state: AppState): boolean {
 
 export function programZapButton(program: RelayProgram, state: AppState): string {
   if (!canZapProgram(program, state)) return '';
-  return `<button class="button gold small program-zap-cta" type="button" data-zap-program="${html(program.address)}" aria-label="Zap creator of ${html(program.name)}">⚡ Zap</button>`;
+  return `<button class="button gold small program-zap-cta" type="button" data-zap-program="${html(program.address)}" aria-label="Zap creator of ${html(program.name)}"><span class="program-zap-icon" aria-hidden="true">⚡</span><span class="program-zap-label">Zap</span></button>`;
 }
 
 export function programActions(program: RelayProgram, state: AppState): string {
