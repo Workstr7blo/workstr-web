@@ -5,7 +5,7 @@ import { OPERATOR_PUBKEY } from '../src/nostr/canon';
 import { parseNwcConnectionString, type NwcConnection } from '../src/nostr/nwc';
 import { executeWorkoutProgramZap } from '../src/nostr/program-zap';
 import type { NwcClientTransport, NwcRequestPayload, NwcResponsePayload } from '../src/nostr/nwc-client';
-import { encodeLnurl } from '../src/nostr/lnurl';
+import { encodeLnurl, lud16ToLnurlPayEndpoint } from '../src/nostr/lnurl';
 
 const invoice = (hrp: string) => `${hrp}1${'q'.repeat(60)}`;
 const BOLT11_21_SATS = invoice('lnbc210n');
@@ -14,6 +14,7 @@ const WALLET_PUBKEY = 'a'.repeat(64);
 const SECRET = 'b'.repeat(64);
 const NWC = `nostr+walletconnect://${WALLET_PUBKEY}?relay=wss%3A%2F%2Frelay.example.com&secret=${SECRET}`;
 const SENDER_PUBKEY = 'f'.repeat(64);
+const COACH_LNURL = encodeLnurl(lud16ToLnurlPayEndpoint('coach@example.com') || '');
 
 function program(overrides: Partial<WorkoutProgramZapSource> = {}): WorkoutProgramZapSource {
   return {
@@ -64,7 +65,7 @@ describe('executeWorkoutProgramZap', () => {
       expect(zapRequest.content).toBe('great set');
       expect(zapRequest.tags).toContainEqual(['p', OPERATOR_PUBKEY]);
       expect(zapRequest.tags).toContainEqual(['a', `33402:${OPERATOR_PUBKEY}:workstr:program:push-day`]);
-      expect(zapRequest.tags).toContainEqual(['lnurl', 'coach@example.com']);
+      expect(zapRequest.tags).toContainEqual(['lnurl', COACH_LNURL]);
       expect(zapRequest.tags).toContainEqual(['amount', '21000']);
       expect(amountMsat).toBe(21_000);
       return { invoice: BOLT11_21_SATS };
@@ -88,13 +89,13 @@ describe('executeWorkoutProgramZap', () => {
     expect(result.value.invoice).toBe(BOLT11_21_SATS);
     expect(result.value.amountSats).toBe(21);
     expect(result.value.programAddress).toBe(`33402:${OPERATOR_PUBKEY}:workstr:program:push-day`);
-    expect(result.value.recipient).toMatchObject({ pubkey: OPERATOR_PUBKEY, lnurl: 'coach@example.com', relays: ['wss://relay.example'] });
+    expect(result.value.recipient).toMatchObject({ pubkey: OPERATOR_PUBKEY, lnurl: COACH_LNURL, lud16: 'coach@example.com', relays: ['wss://relay.example'] });
     expect(result.value.payment).toEqual({ preimage: 'p'.repeat(64), feesPaidMsat: 7, paymentHash: 'h'.repeat(64) });
     expect(testSigner.getPublicKey).toHaveBeenCalledTimes(1);
     expect(testSigner.signEvent).toHaveBeenCalledTimes(1);
     expect(fetchInvoice).toHaveBeenCalledTimes(1);
     expect(fetchInvoice).toHaveBeenCalledWith(expect.objectContaining({
-      recipient: expect.objectContaining({ pubkey: OPERATOR_PUBKEY, lnurl: 'coach@example.com' }),
+      recipient: expect.objectContaining({ pubkey: OPERATOR_PUBKEY, lnurl: COACH_LNURL, lud16: 'coach@example.com' }),
       amountMsat: 21_000,
       comment: 'great set'
     }));
