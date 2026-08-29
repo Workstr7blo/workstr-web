@@ -1,7 +1,7 @@
 import { LOCAL_NAMESPACE } from '../db/adopt';
 import { executeSupportZap } from '../nostr/support-zap';
 import { validateNwcConnection } from '../nostr/nwc-client';
-import { NwcError, maskNwcConnectionString, parseNwcConnectionString, type NwcConnection } from '../nostr/nwc';
+import { NwcError, maskNwcConnectionString, parseNwcConnectionString, redactNwcSecrets, type NwcConnection } from '../nostr/nwc';
 import {
   clearNwcConnection,
   loadNwcConnection,
@@ -211,9 +211,10 @@ export function createNwcController(ctx: NwcControllerContext) {
       const signer = await getSigner();
       const result = await executeSupportZap({ amountSats, comment, signer, nwcConnection: stored.connection });
       if (!result.ok) {
-        state.nwc = { ...activeState(stored), status: 'error', message: result.error.message };
+        const message = redactNwcSecrets(result.error.message);
+        state.nwc = { ...activeState(stored), status: 'error', message };
         render();
-        showZap(result.error.message);
+        showZap(message);
         return;
       }
       state.nwc = { ...activeState(stored), status: 'success', message: `Zapped ${result.value.amountSats.toLocaleString('en-US')} sats. Receipt may take a moment to appear.` };

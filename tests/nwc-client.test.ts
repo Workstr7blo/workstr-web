@@ -154,6 +154,20 @@ describe('payInvoice', () => {
     if (!result.ok) expect(result.error.kind).toBe('payment_failure');
   });
 
+  it('maps payment timeouts without leaking connection credentials', async () => {
+    const transport = fakeTransport(async () => { throw new NwcError('timeout', `slow wallet ${VALID}`); });
+
+    const result = await payInvoiceResult(connection(), INVOICE, { transport });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('timeout');
+      expect(result.error.kind).toBe('unreachable_service');
+      expect(JSON.stringify(result.error)).not.toContain(SECRET);
+      expect(JSON.stringify(result.error)).not.toContain(VALID);
+    }
+  });
+
   it('maps unknown wallet responses distinctly and redacts accidental secrets', async () => {
     const transport = fakeTransport({ result_type: 'pay_invoice', error: { code: 'INTERNAL', message: `oops ${VALID}` } });
 

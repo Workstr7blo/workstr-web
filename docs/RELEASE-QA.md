@@ -163,9 +163,48 @@ installed PWA that has been backgrounded, and a genuinely offline radio.
       relay (`relay-admin usage <pubkey>` does not grow), and that turning it back on does
       not duplicate anything.
 
+## 6c. Nostr Wallet Connect support zaps
+
+Needs a real NWC-capable Lightning wallet, a real signer, and the deployed site. Use a
+low spending budget and a small test amount. Automated tests cover parsing, redaction,
+secure-storage isolation, mocked wallet validation, mocked `pay_invoice`, and UI failure
+copy; these steps cover the real wallet/relay round trip that CI cannot exercise.
+
+- [ ] **Connect succeeds.** Settings → Zap wallet → Connect wallet. Paste a fresh NWC
+      connection string with `pay_invoice` permission and a low budget. Workstr reports
+      the wallet connected and only shows a wallet label / relay host, never the raw URI,
+      `secret=` parameter, or 64-hex secret.
+- [ ] **Malformed URI.** Paste a Lightning address or edited NWC URI. The modal stays open,
+      the error tells you to paste an NWC connection string, and no wallet is marked active.
+- [ ] **Expired connection.** Paste an expired NWC string from the wallet if supported (or
+      revoke/delete the connection in the wallet, then reconnect). Workstr reports that a
+      new connection string is needed.
+- [ ] **Rejected / unauthorized connection.** Create an NWC string without `pay_invoice` or
+      reject the wallet permission prompt. Workstr reports that the wallet rejected the
+      connection or lacks payment permission; it does not save the connection.
+- [ ] **Unreachable wallet service.** Block the wallet relay/network or use a disposable
+      test relay URL, then validate. Workstr reports that the wallet service could not be
+      reached and remains usable.
+- [ ] **Storage failure smoke.** In a non-secure/private browser context where IndexedDB or
+      WebCrypto is unavailable, validation may succeed but saving must fail with secure
+      storage copy and must not mark the wallet active.
+- [ ] **Successful support zap.** Signed in with a real signer, Support Workstr → Zap with
+      wallet, send a tiny amount. The signer signs a NIP-57 request, the wallet receives a
+      `pay_invoice` request, Workstr reports the zap sent, and the funding panel updates
+      once the receipt reaches relays.
+- [ ] **Rejected payment.** Reject the payment in the wallet. Workstr shows a readable
+      payment failure, keeps the wallet connected, and leaves the modal usable.
+- [ ] **Payment timeout/failure.** Put the wallet offline after connection, then attempt a
+      tiny zap. Workstr reports a timeout/unreachable wallet failure and does not claim a
+      zap was sent.
+- [ ] **Security audit.** After every failure above, inspect visible UI, devtools console,
+      Application → Local Storage/Session Storage, JSON export, and any saved screenshots.
+      None contain the raw NWC URI, `secret=`, the NWC 64-hex secret, or `nostr+walletconnect://`.
+
 ## 7. Support surface (from v1.0)
 
-Skip until the support screen ships.
+The support screen now includes in-app NWC zaps plus the external zap target. Run this in
+addition to section 6c when cutting a release.
 
 - [ ] Lightning address and QR render; the QR scans correctly in a wallet.
 - [ ] A real zap to the operator npub appears in the funding panel within a minute.
