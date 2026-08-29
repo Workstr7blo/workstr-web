@@ -2,10 +2,12 @@
 //
 // Uses the client secret from the NWC connection as an isolated NIP-47 keypair;
 // it never touches the user's identity signer. Requests are kind:23194 and
-// responses kind:23195, encrypted with NIP-44 to the wallet service pubkey.
+// responses kind:23195. NIP-47/NWC wallets use NIP-04 content encryption;
+// NIP-44 is accepted as a compatibility fallback for older local test builds.
 import { SimplePool, verifyEvent, type Event } from 'nostr-tools';
 import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
-import { decrypt as nip44DecryptPayload, encrypt as nip44EncryptPayload, getConversationKey } from 'nostr-tools/nip44';
+import { decrypt as nip04DecryptPayload, encrypt as nip04EncryptPayload } from 'nostr-tools/nip04';
+import { decrypt as nip44DecryptPayload, getConversationKey } from 'nostr-tools/nip44';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import { NwcError, toNwcError, type NwcConnection, type NwcResult } from './nwc';
 
@@ -64,6 +66,26 @@ function conversationKey(connection: NwcConnection): Uint8Array {
   return getConversationKey(hexToBytes(connection.secret), connection.walletPubkey);
 }
 
+async function encryptNwcPayload(connection: NwcConnection, payload: NwcRequestPayload): Promise<string> {
+  return Promise.resolve(nip04EncryptPayload(hexToBytes(connection.secret), connection.walletPubkey, JSON.stringify(payload)));
+}
+
+async function decryptNwcResponse(connection: NwcConnection, event: Event, key: Uint8Array): Promise<NwcResponsePayload> {
+  try {
+    const plaintext = await Promise.resolve(nip04DecryptPayload(hexToBytes(connection.secret), event.pubkey, event.content));
+    return JSON.parse(plaintext) as NwcResponsePayload;
+  } catch {
+    // Old local pre-release test builds briefly used NIP-44; keep a read-only
+    // fallback so those responses fail soft, while normal NWC wallets use NIP-04.
+  }
+
+  try {
+    return JSON.parse(nip44DecryptPayload(event.content, key)) as NwcResponsePayload;
+  } catch {
+    throw new NwcError('unknown_failure', 'Could not read the wallet reply.');
+  }
+}
+
 function normalizedMethods(value: unknown): NwcMethod[] {
   const raw = Array.isArray(value) ? value : String(value ?? '').split(/\s+/);
   return raw.filter((item): item is NwcMethod => item === 'get_info' || item === 'pay_invoice');
@@ -108,11 +130,12 @@ class RelayNwcTransport implements NwcClientTransport {
       const key = conversationKey(connection);
       const secretBytes = hexToBytes(connection.secret);
       const clientPubkey = getPublicKey(secretBytes);
+      const encryptedContent = await encryptNwcPayload(connection, payload);
       const requestEvent = finalizeEvent({
         kind: NWC_REQUEST_KIND,
         created_at: Math.floor(Date.now() / 1000),
         tags: [['p', connection.walletPubkey]],
-        content: nip44EncryptPayload(JSON.stringify(payload), key)
+        content: encryptedContent
       }, secretBytes);
 
       const responsePromise = new Promise<Event>((resolve, reject) => {
@@ -147,11 +170,7 @@ class RelayNwcTransport implements NwcClientTransport {
       if (responseEvent.pubkey !== connection.walletPubkey || !verifyEvent(responseEvent)) {
         throw new NwcError('unknown_failure', 'Wallet reply failed verification.');
       }
-      try {
-        return JSON.parse(nip44DecryptPayload(responseEvent.content, key)) as NwcResponsePayload;
-      } catch {
-        throw new NwcError('unknown_failure', 'Could not read the wallet reply.');
-      }
+      return await decryptNwcResponse(connection, responseEvent, key);
     } finally {
       pool.close(relays);
     }
