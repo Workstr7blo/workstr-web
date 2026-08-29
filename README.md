@@ -30,6 +30,12 @@ Run `npm run check` before handoff or review. It runs the module check, the test
 and the production TypeScript/Vite build. `.github/workflows/check.yml` runs the same
 command for pull requests and pushes to `main`, `feature/**`, and `fix/**` branches.
 
+## Maintainer docs
+
+- [NWC workout-program zaps](docs/nwc-workout-zaps.md) — setup, secure wallet
+  configuration, mock-wallet testing, payload flow, failure handling, and manual QA for
+  creator zaps through Nostr Wallet Connect.
+
 ## Phase 0 target
 
 - PWA shell
