@@ -421,6 +421,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .workout-card-map.has-map { padding: 3px; color: inherit; }
 .workout-card-map.has-map svg { width: 100%; height: 100%; }
 .workout-card-info { min-width: 0; }
+.program-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.program-tag-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; max-width: 230px; }
+.program-tag-grid .tag-pill { min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workout-card-name { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-size: 16px; font-weight: 850; letter-spacing: -.03em; }
 .program-chip-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .program-status { font: 800 9px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--dim); }

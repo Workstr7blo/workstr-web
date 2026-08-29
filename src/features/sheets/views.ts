@@ -7,7 +7,7 @@ import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 import { programDisplayTags } from './program-labels';
-import { programActions, programZapStatus } from './program-zap-view';
+import { programActions, programZapButton, programZapStatus } from './program-zap-view';
 export { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, inferProgramLabels, programDisplayTags, programSearchTags, selectedProgramGoals } from './program-labels';
 
 export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; sectionIndex: number; intervalIndex: number; durationSec: number; supersetWithPrevious?: boolean }
@@ -246,17 +246,23 @@ export function programCard(program: RelayProgram, state: AppState): string {
   const map = programMuscleMap(program, state.exercises);
   const emomLabel = emomBlocks.length > 1 ? `${emomBlocks.length}-section EMOM` : emom ? `${emom.rounds}-round EMOM` : '';
   const trainingLabel = [time || '', emomLabel, supersetCount ? `${supersetCount} superset${supersetCount === 1 ? '' : 's'}` : '', exerciseCount || !emomLabel ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
-  const tagPills = programDisplayTags(program, state.exercises).map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('');
+  const displayTags = programDisplayTags(program, state.exercises).slice(0, 2);
+  const tagPills = displayTags.map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('');
   const isExpanded = state.expandedProgramAddress === program.address;
   const statusCls = isLocalProgram(program) ? 'local' : 'published';
+  const fallbackMap = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg>';
   return `<div class="workout-card ${isExpanded ? 'expanded' : ''}" data-program-address="${html(program.address)}">
     <div class="workout-card-header" data-toggle-program="${html(program.address)}">
-      <div class="workout-card-map ${map ? 'has-map' : ''}">${map || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg>'}</div>
+      <div class="workout-card-media">
+        <div class="workout-card-map ${map ? 'has-map' : ''}">${map || fallbackMap}</div>
+        ${programZapButton(program, state)}
+      </div>
       <div class="workout-card-info">
         <div class="workout-card-name">${html(program.name)}</div>
         <div class="workout-card-meta">${trainingLabel}</div>
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(' · '))}</div>` : ''}
-        <div class="program-chip-row"><span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(program.difficulty)}</span>` : ''}${tagPills}</div>
+        <div class="program-badge-row"><span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(program.difficulty)}</span>` : ''}</div>
+        ${tagPills ? `<div class="program-tag-grid">${tagPills}</div>` : ''}
         ${program.pubkey ? `<div class="workout-card-author">${programAuthorPill(program, state)}</div>` : ''}
       </div>
       <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>

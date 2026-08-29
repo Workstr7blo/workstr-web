@@ -35,23 +35,24 @@ export function programZapStatus(program: RelayProgram, state: AppState): string
   return `<div class="program-section-summary program-zap-status"><strong>Creator zap</strong><span class="status-pill ${cls}">${message}</span></div>`;
 }
 
-function canZapProgram(program: RelayProgram, state: AppState): boolean {
+export function canZapProgram(program: RelayProgram, state: AppState): boolean {
   if (!program.pubkey) return false;
   if (!isLocalProgram(program)) return true;
   return Boolean(state.sheets.find((sheet) => sheet.id === localSheetId(program))?.nostr_address);
 }
 
+export function programZapButton(program: RelayProgram, state: AppState): string {
+  if (!canZapProgram(program, state)) return '';
+  return `<button class="button gold small program-zap-cta" type="button" data-zap-program="${html(program.address)}" aria-label="Zap creator of ${html(program.name)}">⚡ Zap</button>`;
+}
+
 export function programActions(program: RelayProgram, state: AppState): string {
   const importState = isLocalProgram(program) ? null : programImportState(program, state.sheets);
-  const zap = canZapProgram(program, state)
-    ? `<button class="button ghost small" type="button" data-zap-program="${html(program.address)}">Zap creator</button>`
-    : '';
   return importState === null
     ? `<button class="button gold small start-workout-action" type="button" data-start-program="${html(program.address)}">Start workout</button>
-      ${zap}
       <button class="button ghost small" type="button" data-edit-sheet="${localSheetId(program)}">Edit</button>
       <button class="button danger small" type="button" data-del-sheet="${localSheetId(program)}">Delete</button>`
     : importState === 'in-library'
-      ? `<button class="button ghost small" type="button" disabled>In library</button>${zap}`
-      : `<button class="button ${importState === 'update' ? 'gold' : 'primary'} small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>${zap}`;
+      ? `<button class="button ghost small" type="button" disabled>In library</button>`
+      : `<button class="button ${importState === 'update' ? 'gold' : 'primary'} small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>`;
 }
