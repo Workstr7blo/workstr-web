@@ -71,6 +71,13 @@
 .support-zap-copy { min-width: 0; }
 .support-zap-copy strong { display: block; margin-top: 8px; font-size: 20px; letter-spacing: -.03em; }
 .support-zap-copy small { display: block; margin-top: 6px; color: var(--muted); font: 700 12px/1.45 ui-monospace, monospace; overflow-wrap: anywhere; }
+.nwc-support-status { margin-top: 10px; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(188,151,255,.16); background: rgba(0,0,0,.2); }
+.nwc-support-status.ok { border-color: rgba(0,208,132,.32); background: rgba(0,208,132,.08); }
+.nwc-support-status strong { display: block; font-size: 13px; }
+.nwc-support-status small { display: block; margin-top: 4px; color: var(--muted); overflow-wrap: anywhere; }
+.nwc-form { display: grid; gap: 14px; }
+.nwc-form label { display: grid; gap: 7px; color: var(--purple-2); font: 900 11px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.nwc-form input, .nwc-form textarea { min-width: 0; }
 .support-receipt-badge { flex: none; display: grid; place-items: center; min-width: 84px; min-height: 70px; padding: 10px; border-radius: 16px; border: 1px solid rgba(0,208,132,.36); background: rgba(0,208,132,.08); color: var(--success-green); text-align: center; text-transform: uppercase; }
 .support-receipt-badge span { font: 800 10px/1 ui-monospace, monospace; letter-spacing: .12em; color: var(--muted); }
 .support-receipt-badge strong { margin-top: 6px; font: 900 14px/1 ui-monospace, monospace; letter-spacing: .06em; }

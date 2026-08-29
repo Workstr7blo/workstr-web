@@ -214,6 +214,40 @@ export interface BackupSettings {
   lastError?: string;
 }
 
+export type WorkoutProgramZapStatus = 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown';
+
+// Device-local payment attempt history for workout program zaps. It gives the UI/calling
+// layer a durable status handle without syncing wallet activity or NWC credentials.
+export interface WorkoutProgramZapAttempt {
+  id: string;
+  status: WorkoutProgramZapStatus;
+  programAddress: string;
+  programName: string;
+  programEventId?: string;
+  programPubkey?: string;
+  amountSats: number;
+  comment?: string;
+  recipientPubkey?: string;
+  recipientLnurl?: string;
+  invoice?: string;
+  paymentHash?: string;
+  feesPaidMsat?: number;
+  errorCode?: string;
+  errorMessage?: string;
+  nwcCode?: string;
+  nwcKind?: string;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+  completedAt?: ISODateTime;
+}
+
+// Device-local NWC wallet state. The connection string itself is a spending credential
+// stored only by src/nostr/nwc-storage.ts; settings may keep non-secret local zap status
+// and are still excluded from syncedSettings/manual exports as defense in depth.
+export interface NwcSettings {
+  programZapAttempts?: WorkoutProgramZapAttempt[];
+}
+
 export interface WorkstrSettings {
   unit: WeightUnit;
   publicRelays: string[];
@@ -229,4 +263,5 @@ export interface WorkstrSettings {
   ownedEquipment?: string[];
   canonCache?: CanonCache;
   backup?: BackupSettings;
+  nwc?: NwcSettings;
 }

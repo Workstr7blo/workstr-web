@@ -1,7 +1,7 @@
 import type { IDBPDatabase } from 'idb';
 import { newSessionUid, openWorkstrDB, type WorkstrDB } from './schema';
 import { exportDatabase, importDatabase, type WorkstrExport } from './export';
-import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, TrainingBlock, WorkstrSettings } from '../core/types';
+import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, TrainingBlock, WorkstrSettings, WorkoutProgramZapAttempt } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
 import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
@@ -36,6 +36,7 @@ function cleanTags(value: unknown): string[] {
 
 const LEGACY_RELAY_KEY = ['paid', 'Relay'].join('');
 const LEGACY_CATALOG_SOURCE = ['pre', 'mium'].join('');
+const MAX_PROGRAM_ZAP_ATTEMPTS = 50;
 
 export class WorkstrStore extends SyncAwareStore {
   private constructor(db: IDBPDatabase<WorkstrDB>) {
@@ -350,6 +351,32 @@ export class WorkstrStore extends SyncAwareStore {
     // decrypt its own new event on the next launch. Only user-facing synced keys queue the
     // settings record.
     if (JSON.stringify(syncedSettings(previous)) !== JSON.stringify(syncedSettings(next))) this.noteChange(SETTINGS_ADDRESS);
+  }
+
+  async listWorkoutProgramZapAttempts(programAddress?: string): Promise<WorkoutProgramZapAttempt[]> {
+    const attempts = (await this.getSettings()).nwc?.programZapAttempts ?? [];
+    return attempts
+      .filter((attempt) => !programAddress || attempt.programAddress === programAddress)
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  }
+
+  async getWorkoutProgramZapAttempt(id: string): Promise<WorkoutProgramZapAttempt | undefined> {
+    return (await this.listWorkoutProgramZapAttempts()).find((attempt) => attempt.id === id);
+  }
+
+  async saveWorkoutProgramZapAttempt(attempt: WorkoutProgramZapAttempt): Promise<void> {
+    const settings = await this.getSettings();
+    const attempts = settings.nwc?.programZapAttempts ?? [];
+    const nextAttempts = [attempt, ...attempts.filter((existing) => existing.id !== attempt.id)]
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+      .slice(0, MAX_PROGRAM_ZAP_ATTEMPTS);
+    await this.saveSettings({
+      ...settings,
+      nwc: {
+        ...settings.nwc,
+        programZapAttempts: nextAttempts
+      }
+    });
   }
 
 }
