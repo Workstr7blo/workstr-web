@@ -15,7 +15,7 @@ function makeState(store: WorkstrStore): AppState {
     settings: { unit: 'kg', publicRelays: [] }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' },
     signerType: null, view: 'workouts',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
-    exercises: [], programs: [], activeSession: null, finishedSessions: [],
+    exercises: [], programs: [], programZapAttempts: [], activeSession: null, finishedSessions: [],
     publishingSessionId: null, publishingStatus: null, editingId: null, filter: '',
     programFilter: '', expandedProgramAddress: null, exerciseStatus: '', programStatus: '',
     signInStatus: null, backup: { state: 'off' as const, pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null },

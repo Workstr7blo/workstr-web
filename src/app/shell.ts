@@ -47,12 +47,14 @@ async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<Rela
       new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 5000))
     ]);
     if (!event) return null;
-    const profile = JSON.parse(event.content) as { display_name?: string; displayName?: string; name?: string; username?: string; picture?: string; image?: string; avatar?: string; nip05?: string };
+    const profile = JSON.parse(event.content) as { display_name?: string; displayName?: string; name?: string; username?: string; picture?: string; image?: string; avatar?: string; nip05?: string; lud16?: string; lud06?: string };
     return {
       pubkey,
       name: profile.display_name?.trim() || profile.displayName?.trim() || profile.name?.trim() || profile.username?.trim() || profile.nip05?.trim() || undefined,
       picture: profile.picture?.trim() || profile.image?.trim() || profile.avatar?.trim() || undefined,
       nip05: profile.nip05?.trim() || undefined,
+      lud16: profile.lud16?.trim() || undefined,
+      lud06: profile.lud06?.trim() || undefined,
       createdAt: event.created_at
     };
   } catch {
@@ -63,7 +65,7 @@ async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<Rela
 }
 
 export function renderShell(root: HTMLElement): void {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', equipment: '' }, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], programZapAttempts: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', equipment: '' }, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -137,6 +139,7 @@ export function renderShell(root: HTMLElement): void {
     state.finishedSessions = await sessionPersistence.loadFinished();
     state.bodyEntries = await state.store.listBody();
     state.sheets = await state.store.listSheets();
+    state.programZapAttempts = await state.store.listWorkoutProgramZapAttempts();
     await catalog.reloadLibrary();
     state.activeSession = await sessionPersistence.loadUnfinished();
     await nwc.loadConnection(); render();

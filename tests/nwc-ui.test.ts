@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { shellMarkup } from '../src/app/layout';
+import { programCard } from '../src/features/sheets/views';
 import { supportPanel } from '../src/features/support/views';
 import type { AppState } from '../src/app/state';
+import type { RelayProgram } from '../src/nostr/canon';
 
 const SECRET = 'b'.repeat(64);
 
@@ -22,6 +24,7 @@ function state(overrides: Partial<AppState> = {}): AppState {
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     exercises: [],
     programs: [],
+    programZapAttempts: [],
     activeSession: null,
     finishedSessions: [],
     publishingSessionId: null,
@@ -77,5 +80,46 @@ describe('NWC support UI', () => {
     expect(active).toContain('id="open-nwc-zap" class="button primary" >Zap with wallet</button>');
     expect(active).toContain('NWC wallet ready');
     expect(active).toContain('Alby · relay.example.com');
+  });
+});
+
+describe('NWC workout-program zap UI', () => {
+  const program: RelayProgram = {
+    slug: 'push-day',
+    name: 'Push Day',
+    description: '',
+    difficulty: 'intermediate',
+    tags: ['strength'],
+    exercises: [],
+    sourceLabel: 'Workstr',
+    eventId: 'e'.repeat(64),
+    pubkey: 'f'.repeat(64),
+    address: `33402:${'f'.repeat(64)}:workstr:program:push-day`,
+    createdAt: 1
+  };
+
+  it('exposes a creator zap action on published program cards even before a wallet is connected', () => {
+    const card = programCard(program, state({ expandedProgramAddress: program.address, nwc: { active: false, status: 'idle' } }));
+
+    expect(card).toContain('Zap creator');
+    expect(card).toContain(`data-zap-program="${program.address}"`);
+  });
+
+  it('shows the latest persisted program zap result in the expanded program body', () => {
+    const card = programCard(program, state({
+      expandedProgramAddress: program.address,
+      programZapAttempts: [{
+        id: 'zap-1',
+        status: 'succeeded',
+        programAddress: program.address,
+        programName: 'Push Day',
+        amountSats: 21,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:01Z'
+      }]
+    }));
+
+    expect(card).toContain('Creator zap');
+    expect(card).toContain('Zap sent · 21 sats');
   });
 });

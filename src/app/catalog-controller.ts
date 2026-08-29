@@ -98,7 +98,8 @@ async function refreshDiscoverProfiles(): Promise<void> {
   state.authorProfiles ||= {};
   const pubkeys = [...new Set([
     ...state.discoverExercises.map((exercise) => exercise.nostr_pubkey).filter((pubkey): pubkey is string => Boolean(pubkey)),
-    ...state.programs.map((program) => program.pubkey).filter((pubkey): pubkey is string => Boolean(pubkey))
+    ...state.programs.map((program) => program.pubkey).filter((pubkey): pubkey is string => Boolean(pubkey)),
+    ...state.sheets.map((sheet) => sheet.nostr_pubkey).filter((pubkey): pubkey is string => Boolean(pubkey))
   ])].filter((pubkey) => !state.authorProfiles?.[pubkey]);
   if (!pubkeys.length) return;
   const entries = await Promise.all(pubkeys.map(async (pubkey) => [pubkey, await fetchProfile(pubkey, CANON_RELAYS)] as const));

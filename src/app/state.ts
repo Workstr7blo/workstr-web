@@ -1,5 +1,5 @@
 import type { WorkstrStore, SheetWithExercises } from '../db/store';
-import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings } from '../core/types';
+import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings, WorkoutProgramZapAttempt } from '../core/types';
 import type { RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import type { SupportState } from '../features/support/views';
@@ -79,6 +79,7 @@ export interface AppState {
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
   exercises: Exercise[];
   programs: RelayProgram[];
+  programZapAttempts: WorkoutProgramZapAttempt[];
   expandedSessionId: number | null;
   // Calendar navigation is transient on purpose: month and day selection reset with the
   // session rather than persisting as a setting. Null month means "the current month".

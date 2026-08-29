@@ -76,6 +76,7 @@ describe('shell', () => {
       subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
       exercises: [],
       programs: [],
+      programZapAttempts: [],
       activeSession: null,
       finishedSessions: [],
       publishingSessionId: null,

@@ -1,5 +1,6 @@
 import { LOCAL_NAMESPACE } from '../db/adopt';
 import { executeSupportZap } from '../nostr/support-zap';
+import { executeWorkoutProgramZapWithStatus } from '../nostr/program-zap-status';
 import { validateNwcConnection } from '../nostr/nwc-client';
 import { NwcError, maskNwcConnectionString, parseNwcConnectionString, redactNwcSecrets, type NwcConnection } from '../nostr/nwc';
 import {
@@ -9,7 +10,9 @@ import {
   NwcSecureStorageError,
   type StoredNwcConnection
 } from '../nostr/nwc-storage';
+import type { WorkoutProgramZapSource } from '../nostr/zaps';
 import type { Signer } from '../signer/types';
+import { sheetToProgram } from '../features/sheets/views';
 import { html } from './format';
 import type { AppState, NwcViewState } from './state';
 
@@ -25,6 +28,7 @@ export interface NwcControllerContext {
 }
 
 const DEFAULT_ZAP_AMOUNT = 1000;
+const DEFAULT_PROGRAM_ZAP_AMOUNT = 21;
 
 function activeNamespace(state: AppState): string {
   return state.pubkey ?? LOCAL_NAMESPACE;
@@ -117,6 +121,23 @@ function zapModal(nwc: NwcViewState, message = ''): string {
       <div class="web-empty-actions">
         <button class="button primary" type="submit">Confirm zap</button>
         <button class="button ghost" type="button" id="nwc-zap-cancel">Cancel</button>
+      </div>
+    </form>`;
+}
+
+function programZapModal(program: WorkoutProgramZapSource, nwc: NwcViewState, message = '', busy = false): string {
+  const walletReady = nwc.active;
+  return `<div class="page-title">Zap program creator</div>
+    <p class="section-help">Send a Nostr zap to the creator of <strong>${html(program.name || 'this workout program')}</strong>. Workstr signs a NIP-57 zap request, asks the creator for an invoice, then sends it to your NWC wallet.</p>
+    ${walletReady ? `<p class="section-help compact-note">Wallet: ${html(nwc.walletLabel || 'NWC wallet')}${nwc.relayLabel ? ` · ${html(nwc.relayLabel)}` : ''}</p>` : '<div class="auth-error">Connect a zap wallet before sending creator zaps.</div>'}
+    <form id="nwc-program-zap-form" class="nwc-form">
+      <label><span>Amount (sats)</span><input id="nwc-program-zap-amount" name="amountSats" inputmode="numeric" autocomplete="off" value="${DEFAULT_PROGRAM_ZAP_AMOUNT}" /></label>
+      <label><span>Note (optional)</span><textarea id="nwc-program-zap-comment" name="comment" maxlength="280" placeholder="Great program — thanks!"></textarea></label>
+      ${message ? `<div class="auth-error">${html(redactNwcSecrets(message))}</div>` : ''}
+      <div class="web-empty-actions">
+        <button class="button primary" type="submit" ${walletReady && !busy ? '' : 'disabled'}>${busy ? 'Sending zap…' : 'Confirm zap'}</button>
+        ${walletReady ? '' : '<button class="button primary" type="button" id="nwc-program-connect">Connect wallet</button>'}
+        <button class="button ghost" type="button" id="nwc-program-zap-cancel">Cancel</button>
       </div>
     </form>`;
 }
@@ -231,11 +252,114 @@ export function createNwcController(ctx: NwcControllerContext) {
     }
   }
 
+  function programFromAddress(address: string): WorkoutProgramZapSource | null {
+    const local = state.sheets.map(sheetToProgram).find((item) => item.address === address);
+    if (local) {
+      const sheet = state.sheets.find((item) => item.id === Number(address.slice('local:'.length)));
+      const profile = sheet?.nostr_pubkey ? state.authorProfiles?.[sheet.nostr_pubkey] : undefined;
+      return {
+        ...local,
+        pubkey: sheet?.nostr_pubkey || local.pubkey,
+        address: sheet?.nostr_address || local.address,
+        eventId: sheet?.nostr_event_id || local.eventId,
+        lud16: profile?.lud16,
+        lud06: profile?.lud06
+      };
+    }
+    const remote = state.programs.find((item) => item.address === address);
+    if (!remote) return null;
+    const profile = state.authorProfiles?.[remote.pubkey];
+    return { ...remote, lud16: profile?.lud16, lud06: profile?.lud06 };
+  }
+
+  function bindProgramZapModal(address: string): void {
+    root.querySelector('#nwc-program-zap-cancel')?.addEventListener('click', closeModal);
+    root.querySelector('#nwc-program-connect')?.addEventListener('click', () => showConnect('Connect a NWC wallet, then return to this program and tap Zap creator.'));
+    root.querySelector('#nwc-program-zap-form')?.addEventListener('submit', (event) => { void zapProgram(event, address); });
+  }
+
+  function showProgramZap(address: string, message = '', busy = false): void {
+    const program = programFromAddress(address);
+    if (!program) { toast('Program not found', 'bad'); return; }
+    openModal(programZapModal(program, state.nwc, message, busy));
+    bindProgramZapModal(address);
+  }
+
+  function updateProgramAttempt(attempt: AppState['programZapAttempts'][number]): void {
+    state.programZapAttempts = [attempt, ...(state.programZapAttempts || []).filter((existing) => existing.id !== attempt.id)].slice(0, 50);
+  }
+
+  async function zapProgram(event: Event, address: string): Promise<void> {
+    event.preventDefault();
+    const program = programFromAddress(address);
+    if (!program) { toast('Program not found', 'bad'); return; }
+    if (!state.store) { toast('Open a local account before zapping programs.', 'bad'); return; }
+    const form = event.target as HTMLFormElement;
+    const amountSats = Number((form.elements.namedItem('amountSats') as HTMLInputElement).value);
+    const comment = (form.elements.namedItem('comment') as HTMLTextAreaElement).value;
+    state.nwc = { ...state.nwc, status: 'paying', message: `Zapping ${program.name}…` };
+    render();
+    showProgramZap(address, 'Requesting invoice and sending to wallet…', true);
+    try {
+      const stored = await loadNwcConnection(activeNamespace(state));
+      if (!stored) {
+        state.nwc = inactiveState('Connect a NWC wallet before zapping program creators.', 'error');
+        render();
+        showProgramZap(address, state.nwc.message);
+        return;
+      }
+      const signer = await getSigner();
+      if (!signer) {
+        state.nwc = { ...activeState(stored), status: 'error', message: 'Sign in before sending program zaps so Workstr can create a Nostr receipt request.' };
+        render();
+        showProgramZap(address, state.nwc.message);
+        return;
+      }
+      const { attempt, result } = await executeWorkoutProgramZapWithStatus(state.store, {
+        program,
+        amountSats,
+        comment,
+        signer,
+        nwcConnection: stored.connection
+      }, {
+        onStatus: ({ attempt: update }) => {
+          updateProgramAttempt(update);
+          if (update.status === 'pending') {
+            state.nwc = { ...activeState(stored), status: 'paying', message: `Sending ${update.amountSats.toLocaleString('en-US')} sats to ${update.programName}…` };
+            render();
+            showProgramZap(address, state.nwc.message, true);
+          }
+        }
+      });
+      updateProgramAttempt(attempt);
+      if (!result.ok) {
+        const message = redactNwcSecrets(result.error.message);
+        state.nwc = { ...activeState(stored), status: 'error', message };
+        render();
+        showProgramZap(address, message);
+        return;
+      }
+      state.nwc = { ...activeState(stored), status: 'success', message: `Zapped ${result.value.amountSats.toLocaleString('en-US')} sats to ${program.name}.` };
+      closeModal();
+      render();
+      toast(`Zapped ${result.value.amountSats.toLocaleString('en-US')} sats to ${program.name}`);
+    } catch (error) {
+      const message = safeErrorMessage(error);
+      state.nwc = { ...state.nwc, status: 'error', message };
+      render();
+      showProgramZap(address, message);
+    }
+  }
+
   function bind(): void {
     root.querySelector('#nwc-connect')?.addEventListener('click', () => showConnect());
     root.querySelector('#nwc-disconnect')?.addEventListener('click', () => { void disconnect(); });
     root.querySelector('#open-nwc-zap')?.addEventListener('click', () => showZap());
+    root.querySelectorAll<HTMLElement>('[data-zap-program]').forEach((button) => button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      showProgramZap(button.dataset.zapProgram || '');
+    }));
   }
 
-  return { bind, loadConnection, showConnect, showZap };
+  return { bind, loadConnection, showConnect, showZap, showProgramZap };
 }
