@@ -419,8 +419,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .workout-card.top-zapped.rank-1 { border-color: rgba(247,147,26,.82); box-shadow: 0 0 34px rgba(247,147,26,.26), inset 0 1px 0 rgba(255,255,255,.08); }
 .workout-card.top-zapped.rank-2 { border-color: rgba(188,151,255,.72); box-shadow: 0 0 30px rgba(124,60,255,.24), inset 0 1px 0 rgba(255,255,255,.07); }
 .workout-card.top-zapped.rank-3 { border-color: rgba(247,147,26,.5); box-shadow: 0 0 24px rgba(124,60,255,.18), 0 0 14px rgba(247,147,26,.1), inset 0 1px 0 rgba(255,255,255,.06); }
-.program-zap-rank { position: absolute; top: 9px; right: 34px; z-index: 1; padding: 4px 7px; border: 1px solid rgba(247,147,26,.46); border-radius: 999px; background: rgba(6,3,12,.86); color: var(--bitcoin-gold); font: 900 9px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; box-shadow: 0 0 16px rgba(247,147,26,.16); }
-.workout-card-header { display: grid; grid-template-columns: 46px minmax(0,1fr) 18px; gap: 12px; align-items: center; padding: 13px; cursor: pointer; }
+.program-zap-rank { display: inline-flex; min-height: 22px; align-items: center; justify-content: center; padding: 4px 7px; border: 1px solid rgba(247,147,26,.46); border-radius: 999px; background: rgba(6,3,12,.86); color: var(--bitcoin-gold); font: 900 9px/1 ui-monospace, monospace; letter-spacing: .08em; text-align: center; text-transform: uppercase; box-shadow: 0 0 16px rgba(247,147,26,.16); }
+.workout-card-header { display: grid; grid-template-columns: 46px minmax(0,1fr) 18px; gap: 12px; align-items: start; padding: 13px; cursor: pointer; }
 .workout-card-map { width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 13px; background: rgba(0,0,0,.26); color: var(--dim); overflow: hidden; }
 .workout-card-map svg { width: 22px; height: 22px; }
 .workout-card-map.has-map { padding: 3px; color: inherit; }
@@ -429,7 +429,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .program-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .program-tag-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; max-width: 230px; }
 .program-tag-grid .tag-pill { min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.program-zap-stats { display: inline-flex; width: fit-content; align-items: center; justify-content: center; margin-top: 8px; padding: 6px 9px; border: 1px solid rgba(247,147,26,.26); border-radius: 999px; background: rgba(247,147,26,.08); color: var(--bitcoin-gold); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .07em; text-transform: uppercase; }
+.program-zap-stats { display: inline-flex; width: fit-content; align-items: center; justify-content: center; margin-left: auto; padding: 6px 9px; border: 1px solid rgba(247,147,26,.26); border-radius: 999px; background: rgba(247,147,26,.08); color: var(--bitcoin-gold); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .07em; text-transform: uppercase; }
 .workout-card-media .program-zap-cta { position: relative; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; padding-inline: 0; text-align: center; line-height: 1; }
 .workout-card-media .program-zap-cta .program-zap-icon,
 .workout-card-media .program-zap-cta .program-zap-label { display: inline-block; line-height: 1; }
@@ -440,7 +440,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .program-status.published { color: var(--success-green); border-color: rgba(0,208,132,.4); }
 .program-status.edited { color: var(--bitcoin-gold); border-color: rgba(247,147,26,.4); }
 .workout-card-meta { margin-top: 6px; color: var(--muted); font: 700 12px/1.3 ui-monospace, monospace; }
-.workout-card-author { margin-top: 6px; display: flex; align-items: center; }
+.workout-card-author { margin-top: 8px; display: flex; align-items: center; gap: 8px; max-width: 230px; }
+.workout-card-author .author-pill { min-width: 0; }
 .workout-card-muscles { margin-top: 5px; color: var(--purple-2); font: 700 11px/1.3 ui-monospace, monospace; }
 .workout-card-chevron { width: 22px; height: 22px; color: var(--dim); transition: transform .25s ease; }
 .workout-card.expanded .workout-card-chevron { transform: rotate(180deg); }

@@ -256,9 +256,9 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
   const statusCls = isLocalProgram(program) ? 'local' : 'published';
   const fallbackMap = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg>';
   return `<div class="workout-card ${isExpanded ? 'expanded' : ''} ${rank ? `top-zapped rank-${rank}` : ''}" data-program-address="${html(program.address)}">
-    ${rankBadge}
     <div class="workout-card-header" data-toggle-program="${html(program.address)}">
       <div class="workout-card-media">
+        ${rankBadge}
         <div class="workout-card-map ${map ? 'has-map' : ''}">${map || fallbackMap}</div>
         ${options.showZap === false ? '' : programZapButton(program, state)}
       </div>
@@ -268,8 +268,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(' · '))}</div>` : ''}
         <div class="program-badge-row"><span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(program.difficulty)}</span>` : ''}</div>
         ${tagPills ? `<div class="program-tag-grid">${tagPills}</div>` : ''}
-        ${zapStats}
-        ${program.pubkey ? `<div class="workout-card-author">${programAuthorPill(program, state)}</div>` : ''}
+        ${program.pubkey ? `<div class="workout-card-author">${programAuthorPill(program, state)}${zapStats}</div>` : zapStats}
       </div>
       <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
     </div>
