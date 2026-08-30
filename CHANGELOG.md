@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Program zap totals update immediately after a successful zap, then run one targeted
+  receipt refresh in the background instead of waiting for an app restart.
 - Sign-out now wipes the NIP-46 client secret along with the cached connection, so a
   later Nostr Connect on the same browser profile never reuses the previous session's
   client identity.
