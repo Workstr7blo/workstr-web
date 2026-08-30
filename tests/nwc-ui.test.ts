@@ -107,6 +107,31 @@ describe('NWC workout-program zap UI', () => {
     expect(card).toContain(`data-zap-program="${program.address}"`);
   });
 
+  it('shows program zaps only in the workouts Discover tab', () => {
+    const importedSheet = {
+      id: 7,
+      slug: 'push-day',
+      name: 'Push Day',
+      notes: '',
+      difficulty: 'intermediate',
+      tags: ['strength'],
+      is_temporary: false,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      nostr_address: program.address,
+      nostr_pubkey: program.pubkey,
+      exercises: []
+    };
+
+    const programsTab = shellMarkup(state({ view: 'workouts', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, sheets: [importedSheet] }));
+    expect(programsTab).not.toContain('program-zap-cta');
+    expect(programsTab).not.toContain(`data-zap-program=\"local:${importedSheet.id}\"`);
+
+    const discoverTab = shellMarkup(state({ view: 'workouts', subState: { exercises: 'library', workouts: 'discover', statistics: 'training' }, programs: [program] }));
+    expect(discoverTab).toContain('program-zap-cta');
+    expect(discoverTab).toContain(`data-zap-program=\"${program.address}\"`);
+  });
+
   it('shows the latest persisted program zap result in the expanded program body', () => {
     const card = programCard(program, state({
       expandedProgramAddress: program.address,

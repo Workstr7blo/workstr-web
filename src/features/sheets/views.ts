@@ -236,7 +236,7 @@ export function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
   };
 }
 
-export function programCard(program: RelayProgram, state: AppState): string {
+export function programCard(program: RelayProgram, state: AppState, options: { showZap?: boolean } = {}): string {
   const exerciseCount = standardProgramExercises(program.exercises, program.blocks).length;
   const time = formatMinutes(estimateProgramMin(program.exercises, program.blocks));
   const emomBlocks = program.blocks?.filter((block) => block.type === 'emom') || [];
@@ -255,7 +255,7 @@ export function programCard(program: RelayProgram, state: AppState): string {
     <div class="workout-card-header" data-toggle-program="${html(program.address)}">
       <div class="workout-card-media">
         <div class="workout-card-map ${map ? 'has-map' : ''}">${map || fallbackMap}</div>
-        ${programZapButton(program, state)}
+        ${options.showZap === false ? '' : programZapButton(program, state)}
       </div>
       <div class="workout-card-info">
         <div class="workout-card-name">${html(program.name)}</div>
