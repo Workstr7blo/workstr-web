@@ -157,6 +157,12 @@ function workoutsView(state: AppState): string {
   };
   const locals = state.sheets.map(sheetToProgram).filter(programMatches);
   const programs = state.programs.filter(programMatches);
+  const topProgramRanks = new Map(programs
+    .map((program) => ({ address: program.address, sats: state.programZapTotals?.[program.address]?.sats || 0 }))
+    .filter((entry) => entry.sats > 0)
+    .sort((a, b) => b.sats - a.sats)
+    .slice(0, 3)
+    .map((entry, index) => [entry.address, index + 1]));
   return `<div class="page active" id="page-workouts">
     <div class="page-title">Workouts</div>
     ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
@@ -164,7 +170,7 @@ function workoutsView(state: AppState): string {
       <div class="panel"><div class="panel-head"><span>Programs</span><button class="button primary small" id="new-program">+ New program</button></div><p class="section-help">Build, edit, and start your training programs.</p>${programFilterBar('program-filter', 'Search programs...', state)}<div class="program-list">${locals.map((program) => programCard(program, state, { showZap: false })).join('') || '<div class="empty">No programs match yet. Build one, import from Discover, or clear a filter.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
-      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost small" id="program-discover-refresh" type="button">Refresh</button></div><p class="section-help">Relay programs published by Workstr. Import a program to add a local copy to your Programs library before editing or running it.</p>${programFilterBar('program-discover-filter', 'Search relay programs...', state)}<div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div><div class="program-list">${programs.map((program) => programCard(program, state, { showZap: true })).join('') || '<div class="empty">No relay programs match. Refresh or clear a filter.</div>'}</div></div>
+      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost small" id="program-discover-refresh" type="button">Refresh</button></div><p class="section-help">Relay programs published by Workstr. Import a program to add a local copy to your Programs library before editing or running it.</p>${programFilterBar('program-discover-filter', 'Search relay programs...', state)}<div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div><div class="program-list">${programs.map((program) => programCard(program, state, { showZap: true, zapRank: topProgramRanks.get(program.address) })).join('') || '<div class="empty">No relay programs match. Refresh or clear a filter.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Your training month at a glance, then every session below.</p>${historyCalendarPanel(state)}${workoutHistory(state)}</div>
