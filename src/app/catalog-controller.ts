@@ -3,6 +3,7 @@ import type { Exercise } from '../core/types';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
+import { fetchProgramZapTotals } from '../nostr/zaps';
 import { discoverImportState } from '../features/discover/views';
 import { paintBodyMapSvg } from './bodymap';
 import { EX_PLACEHOLDER, exerciseSourceLabel, html } from './format';
@@ -72,6 +73,7 @@ async function refreshPrograms(): Promise<void> {
     state.programStatus = `loaded ${programs.length} Workstr programs`;
     await persistCanonCache();
     void refreshDiscoverProfiles();
+    void refreshProgramZapTotals(programs);
   } catch (error) {
     const cached = state.programs.length;
     state.programStatus = cached
@@ -79,6 +81,17 @@ async function refreshPrograms(): Promise<void> {
       : `program relay error: ${(error as Error).message}`;
   }
   render();
+}
+
+async function refreshProgramZapTotals(programs = state.programs): Promise<void> {
+  if (!programs.length) return;
+  try {
+    state.programZapTotals = await fetchProgramZapTotals(programs);
+    render();
+  } catch {
+    // Zap totals are social proof, not core catalog loading. Keep Discover usable
+    // when receipt relays are unavailable.
+  }
 }
 
 // Opens Discover instantly from the persisted snapshot, before any relay answers. Called
@@ -92,6 +105,7 @@ function primeFromCache(): void {
   state.exerciseStatus = `showing ${cached.exercises.length} Workstr exercises from the last sync`;
   state.programStatus = `showing ${cached.programs.length} Workstr programs from the last sync`;
   void refreshDiscoverProfiles();
+  void refreshProgramZapTotals(cached.programs);
 }
 
 async function refreshDiscoverProfiles(): Promise<void> {

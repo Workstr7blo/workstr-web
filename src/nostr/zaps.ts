@@ -23,6 +23,11 @@ export interface FundingTotals {
   percent: number;
 }
 
+export interface ProgramZapTotals {
+  sats: number;
+  count: number;
+}
+
 export type ZapRecipientErrorCode =
   | 'unsupported-program'
   | 'missing-pubkey'
@@ -227,6 +232,50 @@ export function collectZapReceipts(events: Event[], trust: ReceiptTrust = {}): Z
   return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
 
+function programReceiptAddress(event: Event): string {
+  const tags = event.tags as string[][];
+  const direct = tagValue(tags, 'a');
+  if (direct) return direct;
+  try {
+    const request = JSON.parse(tagValue(tags, 'description') || '{}');
+    const requestTags = Array.isArray(request?.tags) ? request.tags as string[][] : [];
+    return tagValue(requestTags, 'a');
+  } catch {
+    return '';
+  }
+}
+
+// Program zap leaderboards are public social proof rather than accounting for
+// Workstr's own wallet, so the signer cannot be pinned: each creator may use a
+// different LNURL provider. We still verify the receipt event signature, require
+// a NIP-57 invoice, and count only receipts tagged to a known program address.
+export function collectProgramZapTotals(events: Event[], programs: RelayProgram[]): Record<string, ProgramZapTotals> {
+  const addresses = new Set(programs.map((program) => program.address).filter(Boolean));
+  const byReceipt = new Map<string, { address: string; sats: number }>();
+  for (const event of events) {
+    if (event.kind !== 9735 || !verifyEvent(event)) continue;
+    const address = programReceiptAddress(event);
+    if (!addresses.has(address)) continue;
+    const bolt11 = tagValue(event.tags as string[][], 'bolt11');
+    if (!bolt11) continue;
+    let sats = 0;
+    try {
+      sats = getSatoshisAmountFromBolt11(bolt11);
+    } catch {
+      continue;
+    }
+    if (!Number.isFinite(sats) || sats <= 0 || byReceipt.has(event.id)) continue;
+    byReceipt.set(event.id, { address, sats });
+  }
+  const totals: Record<string, ProgramZapTotals> = {};
+  for (const { address, sats } of byReceipt.values()) {
+    totals[address] ||= { sats: 0, count: 0 };
+    totals[address].sats += sats;
+    totals[address].count += 1;
+  }
+  return totals;
+}
+
 // Start of the current calendar month, in unix seconds and local time — the
 // panel says "this month", so it should mean the user's month.
 export function monthStartUnix(now: Date = new Date()): number {
@@ -248,6 +297,24 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = QUERY_TIMEOUT_MS): Prom
     const timer = setTimeout(() => reject(new Error('zap relay query timed out')), timeoutMs);
     promise.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
   });
+}
+
+export async function fetchProgramZapTotals(programs: RelayProgram[]): Promise<Record<string, ProgramZapTotals>> {
+  const addresses = [...new Set(programs.map((program) => program.address).filter(Boolean))];
+  if (!addresses.length) return {};
+  const pool = new SimplePool();
+  try {
+    const filter = { kinds: [9735], '#a': addresses, limit: RECEIPT_LIMIT };
+    const results = await Promise.allSettled(ZAP_RELAYS.map(async (relay) => {
+      await withTimeout(pool.ensureRelay(relay));
+      return withTimeout(pool.querySync([relay], filter));
+    }));
+    if (results.every((result) => result.status === 'rejected')) throw new Error('no relay reachable');
+    const merged = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+    return collectProgramZapTotals(merged, programs);
+  } finally {
+    pool.close(ZAP_RELAYS);
+  }
 }
 
 // Every relay is queried with its own timeout; partial failure is fine, total

@@ -130,6 +130,36 @@ describe('NWC workout-program zap UI', () => {
     const discoverTab = shellMarkup(state({ view: 'workouts', subState: { exercises: 'library', workouts: 'discover', statistics: 'training' }, programs: [program] }));
     expect(discoverTab).toContain('program-zap-cta');
     expect(discoverTab).toContain(`data-zap-program=\"${program.address}\"`);
+    expect(discoverTab).toContain('⚡ 0 sats');
+  });
+
+  it('highlights the top three discover programs by visible zap sats', () => {
+    const programs = [1, 2, 3, 4].map((index) => ({
+      ...program,
+      slug: `program-${index}`,
+      name: `Program ${index}`,
+      address: `33402:${program.pubkey}:workstr:program:${index}`
+    }));
+    const markup = shellMarkup(state({
+      view: 'workouts',
+      subState: { exercises: 'library', workouts: 'discover', statistics: 'training' },
+      programs,
+      programZapTotals: {
+        [programs[0].address]: { sats: 500, count: 1 },
+        [programs[1].address]: { sats: 2000, count: 1 },
+        [programs[2].address]: { sats: 1000, count: 1 },
+        [programs[3].address]: { sats: 21, count: 1 }
+      }
+    }));
+
+    expect(markup).toContain('⚡ 2,000 sats');
+    expect(markup).toContain('rank-1');
+    expect(markup).toContain('#1 top zapped');
+    expect(markup).toContain('rank-2');
+    expect(markup).toContain('#2 top zapped');
+    expect(markup).toContain('rank-3');
+    expect(markup).toContain('#3 top zapped');
+    expect(markup).not.toContain('rank-4');
   });
 
   it('shows the latest persisted program zap result in the expanded program body', () => {

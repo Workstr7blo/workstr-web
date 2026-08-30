@@ -1,6 +1,7 @@
 import type { WorkstrStore, SheetWithExercises } from '../db/store';
 import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings, WorkoutProgramZapAttempt } from '../core/types';
 import type { RelayProgram } from '../nostr/canon';
+import type { ProgramZapTotals } from '../nostr/zaps';
 import type { RelayProfile } from '../nostr/pool';
 import type { SupportState } from '../features/support/views';
 import type { SyncStatus } from '../sync/engine';
@@ -79,6 +80,7 @@ export interface AppState {
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
   exercises: Exercise[];
   programs: RelayProgram[];
+  programZapTotals?: Record<string, ProgramZapTotals>;
   programZapAttempts: WorkoutProgramZapAttempt[];
   expandedSessionId: number | null;
   // Calendar navigation is transient on purpose: month and day selection reset with the

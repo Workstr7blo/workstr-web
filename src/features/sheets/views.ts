@@ -236,7 +236,7 @@ export function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
   };
 }
 
-export function programCard(program: RelayProgram, state: AppState, options: { showZap?: boolean } = {}): string {
+export function programCard(program: RelayProgram, state: AppState, options: { showZap?: boolean; zapRank?: number } = {}): string {
   const exerciseCount = standardProgramExercises(program.exercises, program.blocks).length;
   const time = formatMinutes(estimateProgramMin(program.exercises, program.blocks));
   const emomBlocks = program.blocks?.filter((block) => block.type === 'emom') || [];
@@ -249,9 +249,14 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
   const displayTags = programDisplayTags(program, state.exercises).slice(0, 2);
   const tagPills = displayTags.map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('');
   const isExpanded = state.expandedProgramAddress === program.address;
+  const zapTotals = state.programZapTotals?.[program.address];
+  const zapStats = options.showZap === false ? '' : `<div class="program-zap-stats">⚡ ${(zapTotals?.sats || 0).toLocaleString('en-US')} sats</div>`;
+  const rank = options.zapRank && options.zapRank >= 1 && options.zapRank <= 3 ? options.zapRank : 0;
+  const rankBadge = rank ? `<div class="program-zap-rank">#${rank} top zapped</div>` : '';
   const statusCls = isLocalProgram(program) ? 'local' : 'published';
   const fallbackMap = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg>';
-  return `<div class="workout-card ${isExpanded ? 'expanded' : ''}" data-program-address="${html(program.address)}">
+  return `<div class="workout-card ${isExpanded ? 'expanded' : ''} ${rank ? `top-zapped rank-${rank}` : ''}" data-program-address="${html(program.address)}">
+    ${rankBadge}
     <div class="workout-card-header" data-toggle-program="${html(program.address)}">
       <div class="workout-card-media">
         <div class="workout-card-map ${map ? 'has-map' : ''}">${map || fallbackMap}</div>
@@ -263,6 +268,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(' · '))}</div>` : ''}
         <div class="program-badge-row"><span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(program.difficulty)}</span>` : ''}</div>
         ${tagPills ? `<div class="program-tag-grid">${tagPills}</div>` : ''}
+        ${zapStats}
         ${program.pubkey ? `<div class="workout-card-author">${programAuthorPill(program, state)}</div>` : ''}
       </div>
       <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>

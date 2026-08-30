@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
-import { collectZapReceipts, fundingTotals, monthStartUnix, parseZapReceipt, resolveWorkoutProgramZapRecipient, type WorkoutProgramZapSource } from '../src/nostr/zaps';
+import { collectProgramZapTotals, collectZapReceipts, fundingTotals, monthStartUnix, parseZapReceipt, resolveWorkoutProgramZapRecipient, type WorkoutProgramZapSource } from '../src/nostr/zaps';
 import { buildNwcZapPaymentPayload, buildWorkoutProgramZapRequestPayload } from '../src/nostr/zap-request';
 import { OPERATOR_PUBKEY } from '../src/nostr/canon';
 import { decodeLnurl } from '../src/nostr/lnurl';
@@ -22,6 +22,7 @@ const trust = { recipient: OPERATOR_PUBKEY, signer: providerPubkey };
 function receipt(overrides: {
   bolt11?: string;
   recipient?: string;
+  programAddress?: string;
   secret?: Uint8Array;
   description?: string;
   createdAt?: number;
@@ -32,6 +33,7 @@ function receipt(overrides: {
     ['bolt11', overrides.bolt11 ?? BOLT11_21_SATS],
     ['description', overrides.description ?? JSON.stringify({ pubkey: 'f'.repeat(64), kind: 9734 })]
   ];
+  if (overrides.programAddress) tags.push(['a', overrides.programAddress]);
   return finalizeEvent({
     kind: overrides.kind ?? 9735,
     created_at: overrides.createdAt ?? 1_800_000_000,
@@ -230,6 +232,31 @@ describe('collectZapReceipts', () => {
     expect(collected).toHaveLength(2);
     // newest first
     expect(collected[0].createdAt).toBe(1_800_000_200);
+  });
+});
+
+describe('collectProgramZapTotals', () => {
+  it('sums visible kind 9735 receipts by workout program address', () => {
+    const first = program();
+    const second = program({ slug: 'pull-day', name: 'Pull Day', address: `33402:${OPERATOR_PUBKEY}:workstr:program:pull-day` });
+    const totals = collectProgramZapTotals([
+      receipt({ programAddress: first.address, bolt11: BOLT11_21_SATS }),
+      receipt({ programAddress: first.address, bolt11: BOLT11_1000_SATS }),
+      receipt({ programAddress: second.address, bolt11: BOLT11_1000_SATS }),
+      receipt({ programAddress: `33402:${OPERATOR_PUBKEY}:workstr:program:other`, bolt11: BOLT11_1000_SATS })
+    ], [first, second]);
+
+    expect(totals[first.address]).toEqual({ sats: 1021, count: 2 });
+    expect(totals[second.address]).toEqual({ sats: 1000, count: 1 });
+    expect(totals[`33402:${OPERATOR_PUBKEY}:workstr:program:other`]).toBeUndefined();
+  });
+
+  it('falls back to the zap request description a-tag when the receipt omits one', () => {
+    const target = program();
+    const description = JSON.stringify({ pubkey: 'f'.repeat(64), kind: 9734, tags: [['a', target.address]] });
+    const totals = collectProgramZapTotals([receipt({ description })], [target]);
+
+    expect(totals[target.address]).toEqual({ sats: 21, count: 1 });
   });
 });
 
