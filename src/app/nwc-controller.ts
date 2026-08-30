@@ -25,6 +25,7 @@ export interface NwcControllerContext {
   closeModal(): void;
   getSigner(): Promise<Signer | null>;
   refreshFunding(): Promise<void>;
+  refreshProgramZapTotals?(programs?: WorkoutProgramZapSource[]): Promise<void>;
 }
 
 const DEFAULT_ZAP_AMOUNT = 1000;
@@ -58,6 +59,18 @@ function activeState(stored: StoredNwcConnection, message?: string): NwcViewStat
 
 function inactiveState(message?: string, status: NwcViewState['status'] = 'idle'): NwcViewState {
   return { active: false, status, message };
+}
+
+function addOptimisticProgramZapTotal(state: AppState, programAddress: string, amountSats: number): void {
+  const totals = state.programZapTotals || {};
+  const current = totals[programAddress] || { sats: 0, count: 0 };
+  state.programZapTotals = {
+    ...totals,
+    [programAddress]: {
+      sats: current.sats + amountSats,
+      count: current.count + 1
+    }
+  };
 }
 
 function connectionMessage(error: NwcError): string {
@@ -349,10 +362,12 @@ export function createNwcController(ctx: NwcControllerContext) {
         showProgramZap(address, message);
         return;
       }
+      addOptimisticProgramZapTotal(state, result.value.programAddress || program.address, result.value.amountSats);
       state.nwc = { ...activeState(stored), status: 'success', message: `Zapped ${result.value.amountSats.toLocaleString('en-US')} sats to ${program.name}.` };
       closeModal();
       render();
       toast(`Zapped ${result.value.amountSats.toLocaleString('en-US')} sats to ${program.name}`);
+      window.setTimeout(() => { void ctx.refreshProgramZapTotals?.([program]); }, 8000);
     } catch (error) {
       const message = safeErrorMessage(error);
       state.nwc = { ...state.nwc, status: 'error', message };

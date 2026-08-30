@@ -86,7 +86,15 @@ async function refreshPrograms(): Promise<void> {
 async function refreshProgramZapTotals(programs = state.programs): Promise<void> {
   if (!programs.length) return;
   try {
-    state.programZapTotals = await fetchProgramZapTotals(programs);
+    const latest = await fetchProgramZapTotals(programs);
+    // Full catalog refreshes replace the snapshot. Targeted refreshes after a zap merge
+    // just the queried addresses so one cheap receipt check cannot blank the rest of the
+    // Discover leaderboard while relays are still catching up.
+    if (programs.length === state.programs.length) {
+      state.programZapTotals = latest;
+    } else {
+      state.programZapTotals = { ...(state.programZapTotals || {}), ...latest };
+    }
     render();
   } catch {
     // Zap totals are social proof, not core catalog loading. Keep Discover usable
@@ -274,7 +282,7 @@ async function toggleFavourite(slug: string): Promise<void> {
 }
 
   return {
-    refreshMergedExercises, reloadLibrary, persistCanonCache, primeFromCache, refreshExercises, refreshPrograms,
+    refreshMergedExercises, reloadLibrary, persistCanonCache, primeFromCache, refreshExercises, refreshPrograms, refreshProgramZapTotals,
     refreshDiscoverProfiles, openExerciseDetail, importDiscovered, importSelectedDiscovered,
     importProgram, deleteExerciseFromLibrary, deleteSelectedExercises, toggleFavourite
   };

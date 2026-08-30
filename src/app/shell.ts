@@ -371,7 +371,7 @@ export function renderShell(root: HTMLElement): void {
     startTrainingSession: sessionRunner.startTrainingSession,
     loadFinishedSessions: sessionPersistence.loadFinished
   });
-  const nwc = createNwcController({ root, state, render, toast, openModal, closeModal, getSigner: identity.getActiveSigner, refreshFunding: preferences.refreshFunding });
+  const nwc = createNwcController({ root, state, render, toast, openModal, closeModal, getSigner: identity.getActiveSigner, refreshFunding: preferences.refreshFunding, refreshProgramZapTotals: catalog.refreshProgramZapTotals });
   const backup = createBackupController({ state, render, toast, getSigner: identity.getActiveSigner, onSignerStalled: identity.dropActiveSigner, onRestored: () => { void refreshFromStore(); }, requestSignIn: () => { identity.startAccountChoice(); } });
 
   function unitLabel(): string { return normalizeWeightUnit(state.settings.unit); }

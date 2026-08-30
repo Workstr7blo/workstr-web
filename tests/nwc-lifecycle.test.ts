@@ -29,10 +29,16 @@ vi.mock('../src/nostr/support-zap', async () => {
   return { ...actual, executeSupportZap: vi.fn() };
 });
 
+vi.mock('../src/nostr/program-zap-status', async () => {
+  const actual = await vi.importActual<typeof import('../src/nostr/program-zap-status')>('../src/nostr/program-zap-status');
+  return { ...actual, executeWorkoutProgramZapWithStatus: vi.fn() };
+});
+
 const { createNwcController } = await import('../src/app/nwc-controller');
 const { validateNwcConnection } = await import('../src/nostr/nwc-client');
 const { loadNwcConnection, saveNwcConnection, clearNwcConnection, NwcSecureStorageError } = await import('../src/nostr/nwc-storage');
 const { executeSupportZap } = await import('../src/nostr/support-zap');
+const { executeWorkoutProgramZapWithStatus } = await import('../src/nostr/program-zap-status');
 
 const WALLET_PUBKEY = 'a'.repeat(64);
 const SECRET = 'b'.repeat(64);
@@ -111,7 +117,7 @@ function signer(): Signer {
   };
 }
 
-function harness(overrides: Partial<AppState> = {}) {
+function harness(overrides: Partial<AppState> = {}, callbacks: { refreshProgramZapTotals?: Parameters<typeof createNwcController>[0]['refreshProgramZapTotals'] } = {}) {
   const root = document.createElement('div');
   document.body.replaceChildren(root);
   const appState = state(overrides);
@@ -136,7 +142,8 @@ function harness(overrides: Partial<AppState> = {}) {
     openModal,
     closeModal,
     getSigner: vi.fn(async () => signer()),
-    refreshFunding: vi.fn(async () => {})
+    refreshFunding: vi.fn(async () => {}),
+    refreshProgramZapTotals: callbacks.refreshProgramZapTotals
   });
   render();
   return { root, state: appState, controller, toasts };
@@ -331,6 +338,55 @@ describe('NWC workout-program zap modal', () => {
     root.querySelector<HTMLElement>('[data-zap-program]')?.click();
 
     expect(root.textContent).toContain('Recipient: workstr@rizful.com');
+  });
+
+  it('updates visible program zap totals immediately and schedules one targeted receipt refresh', async () => {
+    vi.useFakeTimers();
+    const active = stored();
+    const refreshProgramZapTotals = vi.fn(async () => {});
+    vi.mocked(executeWorkoutProgramZapWithStatus).mockResolvedValueOnce({
+      attempt: {
+        id: 'attempt-1',
+        status: 'succeeded',
+        programAddress: workstrProgram.address,
+        programName: workstrProgram.name,
+        amountSats: 21,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      result: {
+        ok: true,
+        value: {
+          invoice: INVOICE,
+          amountSats: 21,
+          programAddress: workstrProgram.address,
+          recipient: { pubkey: OPERATOR_PUBKEY, relay: 'wss://relay.example.com', lnurl: 'workstr@rizful.com', relays: ['wss://relay.example.com'], programAddress: workstrProgram.address, app: 'workstr' },
+          zapRequest: { kind: 9734, created_at: 1, tags: [], content: '', pubkey: SENDER_PUBKEY, id: '1'.repeat(64), sig: '2'.repeat(128) },
+          payment: { preimage: PREIMAGE }
+        }
+      }
+    });
+    const { root, state: appState } = harness({
+      view: 'workouts',
+      expandedProgramAddress: workstrProgram.address,
+      nwc: { active: true, status: 'idle', walletLabel: active.connection.lud16, relayLabel: 'relay.example.com' },
+      programs: [workstrProgram],
+      programZapTotals: { [workstrProgram.address]: { sats: 5, count: 1 } },
+      authorProfiles: { [OPERATOR_PUBKEY]: { pubkey: OPERATOR_PUBKEY, name: 'Workstr', lud16: 'workstr@rizful.com' } },
+      store: {} as AppState['store']
+    }, { refreshProgramZapTotals });
+
+    root.querySelector<HTMLElement>('[data-zap-program]')?.click();
+    const form = root.querySelector<HTMLFormElement>('#nwc-program-zap-form')!;
+    form.querySelector<HTMLInputElement>('#nwc-program-zap-amount')!.value = '21';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await vi.waitFor(() => expect(appState.programZapTotals?.[workstrProgram.address]).toEqual({ sats: 26, count: 2 }));
+    expect(refreshProgramZapTotals).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(refreshProgramZapTotals).toHaveBeenCalledWith([expect.objectContaining({ address: workstrProgram.address })]);
+    vi.useRealTimers();
   });
 });
 
