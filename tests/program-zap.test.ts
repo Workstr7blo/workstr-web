@@ -139,6 +139,23 @@ describe('executeWorkoutProgramZap', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'signing-failed', message: 'Zap was cancelled in the signer.' } });
   });
 
+  it('explains missing signer zap-request permission', async () => {
+    const result = await executeWorkoutProgramZap({
+      program: program(),
+      amountSats: 21,
+      signer: signer({ signEvent: vi.fn(async () => { throw new Error('not permitted to sign event kind 9734'); }) }),
+      nwcConnection: connection()
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'signing-failed',
+        message: 'Signer is missing permission to sign zap requests. Reconnect your signer and approve program zap signing.'
+      }
+    });
+  });
+
   it('rejects bad invoices before sending anything to the wallet', async () => {
     const transport = fakeTransport({ result_type: 'pay_invoice', result: { preimage: 'p'.repeat(64) } });
     const result = await executeWorkoutProgramZap({
