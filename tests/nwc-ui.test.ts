@@ -153,6 +153,8 @@ describe('NWC workout-program zap UI', () => {
     }));
 
     expect(markup).toContain('⚡ 2,000 sats');
+    expect(markup).toContain('<div class="workout-card-media">\n        <div class="program-zap-rank">#1 top zapped</div>');
+    expect(markup).toContain('workout-card-author');
     expect(markup).toContain('rank-1');
     expect(markup).toContain('#1 top zapped');
     expect(markup).toContain('rank-2');
