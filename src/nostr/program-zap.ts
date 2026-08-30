@@ -106,6 +106,9 @@ async function defaultFetchInvoice(request: ZapInvoiceRequest): Promise<ZapInvoi
 function signingFailureMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error || '');
   if (/reject|denied|cancel/i.test(raw)) return 'Zap was cancelled in the signer.';
+  if (/unauthori[sz]ed|permission|forbidden|not allowed|not permitted/i.test(raw)) {
+    return 'Signer is missing permission to sign zap requests. Reconnect your signer and approve program zap signing.';
+  }
   return 'Could not sign the zap request.';
 }
 
