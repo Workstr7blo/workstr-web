@@ -4,6 +4,7 @@ import { canonMuscle } from '../core/muscles';
 import { slugify } from '../core/ids';
 import type { CanonCache, Exercise, TrainingBlock, TrainingStep } from '../core/types';
 import { DEFAULT_PUBLIC_RELAYS } from './pool';
+import { CREATOR_PROGRAM_D_PREFIX, queryCreatorPrograms } from './creator-programs';
 
 // The canon is everything signed by the operator key. The d-tag convention
 // gives cohesion; the author filter gives control — anyone can copy a d-tag,
@@ -228,7 +229,9 @@ export function programFromEvent(event: Event): RelayProgram | null {
   const dTag = tagValue(tags, 'd');
   const name = tagValue(tags, 'title');
   if (!dTag || !name) return null;
-  if (!dTag.startsWith(PROGRAM_D_PREFIX)) return null;
+  const isOfficialAddress = dTag.startsWith(PROGRAM_D_PREFIX);
+  const isCreatorAddress = dTag.startsWith(CREATOR_PROGRAM_D_PREFIX);
+  if (!isOfficialAddress && !isCreatorAddress) return null;
   const meta = parseWorkstrMeta(tags);
   const difficulty = String(meta.difficulty || tagValue(tags, 'difficulty') || '').trim();
   const normalizedDifficulty = difficulty.toLowerCase().replace(/\s+/g, '-');
@@ -262,14 +265,14 @@ export function programFromEvent(event: Event): RelayProgram | null {
     })).filter((item) => item.address);
 
   return {
-    slug: dTag.startsWith(PROGRAM_D_PREFIX) ? dTag.slice(PROGRAM_D_PREFIX.length) : slugify(name),
+    slug: isOfficialAddress ? dTag.slice(PROGRAM_D_PREFIX.length) : isCreatorAddress ? dTag.slice(CREATOR_PROGRAM_D_PREFIX.length) : slugify(name),
     name,
     description: String(meta.description || event.content || ''),
     difficulty,
     tags: programTags,
     blocks: parseTrainingBlocks(meta.blocks),
     exercises,
-    sourceLabel: hasWorkstrIdentity(tags) ? 'Workstr' : 'NIP-101e',
+    sourceLabel: event.pubkey === OPERATOR_PUBKEY ? 'Workstr' : isCreatorAddress ? 'creator' : hasWorkstrIdentity(tags) ? 'Workstr' : 'NIP-101e',
     muscleMapUrl: String(meta.muscleMapUrl || tagValue(tags, 'workstr_muscle_map') || imetaUrl(tags) || ''),
     eventId: event.id,
     pubkey: event.pubkey,
@@ -302,9 +305,7 @@ export function selectCanonEvents(events: Event[], operator = OPERATOR_PUBKEY): 
   return [...byAddress.values()];
 }
 
-// Every canon relay is queried in parallel with its own timeout; partial
-// failure is tolerated, but if no relay answered at all we throw so the UI
-// can distinguish "offline" from "canon is empty".
+// Parallel relay queries tolerate partial failure but throw when all relays fail.
 async function queryCanon(kind: 33401 | 33402, limit: number): Promise<Event[]> {
   const pool = new SimplePool();
   try {
@@ -349,10 +350,7 @@ function preferredExercise(current: Exercise, candidate: Exercise): Exercise {
   return (candidate.origin_created_at || 0) > (current.origin_created_at || 0) ? candidate : current;
 }
 
-// Workstr's public catalog can contain the same exercise title under a clean
-// slug and a one-off generated slug from an import retry. Discover should show
-// one card per movement title, preferring the stable clean slug so imports and
-// program references stay predictable.
+// Show one card per movement title, preferring stable clean slugs.
 export function dedupeCanonExercises(exercises: Exercise[]): Exercise[] {
   const byTitle = new Map<string, Exercise>();
   for (const exercise of exercises) {
@@ -368,9 +366,7 @@ function programsFrom(events: Event[]): RelayProgram[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// In-memory copy of the verified canon events, refreshed per kind on each
-// successful fetch. Snapshots of it are persisted in settings.canonCache so
-// Discover opens instantly and works offline with the last known catalog.
+// In-memory verified events; settings.canonCache persists snapshots for offline Discover.
 let memory: { fetchedAt: number; events: Event[] } | null = null;
 
 function rememberKind(kind: number, events: Event[]): void {
@@ -378,8 +374,7 @@ function rememberKind(kind: number, events: Event[]): void {
   memory = { fetchedAt: Date.now(), events: [...others, ...events] };
 }
 
-// Hydrate the in-memory canon from a persisted snapshot. Cached events were
-// verified when fetched, so they are not re-verified here.
+// Cached events were verified when fetched, so they are not re-verified here.
 export function primeCanonCache(cache?: CanonCache): { exercises: Exercise[]; programs: RelayProgram[]; fetchedAt: number } | null {
   if (!cache?.events?.length) return null;
   if (!memory || cache.fetchedAt > memory.fetchedAt) memory = { fetchedAt: cache.fetchedAt, events: cache.events as Event[] };
@@ -397,7 +392,9 @@ export async function fetchCanonExercises(): Promise<Exercise[]> {
 }
 
 export async function fetchCanonPrograms(): Promise<RelayProgram[]> {
-  const events = await queryCanon(33402, PROGRAM_LIMIT);
+  const results = await Promise.allSettled([queryCanon(33402, PROGRAM_LIMIT), queryCreatorPrograms(PROGRAM_LIMIT)]);
+  if (results.every((result) => result.status === 'rejected')) throw new Error(results.map((result) => result.status === 'rejected' && result.reason instanceof Error ? result.reason.message : 'program relay error').join('; '));
+  const events = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
   rememberKind(33402, events);
   return programsFrom(events);
 }

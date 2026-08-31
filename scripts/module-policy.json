@@ -2,9 +2,7 @@
   "lineLimit": 400,
   "warningAt": 350,
   "importWarningAt": 12,
-  "oversizedBaseline": {
-    "src/nostr/canon.ts": 403
-  },
+  "oversizedBaseline": {},
   "genericFilenames": [
     "common.ts",
     "helpers.ts",
