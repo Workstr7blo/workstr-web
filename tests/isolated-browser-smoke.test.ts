@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import type { SheetWithExercises } from '../src/db/store';
-import { createIsolatedBrowserSmokeBoundary, renderIsolatedBrowserSmoke } from '../src/app/isolated-browser-smoke';
+import { assertIsolatedBrowserSmokeOrigin, createIsolatedBrowserSmokeBoundary, renderIsolatedBrowserSmoke } from '../src/app/isolated-browser-smoke';
 
 const { realPublisher } = vi.hoisted(() => ({ realPublisher: vi.fn() }));
 
@@ -26,6 +26,11 @@ function sheet(): SheetWithExercises {
 }
 
 describe('isolated browser smoke composition', () => {
+  it('refuses to boot the smoke shell outside a loopback origin', () => {
+    expect(() => assertIsolatedBrowserSmokeOrigin('app.workstr.fit')).toThrow('may only boot on a loopback origin');
+    expect(() => assertIsolatedBrowserSmokeOrigin('127.0.0.1')).not.toThrow();
+  });
+
   it('fails closed when a publisher receives a non-isolated relay list', async () => {
     const boundary = createIsolatedBrowserSmokeBoundary();
     const signer = await boundary.getSigner();

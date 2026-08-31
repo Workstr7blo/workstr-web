@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { request } from 'node:http';
 import { chromium } from 'playwright';
 
@@ -24,7 +25,10 @@ function waitForPreview(timeoutMs = 15000) {
 }
 
 execFileSync('npm', ['run', 'build'], { stdio: 'inherit' });
-const preview = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--host', host, '--port', String(port), '--strictPort'], { stdio: 'inherit' });
+if (existsSync('dist/smoke.html')) throw new Error('normal production build unexpectedly emitted smoke.html');
+execFileSync('npm', ['run', 'build:smoke'], { stdio: 'inherit' });
+if (!existsSync('.smoke-dist/smoke.html')) throw new Error('isolated smoke build did not emit smoke.html');
+const preview = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--config', 'vite.smoke.config.ts', '--host', host, '--port', String(port), '--strictPort'], { stdio: 'inherit' });
 let browser;
 try {
   await waitForPreview();
@@ -35,7 +39,7 @@ try {
   await page.goto(`${baseUrl}/smoke.html`, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => document.documentElement.dataset.smokeIsolation === 'ready');
   if (sockets.length) throw new Error(`isolated smoke opened WebSocket transport: ${sockets.join(', ')}`);
-  console.log('isolated browser smoke passed: mock signer/publisher booted with no WebSocket transport');
+  console.log('isolated browser smoke passed: normal build excludes smoke.html; loopback smoke harness booted with mock signer/publisher and no WebSocket transport');
 } finally {
   await browser?.close();
   preview.kill();

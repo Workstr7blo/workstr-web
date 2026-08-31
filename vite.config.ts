@@ -1,5 +1,4 @@
 import { execSync } from 'node:child_process';
-import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
 // Release builds get the tag from CI (APP_VERSION). Pages builds off main and
@@ -18,11 +17,6 @@ export default defineConfig({
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(appVersion())
-  },
-  build: {
-    rollupOptions: {
-      input: { main: resolve(import.meta.dirname, 'index.html'), smoke: resolve(import.meta.dirname, 'smoke.html') }
-    }
   },
   server: {
     host: '0.0.0.0',

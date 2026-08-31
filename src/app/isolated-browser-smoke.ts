@@ -7,6 +7,7 @@ import type { ShellHandle, ShellOptions } from './shell-types';
 
 const SMOKE_PUBKEY = 'a'.repeat(64);
 const ISOLATED_RELAYS: string[] = [];
+const LOOPBACK_SMOKE_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
 
 const smokeSigner: Signer = {
   type: 'local',
@@ -25,6 +26,12 @@ type CreatorProgramPublisher = NonNullable<ProgramPublishControllerContext['publ
 
 export interface IsolatedBrowserSmokeBoundary extends Pick<ProgramPublishControllerContext, 'getSigner' | 'programPublishRelays'> {
   publishCreatorProgram: CreatorProgramPublisher;
+}
+
+export function assertIsolatedBrowserSmokeOrigin(hostname: string): void {
+  if (!LOOPBACK_SMOKE_HOSTS.has(hostname)) {
+    throw new Error('isolated browser smoke may only boot on a loopback origin');
+  }
 }
 
 export function createIsolatedBrowserSmokeBoundary(): IsolatedBrowserSmokeBoundary {

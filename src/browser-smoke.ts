@@ -1,6 +1,7 @@
 import './style.css';
-import { renderIsolatedBrowserSmoke } from './app/isolated-browser-smoke';
+import { assertIsolatedBrowserSmokeOrigin, renderIsolatedBrowserSmoke } from './app/isolated-browser-smoke';
 
+assertIsolatedBrowserSmokeOrigin(window.location.hostname);
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('missing smoke app root');
 
