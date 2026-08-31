@@ -7,6 +7,9 @@ import { buildCreatorProgramEvent, creatorProgramDTag, normalizeProgramPublishRe
 
 const secret = generateSecretKey();
 const pubkey = getPublicKey(secret);
+const NWC_WALLET_PUBKEY = 'a'.repeat(64);
+const NWC_HEX_SECRET = 'b'.repeat(64);
+const NWC_URI = `nostr+walletconnect://${NWC_WALLET_PUBKEY}?relay=wss%3A%2F%2Fwallet.example.test&secret=${NWC_HEX_SECRET}`;
 
 function sheet(overrides: Partial<SheetWithExercises> = {}): SheetWithExercises {
   return {
@@ -79,6 +82,26 @@ describe('buildCreatorProgramEvent', () => {
       exercises: [{ address: 'workstr:exercise:bench-press', name: 'Bench Press', sets: 4, reps: '8', restSec: 120 }]
     });
   });
+
+  it('rejects NWC-like material before public event serialization', () => {
+    const unsafeSheets = [
+      sheet({ notes: `Do not publish ${NWC_URI}` }),
+      sheet({ tags: ['hypertrophy', `secret=${NWC_HEX_SECRET}`] }),
+      sheet({ exercises: [{ ...sheet().exercises[0], notes: `walletconnect ${NWC_HEX_SECRET}` }] })
+    ];
+
+    for (const unsafeSheet of unsafeSheets) {
+      expect(() => buildCreatorProgramEvent(unsafeSheet)).toThrow('Creator program publish blocked');
+      try {
+        buildCreatorProgramEvent(unsafeSheet);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        expect(message).not.toContain(NWC_URI);
+        expect(message).not.toContain(NWC_HEX_SECRET);
+        expect(message).not.toContain('secret=');
+      }
+    }
+  });
 });
 
 describe('normalizeProgramPublishRelays', () => {
@@ -137,5 +160,18 @@ describe('publishCreatorProgram', () => {
     };
     await expect(publishCreatorProgram(activeSigner, sheet(), ['wss://bad.relay'], { poolFactory: () => pool }))
       .rejects.toThrow('no public relay accepted the program');
+  });
+
+  it('rejects NWC-like material before signing or publishing', async () => {
+    const activeSigner = signer();
+    const poolFactory = vi.fn<() => ProgramPublishPool>(() => ({
+      publish: vi.fn(() => [Promise.resolve('success')]),
+      close: vi.fn()
+    }));
+
+    await expect(publishCreatorProgram(activeSigner, sheet({ notes: NWC_URI }), ['wss://nos.lol'], { poolFactory }))
+      .rejects.toThrow('Creator program publish blocked');
+    expect(activeSigner.signEvent).not.toHaveBeenCalled();
+    expect(poolFactory).not.toHaveBeenCalled();
   });
 });
