@@ -2,6 +2,7 @@ import type { SheetExercise } from '../core/types';
 import type { SheetDraft, SheetWithExercises } from '../db/store';
 import { beastModeEligibility, beastModeLockedMarkup } from '../features/sheets/beast-mode';
 import { creatorProgramDTag, publishCreatorProgram } from '../nostr/program-publish';
+import type { PublishCreatorProgramResult } from '../nostr/program-publish';
 import { redactNwcSecrets } from '../nostr/nwc';
 import type { Signer } from '../signer/types';
 import type { AppState } from './state';
@@ -13,6 +14,8 @@ export interface ProgramPublishControllerContext {
   toast(message: string, kind?: 'ok' | 'bad'): void;
   openModal(content: string): void;
   getSigner(): Promise<Signer | null>;
+  // Browser smoke injects a local fake here; production keeps the real publisher.
+  publishCreatorProgram?: (...args: Parameters<typeof publishCreatorProgram>) => Promise<PublishCreatorProgramResult>;
 }
 
 function localSheetId(address: string): number {
@@ -54,6 +57,7 @@ function publishedSheetDraft(sheet: SheetWithExercises, eventPubkey: string, eve
 
 export function createProgramPublishController(ctx: ProgramPublishControllerContext) {
   const { root, state, render, toast, openModal, getSigner } = ctx;
+  const publish = ctx.publishCreatorProgram || publishCreatorProgram;
 
   async function publishProgram(address: string): Promise<void> {
     const sheet = state.sheets.find((item) => item.id === localSheetId(address));
@@ -65,7 +69,7 @@ export function createProgramPublishController(ctx: ProgramPublishControllerCont
     const signer = await getSigner();
     if (!signer) { toast('Sign in before publishing programs.', 'bad'); return; }
     try {
-      const result = await publishCreatorProgram(signer, sheet, state.settings.publicRelays, {
+      const result = await publish(signer, sheet, state.settings.publicRelays, {
         onStage: (stage) => toast(stage === 'waiting-for-signer' ? 'Approve program publish in your signer…' : 'Publishing program to public relays…')
       });
       if (state.store) {

@@ -3,6 +3,9 @@ import { SimplePool, verifyEvent } from 'nostr-tools';
 import { DEFAULT_PUBLIC_RELAYS } from './pool';
 
 export const CREATOR_PROGRAM_D_PREFIX = 'workstr:beastmode:program:';
+export const INCIDENT_CREATOR_PROGRAM_EVENT_ID = '3db8e166847c6e11830de700cd21e0433bbaa722906a88e54f16e2fbb4dff9cb';
+export const INCIDENT_CREATOR_PROGRAM_PUBKEY = '0a6c41ba921a01e0139aaf6bb7cd344c3e5b7d35a035b186456648149138e728';
+export const INCIDENT_CREATOR_PROGRAM_D_TAG = 'workstr:beastmode:program:smoke-push-day';
 const QUERY_TIMEOUT_MS = 7000;
 
 function tagValue(tags: string[][], key: string): string {
@@ -29,6 +32,15 @@ function isCreatorProgramEvent(event: Event): boolean {
   return topics.includes('workstr') && topics.includes('beastmode') && topics.includes('workstr-program');
 }
 
+function isIncidentFixture(event: Event): boolean {
+  const dTag = tagValue(event.tags as string[][], 'd');
+  // 2026-08-31: a production browser smoke published this fixture publicly.
+  // Remove this narrow guard once the event and its relay copies are gone; do
+  // not broaden it to hide other Beast Mode creators or their programs.
+  return event.id === INCIDENT_CREATOR_PROGRAM_EVENT_ID
+    || (event.pubkey === INCIDENT_CREATOR_PROGRAM_PUBKEY && dTag === INCIDENT_CREATOR_PROGRAM_D_TAG);
+}
+
 // Creator programs are self-published and discoverable by their Beast Mode
 // namespace/tags. The d-tag is only an indexing convention: trust still comes
 // from each event's valid signature and user-visible author, not the namespace.
@@ -36,6 +48,7 @@ export function selectCreatorProgramEvents(events: Event[]): Event[] {
   const byAddress = new Map<string, Event>();
   for (const event of events) {
     if (!isCreatorProgramEvent(event)) continue;
+    if (isIncidentFixture(event)) continue;
     const dTag = tagValue(event.tags as string[][], 'd');
     const existing = byAddress.get(`${event.kind}:${event.pubkey}:${dTag}`);
     if (existing && existing.created_at >= event.created_at) continue;

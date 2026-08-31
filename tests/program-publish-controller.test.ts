@@ -163,4 +163,32 @@ describe('createProgramPublishController', () => {
     expect(render).toHaveBeenCalled();
     expect(toast).toHaveBeenLastCalledWith('Published Push Day to 1 public relay and confirmed.', 'ok');
   });
+
+  it('lets browser smoke inject a publisher and use no configured public relays', async () => {
+    publishCreatorProgramMock.mockClear();
+    const appState = state({
+      pubkey: 'f'.repeat(64),
+      profilePicture: 'https://example.test/avatar.png',
+      sheets: [sheet()],
+      finishedSessions: [
+        session(1, '2026-08-01T10:00:00'), session(2, '2026-08-01T11:00:00'),
+        session(3, '2026-08-02T10:00:00'), session(4, '2026-08-03T10:00:00'),
+        session(5, '2026-08-03T11:00:00')
+      ],
+      settings: { unit: 'kg', publicRelays: [] }
+    });
+    const injectedPublisher = vi.fn(async () => ({
+      event: { id: 'smoke-event', pubkey: 'smoke-pubkey', created_at: 1780000000, kind: 33402, tags: [], content: '', sig: '' },
+      okRelays: [], failedRelays: [], confirmed: false
+    }));
+    const controller = createProgramPublishController({
+      root: document.createElement('div'), state: appState, render: vi.fn(), toast: vi.fn(), openModal: vi.fn(),
+      getSigner: vi.fn(async () => ({ type: 'local' }) as Signer), publishCreatorProgram: injectedPublisher
+    });
+
+    await controller.publishProgram('local:7');
+
+    expect(injectedPublisher).toHaveBeenCalledWith(expect.anything(), appState.sheets[0], [], expect.any(Object));
+    expect(publishCreatorProgramMock).not.toHaveBeenCalled();
+  });
 });
