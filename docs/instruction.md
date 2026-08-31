@@ -122,7 +122,8 @@ Rules that govern every technical decision:
   for when the user has no program in mind.
 - **Nostr layer**:
   - Discover: browse and import the Workstr catalog — operator-signed exercises and
-    programs read from public relays, every signature verified (Section 6.1).
+    programs plus Beast Mode creator programs read from public relays, every signature
+    verified (Section 6.1).
   - Share a session summary as a `kind:1` note, text plus the program's muscle map when
     one exists.
   - Support the project: zap the operator npub, with the app and landing page aligned
@@ -270,18 +271,23 @@ there is nothing to be admitted to.
 3. Sign `kind:1`; publish to the write-relay set (Section 6.2); verify acknowledgement
    before reporting success (Section 5.2).
 
-**Discover & import — the Workstr catalog (free)**
+**Discover & import — the Workstr catalog and creator programs (free)**
 
-This is an author-filtered catalog, *not* open discovery of the Nostr commons. The
+The exercise catalog remains author-filtered; creator programs are open only through the
+Beast Mode namespace and tags. This is *not* open discovery of the Nostr commons. The
 distinction is deliberate and load-bearing:
 
-1. REQ each catalog relay in parallel: `{kinds:[33401], authors:[OPERATOR_PUBKEY], limit}`
-   and the same for `33402`. Per-relay timeout; partial failure is tolerated; if *no*
-   relay answered, throw, so the UI can tell "offline" from "the catalog is empty".
-2. `verifyEvent` every event. Drop anything that fails. **The author filter plus the
-   signature check is the entire spam and quality model** — no keyword blocklists, no
-   heuristic validation, no `t`-tag denylist. Anyone may copy a `d` tag; nobody can forge
-   the operator's signature.
+1. REQ each catalog relay in parallel for official entries:
+   `{kinds:[33401], authors:[OPERATOR_PUBKEY], limit}` and the same for `33402`. Also REQ
+   configured public relays for creator `33402` events tagged `beastmode` and
+   `workstr-program` with a `d` tag under `workstr:beastmode:program:`. Per-relay
+   timeout; partial failure is tolerated; if *no* relay answered, throw, so the UI can
+   tell "offline" from "the catalog is empty".
+2. `verifyEvent` every event. Drop anything that fails. **The operator author filter plus
+   signature check is the official catalog quality model** — no keyword blocklists, no
+   heuristic validation, no `t`-tag denylist. Creator-program trust comes from the valid
+   signature and visible author; the Beast Mode `d` namespace is only an indexing
+   convention, not proof of permission or review.
 3. Merge across relays and dedupe by full address `<kind>:<pubkey>:<d>`, keeping the
    newest `created_at`. A second dedupe pass collapses catalog entries that describe the
    same movement under a generated slug, preferring the clean title-derived slug.
@@ -291,6 +297,21 @@ distinction is deliberate and load-bearing:
    **Everything imports as a snapshot** — no auto-follow of catalog updates. Programs
    import through a dependency walk that pulls in every referenced exercise first.
 6. Author `kind:0` profiles are fetched and cached for display.
+
+**Publish a creator program (free, Beast Mode)**
+1. The checklist lives in Settings. It unlocks when the signed-in user has at least one
+   local program, five completed workouts, workouts on three distinct local days, and an
+   existing Nostr `kind:0` picture/image/avatar. There is no manual queue, admin approval,
+   request/grant flow, or metadata editor inside Workstr.
+2. Program cards use the action label **Publish**. Locked users see the checklist and
+   explanation; unlocked users sign a `kind:33402` creator-program event with the active
+   signer.
+3. Creator-program `d` tags are `workstr:beastmode:program:<stable-program-id>` and carry
+   indexing tags including `t=workstr`, `t=beastmode`, `t=workstr-program`, and
+   `client=Workstr`.
+4. Publishing uses the configured public relay set, filters out `relay.workstr.fit`, and
+   requires at least one relay acknowledgement before reporting success. NWC wallet
+   connection strings or secret material must never be included in public program events.
 
 **Why exercises are operator-signed, permanently**: an open exercise vocabulary degrades.
 Real relay data fills with entries that ignore the tag standard and with a dozen
@@ -391,7 +412,7 @@ Consequences to design around:
 | Tier | Where | Contents | Who |
 |---|---|---|---|
 | **Local** | IndexedDB, per namespace, per device | Everything: exercises, sheets, sessions, sets, body-weight, settings, catalog cache, caches of decrypted sync data | Everyone |
-| **Public relays** | Catalog relays for reads, write relays for shares (Section 6.2) | Inbound: the operator-signed `33401`/`33402` catalog. Outbound: only `kind:1` summaries the user explicitly shares. Plaintext by design. | Everyone |
+| **Public relays** | Catalog relays for reads, write relays for shares and creator-program publishing (Section 6.2) | Inbound: the operator-signed `33401`/`33402` catalog and signed Beast Mode creator programs. Outbound: `kind:1` summaries and creator `kind:33402` programs the user explicitly publishes. Plaintext by design. | Everyone |
 | **Workstr relay** | Operator's strfry (write-policy filtered) | Encrypted V2 `kind:30078` objects, journal chunks, and wrapped account keys | Anyone with Auto-sync on |
 
 Note that the curated exercise library is **not** in that table: it is published to public
@@ -679,12 +700,14 @@ nothing.
    suggestion UI and Quick Workout. Pure functions + tests.
 6. **Signer block 2:** `signer/nip46.ts` (bunker URI + QR connect, request batching)
    → mobile sign-in without an extension.
-7. **Nostr block:** `nostr/pool.ts`, `nostr/share.ts` — compose and publish the `kind:1`
-   summary to the write-relay set, with acknowledgement checking. No media upload; no
-   user-authored 33401/33402.
-8. **Discover block:** `nostr/canon.ts` + `nostr/programImport.ts` — operator-filtered
-   catalog queries, signature verification, dedupe, offline cache, snapshot import with
-   dependency walk, fork-on-edit provenance.
+7. **Nostr block:** `nostr/pool.ts`, `nostr/share.ts`, `nostr/program-publish.ts` —
+   compose and publish the `kind:1` summary and Beast Mode creator `kind:33402` programs
+   to the configured public relay set, with acknowledgement checking. No media upload and
+   no user-authored exercises.
+8. **Discover block:** `nostr/canon.ts`, `nostr/creator-programs.ts` +
+   `nostr/programImport.ts` — operator-filtered official catalog queries, Beast Mode
+   creator-program indexing, signature verification, dedupe, offline cache, snapshot
+   import with dependency walk, fork-on-edit provenance.
 9. **Safety valve:** JSON export/import of the whole local DB.
 10. **Starter seed:** bundle **three beginner programs and every exercise they
     reference** as JSON, shipped with the app. A first-run library that is empty until

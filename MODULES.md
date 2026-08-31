@@ -33,7 +33,7 @@ or set updates would make full-root rendering inappropriate.
 | Redrawing without losing the reader's place | `src/app/scroll.ts` | `src/app/shell.ts` (`render`), the `.content` pane in `src/app/layout.ts` | `tests/scroll.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
-| Programs and program builder | `src/app/program-builder.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-zap-view.ts` | `src/db/store.ts`, `src/nostr/programImport.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/nwc-ui.test.ts`, browser verification |
+| Programs and program builder | `src/app/program-builder.ts`, `src/app/program-publish-controller.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-zap-view.ts`, `src/features/sheets/beast-mode.ts` | `src/db/store.ts`, `src/nostr/programImport.ts`, `src/nostr/program-publish.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/beast-mode.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/program-publish-controller.test.ts`, `tests/program-publish.test.ts`, `tests/nwc-ui.test.ts`, browser verification |
 | Live-session orchestration | `src/app/session-runner.ts` | the applicable controller/view below, `src/features/train/repeat-workout.ts` | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | Repeat a completed workout | `src/features/train/repeat-workout.ts` | `src/app/session-runner.ts`, `src/features/train/views.ts` | `tests/repeat-workout.test.ts`, `tests/session-runner.test.ts` |
 | History release regressions (scale, JSON round trip, neighbouring features) | `tests/history-qa.test.ts` | `docs/RELEASE-QA.md` | `tests/history-qa.test.ts` |
@@ -50,10 +50,10 @@ or set updates would make full-root rendering inappropriate.
 | Quick Workout generation | `src/features/recovery/quickWorkout.ts` | recovery module, `src/app/preferences-controller.ts` | `tests/recovery.test.ts`, relevant shell/session tests |
 | Exercise library UI | `src/features/library/views.ts` | shell library handlers, `src/app/format.ts`, `src/db/store.ts` | `tests/equipment-views.test.ts`, `tests/shell.test.ts`, `tests/store.test.ts` |
 | Discover exercise/program UI | `src/features/discover/views.ts` | `src/nostr/canon.ts`, `programImport.ts`, shell import handlers | `tests/discover.test.ts`, `tests/canon.test.ts`, `tests/programImport.test.ts` |
-| Catalog event parsing/fetch/cache | `src/nostr/canon.ts` | `src/nostr/pool.ts`, `src/core/types.ts` | `tests/canon.test.ts` |
+| Catalog event parsing/fetch/cache | `src/nostr/canon.ts`, `src/nostr/creator-programs.ts` | `src/nostr/pool.ts`, `src/core/types.ts` | `tests/canon.test.ts` |
 | NIP-07 signing and device-local keys | `src/signer/nip07.ts`, `src/signer/local-key.ts` | `src/signer/types.ts` | `tests/local-key-signer.test.ts`, shell/share tests use fakes |
 | NIP-46 remote signing | `src/signer/nip46.ts` | `src/signer/types.ts`, shell sign-in flow | `tests/shell.test.ts` plus browser validation |
-| Workout-summary event and relay publish | `src/nostr/share.ts` | `src/features/train/session-summary.ts`, signer contract | `tests/share.test.ts` |
+| Workout-summary and creator-program event publishing | `src/nostr/share.ts`, `src/nostr/program-publish.ts` | `src/features/train/session-summary.ts`, signer contract | `tests/share.test.ts`, `tests/program-publish.test.ts` |
 | Zap receipts and support totals | `src/nostr/zaps.ts` | `src/core/funding.ts`, `src/features/support/views.ts` | `tests/zaps.test.ts`, `tests/support-views.test.ts` |
 | Nostr Wallet Connect parsing, client, and secure wallet link | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts` | `src/db/export.ts`, payment/support UI | `tests/nwc.test.ts`, `tests/nwc-client.test.ts`, `tests/nwc-storage.test.ts` |
 | Workout program zaps | `src/nostr/program-zap.ts`, `src/nostr/program-zap-status.ts` | `src/nostr/zaps.ts`, `src/nostr/zap-request.ts`, `src/nostr/lnurl.ts`, `src/nostr/nwc-client.ts`, `src/db/store.ts`, `src/signer/types.ts` | `tests/program-zap.test.ts`, `tests/program-zap-status.test.ts`, `tests/zaps.test.ts`, `tests/nwc-client.test.ts` |
@@ -86,11 +86,15 @@ or set updates would make full-root rendering inappropriate.
   controller interfaces and the shell is below the 400-line target.
 - `src/app/program-builder.ts` owns program-builder modal state, exercise selection,
   normal/superset and EMOM prescriptions, row ordering, validation, and persistence.
+- `src/app/program-publish-controller.ts` owns Beast Mode local program publish
+  execution through the active signer and configured public relays.
 - `src/features/sheets/builder-views.ts` renders the builder's row and EMOM-section
   markup from `BuilderState`. It is pure markup; all builder state lives in the
   controller above.
 - `src/features/sheets/program-zap-view.ts` renders program-card zap actions and
   latest local zap status; wallet execution stays in `src/app/nwc-controller.ts`.
+- `src/features/sheets/beast-mode.ts` owns the objective local Beast Mode eligibility
+  helper plus reusable Settings and locked-Publish checklist markup.
 - `src/app/catalog-controller.ts` owns catalog refresh/cache/profile loading and local
   library import, update, deletion, favorite, and detail actions.
 - `src/app/identity-controller.ts` owns signer connection, adoption choices, sign-out,

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Beast Mode creators can now publish local workout programs to configured public Nostr
+  relays after an objective self-serve checklist passes: one local program, five completed
+  workouts, workouts on three local days, and a signed-in Nostr profile with an existing
+  picture.
+- Discover now keeps the official Workstr catalog and also indexes signed Beast Mode
+  creator programs from public relays.
+
 ### Fixed
 
 - Program zap totals update immediately after a successful zap, then run one targeted

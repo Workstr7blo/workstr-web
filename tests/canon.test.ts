@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
 import { dedupeCanonExercises, EXERCISE_D_PREFIX, exerciseFromEvent, programFromEvent, selectCanonEvents } from '../src/nostr/canon';
+import { CREATOR_PROGRAM_D_PREFIX, selectCreatorProgramEvents } from '../src/nostr/creator-programs';
 
 const operatorSecret = generateSecretKey();
 const operatorPubkey = getPublicKey(operatorSecret);
@@ -130,5 +131,65 @@ describe('programFromEvent', () => {
     const program = programFromEvent(event);
     expect(program?.difficulty).toBe('advanced');
     expect(program?.tags).toEqual(['legs']);
+  });
+
+  it('parses Beast Mode creator programs without treating the namespace as operator proof', () => {
+    const event = finalizeEvent({
+      kind: 33402,
+      created_at: 100,
+      content: 'Creator push day.',
+      tags: [
+        ['d', `${CREATOR_PROGRAM_D_PREFIX}creator-push-day`],
+        ['title', 'Creator Push Day'],
+        ['t', 'workstr'],
+        ['t', 'beastmode'],
+        ['t', 'workstr-program'],
+        ['client', 'Workstr'],
+        ['workstr_meta', JSON.stringify({ v: 1, description: 'Creator push day.', tags: ['hypertrophy'], exercises: [{ address: 'workstr:exercise:bench-press', name: 'Bench Press' }] })]
+      ]
+    }, strangerSecret);
+
+    const program = programFromEvent(event);
+    expect(program?.slug).toBe('creator-push-day');
+    expect(program?.sourceLabel).toBe('creator');
+    expect(program?.pubkey).not.toBe(operatorPubkey);
+  });
+});
+
+describe('selectCreatorProgramEvents', () => {
+  it('keeps signed Beast Mode creator programs and ignores copied official d-tags', () => {
+    const creator = finalizeEvent({
+      kind: 33402,
+      created_at: 100,
+      content: '',
+      tags: [
+        ['d', `${CREATOR_PROGRAM_D_PREFIX}creator-push-day`],
+        ['title', 'Creator Push Day'],
+        ['t', 'workstr'],
+        ['t', 'beastmode'],
+        ['t', 'workstr-program']
+      ]
+    }, strangerSecret);
+    const copiedOfficialNamespace = finalizeEvent({
+      kind: 33402,
+      created_at: 100,
+      content: '',
+      tags: [
+        ['d', 'workstr:program:copied'],
+        ['title', 'Copied'],
+        ['t', 'workstr'],
+        ['t', 'beastmode'],
+        ['t', 'workstr-program']
+      ]
+    }, strangerSecret);
+
+    expect(selectCreatorProgramEvents([creator, copiedOfficialNamespace]).map((event) => event.id)).toEqual([creator.id]);
+  });
+
+  it('dedupes creator programs by full address with newest created_at winning', () => {
+    const older = finalizeEvent({ kind: 33402, created_at: 100, content: '', tags: [['d', `${CREATOR_PROGRAM_D_PREFIX}same`], ['title', 'Old'], ['t', 'workstr'], ['t', 'beastmode'], ['t', 'workstr-program']] }, strangerSecret);
+    const newer = finalizeEvent({ kind: 33402, created_at: 200, content: '', tags: [['d', `${CREATOR_PROGRAM_D_PREFIX}same`], ['title', 'New'], ['t', 'workstr'], ['t', 'beastmode'], ['t', 'workstr-program']] }, strangerSecret);
+
+    expect(selectCreatorProgramEvents([older, newer]).map((event) => event.id)).toEqual([newer.id]);
   });
 });

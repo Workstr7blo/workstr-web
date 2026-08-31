@@ -62,7 +62,7 @@ async function refreshExercises(): Promise<void> {
 }
 
 async function refreshPrograms(): Promise<void> {
-  state.programStatus = 'loading Workstr programs from relays...';
+  state.programStatus = 'loading Workstr and creator programs from public relays...';
   render();
   try {
     if (!state.exercises.length) {
@@ -70,14 +70,14 @@ async function refreshPrograms(): Promise<void> {
     }
     const programs = await fetchCanonPrograms();
     state.programs = programs;
-    state.programStatus = `loaded ${programs.length} Workstr programs`;
+    state.programStatus = `loaded ${programs.length} Workstr and creator programs`;
     await persistCanonCache();
     void refreshDiscoverProfiles();
     void refreshProgramZapTotals(programs);
   } catch (error) {
     const cached = state.programs.length;
     state.programStatus = cached
-      ? `offline — showing ${cached} Workstr programs from the last sync`
+      ? `offline — showing ${cached} Workstr and creator programs from the last sync`
       : `program relay error: ${(error as Error).message}`;
   }
   render();
@@ -111,7 +111,7 @@ function primeFromCache(): void {
   state.discoverExercises = cached.exercises;
   state.programs = cached.programs;
   state.exerciseStatus = `showing ${cached.exercises.length} Workstr exercises from the last sync`;
-  state.programStatus = `showing ${cached.programs.length} Workstr programs from the last sync`;
+  state.programStatus = `showing ${cached.programs.length} Workstr and creator programs from the last sync`;
   void refreshDiscoverProfiles();
   void refreshProgramZapTotals(cached.programs);
 }

@@ -30,6 +30,7 @@ import { createIdentityController, launchSignerUri } from './identity-controller
 import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
 import { createNwcController } from './nwc-controller';
+import { createProgramPublishController } from './program-publish-controller';
 export { launchSignerUri };
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
@@ -128,11 +129,8 @@ export function renderShell(root: HTMLElement): void {
     void backup.resume();
   }
 
-  // Re-reads everything the screen draws from the database. A restore writes records
-  // straight to IndexedDB, and the state the UI renders was read when the namespace
-  // opened — so without this a device that has just signed in and pulled its whole
-  // history shows nothing at all, and looks like the restore never happened. It had, and
-  // only reloading the page revealed it.
+  // Re-reads everything the screen draws from the database after restore/sync writes;
+  // without this the UI can look empty until a manual reload.
   async function refreshFromStore(): Promise<void> {
     if (!state.store) return;
     state.settings = await state.store.getSettings();
@@ -285,6 +283,7 @@ export function renderShell(root: HTMLElement): void {
       const program = state.programs.find((item) => item.address === button.dataset.importProgram);
       if (program) await catalog.importProgram(program, button as HTMLButtonElement);
     }));
+    programPublish.bind();
     root.querySelector('#new-program')?.addEventListener('click', () => { void programBuilder.open(); });
     root.querySelectorAll<HTMLElement>('[data-edit-sheet]').forEach((button) => button.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -361,6 +360,7 @@ export function renderShell(root: HTMLElement): void {
   const catalog = createCatalogController({ root, state, render, toast, openModal, closeModal, fetchProfile });
   const sessionPersistence = createSessionPersistence(state);
   const identity = createIdentityController({ root, state, render, openModal, closeModal, openLocal, openIdentity });
+  const programPublish = createProgramPublishController({ root, state, render, toast, openModal, getSigner: identity.getActiveSigner });
 
   const sessionRunner = createSessionRunner({
     root, state, render, toast, openModal, closeModal, wDisplay, wFmt, unitLabel,
@@ -379,7 +379,6 @@ export function renderShell(root: HTMLElement): void {
   function wDisplay(weight: number | null | undefined): number | null { return displayWeightKg(weight, normalizeWeightUnit(state.settings.unit)); }
 
   function wFmt(weight: number | null | undefined): string { return weight == null ? '—' : formatWeightKg(weight, normalizeWeightUnit(state.settings.unit)); }
-
 
   function openModal(content: string): void {
     const modal = root.querySelector('#modal');
