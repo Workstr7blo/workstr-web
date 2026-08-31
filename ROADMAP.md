@@ -16,10 +16,11 @@ Milestones are releases. A milestone is done when it is tagged and on the domain
 - The app opens straight into training. Sign-in is optional and lives in Settings.
   Namespaces are never merged.
 - Data is never hostage: JSON export and import ship in every release.
-- Two event vocabularies stay separate — the public Workstr catalog (operator-signed,
-  plaintext) and private user data (self-encrypted). Nothing public is ever derived from
-  private data.
-- Exercises are operator-authored, permanently. Programs open up in v3.
+- Public program/exercise events and private user data stay separate. Public relays carry
+  plaintext operator catalog events and opt-in creator-published programs; private user
+  data is self-encrypted for sync. Nothing private is published by default.
+- Exercises are operator-authored, permanently. Programs can be creator-published after
+  the self-serve Beast Mode checklist passes; the namespace is indexing, not approval.
 - Funding is donations first; any paywall is a documented fallback with a published
   trigger (`instruction.md` §11), never a roadmap item.
 - Module discipline: no file over ~400 lines, feature modules never import each other,
@@ -43,6 +44,9 @@ deployed to the domain and tagged through v2.0.0 (2026-08-28).
   signature verified, cross-relay merge and dedupe, offline event cache. Import copies a
   snapshot; programs pull their exercises through a dependency walk; update detection
   keys on the full address plus origin timestamp.
+- **Beast Mode creator programs** — local program cards can publish signed `kind:33402`
+  creator programs to configured public relays after the objective Settings checklist is
+  unlocked; Discover shows those alongside official operator programs.
 - **Identity and sharing** — optional NIP-07 / NIP-46 sign-in from Settings, per-namespace
   database with never-merge adoption, `kind:1` workout summaries published to the write
   relay set with real acknowledgement checking.
