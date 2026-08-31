@@ -21,6 +21,11 @@ describe('shell', () => {
     root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
     const settings = root.querySelector('.settings-page') as HTMLElement;
     expect(settings?.textContent).toContain('Account');
+    expect(settings?.textContent).toContain('Beast Mode');
+    expect(settings?.textContent).toContain('Create 1 local program');
+    expect(settings?.textContent).toContain('Complete 5 workouts');
+    expect(settings?.textContent).toContain('Train on 3 distinct local days');
+    expect(settings?.textContent).toContain('Signed-in Nostr profile has a picture');
     expect(settings?.textContent).toContain('Data & Sync');
     expect(settings?.textContent).toContain('Training Preferences');
     expect(settings?.textContent).toContain('Support Workstr');
@@ -35,6 +40,7 @@ describe('shell', () => {
     expect(settings?.textContent).toContain('Use Account above');
     expect(settings?.textContent).toContain('Manual backup');
     expect(settings?.textContent).toContain('0 selected');
+    expect(settings?.querySelector('.beast-mode-card [data-beast-mode-state="locked"]')).toBeTruthy();
   });
 
   it('opens a single tabbed account modal from the signed-out chip', () => {
@@ -107,6 +113,59 @@ describe('shell', () => {
     expect(markup).toContain('aria-label="Signed in"');
     expect(markup).not.toContain('>Connected</span>');
     expect(markup).not.toContain('connection-chip-label">Account');
+  });
+
+  it('renders Beast Mode as unlocked in Settings from objective local state', () => {
+    const markup = shellMarkup({
+      pubkey: 'f'.repeat(64),
+      npub: null,
+      profileName: 'Settebello',
+      profilePicture: 'https://example.com/avatar.png',
+      profileNames: {},
+      authorProfiles: {},
+      store: null,
+      settings: { unit: 'kg', publicRelays: [] },
+      support: { status: 'idle', receipts: [] },
+      nwc: { active: false, status: 'idle' },
+      signerType: 'local',
+      view: 'settings',
+      subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
+      exercises: [],
+      programs: [],
+      programZapAttempts: [],
+      activeSession: null,
+      finishedSessions: [
+        { id: 1, sheetName: 'A', startedAt: '2026-08-01T10:00:00', finishedAt: '2026-08-01T10:30:00', exercises: [], sets: [] },
+        { id: 2, sheetName: 'B', startedAt: '2026-08-01T11:00:00', finishedAt: '2026-08-01T11:30:00', exercises: [], sets: [] },
+        { id: 3, sheetName: 'C', startedAt: '2026-08-02T10:00:00', finishedAt: '2026-08-02T10:30:00', exercises: [], sets: [] },
+        { id: 4, sheetName: 'D', startedAt: '2026-08-03T10:00:00', finishedAt: '2026-08-03T10:30:00', exercises: [], sets: [] },
+        { id: 5, sheetName: 'E', startedAt: '2026-08-03T11:00:00', finishedAt: '2026-08-03T11:30:00', exercises: [], sets: [] }
+      ],
+      publishingSessionId: null,
+      publishingStatus: null,
+      editingId: null,
+      filter: '',
+      programFilter: '',
+      expandedProgramAddress: null,
+      exerciseStatus: '',
+      programStatus: '',
+      signInStatus: null,
+      backup: { state: 'off', pending: 0 },
+      expandedSessionId: null,
+      history: { monthKey: null, selectedDate: null },
+      qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false },
+      bodyEntries: [],
+      sheets: [{ id: 1, slug: 'push-day', name: 'Push Day', notes: '', difficulty: '', tags: [], is_temporary: false, created_at: '2026-08-01T00:00:00Z', updated_at: '2026-08-01T00:00:00Z', exercises: [] }],
+      library: [],
+      librarySelect: { active: false, slugs: new Set() },
+      discoverSelect: { active: false, addresses: new Set() },
+      discoverExercises: [],
+      exFilter: { cat: '', muscle: '', diff: '', equip: '' },
+      discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' }
+    } as AppState);
+
+    expect(markup).toContain('data-beast-mode-state="unlocked"');
+    expect(markup).toContain('>unlocked</span>');
   });
 });
 

@@ -10,6 +10,7 @@ import type { Exercise, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { addMonths, dateKeyFromDate, isDateKey, monthKeyOf } from '../core/dates';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, type RelayProgram } from '../nostr/canon';
+import { beastModeEligibility, beastModeLockedMarkup } from '../features/sheets/beast-mode';
 import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
 import type { ActiveSession, AppState, SubView, View } from './state';
@@ -285,6 +286,7 @@ export function renderShell(root: HTMLElement): void {
       const program = state.programs.find((item) => item.address === button.dataset.importProgram);
       if (program) await catalog.importProgram(program, button as HTMLButtonElement);
     }));
+    root.querySelectorAll<HTMLElement>('[data-publish-program]').forEach((button) => button.addEventListener('click', (event) => { event.stopPropagation(); const program = state.sheets.map(sheetToProgram).find((item) => item.address === button.dataset.publishProgram); if (!program) return; if (!beastModeEligibility(state).unlocked) { openModal(beastModeLockedMarkup(state, program.name)); return; } toast('Beast Mode unlocked. Program publishing is ready.', 'ok'); }));
     root.querySelector('#new-program')?.addEventListener('click', () => { void programBuilder.open(); });
     root.querySelectorAll<HTMLElement>('[data-edit-sheet]').forEach((button) => button.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -379,7 +381,6 @@ export function renderShell(root: HTMLElement): void {
   function wDisplay(weight: number | null | undefined): number | null { return displayWeightKg(weight, normalizeWeightUnit(state.settings.unit)); }
 
   function wFmt(weight: number | null | undefined): string { return weight == null ? '—' : formatWeightKg(weight, normalizeWeightUnit(state.settings.unit)); }
-
 
   function openModal(content: string): void {
     const modal = root.querySelector('#modal');

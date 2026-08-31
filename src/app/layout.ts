@@ -13,6 +13,7 @@ import { workoutHistory } from '../features/train/history-timeline';
 import { bodyView, trainingStatsView } from '../features/progress/views';
 import { quickWorkoutPanel, recoveryView } from '../features/recovery/views';
 import { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, programCard, programSearchTags, sheetToProgram } from '../features/sheets/views';
+import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { backupPanel } from '../features/backup/views';
 import { redactNwcSecrets } from '../nostr/nwc';
 
@@ -238,6 +239,7 @@ function settingsView(state: AppState): string {
   const secureContext = typeof window !== 'undefined' && window.isSecureContext;
   return `<div class="page active settings-page"><div class="page-title">Settings</div>
     <div class="panel settings-card account-card"><div class="panel-head"><span>Account</span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'signed in' : 'local'}</span></div>${account}</div>
+    ${beastModeSettingsCard(state)}
     ${backupPanel({ signedIn: Boolean(state.pubkey), enabled: Boolean(state.settings.backup?.enabled), sync: state.backup, backup: state.settings.backup })}
     <div class="panel settings-card nwc-card"><div class="panel-head"><span>Zap wallet</span><span class="status-pill ${nwc.active ? 'ok' : ''}">${nwc.active ? 'active' : 'not connected'}</span></div>${nwcWalletRows({ ...state, nwc })}</div>
     <div class="panel settings-card training-preferences-card">
