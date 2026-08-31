@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Discover now omits the single known creator-program event accidentally emitted by the
+  browser smoke fixture. The guard is deliberately limited to that event identity (or its
+  matching author and `d` tag), so legitimate creator programs remain discoverable; remove
+  it after relay copies of the fixture are confirmed gone.
 - Program zap totals update immediately after a successful zap, then run one targeted
   receipt refresh in the background instead of waiting for an app restart.
 - Sign-out now wipes the NIP-46 client secret along with the cached connection, so a
@@ -28,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Browser smoke verification now uses a dedicated loopback-only build with an in-memory
+  signer, a mock publisher, and no public relay URLs. The normal production build excludes
+  the smoke entrypoint; run `npm run smoke:browser` to exercise the isolated harness.
 - Removed the jokey `Beast Mode` program difficulty; program creation now offers only
   beginner, intermediate, and advanced levels.
 - Replaced freeform program tags with goal chips and automatic labels for split,
