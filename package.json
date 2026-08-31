@@ -11,7 +11,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "modules": "node scripts/check-modules.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:browser": "node scripts/browser-smoke.mjs"
   },
   "engines": {
     "node": ">=22"

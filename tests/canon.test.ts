@@ -166,6 +166,20 @@ describe('selectCreatorProgramEvents', () => {
     expect(selectCreatorProgramEvents([fixture, valid]).map((event) => event.id)).toEqual([valid.id]);
   });
 
+  it('excludes the exact incident author and d-tag fallback', () => {
+    const valid = finalizeEvent({
+      kind: 33402, created_at: 100, content: '',
+      tags: [['d', `${CREATOR_PROGRAM_D_PREFIX}creator-push-day`], ['title', 'Creator Push Day'], ['t', 'workstr'], ['t', 'beastmode'], ['t', 'workstr-program']]
+    }, strangerSecret);
+    const fallbackFixture = {
+      ...valid,
+      id: 'e'.repeat(64),
+      pubkey: '0a6c41ba921a01e0139aaf6bb7cd344c3e5b7d35a035b186456648149138e728',
+      tags: [['d', `${CREATOR_PROGRAM_D_PREFIX}smoke-push-day`], ['title', 'Smoke Push Day'], ['t', 'workstr'], ['t', 'beastmode'], ['t', 'workstr-program']]
+    };
+    expect(selectCreatorProgramEvents([fallbackFixture, valid]).map((event) => event.id)).toEqual([valid.id]);
+  });
+
   it('keeps signed Beast Mode creator programs and ignores copied official d-tags', () => {
     const creator = finalizeEvent({
       kind: 33402,

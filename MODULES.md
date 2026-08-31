@@ -88,6 +88,12 @@ or set updates would make full-root rendering inappropriate.
   normal/superset and EMOM prescriptions, row ordering, validation, and persistence.
 - `src/app/program-publish-controller.ts` owns Beast Mode local program publish
   execution through the active signer and configured public relays.
+- `src/app/isolated-browser-smoke.ts` owns the production-build browser-smoke
+  composition: an in-memory signer/publisher and an empty relay list that fail
+  closed before any creator-program public transport is reachable.
+- `src/browser-smoke.ts` is the `/smoke.html` entrypoint; `src/app/shell-types.ts`
+  carries its narrow shell composition contract. `npm run smoke:browser` builds
+  these entries and drives the isolated page with Playwright.
 - `src/features/sheets/builder-views.ts` renders the builder's row and EMOM-section
   markup from `BuilderState`. It is pure markup; all builder state lives in the
   controller above.

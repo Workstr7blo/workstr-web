@@ -14,8 +14,11 @@ export interface ProgramPublishControllerContext {
   toast(message: string, kind?: 'ok' | 'bad'): void;
   openModal(content: string): void;
   getSigner(): Promise<Signer | null>;
-  // Browser smoke injects a local fake here; production keeps the real publisher.
+  // The isolated browser smoke injects a local fake; production keeps the real publisher.
   publishCreatorProgram?: (...args: Parameters<typeof publishCreatorProgram>) => Promise<PublishCreatorProgramResult>;
+  // Omitted in production. The smoke passes an empty list so fixture clicks
+  // cannot inherit configured public relay URLs.
+  programPublishRelays?: string[];
 }
 
 function localSheetId(address: string): number {
@@ -69,7 +72,7 @@ export function createProgramPublishController(ctx: ProgramPublishControllerCont
     const signer = await getSigner();
     if (!signer) { toast('Sign in before publishing programs.', 'bad'); return; }
     try {
-      const result = await publish(signer, sheet, state.settings.publicRelays, {
+      const result = await publish(signer, sheet, ctx.programPublishRelays ?? state.settings.publicRelays, {
         onStage: (stage) => toast(stage === 'waiting-for-signer' ? 'Approve program publish in your signer…' : 'Publishing program to public relays…')
       });
       if (state.store) {

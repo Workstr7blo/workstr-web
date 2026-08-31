@@ -31,6 +31,7 @@ import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
 import { createNwcController } from './nwc-controller';
 import { createProgramPublishController } from './program-publish-controller';
+import type { ShellHandle, ShellOptions } from './shell-types';
 export { launchSignerUri };
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
@@ -65,7 +66,7 @@ async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<Rela
   }
 }
 
-export function renderShell(root: HTMLElement): void {
+export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
   const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], programZapTotals: {}, programZapAttempts: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', equipment: '' }, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   async function boot(): Promise<void> {
@@ -81,7 +82,7 @@ export function renderShell(root: HTMLElement): void {
     if (state.pubkey) await openIdentity(state.pubkey, false);
     else await openLocal();
     render();
-    await catalog.refreshExercises();
+    if (!options.skipCatalogRefresh) await catalog.refreshExercises();
   }
 
   async function openIdentity(pubkey: string, persist = true, signerType: AppState['signerType'] = state.signerType): Promise<void> {
@@ -360,7 +361,7 @@ export function renderShell(root: HTMLElement): void {
   const catalog = createCatalogController({ root, state, render, toast, openModal, closeModal, fetchProfile });
   const sessionPersistence = createSessionPersistence(state);
   const identity = createIdentityController({ root, state, render, openModal, closeModal, openLocal, openIdentity });
-  const programPublish = createProgramPublishController({ root, state, render, toast, openModal, getSigner: identity.getActiveSigner });
+  const programPublish = createProgramPublishController({ root, state, render, toast, openModal, getSigner: options.programPublish?.getSigner || identity.getActiveSigner, publishCreatorProgram: options.programPublish?.publishCreatorProgram, programPublishRelays: options.programPublish?.programPublishRelays });
 
   const sessionRunner = createSessionRunner({
     root, state, render, toast, openModal, closeModal, wDisplay, wFmt, unitLabel,
@@ -394,5 +395,6 @@ export function renderShell(root: HTMLElement): void {
     root.querySelector('#modal')?.classList.remove('open');
   }
 
-  void boot();
+  const ready = boot();
+  return { state, ready, publishProgram: programPublish.publishProgram };
 }
