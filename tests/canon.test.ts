@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
 import { dedupeCanonExercises, EXERCISE_D_PREFIX, exerciseFromEvent, programFromEvent, selectCanonEvents } from '../src/nostr/canon';
-import { CREATOR_PROGRAM_D_PREFIX, selectCreatorProgramEvents } from '../src/nostr/creator-programs';
+import { CREATOR_PROGRAM_D_PREFIX, INCIDENT_CREATOR_PROGRAM_EVENT_ID, selectCreatorProgramEvents } from '../src/nostr/creator-programs';
 
 const operatorSecret = generateSecretKey();
 const operatorPubkey = getPublicKey(operatorSecret);
@@ -157,6 +157,29 @@ describe('programFromEvent', () => {
 });
 
 describe('selectCreatorProgramEvents', () => {
+  it('excludes only the accidental smoke fixture while retaining valid creator programs', () => {
+    const valid = finalizeEvent({
+      kind: 33402, created_at: 100, content: '',
+      tags: [['d', `${CREATOR_PROGRAM_D_PREFIX}creator-push-day`], ['title', 'Creator Push Day'], ['t', 'workstr'], ['t', 'beastmode'], ['t', 'workstr-program']]
+    }, strangerSecret);
+    const fixture = { ...valid, id: INCIDENT_CREATOR_PROGRAM_EVENT_ID };
+    expect(selectCreatorProgramEvents([fixture, valid]).map((event) => event.id)).toEqual([valid.id]);
+  });
+
+  it('excludes the exact incident author and d-tag fallback', () => {
+    const valid = finalizeEvent({
+      kind: 33402, created_at: 100, content: '',
+      tags: [['d', `${CREATOR_PROGRAM_D_PREFIX}creator-push-day`], ['title', 'Creator Push Day'], ['t', 'workstr'], ['t', 'beastmode'], ['t', 'workstr-program']]
+    }, strangerSecret);
+    const fallbackFixture = {
+      ...valid,
+      id: 'e'.repeat(64),
+      pubkey: '0a6c41ba921a01e0139aaf6bb7cd344c3e5b7d35a035b186456648149138e728',
+      tags: [['d', `${CREATOR_PROGRAM_D_PREFIX}smoke-push-day`], ['title', 'Smoke Push Day'], ['t', 'workstr'], ['t', 'beastmode'], ['t', 'workstr-program']]
+    };
+    expect(selectCreatorProgramEvents([fallbackFixture, valid]).map((event) => event.id)).toEqual([valid.id]);
+  });
+
   it('keeps signed Beast Mode creator programs and ignores copied official d-tags', () => {
     const creator = finalizeEvent({
       kind: 33402,

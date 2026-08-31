@@ -51,6 +51,7 @@ or set updates would make full-root rendering inappropriate.
 | Exercise library UI | `src/features/library/views.ts` | shell library handlers, `src/app/format.ts`, `src/db/store.ts` | `tests/equipment-views.test.ts`, `tests/shell.test.ts`, `tests/store.test.ts` |
 | Discover exercise/program UI | `src/features/discover/views.ts` | `src/nostr/canon.ts`, `programImport.ts`, shell import handlers | `tests/discover.test.ts`, `tests/canon.test.ts`, `tests/programImport.test.ts` |
 | Catalog event parsing/fetch/cache | `src/nostr/canon.ts`, `src/nostr/creator-programs.ts` | `src/nostr/pool.ts`, `src/core/types.ts` | `tests/canon.test.ts` |
+| Isolated browser smoke verification | `src/app/isolated-browser-smoke.ts`, `src/browser-smoke.ts`, `scripts/browser-smoke.mjs` | `vite.smoke.config.ts`, `smoke.html`, `src/app/program-publish-controller.ts` | `tests/isolated-browser-smoke.test.ts`, `tests/program-publish-controller.test.ts` |
 | NIP-07 signing and device-local keys | `src/signer/nip07.ts`, `src/signer/local-key.ts` | `src/signer/types.ts` | `tests/local-key-signer.test.ts`, shell/share tests use fakes |
 | NIP-46 remote signing | `src/signer/nip46.ts` | `src/signer/types.ts`, shell sign-in flow | `tests/shell.test.ts` plus browser validation |
 | Workout-summary and creator-program event publishing | `src/nostr/share.ts`, `src/nostr/program-publish.ts` | `src/features/train/session-summary.ts`, signer contract | `tests/share.test.ts`, `tests/program-publish.test.ts` |
@@ -88,6 +89,12 @@ or set updates would make full-root rendering inappropriate.
   normal/superset and EMOM prescriptions, row ordering, validation, and persistence.
 - `src/app/program-publish-controller.ts` owns Beast Mode local program publish
   execution through the active signer and configured public relays.
+- `src/app/isolated-browser-smoke.ts` owns the production-build browser-smoke
+  composition: an in-memory signer/publisher and an empty relay list that fail
+  closed before any creator-program public transport is reachable.
+- `src/browser-smoke.ts` is the `/smoke.html` entrypoint; `src/app/shell-types.ts`
+  carries its narrow shell composition contract. `npm run smoke:browser` builds
+  these entries and drives the isolated page with Playwright.
 - `src/features/sheets/builder-views.ts` renders the builder's row and EMOM-section
   markup from `BuilderState`. It is pure markup; all builder state lives in the
   controller above.
@@ -170,6 +177,10 @@ targets, or muscle metadata solely from the current exercise library.
 
 - `src/nostr/canon.ts` accepts only valid operator events, parses exercises/programs,
   merges relay results, and maintains an offline catalog cache.
+- `src/nostr/creator-programs.ts` also applies a temporary, exact-match suppression for the
+  known browser-smoke creator-program fixture. Keep this guard narrow: it must not suppress
+  other Beast Mode creators or their programs, and it can be removed once relay copies of the
+  fixture are confirmed gone.
 - Discover shows relay/catalog objects. Import copies them into IndexedDB.
 - `src/nostr/programImport.ts` plans program dependency imports and detects new,
   already-imported, or update states.

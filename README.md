@@ -18,6 +18,7 @@ npm run modules
 npm test
 npm run build
 npm run check
+npm run smoke:browser
 ```
 
 `npm run modules` performs the fast architecture check configured in
@@ -29,6 +30,11 @@ stable but cannot grow past their recorded baseline.
 Run `npm run check` before handoff or review. It runs the module check, the test suite,
 and the production TypeScript/Vite build. `.github/workflows/check.yml` runs the same
 command for pull requests and pushes to `main`, `feature/**`, and `fix/**` branches.
+
+`npm run smoke:browser` separately builds and opens the isolated browser-smoke page on a
+loopback origin. Its mock signer, mock publisher, and empty relay list prevent fixture
+actions from reaching public Nostr transport; the command also verifies that the normal
+production build does not emit the smoke entrypoint.
 
 ## Maintainer docs
 
