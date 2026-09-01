@@ -197,6 +197,8 @@ targets, or muscle metadata solely from the current exercise library.
   that key local to this browser profile.
 - `src/nostr/share.ts` builds and publishes public workout summaries, requiring actual
   relay acknowledgement/verification before reporting success.
+- `src/nostr/profile.ts` fetches kind-0 identity metadata across configured/default
+  relays, retries transient failures, and maintains the per-browser public profile cache.
 - `src/nostr/support-zap.ts` builds the operator NIP-57 zap request, obtains the LNURL
   invoice, verifies the invoice amount, and sends `pay_invoice` through NWC.
 - Local training must remain usable when every relay operation fails.

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Signed-in identity names and avatars now render from a per-browser kind-0 cache and
+  refresh in the background across configured and default relays with a retry, avoiding
+  desktop-only fallback when the startup relay request is slow or temporarily unavailable.
+
 ## [2.2.0] - 2026-09-01
 
 ### Added

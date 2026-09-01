@@ -1,4 +1,4 @@
-import { nip19, SimplePool } from 'nostr-tools';
+import { nip19 } from 'nostr-tools';
 import { canonMuscle } from '../core/muscles';
 import { mergeOwnedEquipment, MY_EQUIPMENT, ownedEquipmentKeys } from '../core/equipment';
 import { WorkstrStore, type ExerciseDraft } from '../db/store';
@@ -11,6 +11,7 @@ import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput 
 import { addMonths, dateKeyFromDate, isDateKey, monthKeyOf } from '../core/dates';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, type RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
+import { fetchProfile, profileRelays, readCachedProfile, writeCachedProfile } from '../nostr/profile';
 import { planProgramImport, programImportState } from '../nostr/programImport';
 import type { ActiveSession, AppState, SubView, View } from './state';
 import { EX_PLACEHOLDER, exerciseImage, exerciseSourceLabel, filterExercises, formatMinutes, html } from './format';
@@ -39,31 +40,6 @@ const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', publicRelays: ['wss://re
 
 function profileName(profile: RelayProfile | null): string | null {
   return profile?.name?.trim() || profile?.nip05?.trim() || null;
-}
-
-async function fetchProfile(pubkey: string, relays = CANON_RELAYS): Promise<RelayProfile | null> {
-  const pool = new SimplePool();
-  try {
-    const event = await Promise.race([
-      pool.get(relays, { kinds: [0], authors: [pubkey] }),
-      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 5000))
-    ]);
-    if (!event) return null;
-    const profile = JSON.parse(event.content) as { display_name?: string; displayName?: string; name?: string; username?: string; picture?: string; image?: string; avatar?: string; nip05?: string; lud16?: string; lud06?: string };
-    return {
-      pubkey,
-      name: profile.display_name?.trim() || profile.displayName?.trim() || profile.name?.trim() || profile.username?.trim() || profile.nip05?.trim() || undefined,
-      picture: profile.picture?.trim() || profile.image?.trim() || profile.avatar?.trim() || undefined,
-      nip05: profile.nip05?.trim() || undefined,
-      lud16: profile.lud16?.trim() || undefined,
-      lud06: profile.lud06?.trim() || undefined,
-      createdAt: event.created_at
-    };
-  } catch {
-    return null;
-  } finally {
-    pool.close(relays);
-  }
 }
 
 export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
@@ -97,7 +73,15 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
     }
     await loadNamespace(pubkey);
-    const profile = await fetchProfile(pubkey); state.profileName = profileName(profile); state.profilePicture = profile?.picture || null;
+    const cached = readCachedProfile(pubkey);
+    state.profileName = profileName(cached); state.profilePicture = cached?.picture || null;
+    render();
+    void fetchProfile(pubkey, profileRelays(state.settings.publicRelays)).then((profile) => {
+      if (!profile || state.pubkey !== pubkey) return;
+      writeCachedProfile(profile);
+      state.profileName = profileName(profile); state.profilePicture = profile.picture || null;
+      render();
+    });
   }
 
   // Anonymous local account — the default; no signer involved.
