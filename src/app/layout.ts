@@ -207,11 +207,11 @@ function equipmentRows(state: AppState): string {
     return `<div class="settings-row-main"><div><strong>Equipment</strong><small>No equipment listed yet. Import exercises from Discover and equipment appears here.</small></div><span class="status-pill">0 selected</span></div>`;
   }
   const boxes = options.map((item) => `<label class="equip-option"><input type="checkbox" class="equip-toggle" value="${html(item.key)}" ${owned.has(item.key) ? 'checked' : ''} />${html(item.label)}</label>`).join('');
-  return `<details class="settings-details equipment-details">
-    <summary><span>Equipment</span><strong>${owned.size} selected</strong></summary>
+  return `<div class="settings-inline-section equipment-details">
+    <div class="settings-inline-heading"><strong>Equipment</strong><span class="status-pill">${owned.size} selected</span></div>
     <p class="section-help">Choose available equipment so Quick Workout avoids exercises you cannot do. Bodyweight exercises are always available.</p>
     <div class="equip-options">${boxes}</div>
-  </details>`;
+  </div>`;
 }
 
 function nwcWalletRows(state: AppState): string {
@@ -231,6 +231,7 @@ function settingsView(state: AppState): string {
   const nwc = state.nwc ?? { active: false, status: 'idle' as const };
   const unit = normalizeWeightUnit(state.settings.unit);
   const keyLine = state.signerType === 'local' ? 'Device-managed key for faster sync.' : 'Keys stay in your signer.';
+  const accountSummary = state.pubkey ? `Signed in · ${displayIdentity(state)}` : 'Local only';
   const account = state.pubkey
     ? `<div class="settings-row-main account-row"><div><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></div><div class="settings-row-actions"><button id="sign-out-settings" class="button ghost">Sign out</button><button id="remove-account-data" class="button ghost">Remove data</button></div></div>`
     : `<div class="settings-row-main account-row"><div><strong>Local only</strong><small>Use Workstr now, add encrypted sync when ready.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Account</button></div></div>`;
@@ -238,19 +239,27 @@ function settingsView(state: AppState): string {
   const signerType = state.signerType || (state.pubkey ? 'unknown' : 'none');
   const secureContext = typeof window !== 'undefined' && window.isSecureContext;
   return `<div class="page active settings-page"><div class="page-title">Settings</div>
-    <div class="panel settings-card account-card"><div class="panel-head"><span>Account</span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'signed in' : 'local'}</span></div>${account}</div>
+    <details class="settings-category account-card">
+      <summary><span class="settings-category-copy"><strong>Account</strong><small>${html(accountSummary)}</small></span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'SIGNED IN' : 'LOCAL'}</span></summary>
+      <div class="settings-category-body">${account}</div>
+    </details>
     ${beastModeSettingsCard(state)}
     ${backupPanel({ signedIn: Boolean(state.pubkey), enabled: Boolean(state.settings.backup?.enabled), sync: state.backup, backup: state.settings.backup })}
-    <div class="panel settings-card nwc-card"><div class="panel-head"><span>Zap wallet</span><span class="status-pill ${nwc.active ? 'ok' : ''}">${nwc.active ? 'active' : 'not connected'}</span></div>${nwcWalletRows({ ...state, nwc })}</div>
-    <div class="panel settings-card training-preferences-card">
-      <div class="panel-head"><span>Training Preferences</span></div>
-      <div class="settings-row-main"><div><strong>Weight unit</strong><small>Weights are stored in kilograms and converted for display.</small></div><label class="compact-select"><select id="unit-select"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds</option></select></label></div>
-      ${equipmentRows(state)}
-    </div>
+    <details class="settings-category nwc-card">
+      <summary><span class="settings-category-copy"><strong>Zap wallet</strong><small>${nwc.active ? html(nwc.walletLabel || 'Wallet connected') : 'Not connected'}</small></span><span class="status-pill ${nwc.active ? 'ok' : ''}">${nwc.active ? 'ACTIVE' : 'OFF'}</span></summary>
+      <div class="settings-category-body">${nwcWalletRows({ ...state, nwc })}</div>
+    </details>
+    <details class="settings-category training-preferences-card">
+      <summary><span class="settings-category-copy"><strong>Training Preferences</strong><small>${unit === 'kg' ? 'Kilograms' : 'Pounds'} · ${ownedEquipmentKeys(state.settings.ownedEquipment).length} equipment</small></span></summary>
+      <div class="settings-category-body">
+        <div class="settings-row-main"><div><strong>Weight unit</strong><small>Weights are stored in kilograms and converted for display.</small></div><label class="compact-select"><select id="unit-select"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds</option></select></label></div>
+        ${equipmentRows(state)}
+      </div>
+    </details>
     ${supportPanel(state.support, nwc, Boolean(state.pubkey))}
-    <details class="panel settings-card advanced-settings">
-      <summary><span>Advanced</span><small>Diagnostics, relay, signer, and technical state</small></summary>
-      <div class="terminal-mini">version: ${html(APP_VERSION)}\nsecure context: ${secureContext}\ncountdown audio: ${html(countdownAudioState())}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nsigner type: ${html(signerType)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}</div>
+    <details class="settings-category advanced-settings">
+      <summary><span class="settings-category-copy"><strong>Advanced</strong><small>Diagnostics, relay, signer, and technical state</small></span></summary>
+      <div class="settings-category-body"><div class="terminal-mini">version: ${html(APP_VERSION)}\nsecure context: ${secureContext}\ncountdown audio: ${html(countdownAudioState())}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nsigner type: ${html(signerType)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div>
     </details>
   </div>`;
 }

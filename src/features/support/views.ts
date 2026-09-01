@@ -56,20 +56,25 @@ function fundingPanel(state: SupportState): string {
     </div>`;
 }
 
-// Defaults to idle so a caller that has not fetched yet — or a test rendering
-// a minimal state — gets the zap target without a funding panel.
-export function supportPanel(state: SupportState = { status: 'idle', receipts: [] }, nwc: NwcViewState = { active: false, status: 'idle' }, signedIn = false): string {
-  const npub = nip19.npubEncode(OPERATOR_PUBKEY);
+export function supportSummary(state: SupportState = { status: 'idle', receipts: [] }): string {
   const totals = fundingTotals(state.receipts, MONTHLY_COST_SATS);
-  const summary = state.status === 'ready'
+  return state.status === 'ready'
     ? `${sats(totals.sats)} / ${sats(MONTHLY_COST_SATS)} sats this month`
     : state.status === 'loading'
       ? 'Reading zap receipts…'
       : state.status === 'offline'
         ? 'Receipt check offline'
         : `Monthly target ${sats(MONTHLY_COST_SATS)} sats`;
-  return `<div class="panel support-panel compact-support">
-    <div class="panel-head"><span>Support Workstr</span><strong>zap receipts</strong></div>
+}
+
+// Defaults to idle so a caller that has not fetched yet — or a test rendering
+// a minimal state — gets the zap target without a funding panel.
+export function supportPanel(state: SupportState = { status: 'idle', receipts: [] }, nwc: NwcViewState = { active: false, status: 'idle' }, signedIn = false): string {
+  const npub = nip19.npubEncode(OPERATOR_PUBKEY);
+  const summary = supportSummary(state);
+  return `<details class="settings-category support-panel compact-support">
+    <summary><span class="settings-category-copy"><strong>Support Workstr</strong><small>${html(summary)}</small></span><span class="settings-category-meta">ZAP</span></summary>
+    <div class="settings-category-body">
     <div class="settings-row-main support-summary-row">
       <div>
         <strong>Fund the build. Keep the receipt.</strong>
@@ -85,8 +90,7 @@ export function supportPanel(state: SupportState = { status: 'idle', receipts: [
       <strong>${nwc.active ? 'NWC wallet ready' : signedIn ? 'Connect a zap wallet in Settings for in-app zaps.' : 'Sign in and connect a zap wallet for in-app zaps.'}</strong>
       <small>${html(redactNwcSecrets(nwc.message || (nwc.active ? `${nwc.walletLabel || 'Wallet'} · ${nwc.relayLabel || 'wallet relay'}` : 'The external zap link still works without an in-app wallet.')))}</small>
     </div>
-    <details class="settings-details support-details">
-      <summary>Funding details and receipts</summary>
+    <div class="support-details">
       <p class="section-help">Workstr is free and stays free. The monthly target covers AI credits, development, growth tests, media hosting, the domain, and buffer. Zaps keep support public and receipt-backed.</p>
       <div class="support-zap-card">
         <div class="support-zap-copy">
@@ -100,6 +104,7 @@ export function supportPanel(state: SupportState = { status: 'idle', receipts: [
         </div>
       </div>
       ${fundingPanel(state)}
-    </details>
-  </div>`;
+    </div>
+    </div>
+  </details>`;
 }

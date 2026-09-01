@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { nip19 } from 'nostr-tools';
-import { supportPanel } from '../src/features/support/views';
+import { supportPanel, supportSummary } from '../src/features/support/views';
 import { OPERATOR_NOSTR_HANDLE, OPERATOR_NOSTR_URL } from '../src/core/funding';
 import { OPERATOR_PUBKEY } from '../src/nostr/canon';
 
@@ -16,7 +16,7 @@ describe('supportPanel', () => {
     expect(markup).toContain(`>${OPERATOR_NOSTR_HANDLE}</strong>`);
     expect(markup).toContain(npub);
     expect(markup).toContain('Copy npub');
-    expect(markup).toContain('Funding details and receipts');
+    expect(markup).toContain('class="settings-category support-panel compact-support"');
     expect(markup).toContain('Zaps keep support public and receipt-backed');
     expect(markup).toContain('Monthly target 85,000 sats');
     expect(markup).toContain('NIP-57');
@@ -50,5 +50,12 @@ describe('supportPanel', () => {
     expect(markup).toContain('could not reach relays');
     expect(markup).toContain('donations this month unknown');
     expect(markup).not.toContain('received: 0 sats');
+  });
+});
+
+describe('supportSummary', () => {
+  it('derives the compact disclosure summary from receipt state', () => {
+    expect(supportSummary()).toBe('Monthly target 85,000 sats');
+    expect(supportSummary({ status: 'offline', receipts: [] })).toBe('Receipt check offline');
   });
 });

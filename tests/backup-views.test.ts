@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backupPanel, lastSyncLabel, progressDetail, progressPercent, statusLine, statusPill, type BackupPanelState } from '../src/features/backup/views';
+import { backupPanel, backupSummary, lastSyncLabel, progressDetail, progressPercent, statusLine, statusPill, type BackupPanelState } from '../src/features/backup/views';
 
 const panelState = (overrides: Partial<BackupPanelState> = {}): BackupPanelState => ({
   signedIn: true,
@@ -27,6 +27,11 @@ describe('last sync label', () => {
 });
 
 describe('status pill', () => {
+  it('keeps the collapsed data summary meaningful before account setup', () => {
+    expect(backupSummary(panelState({ signedIn: false, enabled: false }))).toBe('Local only');
+    expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).toBe('3 pending');
+  });
+
   it('says off before it says anything else', () => {
     expect(statusPill(panelState({ enabled: false, sync: { state: 'error', pending: 4, lastError: 'boom' } })))
       .toEqual({ label: 'off', ok: false });

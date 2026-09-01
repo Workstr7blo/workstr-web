@@ -30,6 +30,9 @@ describe('shell', () => {
     expect(settings?.textContent).toContain('Training Preferences');
     expect(settings?.textContent).toContain('Support Workstr');
     expect(settings?.querySelector('.advanced-settings:not([open])')).toBeTruthy();
+    expect(settings?.querySelectorAll('.settings-category:not([open])')).toHaveLength(7);
+    expect(settings?.querySelector('.account-card summary')?.textContent).toContain('Local only');
+    expect(settings?.querySelector('.beast-mode-card summary')?.textContent).toContain('0/4 objectives');
     expect(settings?.querySelector('.account-card .terminal-mini')).toBeNull();
     expect(settings?.querySelector('#sign-in-settings')).toBeTruthy();
     expect(settings?.querySelector('#create-account-settings')).toBeNull();
@@ -165,7 +168,8 @@ describe('shell', () => {
     } as AppState);
 
     expect(markup).toContain('data-beast-mode-state="unlocked"');
-    expect(markup).toContain('>unlocked</span>');
+    expect(markup).toContain('>UNLOCKED</span>');
+    expect(markup).toContain('4/4 objectives');
   });
 });
 
