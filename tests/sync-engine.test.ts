@@ -7,6 +7,7 @@ import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 import { withSignerTimeout } from '../src/signer/timeout';
 import { forgetAutoApprove } from '../src/signer/auto-approve';
 import { decodePrivateRecord, type PrivateRecord, type RecordCipher } from '../src/nostr/codecs30078';
+import { KEY_FINGERPRINT_TAG } from '../src/nostr/backup-key';
 
 const SELF = 'ab'.repeat(32);
 
@@ -16,7 +17,7 @@ const relay = vi.hoisted(() => ({
   events: new Map<string, { event: unknown }>(),
   // The wrapped backup key, held apart from the records because it is not one: it is
   // NIP-44 to the user's own pubkey and is resolved before a pass can start.
-  keyEvent: null as null | { content: string; created_at?: number },
+  keyEvent: null as null | { content: string; created_at?: number; fingerprint?: string },
   failure: null as null | 'policy' | 'network',
   // Real event ids are content hashes, so republishing an address produces a different
   // one. The seen ledger keys on that, so a double that reused ids would never be tested.
@@ -53,12 +54,12 @@ vi.mock('../src/sync/relay', async () => {
     async fetchKeyEvent() {
       if (relay.failure === 'network') throw new Error('relay query timed out');
       return relay.keyEvent
-        ? { ...relay.keyEvent, id: 'key-event', pubkey: SELF, sig: 'sig', kind: 30078, created_at: relay.keyEvent.created_at ?? 1, tags: [['d', 'workstr:v2:key']] }
+        ? { ...relay.keyEvent, id: 'key-event', pubkey: SELF, sig: 'sig', kind: 30078, created_at: relay.keyEvent.created_at ?? 1, tags: [['d', 'workstr:v2:key'], ...(relay.keyEvent.fingerprint ? [[KEY_FINGERPRINT_TAG, relay.keyEvent.fingerprint]] : [])] }
         : null;
     },
-    async publishKeyEvent(_signer: Signer, _url: string, content: string) {
+    async publishKeyEvent(_signer: Signer, _url: string, content: string, fingerprint?: string) {
       if (relay.failure) return { accepted: false, reason: `${relay.failure} failure` };
-      relay.keyEvent = { content, created_at: relay.seq += 1 };
+      relay.keyEvent = { content, created_at: relay.seq += 1, fingerprint };
       return { accepted: true, reason: 'ok' };
     }
   };
@@ -211,9 +212,45 @@ describe('opening the app again', () => {
     relay.keyEvent = { content: relayKey, created_at: 20 };
 
     const { engine } = await harness(store);
-    await engine.start();
+    const status = await engine.start();
 
     expect(relay.keyEvent?.content).toBe(relayKey);
+    expect(status.state).toBe('error');
+    expect(status.lastError).toContain('different account keys');
+    expect(relay.events.size).toBe(0);
+  });
+
+  it('blocks uploads when a relay record declares a different key lineage', async () => {
+    const store = await freshStore();
+    await populate(store);
+    relay.keyEvent = { content: CACHED_KEY, created_at: 20 };
+    const unsigned = await (await import('../src/nostr/codecs30078')).encodePrivateRecord(
+      { ...(await cipherOf(store)), keyFingerprint: 'different-lineage' },
+      { address: SETTINGS_ADDRESS, updatedAt: '2026-08-01T00:00:00.000Z', payload: {} }
+    );
+    relay.events.set(SETTINGS_ADDRESS, { event: { ...unsigned, id: 'foreign-lineage', pubkey: SELF, sig: 'sig' } });
+
+    const { engine } = await harness(store);
+    const status = await engine.start();
+
+    expect(status.state).toBe('error');
+    expect(status.lastError).toContain('different account-key lineage');
+    expect(relay.events.size).toBe(1);
+    expect((await store.listSheets()).some((sheet) => sheet.name === 'Push Day')).toBe(true);
+  });
+
+  it('blocks uploads when the relay key cannot be verified', async () => {
+    const store = await freshStore();
+    await populate(store);
+    relay.keyEvent = { content: CACHED_KEY, created_at: 20 };
+    const signer = fakeSignerWith({ nip44Decrypt: async () => { throw new Error('refused'); } });
+
+    const { engine } = await harness(store, signer);
+    const status = await engine.start();
+
+    expect(status.state).toBe('error');
+    expect(status.lastError).toContain('could not open your backup key');
+    expect(relay.events.size).toBe(0);
   });
 
   it('does not open a backup record it has already read', async () => {
@@ -585,7 +622,7 @@ describe('when the relay or signer will not cooperate', () => {
     const { engine } = await harness(store);
     await engine.start();
 
-    expect((await store.getSettings()).backup?.lastError).toContain('network failure');
+    expect((await store.getSettings()).backup?.lastError).toContain('relay query timed out');
   });
 });
 

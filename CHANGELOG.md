@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Encrypted sync now labels new key and data events with a non-secret backup-key
+  fingerprint, blocks uploads when key lineages conflict, and upgrades legacy key
+  metadata without rotating keys or rewriting existing records.
 - Beast Mode creators can now publish local workout programs to configured public Nostr
   relays after an objective self-serve checklist passes: one local program, five completed
   workouts, workouts on three local days, and a signed-in Nostr profile with an existing

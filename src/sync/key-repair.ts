@@ -20,6 +20,6 @@ export async function repairCachedKeyIfOlderBackupWasSeen({
   const pubkey = await signer.getPublicKey();
   return republishBackupKey(signer, {
     fetchKeyEvent: () => fetchKeyEvent(relayUrl, pubkey),
-    publishKeyEvent: (content: string) => publishKeyEvent(signer, relayUrl, content)
+    publishKeyEvent: (content: string, fingerprint?: string) => publishKeyEvent(signer, relayUrl, content, fingerprint)
   }, cachedKeyRaw);
 }

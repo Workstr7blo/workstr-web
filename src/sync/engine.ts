@@ -6,7 +6,7 @@ import { pushQueue } from './push';
 import { compactJournal, pushJournal } from './journal';
 import { isRecordAddress, newDeviceId, parseAddress } from './addresses';
 import { SignerTimeoutError, withSignerTimeout } from '../signer/timeout';
-import { BackupKeyUnavailableError, republishBackupKey, resolveBackupKey } from '../nostr/backup-key';
+import { BackupKeyUnavailableError, backupKeyFingerprint, keyEventFingerprint, republishBackupKey, resolveBackupKey, unwrapBackupKey } from '../nostr/backup-key';
 import { fetchKeyEvent, publishKeyEvent } from './relay';
 import { createRetrySchedule } from './retry';
 import type { RecordCipher } from '../nostr/codecs30078';
@@ -18,7 +18,6 @@ import { repairCachedKeyIfOlderBackupWasSeen } from './key-repair';
 // refuse them. It is also never mixed into the catalog or public write relay sets.
 export const WORKSTR_RELAY_URL = 'wss://relay.workstr.fit:43736';
 
-// Logging a set writes several records in a burst; one sync afterwards is enough.
 export const CHANGE_DEBOUNCE_MS = 4000;
 
 // 5 moves workout history into the append-only log. A device on 4 wrote one record per
@@ -96,26 +95,19 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
   let status: SyncStatus = { state: 'off', pending: 0 };
   let running = false;
   let inFlight: Promise<SyncStatus> | null = null;
-  // A change that lands mid-sync must not be lost to the pass that is already reading
-  // the queue, so it asks for another one instead of being folded into this one.
+  // A change that lands mid-sync asks for another pass rather than being lost.
   let again = false;
   let failures = 0;
-  // Whether the failure that ended the last pass was a signer going quiet: it is the one
-  // failure whose next attempt is worth making immediately.
+  // Signer silence is the one failure worth retrying immediately.
   let stalledLast = false;
   const retry = createRetrySchedule();
   let cancelTimer: (() => void) | null = null;
-  // The relay is read once per session. Every later pass is an upload: re-reading the whole
-  // history on a timer is wasted work even now that opening a record is local.
+  // Read the relay once per session; later passes only upload.
   let pulled = false;
-  // Resolved once per run and then held: the unwrap is the only signer round trip the
-  // backup key ever costs, and every record after it is sealed and opened locally.
+  // Resolve and unwrap once per run, then seal/open records locally.
   let cipher: RecordCipher | null = null;
   let cachedKeyRaw: string | undefined, relayKeyEvent: SignedNostrEvent | null = null, relayKeyRaw: string | undefined;
-  // Whether this run has already confirmed the wrapped key is still on the relay. Only
-  // done when the key came from this device's cache, because that path never asks the
-  // relay anything and would not notice the one record everything else depends on
-  // going missing.
+  // A cached-key path must still confirm the wrapped relay record once per run.
   let keyConfirmed = false;
 
   async function ensureCipher(signer: Signer): Promise<RecordCipher> {
@@ -123,7 +115,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     const pubkey = await signer.getPublicKey();
     const transport = {
       fetchKeyEvent: () => fetchKeyEvent(relayUrl, pubkey),
-      publishKeyEvent: (content: string) => publishKeyEvent(signer, relayUrl, content)
+      publishKeyEvent: (content: string, fingerprint?: string) => publishKeyEvent(signer, relayUrl, content, fingerprint)
     };
     if (!(await ctx.store.getSettings()).backup?.device) {
       await ctx.store.saveBackupState({ device: newDeviceId() });
@@ -135,22 +127,27 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       write: async (raw: string) => { await ctx.store.saveBackupState({ key: raw }); }
     });
 
-    // Cheap in the currency that matters: one relay round trip, and the two signer round
-    // trips of a republish only when the record is actually gone.
+    // Republish only when the wrapped record is missing or needs legacy metadata.
     if (cached && !keyConfirmed) {
       keyConfirmed = true;
-      relayKeyEvent = await fetchKeyEvent(relayUrl, pubkey).catch(() => null);
-      relayKeyRaw = relayKeyEvent ? await signer.nip44Decrypt(relayKeyEvent.pubkey, relayKeyEvent.content).catch(() => undefined) : undefined;
+      relayKeyEvent = await fetchKeyEvent(relayUrl, pubkey);
+      relayKeyRaw = relayKeyEvent ? await unwrapBackupKey(signer, relayKeyEvent) : undefined;
       if (!relayKeyEvent) {
         await republishBackupKey(signer, transport, cached);
+      } else if (relayKeyRaw) {
+        const declared = keyEventFingerprint(relayKeyEvent);
+        const actual = await backupKeyFingerprint(relayKeyRaw);
+        if (declared && declared !== actual) {
+          throw new BackupKeyUnavailableError('Backup is paused because the relay key metadata does not match the wrapped key. Keep this device and its data; repair from a known-good device before syncing.');
+        }
+        if (relayKeyRaw === cached && !declared) await republishBackupKey(signer, transport, cached);
       }
     }
 
-    cipher = { key, pubkey };
+    const raw = (await ctx.store.getSettings()).backup?.key;
+    cipher = { key, pubkey, keyFingerprint: raw ? (await backupKeyFingerprint(raw)) || undefined : undefined };
     return cipher;
   }
-
-
   const report = (next: Partial<SyncStatus>): SyncStatus => {
     status = { ...status, ...next };
     ctx.onStatus(status);
@@ -175,15 +172,24 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     // Before anything reads or writes a record. Nothing in a pass can proceed without it,
     // and it must never be improvised: see `resolveBackupKey`.
     const active = await ensureCipher(signer);
-    if (await repairCachedKeyIfOlderBackupWasSeen({ store: ctx.store, signer, relayUrl, cachedKeyRaw, relayKeyRaw, relayKeyEvent })) relayKeyRaw = cachedKeyRaw;
+    let repairedKnownGood = await repairCachedKeyIfOlderBackupWasSeen({ store: ctx.store, signer, relayUrl, cachedKeyRaw, relayKeyRaw, relayKeyEvent });
+    if (repairedKnownGood) relayKeyRaw = cachedKeyRaw;
 
     if (!pulled) {
-      // Before uploading anything: a device that has just signed in may be the empty one,
-      // and last-write-wins protects a populated one.
+      // Restore before upload so an empty fresh device cannot win last-write-wins.
       const merged = await pullAndMerge(ctx.store, signer, active, relayUrl, {
         onProgress: (done, total) => report({ progress: { phase: 'restore', done, total } })
       });
-      if (await repairCachedKeyIfOlderBackupWasSeen({ store: ctx.store, signer, relayUrl, cachedKeyRaw, relayKeyRaw, relayKeyEvent, readableBeforeKey: Boolean(relayKeyEvent?.created_at && merged.earliestReadableCreatedAt && merged.earliestReadableCreatedAt < relayKeyEvent.created_at) })) relayKeyRaw = cachedKeyRaw;
+      if (await repairCachedKeyIfOlderBackupWasSeen({ store: ctx.store, signer, relayUrl, cachedKeyRaw, relayKeyRaw, relayKeyEvent, readableBeforeKey: Boolean(relayKeyEvent?.created_at && merged.earliestReadableCreatedAt && merged.earliestReadableCreatedAt < relayKeyEvent.created_at) })) {
+        repairedKnownGood = true;
+        relayKeyRaw = cachedKeyRaw;
+      }
+      if (cachedKeyRaw && relayKeyRaw && cachedKeyRaw !== relayKeyRaw) {
+        throw new BackupKeyUnavailableError('Backup is paused because this device and the relay have different account keys. No records were uploaded. Keep this device and repair from a known-good cached key.');
+      }
+      if (merged.conflictingKeyFingerprints?.length && !repairedKnownGood) {
+        throw new BackupKeyUnavailableError('Backup is paused because relay records belong to a different account-key lineage. No records were uploaded. Keep this device and repair from a known-good cached key.');
+      }
       pulled = true;
       report({ progress: undefined });
       if (merged.applied > 0 || merged.deleted > 0) ctx.onRestored?.();
@@ -191,12 +197,9 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
     }
 
     if ((backup?.recordFormat ?? 0) < RECORD_FORMAT) {
-      // The previous version left `workstr:v1:` addresses in the queue. This client cannot
-      // resolve them, so they would publish as tombstones the relay refuses and hold the
-      // engine in an error state no retry clears. Dropped once, here, before anything else.
+      // Drop obsolete V1 addresses before they become rejected tombstones.
       await ctx.store.purgeUnpublishableQueue();
-      // Per-workout addresses queued by the previous format. They resolve to valid records,
-      // but sending them would write history to the very addresses the log replaces.
+      // Per-workout addresses are replaced by the journal log.
       for (const entry of await ctx.store.listSyncQueue()) {
         if (parseAddress(entry.address)?.kind === 'session') await ctx.store.dequeueSync(entry.address, entry.updated_at);
       }
@@ -210,9 +213,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       report({ progress: undefined });
     }
 
-    // Recounted every pass rather than captured once at the cutover: deleting an old
-    // workout, or importing an archive, changes how many are held back from the relay, and
-    // a number frozen at the cutover would keep reporting the count from before.
+    // Recount each pass because deletes and imports change the local-only total.
     const counts = await ctx.store.countSessionBackupEra();
     if (counts.localOnly !== backup?.localOnlyHistoryCount) {
       await ctx.store.saveBackupState({ localOnlyHistoryCount: counts.localOnly });
@@ -229,8 +230,7 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       report({ progress: undefined });
     }
 
-    // One signer round trip per record now — the signature. Reported per record so a long
-    // upload is visibly moving rather than indistinguishable from a hang.
+    // Report each signed record so long uploads visibly progress.
     const renewSigner = async (): Promise<Signer | null> => {
       ctx.onSignerStalled?.();
       const renewed = await ctx.getSigner();

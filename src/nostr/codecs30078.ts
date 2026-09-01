@@ -1,6 +1,7 @@
 import type { SignedNostrEvent, UnsignedNostrEvent } from '../signer/types';
 import { isRecordAddress, parseAddress, type RecordAddress } from '../sync/addresses';
 import { openEnvelope, sealEnvelope } from './envelope';
+import { KEY_FINGERPRINT_TAG } from './backup-key';
 
 // NIP-78 arbitrary app data. Shared with other clients, which is exactly why the relay
 // policy also requires the address prefix rather than filtering on the kind alone.
@@ -13,6 +14,7 @@ export const CLIENT_TAG = 'workstr';
 export interface RecordCipher {
   key: CryptoKey;
   pubkey: string;
+  keyFingerprint?: string;
 }
 
 export interface PrivateRecord<T = unknown> {
@@ -34,11 +36,11 @@ function tagValue(tags: string[][], name: string): string {
   return (tags.find((tag) => tag[0] === name) || [])[1] || '';
 }
 
-export function buildPrivateRecordEvent(address: string, ciphertext: string, createdAt = Math.floor(Date.now() / 1000)): UnsignedNostrEvent {
+export function buildPrivateRecordEvent(address: string, ciphertext: string, createdAt = Math.floor(Date.now() / 1000), keyFingerprint?: string): UnsignedNostrEvent {
   return {
     kind: PRIVATE_RECORD_KIND,
     created_at: createdAt,
-    tags: [['d', address], ['client', CLIENT_TAG]],
+    tags: [['d', address], ['client', CLIENT_TAG], ...(keyFingerprint ? [[KEY_FINGERPRINT_TAG, keyFingerprint]] : [])],
     content: ciphertext
   };
 }
@@ -55,7 +57,7 @@ export async function encodePrivateRecord<T>(cipher: RecordCipher, record: Priva
     ...(record.deleted ? {} : { payload: record.payload })
   };
   const content = await sealEnvelope(cipher.key, { pubkey: cipher.pubkey, address: record.address }, JSON.stringify(envelope));
-  return buildPrivateRecordEvent(record.address, content);
+  return buildPrivateRecordEvent(record.address, content, undefined, cipher.keyFingerprint);
 }
 
 // Returns null for anything unreadable. Events come from an open relay that anyone may
@@ -66,6 +68,8 @@ export async function decodePrivateRecord<T>(cipher: RecordCipher, event: Signed
   const parsed = parseAddress(address);
   if (!parsed) return null;
   if (tagValue(event.tags || [], 'client') !== CLIENT_TAG) return null;
+  const eventFingerprint = tagValue(event.tags || [], KEY_FINGERPRINT_TAG);
+  if (cipher.keyFingerprint && eventFingerprint && eventFingerprint !== cipher.keyFingerprint) return null;
   try {
     // Authenticated against the address it was found at, so a record served from the wrong
     // address does not open at all rather than opening into the wrong row.

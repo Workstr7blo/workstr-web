@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  BACKUP_KEY_ADDRESS, BackupKeyUnavailableError, KEY_BYTES, importBackupKey,
+  BACKUP_KEY_ADDRESS, BackupKeyUnavailableError, KEY_BYTES, KEY_FINGERPRINT_TAG, backupKeyFingerprint, importBackupKey,
   republishBackupKey, resolveBackupKey, type BackupKeyCache, type BackupKeyTransport
 } from '../src/nostr/backup-key';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../src/signer/types';
@@ -20,10 +20,10 @@ function fakeSigner(overrides: Partial<Signer> = {}): Signer {
   };
 }
 
-function keyEvent(content: string): SignedNostrEvent {
+function keyEvent(content: string, fingerprint?: string): SignedNostrEvent {
   return {
     id: 'key-event', pubkey: SELF, sig: 'sig', kind: 30078, created_at: 1,
-    tags: [['d', BACKUP_KEY_ADDRESS]], content
+    tags: [['d', BACKUP_KEY_ADDRESS], ...(fingerprint ? [[KEY_FINGERPRINT_TAG, fingerprint]] : [])], content
   } as SignedNostrEvent;
 }
 
@@ -43,9 +43,9 @@ function memoryTransport(initial: SignedNostrEvent | null = null) {
     published: [] as string[],
     fetches: 0,
     fetchKeyEvent: async () => { state.fetches += 1; return state.event; },
-    publishKeyEvent: async (content: string) => {
+    publishKeyEvent: async (content: string, fingerprint?: string) => {
       state.published.push(content);
-      state.event = keyEvent(content);
+      state.event = keyEvent(content, fingerprint);
       return { accepted: true, reason: 'ok' };
     }
   };
@@ -74,8 +74,10 @@ describe('resolving the backup key', () => {
 
     await resolveBackupKey(fakeSigner(), transport, cache);
 
-    expect(transport.published).toHaveLength(0);
+    // Legacy key events are upgraded with metadata, without changing the key.
+    expect(transport.published).toEqual([existing]);
     expect(cache.value).toBe(existing);
+    expect(transport.event?.tags).toContainEqual([KEY_FINGERPRINT_TAG, await backupKeyFingerprint(existing)]);
   });
 
   it('costs the signer nothing once the key is cached', async () => {
@@ -183,5 +185,19 @@ describe('republishing the key', () => {
     };
 
     expect(await republishBackupKey(fakeSigner(), transport, 'r'.repeat(43) + '=')).toBe(false);
+  });
+});
+
+describe('backup-key fingerprints', () => {
+  it('is deterministic, domain separated and does not expose the raw key', async () => {
+    const raw = 'r'.repeat(43) + '=';
+    const fingerprint = await backupKeyFingerprint(raw);
+    expect(fingerprint).toHaveLength(43);
+    expect(fingerprint).toBe(await backupKeyFingerprint(raw));
+    expect(fingerprint).not.toContain(raw.slice(0, 8));
+  });
+
+  it('refuses malformed key material', async () => {
+    expect(await backupKeyFingerprint('not-a-key')).toBeNull();
   });
 });
