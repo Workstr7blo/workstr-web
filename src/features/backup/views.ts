@@ -42,6 +42,11 @@ export function statusPill(state: BackupPanelState): { label: string; ok: boolea
   return { label: state.sync.pending > 0 ? `${state.sync.pending} pending` : 'up to date', ok: true };
 }
 
+export function backupSummary(state: BackupPanelState): string {
+  if (!state.signedIn) return 'Local only';
+  return statusPill(state).label;
+}
+
 const PHASE_LABEL: Record<SyncProgress['phase'], string> = {
   restore: 'Checking encrypted sync…',
   prepare: 'Preparing local changes…',
@@ -90,6 +95,7 @@ function progressMarkup(progress: SyncProgress | undefined): string {
 
 export function backupPanel(state: BackupPanelState): string {
   const pill = statusPill(state);
+  const summary = backupSummary(state);
   const localOnly = state.backup?.localOnlyHistoryCount ?? 0;
   const eraLine = state.signedIn && state.enabled && localOnly > 0
     ? `<div class="settings-subtle-row"><span>Local-only older workouts</span><strong>${localOnly}</strong></div>`
@@ -110,17 +116,19 @@ export function backupPanel(state: BackupPanelState): string {
   const olderNote = state.signedIn && state.enabled && localOnly > 0
     ? `<p class="section-help">Those older workouts stay on this device and are included when you export JSON.</p>`
     : '';
-  return `<div class="panel settings-card data-sync-card">
-    <div class="panel-head"><span>Data &amp; Sync</span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></div>
-    <div class="settings-row-main">
-      <div><strong>Encrypted sync</strong><small>${html(syncCopy)}</small></div>
-      <div class="settings-row-actions">${syncAction}</div>
+  return `<details class="settings-category data-sync-card">
+    <summary><span class="settings-category-copy"><strong>Data &amp; Sync</strong><small>${html(summary)}</small></span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></summary>
+    <div class="settings-category-body">
+      <div class="settings-row-main">
+        <div><strong>Encrypted sync</strong><small>${html(syncCopy)}</small></div>
+        <div class="settings-row-actions">${syncAction}</div>
+      </div>
+      ${live}
+      ${olderNote}
+      <div class="settings-row-main manual-backup-row">
+        <div><strong>Manual backup</strong><small>Export or import a full JSON archive.</small></div>
+        <div class="settings-row-actions"><button id="export-data" class="button ghost">Export JSON</button><button id="import-data" class="button ghost">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
+      </div>
     </div>
-    ${live}
-    ${olderNote}
-    <div class="settings-row-main manual-backup-row">
-      <div><strong>Manual backup</strong><small>Export or import a full JSON archive.</small></div>
-      <div class="settings-row-actions"><button id="export-data" class="button ghost">Export JSON</button><button id="import-data" class="button ghost">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
-    </div>
-  </div>`;
+  </details>`;
 }
