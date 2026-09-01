@@ -32,7 +32,7 @@ Milestones are releases. A milestone is done when it is tagged and on the domain
 
 All four Phase 1 pillars are shipped and the app is public. It is a complete offline
 tracker with a working Nostr read path, optional identity, and live training modes,
-deployed to the domain and tagged through v2.0.0 (2026-08-28).
+deployed to the domain and prepared for v2.2.0 (2026-09-01).
 
 **Shipped**
 
@@ -59,13 +59,13 @@ deployed to the domain and tagged through v2.0.0 (2026-08-28).
 - **Release and support** — starter seed of three beginner programs, the zap-only support
   and funding panel, and the tag-triggered release pipeline. v0.9.0, v1.0.0 and v1.1.0 are
   tagged, released with build artifacts, and live on the domain.
-- **Delivery** — Pages workflow deploys `main` to the custom domain; 370 tests across 30
-  files, green.
+- **Delivery** — Pages workflow deploys `main` to the custom domain; more than 700 tests
+  across the unit, integration, and browser surfaces are green.
 
 **Next**
 
-Complete the measured funding numbers and EMOM transition tone tracked for v2.2,
-then scope v3 growth work.
+No numbered growth milestone is scheduled. New work is selected from observed product
+needs and recorded as a focused issue when it is ready to build.
 
 ---
 
@@ -194,39 +194,16 @@ not backup work, and ships independently. Publishing the real monthly cost and s
 §11.4 threshold (issue #59) moved to v2.2 — the alpha is what produces the cost figure, so
 gating the alpha on it was circular.
 
-## v2.2 — Funding numbers and training polish
+## v2.2 — Wallet, creator publishing, and sync hardening
 
-Deferred items that do not gate the alpha. Both were written down elsewhere and never
-reached the issue queue, which is the only reason they are called out here.
+Released 2026-09-01 as v2.2.0. This release adds NWC workout-program zaps, verified zap
+totals, self-serve Beast Mode creator publishing and discovery, compact Settings, isolated
+browser smoke verification, and backup-key lineage fingerprints that stop conflicting
+encrypted-sync writes before they can deepen a key fork.
 
-1. Publish the real monthly relay cost and set the §11.4 threshold to a real number at the
-   same time (#59). The alpha is the thing that generates the cost, so this follows it
-   rather than blocking it — but it is still a pair: a published cost without a threshold
-   restates the problem instead of answering it.
-2. Mark the EMOM work-to-recovery transition with a tone (#60). Work counts down and then
-   goes silent, while recovery ends on the round-boundary tone; the two halves of an
-   interval are not treated the same.
-
-**Done when:** the funding figures in the app and on the landing page are measured rather
-than placeholder, the §11.4 trigger is a number with its reasoning recorded, and a timed
-EMOM step ends audibly.
-
-## v3 — Growth
-
-Independently shippable, roughly in order of value. Nothing here blocks v1 or v2.
-
-1. Milestone zap prompts — contextual donation moments at PRs and streaks, built on the
-   v2 NWC support flow rather than a separate payment rail.
-2. Supporter badge and supporters page, resolved from public zap receipts.
-3. **User-published programs** (`kind:33402`) — the one authoring capability that opens
-   up. Programs may only reference exercises that already have an address, which keeps
-   the exercise vocabulary clean and removes the need for a publish-time dependency walk.
-   Separate discovery surface from the operator catalog; imports stay snapshots.
-4. Blossom media server on the relay host — and only there does the media-upload question
-   reopen, from scratch.
-5. Push notifications for scheduled workouts.
-6. Coach platform, built on item 3.
-7. `signer/idenstr.ts` — one codebase, three signer backends.
+The proposed EMOM transition tone (#60) was retired by owner direction rather than shipped.
+The catalog-growth target (#23) was completed by the live operator catalog with more than
+55 exercises and five programs.
 
 ## Fallback — paid relay access
 
@@ -237,9 +214,8 @@ Not a milestone and not scheduled. Built only if the funding trigger in `instruc
 
 ## Continuous
 
-- **Catalog content** — grow from the launch set toward 50–100 exercises and 5–10
-  programs, authored and published from the self-hosted Workstr install. Independent of
-  every milestone above.
+- **Catalog content** — maintain and curate the live set of more than 55 exercises and
+  five programs from the self-hosted Workstr install.
 - **Browser-surface verification** — any change to a view, the shell, or the session
   runner is driven in headless Chromium against the production build before it is done.
 
@@ -248,8 +224,6 @@ Not a milestone and not scheduled. Built only if the funding trigger in `instruc
 - **RPE** — the field is typed and unwritten on purpose. Three decisions block it: RPE or
   RIR, prompted per set or per exercise, and what consumes the number. Build the consumer
   before the input.
-- **The §11.4 threshold** — deliberately unset until the alpha gives it a real
-  denominator. Scheduled as v2.2 #59, not as an alpha launch gate.
 - ~~**Does this file ship with the repo?**~~ — settled by practice: it is tracked and
   committed, so the accurate description of the project ships alongside the spec.
 

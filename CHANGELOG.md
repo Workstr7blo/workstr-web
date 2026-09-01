@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-09-01
+
 ### Added
 
+- Signed-in users can connect an NWC wallet and zap workout programs in-app; Discover
+  shows verified program zap totals and refreshes them after payment.
 - Encrypted sync now labels new key and data events with a non-secret backup-key
   fingerprint, blocks uploads when key lineages conflict, and upgrades legacy key
   metadata without rotating keys or rewriting existing records.
@@ -35,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Settings now groups account, backup, training, wallet, support, and advanced controls
+  into compact accessible disclosure categories.
 - Browser smoke verification now uses a dedicated loopback-only build with an in-memory
   signer, a mock publisher, and no public relay URLs. The normal production build excludes
   the smoke entrypoint; run `npm run smoke:browser` to exercise the isolated harness.
@@ -495,7 +501,8 @@ Nostr read path; it is versioned here so releases are traceable while v1.0 is fi
 - Weights are stored canonically in kilograms; the display unit is a user preference.
 - `session_sets.rpe` exists in the schema but is never written — see `ROADMAP.md`.
 
-[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.0.0...v2.2.0
 [2.0.0]: https://github.com/Workstr7blo/workstr-web/compare/v1.3.0...v2.0.0
 [1.3.0]: https://github.com/Workstr7blo/workstr-web/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Workstr7blo/workstr-web/compare/v1.1.0...v1.2.0
