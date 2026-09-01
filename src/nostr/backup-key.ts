@@ -5,6 +5,8 @@ import { SignerTimeoutError } from '../signer/timeout';
 // It is NIP-44 encrypted to the user's own pubkey, so unwrapping it is the single signer
 // round trip a device pays before it can read or write anything else.
 export const BACKUP_KEY_ADDRESS = 'workstr:v2:key';
+export const KEY_FINGERPRINT_TAG = 'key-fingerprint';
+const KEY_FINGERPRINT_DOMAIN = 'workstr-backup-key-v1';
 
 export const KEY_BYTES = 32;
 
@@ -23,7 +25,7 @@ export class BackupKeyUnavailableError extends Error {
 // that went wrong throws, so "absent" can never be confused with "unknown".
 export interface BackupKeyTransport {
   fetchKeyEvent(): Promise<SignedNostrEvent | null>;
-  publishKeyEvent(content: string): Promise<{ accepted: boolean; reason: string }>;
+  publishKeyEvent(content: string, fingerprint?: string): Promise<{ accepted: boolean; reason: string }>;
 }
 
 export interface BackupKeyCache {
@@ -49,6 +51,21 @@ function fromBase64(text: string): Uint8Array<ArrayBuffer> | null {
   }
 }
 
+export async function backupKeyFingerprint(rawBase64: string): Promise<string | null> {
+  const bytes = fromBase64(rawBase64);
+  if (!bytes) return null;
+  const domain = new TextEncoder().encode(`${KEY_FINGERPRINT_DOMAIN}|`);
+  const input = new Uint8Array(domain.length + bytes.length);
+  input.set(domain);
+  input.set(bytes, domain.length);
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', input));
+  return toBase64(digest).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export function keyEventFingerprint(event: SignedNostrEvent | null): string | undefined {
+  return event?.tags?.find((tag) => tag[0] === KEY_FINGERPRINT_TAG)?.[1] || undefined;
+}
+
 export async function importBackupKey(rawBase64: string): Promise<CryptoKey | null> {
   const bytes = fromBase64(rawBase64);
   if (!bytes) return null;
@@ -59,7 +76,7 @@ function generateKeyBase64(): string {
   return toBase64(crypto.getRandomValues(new Uint8Array(KEY_BYTES)));
 }
 
-async function unwrap(signer: Signer, event: SignedNostrEvent): Promise<string> {
+export async function unwrapBackupKey(signer: Signer, event: SignedNostrEvent): Promise<string> {
   let plaintext: string;
   try {
     plaintext = await signer.nip44Decrypt(event.pubkey, event.content);
@@ -104,14 +121,17 @@ export async function resolveBackupKey(
 
   const existing = await fetchExisting(transport);
   if (existing) {
-    const raw = await unwrap(signer, existing);
+    const raw = await unwrapBackupKey(signer, existing);
     await cache.write(raw);
+    // Fingerprint-free key events remain valid. Upgrade their metadata in place only
+    // after successfully unwrapping them, without rotating the key or touching records.
+    if (!keyEventFingerprint(existing)) await republishBackupKey(signer, transport, raw);
     return (await importBackupKey(raw)) as CryptoKey;
   }
 
   const minted = generateKeyBase64();
   const wrapped = await wrapForSelf(signer, minted);
-  const outcome = await transport.publishKeyEvent(wrapped);
+  const outcome = await transport.publishKeyEvent(wrapped, (await backupKeyFingerprint(minted)) || undefined);
   if (!outcome.accepted) {
     throw new BackupKeyUnavailableError(`Your backup key could not be saved to the relay: ${outcome.reason}`);
   }
@@ -122,7 +142,7 @@ export async function resolveBackupKey(
     // against a key it did not keep would lose them.
     throw new BackupKeyUnavailableError('Your backup key did not stay on the relay. Backup is paused until it can be saved.');
   }
-  const winner = await unwrap(signer, confirmed);
+  const winner = await unwrapBackupKey(signer, confirmed);
   await cache.write(winner);
   return (await importBackupKey(winner)) as CryptoKey;
 }
@@ -154,7 +174,9 @@ async function wrapForSelf(signer: Signer, rawBase64: string): Promise<string> {
 // it. Republishing is one signer round trip on a device that has already paid one.
 export async function republishBackupKey(signer: Signer, transport: BackupKeyTransport, rawBase64: string): Promise<boolean> {
   try {
-    const outcome = await transport.publishKeyEvent(await wrapForSelf(signer, rawBase64));
+    const fingerprint = await backupKeyFingerprint(rawBase64);
+    if (!fingerprint) return false;
+    const outcome = await transport.publishKeyEvent(await wrapForSelf(signer, rawBase64), fingerprint);
     return outcome.accepted;
   } catch {
     // Best effort by design: the device already holds a working key, so a failure here

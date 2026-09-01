@@ -1,7 +1,7 @@
 import { SimplePool } from 'nostr-tools';
 import type { SignedNostrEvent, Signer } from '../signer/types';
 import { PRIVATE_RECORD_KIND, encodePrivateRecord, type PrivateRecord, type RecordCipher } from '../nostr/codecs30078';
-import { BACKUP_KEY_ADDRESS } from '../nostr/backup-key';
+import { BACKUP_KEY_ADDRESS, KEY_FINGERPRINT_TAG } from '../nostr/backup-key';
 
 export const PUBLISH_TIMEOUT_MS = 10000;
 export const FETCH_TIMEOUT_MS = 15000;
@@ -103,12 +103,12 @@ export async function fetchKeyEvent(relayUrl: string, pubkey: string, pool = new
   }
 }
 
-export async function publishKeyEvent(signer: Signer, relayUrl: string, content: string, pool = new SimplePool(), ownPool = true): Promise<{ accepted: boolean; reason: string }> {
+export async function publishKeyEvent(signer: Signer, relayUrl: string, content: string, fingerprint?: string, pool = new SimplePool(), ownPool = true): Promise<{ accepted: boolean; reason: string }> {
   try {
     const signed = await signer.signEvent({
       kind: PRIVATE_RECORD_KIND,
       created_at: Math.floor(Date.now() / 1000),
-      tags: [['d', BACKUP_KEY_ADDRESS], ['client', 'workstr']],
+      tags: [['d', BACKUP_KEY_ADDRESS], ['client', 'workstr'], ...(fingerprint ? [[KEY_FINGERPRINT_TAG, fingerprint]] : [])],
       content
     });
     const [publish] = pool.publish([relayUrl], signed as Parameters<typeof pool.publish>[1]);

@@ -4,6 +4,7 @@ import {
   sessionAddress, sheetAddress, isRecordAddress, RECORD_PREFIX
 } from '../src/sync/addresses';
 import { CLIENT_TAG, PRIVATE_RECORD_KIND, decodePrivateRecord, encodePrivateRecord } from '../src/nostr/codecs30078';
+import { KEY_FINGERPRINT_TAG } from '../src/nostr/backup-key';
 import type { SignedNostrEvent, UnsignedNostrEvent } from '../src/signer/types';
 import { otherCipher, testCipher, TEST_PUBKEY } from './cipher';
 
@@ -76,6 +77,16 @@ describe('private record codecs', () => {
     const decoded = await decodePrivateRecord(signer, signed(event));
     expect(decoded?.deleted).toBe(true);
     expect(decoded?.payload).toBeUndefined();
+  });
+
+  it('labels new records with their non-secret key lineage and rejects a declared mismatch', async () => {
+    const cipher = { ...(await testCipher()), keyFingerprint: 'fingerprint-a' };
+    const event = await encodePrivateRecord(cipher, { address: SETTINGS_ADDRESS, updatedAt: 'now', payload: {} });
+    expect(event.tags).toContainEqual([KEY_FINGERPRINT_TAG, 'fingerprint-a']);
+    expect(await decodePrivateRecord(cipher, signed({
+      ...event,
+      tags: event.tags.map((tag) => tag[0] === KEY_FINGERPRINT_TAG ? [KEY_FINGERPRINT_TAG, 'fingerprint-b'] : tag)
+    }))).toBeNull();
   });
 
   it('refuses to encode an address the relay would reject', async () => {

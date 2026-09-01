@@ -22,6 +22,12 @@ Each account has one random 256-bit backup key. The client asks the user's signe
 NIP-44-wrap or unwrap that key to the account pubkey. The wrapped key is stored at
 `workstr:v2:key`; the usable key is cached only in the account's local IndexedDB.
 
+New wrapped-key events and encrypted records also carry a non-secret, domain-separated
+SHA-256 fingerprint of that key. Fingerprint-free records from older releases remain
+valid. A declared mismatch pauses uploads before any record is written; it never rotates
+or overwrites a key. A previously synced device may republish its cached key only when
+older readable or seen records establish that key as the known-good lineage.
+
 Private payloads are canonical JSON, compressed with gzip when that makes them smaller,
 and encrypted locally with AES-256-GCM. The binary envelope authenticates its version,
 compression mode, author pubkey, and record address, so ciphertext cannot be moved to a

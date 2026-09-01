@@ -7,6 +7,7 @@ import { resolveRecord } from './backfill';
 import { parseAddress, sessionAddress } from './addresses';
 import { sessionUpdatedAt, type SyncedSettings } from './records';
 import { isLogEntry, type ChunkPayload } from './chunks';
+import { KEY_FINGERPRINT_TAG } from '../nostr/backup-key';
 
 export interface MergeSummary {
   applied: number;
@@ -16,6 +17,7 @@ export interface MergeSummary {
   // means a key changed or the data is damaged, which the user needs to know.
   unreadable: number;
   earliestReadableCreatedAt?: number;
+  conflictingKeyFingerprints?: string[];
 }
 
 export interface PullOptions {
@@ -284,8 +286,16 @@ export async function pullAndMerge(store: WorkstrStore, signer: Signer, cipher: 
   const events = (await unreadEvents(store, relayUrl, signer)).sort((a, b) => a.created_at - b.created_at || dTag(a).localeCompare(dTag(b)));
   const summary: MergeSummary = { applied: 0, skipped: 0, deleted: 0, unreadable: 0 };
   let consecutiveFailures = 0;
+  const conflicts = new Set<string>();
 
   for (const [index, event] of events.entries()) {
+    const fingerprint = (event.tags || []).find((tag) => tag[0] === KEY_FINGERPRINT_TAG)?.[1];
+    if (cipher.keyFingerprint && fingerprint && fingerprint !== cipher.keyFingerprint) {
+      conflicts.add(fingerprint);
+      summary.unreadable += 1;
+      options.onProgress?.(index + 1, events.length);
+      continue;
+    }
     const decoded = await decodePrivateRecord(cipher, event);
     if (!decoded) {
       summary.unreadable += 1;
@@ -306,5 +316,6 @@ export async function pullAndMerge(store: WorkstrStore, signer: Signer, cipher: 
     summary.unreadable += merged.unreadable;
     options.onProgress?.(index + 1, events.length);
   }
+  if (conflicts.size > 0) summary.conflictingKeyFingerprints = [...conflicts];
   return summary;
 }
