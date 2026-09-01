@@ -101,7 +101,8 @@ or set updates would make full-root rendering inappropriate.
 - `src/features/sheets/program-zap-view.ts` renders program-card zap actions and
   latest local zap status; wallet execution stays in `src/app/nwc-controller.ts`.
 - `src/features/sheets/beast-mode.ts` owns the objective local Beast Mode eligibility
-  helper plus reusable Settings and locked-Publish checklist markup.
+  helper, compact Settings category summary, and reusable Settings and locked-Publish
+  checklist markup.
 - `src/app/catalog-controller.ts` owns catalog refresh/cache/profile loading and local
   library import, update, deletion, favorite, and detail actions.
 - `src/app/identity-controller.ts` owns signer connection, adoption choices, sign-out,
@@ -111,8 +112,9 @@ or set updates would make full-root rendering inappropriate.
 - `src/app/nwc-controller.ts` owns zap-wallet connection modals, active NWC restore,
   disconnect, and in-app support zap UI execution.
 - `src/app/session-persistence.ts` adapts stored session rows into live/history state.
-- `src/app/layout.ts` composes top-level pages from feature view functions. It does not
-  persist data.
+- `src/app/layout.ts` composes top-level pages from feature view functions. It owns the
+  Settings category order and disclosure shell; backup, wallet, support, and Beast Mode
+  views render their category bodies and summaries. It does not persist data.
 - `src/app/state.ts` defines render/session state and cross-feature session helpers.
 - `src/app/session-runner.ts` creates a live session, selects standard versus EMOM
   controller, controls the overlay lifecycle, and delegates finish/publish behavior.
