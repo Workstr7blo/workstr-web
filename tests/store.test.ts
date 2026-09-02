@@ -65,6 +65,15 @@ describe('WorkstrStore', () => {
     expect((await store.getSettings()).unit).toBe('lbs');
   });
 
+  it('defaults paymentMode to lightning and persists monero', async () => {
+    const store = await WorkstrStore.open('payment-mode-test-pubkey');
+    const defaults = await store.getSettings();
+    expect(defaults.paymentMode).toBe('lightning');
+
+    await store.saveSettings({ ...defaults, paymentMode: 'monero' });
+    expect((await store.getSettings()).paymentMode).toBe('monero');
+  });
+
   it('queues synced settings changes but not device-local cache writes', async () => {
     const store = await WorkstrStore.open('settings-queue-test-pubkey');
     const defaults = await store.getSettings();
@@ -77,6 +86,16 @@ describe('WorkstrStore', () => {
     // The change listener enqueues asynchronously, so this waits for the write rather than
     // for one macrotask: a single tick is usually enough and occasionally is not, which
     // showed up as a test that failed only when the whole suite ran at once.
+    await vi.waitFor(async () => expect(await store.listSyncQueue()).toHaveLength(1));
+    expect(await store.listSyncQueue()).toEqual([{ address: 'workstr:v2:settings', updated_at: expect.any(String) }]);
+  });
+
+  it('queues a synced settings change when only paymentMode changes', async () => {
+    const store = await WorkstrStore.open('payment-mode-queue-test-pubkey');
+    const defaults = await store.getSettings();
+    store.setChangeListener((address, updatedAt) => { void store.enqueueSync(address, updatedAt); });
+
+    await store.saveSettings({ ...defaults, paymentMode: 'monero' });
     await vi.waitFor(async () => expect(await store.listSyncQueue()).toHaveLength(1));
     expect(await store.listSyncQueue()).toEqual([{ address: 'workstr:v2:settings', updated_at: expect.any(String) }]);
   });

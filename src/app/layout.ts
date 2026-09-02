@@ -4,6 +4,7 @@ import { APP_VERSION } from './version';
 import { countdownAudioState } from '../features/train/countdown-audio';
 import { supportPanel } from '../features/support/views';
 import { isFreeEquipment, ownedEquipmentKeys } from '../core/equipment';
+import { normalizePaymentMode } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { hasNip07 } from '../signer/nip07';
 import { libraryPanel } from '../features/library/views';
@@ -213,6 +214,22 @@ function equipmentRows(state: AppState): string {
   </div>`;
 }
 
+// Foundation-only for now: the checkbox flips `settings.paymentMode` and the
+// `data-payment-mode` theme attribute. It does not yet touch NWC, zap, or Discover surfaces —
+// later Monero Mode phases read this flag to replace those.
+function paymentModeCard(state: AppState): string {
+  const monero = normalizePaymentMode(state.settings.paymentMode) === 'monero';
+  return `<details class="settings-category payment-mode-card">
+    <summary><span class="settings-category-copy"><strong>Monero Mode</strong><small>${monero ? 'Monero payment targets' : 'Lightning zaps (default)'}</small></span><span class="status-pill ${monero ? 'ok' : ''}">${monero ? 'MONERO' : 'LIGHTNING'}</span></summary>
+    <div class="settings-category-body">
+      <div class="settings-row-main payment-mode-row">
+        <div><strong>Monero Mode</strong><small>Use public Monero payment targets for creator support instead of Lightning zaps. Workouts, programs, and sync stay the same.</small></div>
+        <label class="payment-mode-switch"><input type="checkbox" id="payment-mode-toggle" ${monero ? 'checked' : ''} /><span>${monero ? 'On' : 'Off'}</span></label>
+      </div>
+    </div>
+  </details>`;
+}
+
 function nwcWalletRows(state: AppState): string {
   const detail = state.nwc.message || (state.nwc.active
     ? `${state.nwc.walletLabel || 'Wallet connected'}${state.nwc.relayLabel ? ` · ${state.nwc.relayLabel}` : ''}`
@@ -252,6 +269,7 @@ function settingsView(state: AppState): string {
       <summary><span class="settings-category-copy"><strong>Zap wallet</strong><small>${nwc.active ? html(nwc.walletLabel || 'Wallet connected') : 'Not connected'}</small></span><span class="status-pill ${nwc.active ? 'ok' : ''}">${nwc.active ? 'ACTIVE' : 'OFF'}</span></summary>
       <div class="settings-category-body">${nwcWalletRows({ ...state, nwc })}</div>
     </details>
+    ${paymentModeCard(state)}
     <details class="settings-category training-preferences-card">
       <summary><span class="settings-category-copy"><strong>Training Preferences</strong><small>${unit === 'kg' ? 'Kilograms' : 'Pounds'} · ${ownedEquipmentKeys(state.settings.ownedEquipment).length} equipment</small></span></summary>
       <div class="settings-category-body">

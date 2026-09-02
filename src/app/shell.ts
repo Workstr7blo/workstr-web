@@ -36,7 +36,7 @@ import type { ShellHandle, ShellOptions } from './shell-types';
 export { launchSignerUri };
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
-const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
+const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'lightning', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
 
 function profileName(profile: RelayProfile | null): string | null {
   return profile?.name?.trim() || profile?.nip05?.trim() || null;
@@ -130,6 +130,10 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
 
   // `toTop`: moving to another view is a new page to the reader, not a redraw.
   function render(options: { toTop?: boolean } = {}): void {
+    // The theme foundation for later Monero Mode phases keys off this attribute rather
+    // than a class the shell markup itself carries, so it survives root.innerHTML resets.
+    if (state.settings.paymentMode === 'monero') document.body.setAttribute('data-payment-mode', 'monero');
+    else document.body.removeAttribute('data-payment-mode');
     preservingScroll(root, () => {
       root.innerHTML = shellMarkup(state);
       bind();
@@ -169,6 +173,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void identity.signOut(); });
     root.querySelector('#remove-account-data')?.addEventListener('click', () => { void identity.signOutAndRemoveData(); });
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void preferences.saveUnitPreference((event.target as HTMLSelectElement).value); });
+    root.querySelector('#payment-mode-toggle')?.addEventListener('change', (event) => { void preferences.savePaymentMode((event.target as HTMLInputElement).checked); });
     root.querySelectorAll('.equip-toggle').forEach((box) => box.addEventListener('change', () => { void preferences.saveOwnedEquipment(); }));
     root.querySelector('#auto-backup')?.addEventListener('change', (event) => { void backup.setEnabled((event.target as HTMLInputElement).checked); }); root.querySelector('#enable-sync')?.addEventListener('click', () => { void backup.setEnabled(true); });
     root.querySelector('#sync-now')?.addEventListener('click', () => { void backup.syncNow(); });

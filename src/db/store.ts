@@ -2,6 +2,7 @@ import type { IDBPDatabase } from 'idb';
 import { newSessionUid, openWorkstrDB, type WorkstrDB } from './schema';
 import { exportDatabase, importDatabase, type WorkstrExport } from './export';
 import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, TrainingBlock, WorkstrSettings, WorkoutProgramZapAttempt } from '../core/types';
+import { normalizePaymentMode } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
 import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
@@ -337,13 +338,14 @@ export class WorkstrStore extends SyncAwareStore {
     return {
       publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'],
       ...stored,
-      unit: normalizeWeightUnit(stored?.unit)
+      unit: normalizeWeightUnit(stored?.unit),
+      paymentMode: normalizePaymentMode(stored?.paymentMode)
     };
   }
 
   async saveSettings(settings: WorkstrSettings): Promise<void> {
     const previous = await this.getSettings();
-    const next = { ...settings, unit: normalizeWeightUnit(settings.unit) };
+    const next = { ...settings, unit: normalizeWeightUnit(settings.unit), paymentMode: normalizePaymentMode(settings.paymentMode) };
     await this.db.put('settings', next, 'settings');
     // `settings` carries both synced preferences and device-local state. Catalog cache,
     // signer choice, relay URL and backup progress must persist locally without creating a

@@ -12,7 +12,7 @@ export interface RecordSnapshot<T = unknown> {
 // how this browser reaches the network, `canonCache` is a re-fetchable catalog copy, and
 // `backup` is this device's sync state — replicating any of them would fight the device
 // it landed on rather than restore anything.
-export const SYNCED_SETTINGS_KEYS = ['unit', 'publicRelays', 'heightCm', 'targetWeightKg', 'ownedEquipment', 'seedVersion'] as const;
+export const SYNCED_SETTINGS_KEYS = ['unit', 'paymentMode', 'publicRelays', 'heightCm', 'targetWeightKg', 'ownedEquipment', 'seedVersion'] as const;
 
 export type SyncedSettings = Pick<WorkstrSettings, typeof SYNCED_SETTINGS_KEYS[number]>;
 

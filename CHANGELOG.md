@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Monero Mode setting: a Settings toggle and theme foundation for a future all-Monero payment
+  surface. Off by default — Lightning zaps and NWC are unchanged either way; this phase adds
+  only the persisted preference and its dark/orange theme tokens.
+
 ### Changed
 
 - Settings now uses a compact, fixed-width mobile control-center layout: aligned status pills,
