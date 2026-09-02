@@ -405,6 +405,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .settings-account-identity > span:last-child { min-width: 0; }
 .settings-account-avatar { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; overflow: hidden; border: 1px solid var(--border-hot); border-radius: 11px; object-fit: cover; background: rgba(124,60,255,.18); color: var(--purple-2); font-weight: 900; }
 .settings-account-avatar.fallback { font-size: 14px; }
+.settings-account-avatar[hidden] { display: none !important; }
 .beast-mode-card .section-help, .beast-mode-lock-modal .section-help { margin: 0 0 2px; font-size: 12px; line-height: 1.35; }
 .beast-mode-checklist ul { display: grid; gap: 0; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 13px; list-style: none; }
 .beast-mode-check { display: flex; gap: 9px; align-items: center; padding: 9px 10px; background: rgba(255,255,255,.02); }
