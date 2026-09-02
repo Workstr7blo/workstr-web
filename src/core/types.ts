@@ -214,6 +214,16 @@ export interface BackupSettings {
   lastError?: string;
 }
 
+// Which payment surface Settings, Discover, and program cards show for creator support.
+// 'lightning' is the compatibility default: NIP-57 zaps and NWC stay exactly as they are
+// today. 'monero' is consumed by later NIP-A3 phases; this flag alone changes no payment
+// behavior.
+export type PaymentMode = 'lightning' | 'monero';
+
+export function normalizePaymentMode(value: unknown): PaymentMode {
+  return value === 'monero' ? 'monero' : 'lightning';
+}
+
 export type WorkoutProgramZapStatus = 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown';
 
 // Device-local payment attempt history for workout program zaps. It gives the UI/calling
@@ -250,6 +260,7 @@ export interface NwcSettings {
 
 export interface WorkstrSettings {
   unit: WeightUnit;
+  paymentMode?: PaymentMode;
   publicRelays: string[];
   workstrRelay?: string;
   signerType?: 'nip07' | 'nip46' | 'idenstr' | 'local';

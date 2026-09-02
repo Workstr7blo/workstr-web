@@ -160,6 +160,15 @@ async function saveUnitPreference(value: string): Promise<void> {
   render();
 }
 
+// Only flips the stored mode and the theme/attribute layer it drives; NWC, zap, and
+// Discover behavior are untouched until the later Monero Mode phases read this flag.
+async function savePaymentMode(enabled: boolean): Promise<void> {
+  if (!state.store) return;
+  state.settings = { ...state.settings, paymentMode: enabled ? 'monero' : 'lightning' };
+  await state.store.saveSettings(state.settings);
+  render();
+}
+
 async function saveOwnedEquipment(): Promise<void> {
   if (!state.store) return;
   // Merge rather than replace: the checkbox list only covers equipment the
@@ -206,6 +215,6 @@ async function importUserData(input: HTMLInputElement): Promise<void> {
 
   return {
     bindBodyControls, refreshFunding, bindRecoveryControls, deleteSession,
-    saveUnitPreference, saveOwnedEquipment, exportUserData, importUserData
+    saveUnitPreference, savePaymentMode, saveOwnedEquipment, exportUserData, importUserData
   };
 }

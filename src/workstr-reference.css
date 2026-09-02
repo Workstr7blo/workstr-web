@@ -16,6 +16,15 @@
   --shadow: 0 0 60px rgba(124, 60, 255, 0.2), inset 0 1px 0 rgba(255,255,255,0.04);
   --sidebar-w: 88px;
   --topbar-h: 62px;
+  /* Monero Mode theme foundation (issue #129). Default values equal the current Lightning
+     look; only `body[data-payment-mode="monero"]` in style.css overrides them, so Monero
+     Mode OFF is unaffected. No component reads --payment-cta yet — later phases (#131/#132)
+     repaint the Discover/zap surfaces onto it. */
+  --graphite-surface: #101014;
+  --graphite-void: #08080a;
+  --payment-cta: var(--bitcoin-gold);
+  --payment-cta-strong: #ffbd4a;
+  --payment-glow: rgba(247, 147, 26, 0.3);
 }
 
 * { box-sizing: border-box; }

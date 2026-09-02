@@ -1,5 +1,24 @@
 @import './workstr-reference.css';
 
+/* Monero Mode theme foundation (issue #129): dark graphite base, Monero orange accents,
+   soft glow. Scoped to the attribute the shell sets from `settings.paymentMode`, so default
+   Lightning mode never repaints. Nothing in the app reads --payment-cta yet; later phases
+   apply it to the Discover/zap surfaces this issue intentionally leaves untouched. */
+body[data-payment-mode="monero"] {
+  --payment-cta: var(--monero-orange);
+  --payment-cta-strong: #ff8a3d;
+  --payment-glow: rgba(255, 102, 0, 0.28);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255,102,0,0.16), transparent 28rem),
+    radial-gradient(circle at 80% 10%, rgba(255,140,64,0.10), transparent 24rem),
+    radial-gradient(circle at 50% 100%, rgba(255,102,0,0.08), transparent 22rem),
+    var(--graphite-void);
+}
+
+.payment-mode-row { gap: 14px; }
+.payment-mode-switch { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; color: var(--muted); font: 800 11px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
+.payment-mode-switch input { width: 16px; height: 16px; accent-color: var(--payment-cta); cursor: pointer; }
+
 .topbar-actions .button.small { padding: 8px 11px; font-size: 12px; }
 
 /* Compact identity chip: profile avatar + name + ambient status dot, opens Settings. */
