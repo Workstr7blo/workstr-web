@@ -208,8 +208,7 @@ function equipmentRows(state: AppState): string {
   }
   const boxes = options.map((item) => `<label class="equip-option"><input type="checkbox" class="equip-toggle" value="${html(item.key)}" ${owned.has(item.key) ? 'checked' : ''} />${html(item.label)}</label>`).join('');
   return `<div class="settings-inline-section equipment-details">
-    <div class="settings-inline-heading"><strong>Equipment</strong><span class="status-pill">${owned.size} selected</span></div>
-    <p class="section-help">Choose available equipment so Quick Workout avoids exercises you cannot do. Bodyweight exercises are always available.</p>
+    <div class="settings-inline-heading"><span><strong>Equipment</strong><small>Used for Quick Workout suggestions.</small></span><span class="status-pill">${owned.size} selected</span></div>
     <div class="equip-options">${boxes}</div>
   </div>`;
 }
@@ -232,8 +231,12 @@ function settingsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   const keyLine = state.signerType === 'local' ? 'Device-managed key for faster sync.' : 'Keys stay in your signer.';
   const accountSummary = state.pubkey ? `Signed in · ${displayIdentity(state)}` : 'Local only';
+  const initial = displayIdentity(state).trim().slice(0, 1).toUpperCase() || 'W';
+  const accountAvatar = state.profilePicture
+    ? `<img class="settings-account-avatar" src="${html(state.profilePicture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="settings-account-avatar fallback" hidden>${html(initial)}</span>`
+    : `<span class="settings-account-avatar fallback">${html(initial)}</span>`;
   const account = state.pubkey
-    ? `<div class="settings-row-main account-row"><div><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></div><div class="settings-row-actions"><button id="sign-out-settings" class="button ghost">Sign out</button><button id="remove-account-data" class="button ghost">Remove data</button></div></div>`
+    ? `<div class="settings-row-main account-row"><div class="settings-account-identity">${accountAvatar}<span><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></span></div><div class="settings-row-actions"><button id="sign-out-settings" class="button ghost small">Sign out</button><button id="remove-account-data" class="button danger small">Remove data</button></div></div>`
     : `<div class="settings-row-main account-row"><div><strong>Local only</strong><small>Use Workstr now, add encrypted sync when ready.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Account</button></div></div>`;
   const relay = state.settings.workstrRelay || 'default Workstr relay';
   const signerType = state.signerType || (state.pubkey ? 'unknown' : 'none');

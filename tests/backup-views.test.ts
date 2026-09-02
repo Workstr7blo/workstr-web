@@ -95,7 +95,7 @@ describe('the panel', () => {
 
   it('tells a signed-out user that sign-in comes first', () => {
     const html = backupPanel(panelState({ signedIn: false, enabled: false }));
-    expect(html).toContain('Sign in to sync');
+    expect(html).toContain('Sign in to protect new training');
     expect(html).not.toContain('id="auto-backup"');
   });
 

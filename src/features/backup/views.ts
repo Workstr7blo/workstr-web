@@ -101,17 +101,17 @@ export function backupPanel(state: BackupPanelState): string {
     ? `<div class="settings-subtle-row"><span>Local-only older workouts</span><strong>${localOnly}</strong></div>`
     : '';
   const syncCopy = !state.signedIn
-    ? 'Sign in to sync across devices.'
+    ? 'Sign in to protect new training across devices.'
     : state.enabled
-      ? 'Encrypted across your devices.'
-      : 'Keep training current across devices.';
+      ? 'Encrypted backup for new training.'
+      : 'Protect new training across devices.';
   const syncAction = !state.signedIn
     ? '<span class="settings-muted-action">Use Account above</span>'
     : state.enabled
       ? `<label class="settings-switch"><input type="checkbox" id="auto-backup" checked />Auto-sync</label><button id="sync-now" class="button ghost" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button>`
       : '<button id="enable-sync" class="button primary">Turn on sync</button>';
   const live = state.enabled
-    ? `<div class="backup-live" id="backup-status"><p class="section-help">${html(statusLine(state))}</p>${progressMarkup(state.sync.progress)}</div>${eraLine}`
+    ? `<div class="backup-live" id="backup-status"><span class="settings-live-label">${html(statusLine(state))}</span>${progressMarkup(state.sync.progress)}</div>${eraLine}`
     : '';
   const olderNote = state.signedIn && state.enabled && localOnly > 0
     ? `<p class="section-help">Those older workouts stay on this device and are included when you export JSON.</p>`
@@ -119,16 +119,19 @@ export function backupPanel(state: BackupPanelState): string {
   return `<details class="settings-category data-sync-card">
     <summary><span class="settings-category-copy"><strong>Data &amp; Sync</strong><small>${html(summary)}</small></span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></summary>
     <div class="settings-category-body">
-      <div class="settings-row-main">
-        <div><strong>Encrypted sync</strong><small>${html(syncCopy)}</small></div>
-        <div class="settings-row-actions">${syncAction}</div>
-      </div>
-      ${live}
-      ${olderNote}
-      <div class="settings-row-main manual-backup-row">
-        <div><strong>Manual backup</strong><small>Export or import a full JSON archive.</small></div>
-        <div class="settings-row-actions"><button id="export-data" class="button ghost">Export JSON</button><button id="import-data" class="button ghost">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
-      </div>
+      <section class="settings-control-group sync-control-group" aria-label="Sync">
+        <div class="settings-control-heading"><span><strong>Sync</strong><small>${html(syncCopy)}</small></span></div>
+        <div class="settings-row-main sync-control-row"><div><strong>Auto-sync</strong><small>${state.enabled ? 'Keep this device current automatically.' : 'Turn on encrypted backup.'}</small></div><div class="settings-row-actions">${syncAction}</div></div>
+        ${live}
+        ${olderNote}
+      </section>
+      <section class="settings-control-group manual-backup-group" aria-label="Manual backup">
+        <div class="settings-control-heading"><span><strong>Manual backup</strong><small>A portable archive for this device.</small></span></div>
+        <div class="settings-row-main manual-backup-row">
+          <div><strong>Export or import</strong><small>JSON includes all local training data.</small></div>
+          <div class="settings-row-actions"><button id="export-data" class="button ghost">Export JSON</button><button id="import-data" class="button ghost">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
+        </div>
+      </section>
     </div>
   </details>`;
 }

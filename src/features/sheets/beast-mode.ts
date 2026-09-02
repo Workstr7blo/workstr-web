@@ -84,7 +84,7 @@ export function beastModeSettingsCard(state: BeastModeState): string {
   return `<details class="settings-category beast-mode-card">
     <summary><span class="settings-category-copy"><strong>Beast Mode</strong><small>${summary.progress}</small></span><span class="status-pill ${summary.unlocked ? 'ok' : ''}">${summary.label}</span></summary>
     <div class="settings-category-body">
-      <p class="section-help">Publish creator programs after Workstr can verify objective local training history and an existing Nostr profile picture. No manual queue or admin approval.</p>
+      <p class="section-help">Meet these local goals to publish creator programs. No manual approval.</p>
       ${beastModeChecklistMarkup(state)}
     </div>
   </details>`;

@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Settings now uses a compact, fixed-width mobile control-center layout: aligned status pills,
+  an account avatar row, denser Beast Mode objectives, clarified Sync versus Manual backup
+  groups, and consistent Training Preference controls.
+
 ### Fixed
 
+- Settings no longer creates horizontal document overflow on narrow mobile viewports.
 - Signed-in identity names and avatars now render from a per-browser kind-0 cache and
   refresh in the background across configured and default relays with a retry, avoiding
   desktop-only fallback when the startup relay request is slow or temporarily unavailable.
