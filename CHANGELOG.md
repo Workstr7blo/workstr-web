@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   withdrawn rather than recoloured, and no Monero total, ranking or receipt is invented in
   their place: Workstr cannot see a Monero payment. The tip sheet shows the creator, the
   address, a QR code, Copy address and Open wallet, and never touches the NWC zap path.
+- Documented the creator-support rails in `docs/instruction.md`: Lightning/NIP-57 stays the
+  default and `kind:0` `lud16`/`lud06` stays canonical for zaps, `kind:10133` is canonical
+  for Monero, the public Monero address is Nostr metadata that never enters encrypted sync,
+  auto-sync is unchanged in Monero Mode, and the app theme stays Workstr purple in both
+  modes with orange reserved for payment surfaces.
 
 ### Changed
 

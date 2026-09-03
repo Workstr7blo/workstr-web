@@ -203,6 +203,7 @@ rules out open exercise publishing does not apply the same way.
 | **NIP-19** | bech32 encoding (`npub`, `naddr`, `nevent`) for display and share links. |
 | **LNURL-pay / lud16** | The operator's Lightning address in `kind:0`, used as the LNURL-pay target behind zaps. It is payment plumbing, not a separate primary donation rail: v1 support copy steers users to Nostr zaps because zaps produce public receipts. |
 | **NIP-57** | Zaps and zap receipts (`kind:9735`). The canonical donation path for Workstr, because every counted donation must leave a verifiable public receipt. Donation prompts, supporter recognition, and the funding transparency panel are computed from these receipts client-side. Phase 1, core, not optional. |
+| **NIP-A3 (kind 10133)** | Public payment targets. A replaceable event whose `payto` tags say where an author can be paid. Read for a program author to offer a Monero tip, written for the signed-in user from Settings. Monero only in Workstr: a Lightning target here is deliberately ignored, because NIP-57 says a zap recipient comes from `kind:0`, and quietly preferring a NIP-A3 Lightning target would redirect payments away from where every other client sends them. Optional, and only visible on the Monero rail. |
 | **NIP-47 (NWC)** | V2 support follow-up. Nostr Wallet Connect enables custom in-app zap amounts without leaving Workstr: build/sign the NIP-57 zap request, fetch the LNURL invoice, pay through the user's wallet, then verify the `kind:9735` receipt before claiming success. |
 
 **Important distinction**: NIP-46 = remote *signing* (identity). NIP-47/NWC = remote
@@ -402,6 +403,69 @@ Consequences to design around:
   that maps old addresses to new ones, not a config change.
 - Compromise means an attacker can publish catalog entries users will trust. Detection is
   manual. This is the price of the curation model and it is worth stating plainly.
+
+### 6.4 Creator support: two rails, one app theme
+
+Workstr supports creators on exactly one rail at a time, chosen in Settings. **Lightning
+is the default and the unchanged product**; Monero Mode is an opt-in that swaps the
+payment layer and nothing else.
+
+| | Lightning (default) | Monero Mode |
+|---|---|---|
+| Recipient of record | `kind:0` `lud16`/`lud06`, per NIP-57 | `kind:10133` `payto` tag, per NIP-A3 |
+| Mechanism | Zap request (`kind:9734`) → LNURL invoice → NWC payment → receipt (`kind:9735`) | An address, a QR and a `monero:` link. The user pays from their own wallet. |
+| Proof | Public zap receipts. Totals and the top-zapped ranking are computed from them. | **None, and none is invented.** |
+| Settings | NWC wallet card | Public Monero address card (`kind:10133`) |
+| Discover | Zap CTA, sats totals, top-zapped ranking | Tip action, and only for an author who publishes a Monero address |
+
+Rules that follow from this, and that later work must not erode:
+
+- **`kind:10133` is canonical for Monero. `kind:0` `lud16`/`lud06` stays canonical for
+  Lightning.** Neither is read as a substitute for the other.
+- **Monero has no receipt layer here.** Workstr cannot see a Monero transfer, so it never
+  shows a Monero total, ranking, badge, count, or "creator earnings". Lightning social
+  proof is not reused as Monero social proof: on the Monero rail the sats totals and the
+  top-zapped badge are removed, not recoloured. The list itself is ordered by name in both
+  rails — zaps only ever decorated it — so nothing has to be invented to replace them.
+- **No CTA without an address.** An author who publishes no Monero target gets no payment
+  control at all — not a disabled button, not "no address". It is somebody else's payment
+  setup, not a Workstr error.
+- **The public Monero address is Nostr metadata, not a Workstr credential.** It lives in
+  the user's `kind:10133` on public relays, is never written to IndexedDB, never enters
+  encrypted sync, and is never stored beside NWC wallet credentials. The relays are its
+  only source of truth.
+- **Auto-sync is unchanged in Monero Mode.** The rail decides who gets paid and how; it
+  has nothing to do with backup, and no sync behaviour may be made to depend on it.
+- **Monero Mode hides NWC, it never deletes it.** A saved wallet survives the switch and
+  returns with the Lightning rail.
+
+**The theme has two layers, and only the second one is a payment mode's business:**
+
+```text
+                         WORKSTR
+                            │
+              ┌─────────────┴─────────────┐
+       WORKSTR APP THEME           CREATOR SUPPORT
+       black + purple                    │
+       Nostr identity          ┌─────────┴─────────┐
+              │            Lightning            Monero
+       navigation, cards,      gold              orange
+       exercises, programs,
+       workouts, statistics,
+       recovery, identity
+```
+
+Purple is Workstr and Nostr. Orange is Monero. `--accent-*`, `--surface-*`, `--void-*`,
+`--chrome-*`, `--text`/`--muted`/`--dim`, `--shadow` are owned by `:root` and are identical
+in every payment mode; `--payment-rgb`, `--payment-accent`, `--payment-accent-strong` and
+`--on-payment` are the only tokens a payment mode may override. `tests/theme-tokens.test.ts`
+fails the build otherwise.
+
+The mental model is not "if Monero, turn Workstr orange". It is: render Workstr normally,
+then render the payment UI for whichever rail is selected. This has eroded twice — once as
+tokens that changed nothing, once as an app repainted graphite and orange — which is why
+the rule is written here and enforced by a test. A view with no payment control on screen
+must look the same in both modes.
 
 ---
 

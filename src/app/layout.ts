@@ -161,8 +161,9 @@ function workoutsView(state: AppState): string {
   };
   const locals = state.sheets.map(sheetToProgram).filter(programMatches);
   const programs = state.programs.filter(programMatches);
-  // Lightning popularity is not Monero popularity, so the ranking is not carried over to
-  // the Monero rail — it is dropped, and Discover falls back to relay order.
+  // Lightning popularity is not Monero popularity, so the top-zapped badge is not carried
+  // over to the Monero rail. Nothing replaces it: the list is ordered by name either way,
+  // and zaps only ever decorated it.
   const topProgramRanks = new Map(moneroMode(state) ? [] : programs
     .map((program) => ({ address: program.address, sats: state.programZapTotals?.[program.address]?.sats || 0 }))
     .filter((entry) => entry.sats > 0)
