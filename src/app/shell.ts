@@ -130,10 +130,11 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
 
   // `toTop`: moving to another view is a new page to the reader, not a redraw.
   function render(options: { toTop?: boolean } = {}): void {
-    // The theme foundation for later Monero Mode phases keys off this attribute rather
-    // than a class the shell markup itself carries, so it survives root.innerHTML resets.
-    if (state.settings.paymentMode === 'monero') document.body.setAttribute('data-payment-mode', 'monero');
-    else document.body.removeAttribute('data-payment-mode');
+    // Monero Mode is a token swap, and the tokens are declared on `:root`, so the flag has
+    // to land there too — an override on `body` cannot win against a `:root` declaration.
+    // An attribute rather than a class so it survives `root.innerHTML` resets.
+    if (state.settings.paymentMode === 'monero') document.documentElement.setAttribute('data-payment-mode', 'monero');
+    else document.documentElement.removeAttribute('data-payment-mode');
     preservingScroll(root, () => {
       root.innerHTML = shellMarkup(state);
       bind();

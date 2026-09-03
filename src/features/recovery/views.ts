@@ -3,7 +3,9 @@ import { html } from '../../app/format';
 import { RECOVERY_BODY_SVG } from '../../app/bodymap';
 import { getRecovery, type RecoveryGroup } from './recovery';
 
-export const RECOVERY_COLORS: Record<RecoveryGroup['status'], string> = { ready: '#00d084', partial: '#f7931a', recovering: '#ff3864', untrained: '#3a3052' };
+// Status hues are semantic and stay fixed; `untrained` is a theme surface, so it follows
+// the token layer and turns graphite in Monero Mode.
+export const RECOVERY_COLORS: Record<RecoveryGroup['status'], string> = { ready: '#00d084', partial: '#f7931a', recovering: '#ff3864', untrained: 'var(--chrome-raised)' };
 
 function recoveryNote(group: RecoveryGroup): string {
   if (group.status === 'untrained') return 'not logged recently';

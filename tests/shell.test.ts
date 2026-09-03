@@ -16,6 +16,13 @@ vi.mock('../src/nostr/canon', async (importOriginal) => ({
   fetchCanonExercises: vi.fn(async () => []),
   fetchCanonPrograms: vi.fn(async () => [])
 }));
+// `renderShell` also fires a background kind-0 lookup whenever a session pubkey is present.
+// That one was missed, so the suite still opened real relay sockets and intermittently failed
+// the run with an undici/jsdom `Event` mismatch even though every test passed.
+vi.mock('../src/nostr/profile', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/nostr/profile')>(),
+  fetchProfile: vi.fn(async () => null)
+}));
 
 describe('shell', () => {
   it('renders the app chrome and all views without a signer', () => {
@@ -70,16 +77,16 @@ describe('shell', () => {
 
     const toggle = () => root.querySelector<HTMLInputElement>('#payment-mode-toggle');
     expect(toggle()?.checked).toBe(false);
-    expect(document.body.hasAttribute('data-payment-mode')).toBe(false);
+    expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false);
 
     toggle()!.checked = true;
     toggle()!.dispatchEvent(new Event('change', { bubbles: true }));
-    await vi.waitFor(() => expect(document.body.getAttribute('data-payment-mode')).toBe('monero'));
+    await vi.waitFor(() => expect(document.documentElement.getAttribute('data-payment-mode')).toBe('monero'));
     expect(root.querySelector('.settings-page')?.textContent).toContain('Monero payment targets');
 
     toggle()!.checked = false;
     toggle()!.dispatchEvent(new Event('change', { bubbles: true }));
-    await vi.waitFor(() => expect(document.body.hasAttribute('data-payment-mode')).toBe(false));
+    await vi.waitFor(() => expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false));
   });
 
   it('opens a single tabbed account modal from the signed-out chip', () => {

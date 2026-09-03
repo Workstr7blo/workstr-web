@@ -105,11 +105,11 @@ export function paintBodyMapSvg(primary: Set<string>, secondary: Set<string>): s
   if (!primary.size && !secondary.size) return '';
   return RECOVERY_BODY_SVG.replace(/<polygon([^>]*data-muscle="([^"]+)"[^>]*)>/g, (_match, attrs: string, muscle: string) => {
     const cleanAttrs = attrs.replace(/\s*\/$/, '');
-    if (primary.has(muscle)) return `<polygon${cleanAttrs} style="fill:var(--sovereign-purple);opacity:.95"/>`;
-    if (secondary.has(muscle)) return `<polygon${cleanAttrs} style="fill:var(--purple-2);opacity:.5"/>`;
-    return `<polygon${cleanAttrs} style="fill:#2a1d40"/>`;
+    if (primary.has(muscle)) return `<polygon${cleanAttrs} style="fill:var(--accent);opacity:.95"/>`;
+    if (secondary.has(muscle)) return `<polygon${cleanAttrs} style="fill:var(--accent-soft);opacity:.5"/>`;
+    return `<polygon${cleanAttrs} style="fill:var(--chrome-fill)"/>`;
   }).replace(/<polygon((?:(?!data-muscle)[^>])*)>/g, (_match, attrs: string) => {
     const cleanAttrs = attrs.replace(/\s*\/$/, '');
-    return `<polygon${cleanAttrs} style="fill:#1a1228"/>`;
+    return `<polygon${cleanAttrs} style="fill:var(--chrome-body)"/>`;
   });
 }

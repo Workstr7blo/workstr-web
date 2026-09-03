@@ -217,8 +217,14 @@ targets, or muscle metadata solely from the current exercise library.
 
 ## Styling and static assets
 
-- `src/style.css` contains Workstr Web-specific and live-runner overrides.
-- `src/workstr-reference.css` is imported design/reference CSS used by the app.
+- `src/style.css` contains Workstr Web-specific and live-runner overrides. Its last block is
+  the Monero Mode theme override.
+- `src/workstr-reference.css` is imported design/reference CSS used by the app. Its `:root`
+  block owns the theme tokens. Colour is expressed as channel tokens (`--accent-rgb` and
+  friends, bare `R, G, B` triplets) so rules pick their own alpha via
+  `rgba(var(--accent-rgb), .18)` while still resolving through one definition — that is what
+  lets Monero Mode repaint the app from a single override. Do not write theme colour
+  literals in a rule; `tests/theme-tokens.test.ts` fails the build if you do.
 - `public/workstr-reference.css` is a static public copy; confirm which copy a proposed
   change targets before editing both.
 - `public/sw.js` is copied as-is into the production build.
