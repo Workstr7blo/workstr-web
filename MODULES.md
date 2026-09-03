@@ -58,6 +58,7 @@ or set updates would make full-root rendering inappropriate.
 | Zap receipts and support totals | `src/nostr/zaps.ts` | `src/core/funding.ts`, `src/features/support/views.ts` | `tests/zaps.test.ts`, `tests/support-views.test.ts` |
 | Nostr Wallet Connect parsing, client, and secure wallet link | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts` | `src/db/export.ts`, payment/support UI | `tests/nwc.test.ts`, `tests/nwc-client.test.ts`, `tests/nwc-storage.test.ts` |
 | Workout program zaps | `src/nostr/program-zap.ts`, `src/nostr/program-zap-status.ts` | `src/nostr/zaps.ts`, `src/nostr/zap-request.ts`, `src/nostr/lnurl.ts`, `src/nostr/nwc-client.ts`, `src/db/store.ts`, `src/signer/types.ts` | `tests/program-zap.test.ts`, `tests/program-zap-status.test.ts`, `tests/zaps.test.ts`, `tests/nwc-client.test.ts` |
+| NIP-A3 Monero payment targets (`kind:10133`) | `src/nostr/payment-targets.ts` | `src/nostr/pool.ts`, `src/signer/types.ts` | `tests/payment-targets.test.ts` |
 | IndexedDB schema | `src/db/schema.ts` | `src/core/types.ts`, `src/db/store.ts` | `tests/store.test.ts`, `tests/export.test.ts`, `tests/adopt.test.ts` |
 | IndexedDB repository operations | `src/db/store.ts` | schema and domain types | `tests/store.test.ts` |
 | Anonymous/signed-in namespace adoption | `src/db/adopt.ts` | schema, shell sign-in flow | `tests/adopt.test.ts`, `tests/shell.test.ts` |
@@ -201,6 +202,16 @@ targets, or muscle metadata solely from the current exercise library.
   relays, retries transient failures, and maintains the per-browser public profile cache.
 - `src/nostr/support-zap.ts` builds the operator NIP-57 zap request, obtains the LNURL
   invoice, verifies the invoice amount, and sends `pay_invoice` through NWC.
+- `src/nostr/payment-targets.ts` reads and writes NIP-A3 `kind:10133` payment targets. It is
+  Monero-only on purpose: a `kind:10133` may also carry Lightning targets, but Lightning zap
+  recipients keep resolving from `kind:0` `lud16`/`lud06`, and honouring a NIP-A3 Lightning
+  target would silently redirect payments away from where NIP-57 says they go. It writes the
+  canonical `monero` method and accepts the `xmr` alias when reading. The signed event is the
+  only source of truth — the address is never written to encrypted sync, workout records, or
+  the NWC credential store, and `tests/payment-targets.test.ts` enforces that boundary.
+  Reading tolerates relay failure (returns null, so cards still render); publishing does not,
+  because writing a replaceable event without first reading it would drop the user's other
+  `payto` targets.
 - Local training must remain usable when every relay operation fails.
 
 ### Relay-side policy (not client code)
