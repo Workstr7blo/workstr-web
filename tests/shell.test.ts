@@ -16,6 +16,13 @@ vi.mock('../src/nostr/canon', async (importOriginal) => ({
   fetchCanonExercises: vi.fn(async () => []),
   fetchCanonPrograms: vi.fn(async () => [])
 }));
+// `renderShell` also fires a background kind-0 lookup whenever a session pubkey is present.
+// That one was missed, so the suite still opened real relay sockets and intermittently failed
+// the run with an undici/jsdom `Event` mismatch even though every test passed.
+vi.mock('../src/nostr/profile', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/nostr/profile')>(),
+  fetchProfile: vi.fn(async () => null)
+}));
 
 describe('shell', () => {
   it('renders the app chrome and all views without a signer', () => {
