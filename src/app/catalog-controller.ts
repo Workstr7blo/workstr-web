@@ -3,8 +3,10 @@ import type { Exercise } from '../core/types';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
+import { fetchAuthorMoneroPaymentTargets } from '../nostr/payment-targets';
 import { fetchProgramZapTotals } from '../nostr/zaps';
 import { discoverImportState } from '../features/discover/views';
+import { moneroMode } from '../features/sheets/monero-tip-view';
 import { paintBodyMapSvg } from './bodymap';
 import { EX_PLACEHOLDER, exerciseSourceLabel, html } from './format';
 import type { AppState } from './state';
@@ -74,6 +76,7 @@ async function refreshPrograms(): Promise<void> {
     await persistCanonCache();
     void refreshDiscoverProfiles();
     void refreshProgramZapTotals(programs);
+    void refreshAuthorPaymentTargets(programs);
   } catch (error) {
     const cached = state.programs.length;
     state.programStatus = cached
@@ -102,6 +105,30 @@ async function refreshProgramZapTotals(programs = state.programs): Promise<void>
   }
 }
 
+// Which authors on the Discover list can be tipped in Monero. One batched query for every
+// unknown author, and only in Monero Mode: on the Lightning rail nothing on screen would
+// use the answer, so asking for it would be a relay round trip that buys nothing.
+//
+// An author is asked about once. A `null` answer is a real answer — "publishes no Monero
+// target" — and is cached exactly like an address so scrolling and rerenders stay free.
+async function refreshAuthorPaymentTargets(programs = state.programs): Promise<void> {
+  if (!moneroMode(state)) return;
+  state.authorPaymentTargets ||= {};
+  const known = state.authorPaymentTargets;
+  const pubkeys = [...new Set(programs.map((program) => program.pubkey).filter((pubkey): pubkey is string => Boolean(pubkey)))]
+    .filter((pubkey) => !(pubkey in known));
+  if (!pubkeys.length) return;
+  try {
+    const targets = await fetchAuthorMoneroPaymentTargets(pubkeys, state.settings.publicRelays);
+    if (!Object.keys(targets).length) return;
+    state.authorPaymentTargets = { ...state.authorPaymentTargets, ...targets };
+    render();
+  } catch {
+    // A creator's payment address is not part of the catalog. Discover keeps working
+    // without it, and the next refresh asks again.
+  }
+}
+
 // Opens Discover instantly from the persisted snapshot, before any relay answers. Called
 // as a namespace loads, so the catalog is on screen while the network refresh runs behind
 // it and replaces what it shows.
@@ -114,6 +141,7 @@ function primeFromCache(): void {
   state.programStatus = `showing ${cached.programs.length} Workstr and creator programs from the last sync`;
   void refreshDiscoverProfiles();
   void refreshProgramZapTotals(cached.programs);
+  void refreshAuthorPaymentTargets(cached.programs);
 }
 
 async function refreshDiscoverProfiles(): Promise<void> {
@@ -283,7 +311,7 @@ async function toggleFavourite(slug: string): Promise<void> {
 
   return {
     refreshMergedExercises, reloadLibrary, persistCanonCache, primeFromCache, refreshExercises, refreshPrograms, refreshProgramZapTotals,
-    refreshDiscoverProfiles, openExerciseDetail, importDiscovered, importSelectedDiscovered,
+    refreshDiscoverProfiles, refreshAuthorPaymentTargets, openExerciseDetail, importDiscovered, importSelectedDiscovered,
     importProgram, deleteExerciseFromLibrary, deleteSelectedExercises, toggleFavourite
   };
 }

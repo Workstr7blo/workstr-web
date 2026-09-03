@@ -59,6 +59,7 @@ or set updates would make full-root rendering inappropriate.
 | Nostr Wallet Connect parsing, client, and secure wallet link | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts` | `src/db/export.ts`, payment/support UI | `tests/nwc.test.ts`, `tests/nwc-client.test.ts`, `tests/nwc-storage.test.ts` |
 | Workout program zaps | `src/nostr/program-zap.ts`, `src/nostr/program-zap-status.ts` | `src/nostr/zaps.ts`, `src/nostr/zap-request.ts`, `src/nostr/lnurl.ts`, `src/nostr/nwc-client.ts`, `src/db/store.ts`, `src/signer/types.ts` | `tests/program-zap.test.ts`, `tests/program-zap-status.test.ts`, `tests/zaps.test.ts`, `tests/nwc-client.test.ts` |
 | NIP-A3 Monero payment targets (`kind:10133`) | `src/nostr/payment-targets.ts` | `src/nostr/pool.ts`, `src/signer/types.ts` | `tests/payment-targets.test.ts` |
+| Monero Tip on Discover program cards | `src/features/sheets/monero-tip-view.ts`, `src/app/monero-tip-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/catalog-controller.ts`, `src/features/sheets/views.ts` | `tests/monero-tip-controller.test.ts`, `tests/discover.test.ts` |
 | Monero Mode Settings card and the user's public Monero address | `src/features/support/payment-mode-views.ts`, `src/app/monero-address-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/layout.ts`, `src/features/support/views.ts` | `tests/monero-address-controller.test.ts`, `tests/nwc-ui.test.ts`, `tests/shell.test.ts` |
 | IndexedDB schema | `src/db/schema.ts` | `src/core/types.ts`, `src/db/store.ts` | `tests/store.test.ts`, `tests/export.test.ts`, `tests/adopt.test.ts` |
 | IndexedDB repository operations | `src/db/store.ts` | schema and domain types | `tests/store.test.ts` |
@@ -117,6 +118,13 @@ or set updates would make full-root rendering inappropriate.
   address: the `kind:10133` lookup, validation, publish and clear, and the in-place repaint
   of that Settings section. It never writes the address to the database, so the relays stay
   the only source of truth and nothing about it enters encrypted sync.
+- `src/features/sheets/monero-tip-view.ts` owns the Monero rail's program-card surfaces:
+  the vendored Monero mark, whether an author can be tipped at all, the card action, and
+  the tip sheet's markup. `moneroMode(state)` is the single answer to "which creator-support
+  rail is this" for the sheets feature. It renders no total and no status, because a Monero
+  transfer leaves nothing Workstr can read.
+- `src/app/monero-tip-controller.ts` owns opening that sheet, copying the address, and the
+  `monero:` wallet hand-off. It never touches Idenstr, NWC, or the program-zap path.
 - `src/features/support/payment-mode-views.ts` renders the Monero Mode Settings card: the
   creator-support rail picker and, in Monero Mode, the public payment-address section.
   While that mode is on, `src/app/layout.ts` renders no NWC wallet card and

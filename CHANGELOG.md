@@ -28,8 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - While Monero Mode is on, the in-app NWC zap controls are withdrawn from Settings so the
   app never invites a Lightning connection on the Monero rail. Nothing is disconnected:
   a saved wallet is untouched and returns with its card when Lightning zaps are picked
-  again. Discover's program zap surfaces still follow the Lightning rail and change in the
-  next phase.
+  again.
+- Monero Mode replaces Discover's Lightning zap surfaces with a Monero tip. A program card
+  shows a Tip action only when its author publishes a NIP-A3 `kind:10133` Monero address —
+  looked up for every visible author in one batched relay query and cached, including the
+  authors who publish none. The zap CTA, the sats totals and the top-zapped ranking are
+  withdrawn rather than recoloured, and no Monero total, ranking or receipt is invented in
+  their place: Workstr cannot see a Monero payment. The tip sheet shows the creator, the
+  address, a QR code, Copy address and Open wallet, and never touches the NWC zap path.
 
 ### Changed
 

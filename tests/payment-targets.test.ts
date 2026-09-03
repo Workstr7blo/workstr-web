@@ -5,6 +5,7 @@ import {
   PAYMENT_TARGETS_KIND,
   PAYTO_TAG,
   buildPaymentTargetsEvent,
+  fetchAuthorMoneroPaymentTargets,
   fetchMoneroPaymentTarget,
   fetchPaymentTargetsEvent,
   looksLikeMoneroAddress,
@@ -372,5 +373,58 @@ describe('publishMoneroPaymentTarget', () => {
       ADDRESS,
       { relays: ['wss://relay.example'], existing: null, poolFactory: () => pool() }
     )).rejects.toThrow('signer rejected');
+  });
+});
+
+// Discover asks about every author on screen at once. The answer has to distinguish "this
+// author publishes no Monero address" from "nobody answered for this author" — the first is
+// cacheable and hides the tip action for good, the second must be asked again.
+describe('author payment targets', () => {
+  const ALICE = 'a'.repeat(64);
+  const BOB = 'b'.repeat(64);
+  const CAROL = 'c'.repeat(64);
+
+  function authored(pubkey: string, address: string, createdAt: number): SignedNostrEvent {
+    return event([[PAYTO_TAG, MONERO_METHOD, address]], { pubkey, created_at: createdAt });
+  }
+
+  it('maps an author with no target to null and one with a target to the address', async () => {
+    const targets = await fetchAuthorMoneroPaymentTargets([ALICE, BOB], ['wss://relay.example'], {
+      query: async () => [authored(ALICE, ADDRESS, 5)]
+    });
+    expect(targets).toEqual({ [ALICE]: ADDRESS, [BOB]: null });
+  });
+
+  it('takes the newest event when relays disagree about the current one', async () => {
+    const targets = await fetchAuthorMoneroPaymentTargets([ALICE], ['wss://relay.example'], {
+      query: async () => [authored(ALICE, OTHER, 9), authored(ALICE, ADDRESS, 3)]
+    });
+    expect(targets[ALICE]).toBe(OTHER);
+  });
+
+  it('leaves the authors of a failed batch unknown rather than calling them empty', async () => {
+    const targets = await fetchAuthorMoneroPaymentTargets([ALICE, BOB, CAROL], ['wss://relay.example'], {
+      batchSize: 2,
+      query: async (_relays, pubkeys) => {
+        if (pubkeys.includes(CAROL)) throw new Error('relay timed out');
+        return [authored(ALICE, ADDRESS, 5)];
+      }
+    });
+    expect(targets[ALICE]).toBe(ADDRESS);
+    expect(targets[BOB]).toBeNull();
+    expect(CAROL in targets).toBe(false);
+  });
+
+  it('ignores an event from an author nobody asked about', async () => {
+    const targets = await fetchAuthorMoneroPaymentTargets([ALICE], ['wss://relay.example'], {
+      query: async () => [authored(BOB, ADDRESS, 5)]
+    });
+    expect(targets).toEqual({ [ALICE]: null });
+  });
+
+  it('asks nothing when there is no author to ask about', async () => {
+    const query = vi.fn();
+    expect(await fetchAuthorMoneroPaymentTargets([], ['wss://relay.example'], { query })).toEqual({});
+    expect(query).not.toHaveBeenCalled();
   });
 });

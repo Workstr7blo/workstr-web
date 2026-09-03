@@ -8,6 +8,7 @@ import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatM
 import { paintBodyMapSvg } from '../../app/bodymap';
 import { programDisplayTags } from './program-labels';
 import { programActions, programZapButton, programZapStatus } from './program-zap-view';
+import { moneroMode, moneroTipButton } from './monero-tip-view';
 export { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, inferProgramLabels, programDisplayTags, programSearchTags, selectedProgramGoals } from './program-labels';
 
 export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; sectionIndex: number; intervalIndex: number; durationSec: number; supersetWithPrevious?: boolean }
@@ -236,7 +237,7 @@ export function sheetToProgram(sheet: SheetWithExercises): RelayProgram {
   };
 }
 
-export function programCard(program: RelayProgram, state: AppState, options: { showZap?: boolean; zapRank?: number } = {}): string {
+export function programCard(program: RelayProgram, state: AppState, options: { showPayment?: boolean; zapRank?: number } = {}): string {
   const exerciseCount = standardProgramExercises(program.exercises, program.blocks).length;
   const time = formatMinutes(estimateProgramMin(program.exercises, program.blocks));
   const emomBlocks = program.blocks?.filter((block) => block.type === 'emom') || [];
@@ -249,9 +250,16 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
   const displayTags = programDisplayTags(program, state.exercises).slice(0, 2);
   const tagPills = displayTags.map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('');
   const isExpanded = state.expandedProgramAddress === program.address;
+  // Which creator-support rail this card is on. On Monero the zap surfaces are not
+  // recoloured, they are gone: sats totals and a top-zapped ranking are Lightning proof of
+  // popularity, and reusing them to decorate a Monero card would be inventing evidence
+  // about a payment network Workstr cannot see.
+  const monero = moneroMode(state);
+  const payment = options.showPayment !== false;
   const zapTotals = state.programZapTotals?.[program.address];
-  const zapStats = options.showZap === false ? '' : `<div class="program-zap-stats">⚡ ${(zapTotals?.sats || 0).toLocaleString('en-US')} sats</div>`;
-  const rank = options.zapRank && options.zapRank >= 1 && options.zapRank <= 3 ? options.zapRank : 0;
+  const zapStats = !payment || monero ? '' : `<div class="program-zap-stats">⚡ ${(zapTotals?.sats || 0).toLocaleString('en-US')} sats</div>`;
+  const paymentCta = !payment ? '' : monero ? moneroTipButton(program, state) : programZapButton(program, state);
+  const rank = !monero && options.zapRank && options.zapRank >= 1 && options.zapRank <= 3 ? options.zapRank : 0;
   const rankBadge = rank ? `<div class="program-zap-rank">#${rank} top zapped</div>` : '';
   const statusCls = isLocalProgram(program) ? 'local' : 'published';
   const fallbackMap = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg>';
@@ -260,7 +268,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
       <div class="workout-card-media">
         ${rankBadge}
         <div class="workout-card-map ${map ? 'has-map' : ''}">${map || fallbackMap}</div>
-        ${options.showZap === false ? '' : programZapButton(program, state)}
+        ${paymentCta}
       </div>
       <div class="workout-card-info">
         <div class="workout-card-name">${html(program.name)}</div>

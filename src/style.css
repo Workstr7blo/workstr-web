@@ -62,6 +62,18 @@
 .button.payment:hover { filter: brightness(1.05); }
 .monero-address-section .settings-row-actions { justify-content: flex-start; }
 
+/* The tip sheet. Monero owns the mark, the QR frame and the paying action; the sheet around
+   them is the ordinary Workstr modal. There is no amount and no total here by design —
+   Workstr cannot see a Monero payment, so it has nothing true to say about one. */
+.monero-tip { display: grid; justify-items: center; gap: 12px; text-align: center; }
+.monero-tip .page-title { margin: 0; }
+.monero-tip-mark { color: var(--payment-accent); line-height: 0; filter: drop-shadow(0 0 18px rgba(var(--payment-rgb), .32)); }
+.monero-tip-creator { margin: -6px 0 0; color: var(--text); font-weight: 700; }
+.monero-tip-qr { width: 210px; max-width: 100%; padding: 12px; border: 1px solid rgba(var(--payment-rgb), .45); border-radius: 12px; background: #fff; box-shadow: 0 0 26px rgba(var(--payment-rgb), .18); }
+.monero-tip-qr svg { display: block; width: 100%; height: auto; }
+.monero-tip-address { display: block; width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid rgba(var(--payment-rgb), .3); border-radius: 10px; background: rgba(var(--payment-rgb), .07); color: var(--text); font: 500 12px/1.5 ui-monospace, monospace; word-break: break-all; user-select: all; }
+.monero-tip-actions { width: 100%; justify-content: center; }
+
 @media (max-width: 760px) {
   .payment-rail { grid-template-columns: 1fr; }
   .monero-address-section .settings-row-actions .button { flex: 1; }
@@ -191,6 +203,13 @@
 .workout-card-media .program-zap-cta .program-zap-label { display: inline-block; line-height: 1; }
 .workout-card-media .program-zap-cta .program-zap-icon { position: absolute; left: calc(50% - 28px); transform: translateY(-.5px); }
 .workout-card-media .program-zap-cta:hover { filter: brightness(1.05); box-shadow: 0 0 28px rgba(var(--payment-rgb), .34); }
+/* The Monero rail's payment action, in the slot the zap CTA occupies so a card keeps its
+   shape between rails. Orange stops here: the card, its title, its creator and its border
+   stay Workstr. */
+.workout-card-media .monero-tip-cta { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 7px; box-sizing: border-box; min-height: 38px; padding-inline: 0; line-height: 1; }
+.workout-card-media .monero-tip-cta:hover { filter: brightness(1.05); box-shadow: 0 0 28px rgba(var(--payment-rgb), .34); }
+.monero-tip-cta .monero-mark { display: block; flex: none; }
+.monero-tip-cta .monero-tip-label { display: inline-block; line-height: 1; letter-spacing: .04em; text-transform: uppercase; }
 .diff-badge.inline { position: static; display: inline-flex; align-items: center; padding: 4px 7px; }
 .program-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .program-tag-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; max-width: 230px; }
@@ -421,6 +440,8 @@
   .workout-card-map.has-map { width: 104px; height: 104px; padding: 4px; }
   .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 104px minmax(0,1fr) 22px; gap: 10px; }
   .workout-card-media .program-zap-cta { min-height: 36px; padding: 8px 7px; font-size: 14px; }
+  .workout-card-media .monero-tip-cta { min-height: 36px; padding: 8px 7px; font-size: 14px; }
+  .monero-tip-qr { width: 180px; }
   .program-tag-grid { gap: 6px; max-width: none; }
   .program-tag-grid .tag-pill { padding: 6px 7px; font-size: 10px; letter-spacing: .02em; }
   .workout-card-name { font-size: 15px; }
