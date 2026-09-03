@@ -9,12 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Monero Mode setting: a Settings toggle for a future all-Monero payment surface. Off by
-  default — Lightning zaps and NWC are unchanged either way; this phase adds only the
-  persisted preference and the theme it switches to.
-- Monero Mode theme: turning it on now repaints the app — dark charcoal and graphite
-  surfaces, a soft orange glow, neutral text, and Monero orange kept to accents, active
-  states, and creator-payment buttons.
+- Monero Mode setting: a Settings toggle that switches creator support from Lightning zaps
+  to Monero. Off by default, and Lightning zaps and NWC are unchanged either way. This phase
+  adds the persisted preference and the theme layer it switches; the Monero payment surfaces
+  themselves land in later phases.
+- Monero Mode theming is confined to creator-support surfaces. Workstr keeps its black and
+  purple Nostr look in both modes — navigation, cards, workouts, statistics, recovery and
+  profile are untouched — and Monero orange appears only on payment controls and the Monero
+  setting itself.
 
 ### Changed
 

@@ -218,13 +218,19 @@ targets, or muscle metadata solely from the current exercise library.
 ## Styling and static assets
 
 - `src/style.css` contains Workstr Web-specific and live-runner overrides. Its last block is
-  the Monero Mode theme override.
+  the Monero Mode override.
 - `src/workstr-reference.css` is imported design/reference CSS used by the app. Its `:root`
   block owns the theme tokens. Colour is expressed as channel tokens (`--accent-rgb` and
   friends, bare `R, G, B` triplets) so rules pick their own alpha via
-  `rgba(var(--accent-rgb), .18)` while still resolving through one definition — that is what
-  lets Monero Mode repaint the app from a single override. Do not write theme colour
-  literals in a rule; `tests/theme-tokens.test.ts` fails the build if you do.
+  `rgba(var(--accent-rgb), .18)` while still resolving through one definition. Do not write
+  theme colour literals in a rule; `tests/theme-tokens.test.ts` fails the build if you do.
+- **Two theme layers, and they must stay apart.** `--accent-*`, `--surface-*`, `--void-*`,
+  `--chrome-*`, `--text`/`--muted`/`--dim` and `--shadow` are the Workstr/Nostr app identity:
+  purple, owned by `:root`, and identical in every payment mode. `--payment-rgb`,
+  `--payment-accent`, `--payment-accent-strong` and `--on-payment` are the creator-support
+  layer, and are the only tokens a payment mode may override. Purple means "this is Workstr";
+  orange means "this is Monero payment" — never "this is selected". A creator-payment control
+  reaches for `--payment-*`; everything else reaches for `--accent-*`.
 - `public/workstr-reference.css` is a static public copy; confirm which copy a proposed
   change targets before editing both.
 - `public/sw.js` is copied as-is into the production build.

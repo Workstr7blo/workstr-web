@@ -618,51 +618,22 @@
 /* ---------------------------------------------------------------------------
    Monero Mode.
 
-   The entire repaint lives in this one block. Because every theme colour above
-   resolves through a channel token, overriding the channels here is enough — no
-   component rules are duplicated and no second stylesheet ships.
+   Two separate identities, and this block only owns the second one:
 
-   The palette is deliberately restrained: graphite surfaces, neutral text, and
-   orange reserved for accents, active states, and creator-payment affordances.
-   --accent-soft stays a light grey rather than becoming orange, because ~50 of
-   its usages are plain body text and orange text at that volume reads as a wash.
+     purple  = Workstr / Nostr   (shell, navigation, cards, recovery, identity)
+     orange  = Monero            (creator-support and payment surfaces)
+
+   So the override is deliberately tiny. Monero Mode swaps the creator-support
+   layer and leaves the app theme alone — Workstr stays visually Workstr, and
+   orange means "this is Monero payment" rather than "this is selected".
+
+   Nothing here may touch --accent-*, --surface-*, --void-*, --chrome-*, --text,
+   --muted, --dim or --shadow; those are the Workstr identity and are owned by
+   the :root block in workstr-reference.css. tests/theme-tokens.test.ts enforces
+   it. --payment-accent needs no entry: it resolves from --payment-rgb.
    --------------------------------------------------------------------------- */
 :root[data-payment-mode="monero"] {
-  /* Monero orange replaces the purple accent */
-  --accent-rgb: 255, 102, 0;
-  --accent-soft-rgb: 229, 229, 229;  /* light grey text, not orange */
-  --accent-line-rgb: 214, 214, 214;  /* neutral hairlines on graphite */
-  --accent-alt-rgb: 255, 138, 42;
-  --accent-deep: #ff8a2a;            /* gradients run orange -> lighter orange */
-  --accent-pale: #f0f0f0;
-  --on-accent: #111;                 /* dark text on an orange fill */
-
-  /* Dark charcoal / graphite surfaces replace the purple-black ramp */
-  --surface-rgb: 42, 42, 42;
-  --surface-raised-rgb: 46, 46, 46;
-  --surface-panel-rgb: 38, 38, 38;
-  --surface-track-rgb: 74, 74, 74;
-  --void-rgb: 27, 27, 27;
-  --void-deep-rgb: 17, 17, 17;
-  --void: #1b1b1b;
-
-  --chrome-raised: #3a3a3a;
-  --chrome-fill: #2f2f2f;
-  --chrome-fill-strong: #333;
-  --chrome-inset: #202020;
-  --chrome-body: #232323;
-  --chrome-menu: #1d1d1d;
-  --chrome-input: #171717;
-
-  --text: #f2f2f2;
-  --muted: #a8a8a8;
-  --dim: #6e6e6e;
-
-  /* Creator payments become Monero orange; --bitcoin-gold stays put so the
-     log/train action keeps its own colour. */
   --payment-rgb: 255, 102, 0;
   --payment-accent-strong: #ff8a2a;
   --on-payment: #111;
-
-  --shadow: 0 0 60px rgba(var(--accent-rgb), 0.16), inset 0 1px 0 rgba(255,255,255,0.04);
 }
