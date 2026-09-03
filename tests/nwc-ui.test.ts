@@ -19,6 +19,7 @@ function state(overrides: Partial<AppState> = {}): AppState {
     settings: { unit: 'kg', publicRelays: [] },
     support: { status: 'idle', receipts: [] },
     nwc: { active: false, status: 'idle' },
+    monero: { status: 'idle', address: '' },
     signerType: null,
     view: 'settings',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
@@ -80,6 +81,41 @@ describe('NWC support UI', () => {
     expect(active).toContain('id="open-nwc-zap" class="button primary" >Zap with wallet</button>');
     expect(active).toContain('NWC wallet ready');
     expect(active).toContain('Alby · relay.example.com');
+  });
+
+  it('replaces the Settings wallet card with the Monero address layout in Monero Mode', () => {
+    const wallet = { active: true, status: 'idle' as const, walletLabel: 'Alby', relayLabel: 'relay.example.com' };
+    const lightning = shellMarkup(state({ nwc: wallet, settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [] } }));
+    expect(lightning).toContain('nwc-card');
+    expect(lightning).toContain('Zap wallet (NWC)');
+    expect(lightning).not.toContain('Monero payment address');
+
+    const monero = shellMarkup(state({ nwc: wallet, settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } }));
+    expect(monero).not.toContain('nwc-card');
+    expect(monero).not.toContain('Zap wallet (NWC)');
+    expect(monero).not.toContain('id="nwc-connect"');
+    expect(monero).not.toContain('id="nwc-disconnect"');
+    expect(monero).not.toContain('Replace wallet');
+    expect(monero).toContain('Monero payment address');
+    expect(monero).toContain('Sign in with your Nostr signer');
+
+    const signedIn = shellMarkup(state({ pubkey: 'a'.repeat(64), nwc: wallet, settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } }));
+    expect(signedIn).toContain('id="monero-address"');
+    expect(signedIn).toContain('id="monero-address-save"');
+    expect(signedIn).toContain('id="monero-address-refresh"');
+    expect(signedIn).not.toContain('nwc-card');
+  });
+
+  it('withdraws the in-app zap controls from Support in Monero Mode without hiding the funding facts', () => {
+    const panel = supportPanel({ status: 'idle', receipts: [] }, { active: true, status: 'idle', walletLabel: 'Alby' }, true, true);
+
+    expect(panel).not.toContain('open-nwc-zap');
+    expect(panel).not.toContain('Zap with wallet');
+    expect(panel).not.toContain('Connect a zap wallet');
+    expect(panel).toContain('Creator support is on Monero.');
+    // The operator's own zap target is a published NIP-57 fact, not an NWC control.
+    expect(panel).toContain('External zap');
+    expect(panel).toContain('Copy npub');
   });
 });
 

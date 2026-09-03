@@ -10,9 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Monero Mode setting: a Settings toggle that switches creator support from Lightning zaps
-  to Monero. Off by default, and Lightning zaps and NWC are unchanged either way. This phase
-  adds the persisted preference and the theme layer it switches; the Monero payment surfaces
-  themselves land in later phases.
+  to Monero. Off by default; on Lightning nothing about zaps or NWC changes. This phase adds
+  the persisted preference and the theme layer it switches.
 - Monero Mode theming is confined to creator-support surfaces. Workstr keeps its black and
   purple Nostr look in both modes — navigation, cards, workouts, statistics, recovery and
   profile are untouched — and Monero orange appears only on payment controls and the Monero
@@ -20,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Creator support is now picked from a two-option control in Settings — Lightning zaps or
   Monero tips — instead of an on/off switch, since the app is always on one rail or the
   other. The selected rail carries its own colour: Lightning gold or Monero orange.
+- Monero Mode replaces the Settings zap-wallet card with a public Monero payment address.
+  Workstr reads the signed-in user's NIP-A3 `kind:10133` from relays, publishes an edited
+  address through the same signer as every other event, and clearing the field removes the
+  Monero target while leaving any other payment targets on that event untouched. The
+  address is public and relay-replicated, is never written to the database or encrypted
+  sync, and Workstr holds no Monero keys or funds.
+- While Monero Mode is on, the in-app NWC zap controls are withdrawn from Settings so the
+  app never invites a Lightning connection on the Monero rail. Nothing is disconnected:
+  a saved wallet is untouched and returns with its card when Lightning zaps are picked
+  again. Discover's program zap surfaces still follow the Lightning rail and change in the
+  next phase.
 
 ### Changed
 

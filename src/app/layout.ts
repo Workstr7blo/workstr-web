@@ -3,6 +3,7 @@ import { displayIdentity, exerciseFilterValues, html } from './format';
 import { APP_VERSION } from './version';
 import { countdownAudioState } from '../features/train/countdown-audio';
 import { supportPanel } from '../features/support/views';
+import { paymentModeCard } from '../features/support/payment-mode-views';
 import { isFreeEquipment, ownedEquipmentKeys } from '../core/equipment';
 import { normalizePaymentMode } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
@@ -214,35 +215,6 @@ function equipmentRows(state: AppState): string {
   </div>`;
 }
 
-// Which rail carries creator support. Presented as a choice rather than an on/off switch,
-// because that is what it is — the app is on Lightning or on Monero, never on "neither".
-// Selecting a rail only flips `settings.paymentMode` and the `data-payment-mode` attribute
-// for now; later phases read the flag to replace the NWC and Discover payment surfaces.
-// Marks are `₿` (U+20BF) and `ɱ` (U+0271), the Bitcoin and Monero symbols. Real typographic
-// characters rather than icon assets, so the pair stays symmetric and needs nothing vendored;
-// #132 brings official Monero artwork in for the Tip CTA, where it carries more weight.
-function paymentModeCard(state: AppState): string {
-  const monero = normalizePaymentMode(state.settings.paymentMode) === 'monero';
-  const rail = (value: 'lightning' | 'monero', mark: string, label: string, hint: string) => {
-    const on = (value === 'monero') === monero;
-    return `<label class="payment-rail-option${on ? ' selected' : ''}">
-      <input type="radio" name="payment-mode" value="${value}" ${on ? 'checked' : ''} />
-      <span class="payment-rail-mark" aria-hidden="true">${mark}</span>
-      <span class="payment-rail-copy"><strong>${label}</strong><small>${hint}</small></span>
-    </label>`;
-  };
-  return `<details class="settings-category payment-mode-card">
-    <summary><span class="settings-category-copy"><strong>Monero Mode</strong><small>${monero ? 'Monero tips' : 'Lightning zaps'}</small></span><span class="status-pill ${monero ? 'ok' : ''}">${monero ? 'MONERO' : 'LIGHTNING'}</span></summary>
-    <div class="settings-category-body">
-      <p class="section-help">Switch creator support from Lightning zaps to public Monero payment targets. Workouts and programs stay the same.</p>
-      <div class="payment-rail" role="radiogroup" aria-label="Creator support">
-        ${rail('lightning', '₿', 'Lightning zaps', 'Default. Zap creators over NWC.')}
-        ${rail('monero', 'ɱ', 'Monero tips', 'Tip creators at their public Monero address.')}
-      </div>
-    </div>
-  </details>`;
-}
-
 function nwcWalletRows(state: AppState): string {
   const detail = state.nwc.message || (state.nwc.active
     ? `${state.nwc.walletLabel || 'Wallet connected'}${state.nwc.relayLabel ? ` · ${state.nwc.relayLabel}` : ''}`
@@ -271,6 +243,15 @@ function settingsView(state: AppState): string {
   const relay = state.settings.workstrRelay || 'default Workstr relay';
   const signerType = state.signerType || (state.pubkey ? 'unknown' : 'none');
   const secureContext = typeof window !== 'undefined' && window.isSecureContext;
+  // Monero Mode replaces the wallet layer rather than adding to it: an NWC connection is a
+  // Lightning instrument, and offering to connect one while creator support is on Monero
+  // would be an invitation to pay over a rail this mode has switched off. The stored
+  // connection is untouched — picking Lightning again brings the card back as it was.
+  const moneroMode = normalizePaymentMode(state.settings.paymentMode) === 'monero';
+  const nwcCard = moneroMode ? '' : `<details class="settings-category nwc-card">
+      <summary><span class="settings-category-copy"><strong>Zap wallet</strong><small>${nwc.active ? html(nwc.walletLabel || 'Wallet connected') : 'Not connected'}</small></span><span class="status-pill ${nwc.active ? 'ok' : ''}">${nwc.active ? 'ACTIVE' : 'OFF'}</span></summary>
+      <div class="settings-category-body">${nwcWalletRows({ ...state, nwc })}</div>
+    </details>`;
   return `<div class="page active settings-page"><div class="page-title">Settings</div>
     <details class="settings-category account-card">
       <summary><span class="settings-category-copy"><strong>Account</strong><small>${html(accountSummary)}</small></span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'SIGNED IN' : 'LOCAL'}</span></summary>
@@ -278,10 +259,7 @@ function settingsView(state: AppState): string {
     </details>
     ${beastModeSettingsCard(state)}
     ${backupPanel({ signedIn: Boolean(state.pubkey), enabled: Boolean(state.settings.backup?.enabled), sync: state.backup, backup: state.settings.backup })}
-    <details class="settings-category nwc-card">
-      <summary><span class="settings-category-copy"><strong>Zap wallet</strong><small>${nwc.active ? html(nwc.walletLabel || 'Wallet connected') : 'Not connected'}</small></span><span class="status-pill ${nwc.active ? 'ok' : ''}">${nwc.active ? 'ACTIVE' : 'OFF'}</span></summary>
-      <div class="settings-category-body">${nwcWalletRows({ ...state, nwc })}</div>
-    </details>
+    ${nwcCard}
     ${paymentModeCard(state)}
     <details class="settings-category training-preferences-card">
       <summary><span class="settings-category-copy"><strong>Training Preferences</strong><small>${unit === 'kg' ? 'Kilograms' : 'Pounds'} · ${ownedEquipmentKeys(state.settings.ownedEquipment).length} equipment</small></span></summary>
@@ -290,7 +268,7 @@ function settingsView(state: AppState): string {
         ${equipmentRows(state)}
       </div>
     </details>
-    ${supportPanel(state.support, nwc, Boolean(state.pubkey))}
+    ${supportPanel(state.support, nwc, Boolean(state.pubkey), moneroMode)}
     <details class="settings-category advanced-settings">
       <summary><span class="settings-category-copy"><strong>Advanced</strong><small>Diagnostics, relay, signer, and technical state</small></span></summary>
       <div class="settings-category-body"><div class="terminal-mini">version: ${html(APP_VERSION)}\nsecure context: ${secureContext}\ncountdown audio: ${html(countdownAudioState())}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nsigner type: ${html(signerType)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div>

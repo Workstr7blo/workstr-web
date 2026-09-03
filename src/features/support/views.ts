@@ -69,7 +69,12 @@ export function supportSummary(state: SupportState = { status: 'idle', receipts:
 
 // Defaults to idle so a caller that has not fetched yet — or a test rendering
 // a minimal state — gets the zap target without a funding panel.
-export function supportPanel(state: SupportState = { status: 'idle', receipts: [] }, nwc: NwcViewState = { active: false, status: 'idle' }, signedIn = false): string {
+//
+// `moneroMode` drops the in-app NWC controls only. The operator's zap target, the receipt
+// history and the funding meter are public NIP-57 facts about how Workstr is funded, and
+// they stay readable on either rail; what disappears is every control that would have the
+// user connect or spend from a Lightning wallet.
+export function supportPanel(state: SupportState = { status: 'idle', receipts: [] }, nwc: NwcViewState = { active: false, status: 'idle' }, signedIn = false, moneroMode = false): string {
   const npub = nip19.npubEncode(OPERATOR_PUBKEY);
   const summary = supportSummary(state);
   return `<details class="settings-category support-panel compact-support">
@@ -81,15 +86,18 @@ export function supportPanel(state: SupportState = { status: 'idle', receipts: [
         <small>${html(summary)}</small>
       </div>
       <div class="settings-row-actions">
-        <button id="open-nwc-zap" class="button primary" ${nwc.active && signedIn ? '' : 'disabled'}>Zap with wallet</button>
+        ${moneroMode ? '' : `<button id="open-nwc-zap" class="button primary" ${nwc.active && signedIn ? '' : 'disabled'}>Zap with wallet</button>`}
         <a id="open-zap-target" class="button ghost" href="${html(OPERATOR_NOSTR_URL)}" target="_blank" rel="noreferrer">External zap</a>
         <button id="copy-npub" class="button ghost" data-copy="${html(npub)}">Copy npub</button>
       </div>
     </div>
-    <div class="nwc-support-status ${nwc.active ? 'ok' : ''}">
+    ${moneroMode ? `<div class="nwc-support-status">
+      <strong>Creator support is on Monero.</strong>
+      <small>Workstr's own support target is still a Nostr zap address. Use the external zap link above, or switch back to Lightning zaps in Monero Mode for in-app zaps.</small>
+    </div>` : `<div class="nwc-support-status ${nwc.active ? 'ok' : ''}">
       <strong>${nwc.active ? 'NWC wallet ready' : signedIn ? 'Connect a zap wallet in Settings for in-app zaps.' : 'Sign in and connect a zap wallet for in-app zaps.'}</strong>
       <small>${html(redactNwcSecrets(nwc.message || (nwc.active ? `${nwc.walletLabel || 'Wallet'} · ${nwc.relayLabel || 'wallet relay'}` : 'The external zap link still works without an in-app wallet.')))}</small>
-    </div>
+    </div>`}
     <div class="support-details">
       <p class="section-help">Workstr is free and stays free. The monthly target covers AI credits, development, growth tests, media hosting, the domain, and buffer. Zaps keep support public and receipt-backed.</p>
       <div class="support-zap-card">

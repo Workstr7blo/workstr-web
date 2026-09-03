@@ -68,7 +68,7 @@ describe('shell', () => {
     expect(settings?.querySelector('.beast-mode-card [data-beast-mode-state="locked"]')).toBeTruthy();
   });
 
-  it('toggles Monero Mode without touching zap or NWC behavior', async () => {
+  it('swaps the wallet card for the Monero payment address when the rail changes', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
     const shell = renderShell(root, { skipCatalogRefresh: true });
@@ -94,9 +94,21 @@ describe('shell', () => {
     expect(selected()).toBe('Monero tips');
     expect(root.querySelector('.payment-mode-card .status-pill.ok')?.textContent).toBe('MONERO');
 
+    // The wallet card is replaced, not deleted: nothing about the stored NWC connection
+    // changes, and the section that takes its place is a payment address rather than a wallet.
+    expect(root.querySelector('.nwc-card')).toBeNull();
+    expect(root.querySelector('#nwc-connect')).toBeNull();
+    expect(root.querySelector('#monero-address-section')).toBeTruthy();
+    expect(root.querySelector('.payment-mode-card[open]')).toBeTruthy();
+    expect(root.querySelector('#open-nwc-zap')).toBeNull();
+
     pick('lightning');
     await vi.waitFor(() => expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false));
     expect(selected()).toBe('Lightning zaps');
+    expect(root.querySelector('.nwc-card')).toBeTruthy();
+    expect(root.querySelector('#nwc-connect')).toBeTruthy();
+    expect(root.querySelector('#monero-address-section')).toBeNull();
+    expect(root.querySelector('#open-nwc-zap')).toBeTruthy();
   });
 
   it('opens a single tabbed account modal from the signed-out chip', () => {
@@ -133,6 +145,7 @@ describe('shell', () => {
       settings: { unit: 'kg', publicRelays: [] },
       support: { status: 'idle', receipts: [] },
       nwc: { active: false, status: 'idle' },
+      monero: { status: 'idle', address: '' },
       signerType: 'local',
       view: 'exercises',
       subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
@@ -183,6 +196,7 @@ describe('shell', () => {
       settings: { unit: 'kg', publicRelays: [] },
       support: { status: 'idle', receipts: [] },
       nwc: { active: false, status: 'idle' },
+      monero: { status: 'idle', address: '' },
       signerType: 'local',
       view: 'settings',
       subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },

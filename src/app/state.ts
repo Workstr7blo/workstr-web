@@ -4,6 +4,7 @@ import type { RelayProgram } from '../nostr/canon';
 import type { ProgramZapTotals } from '../nostr/zaps';
 import type { RelayProfile } from '../nostr/pool';
 import type { SupportState } from '../features/support/views';
+import type { MoneroAddressState } from '../features/support/payment-mode-views';
 import type { SyncStatus } from '../sync/engine';
 
 export interface NwcViewState {
@@ -75,6 +76,9 @@ export interface AppState {
   settings: WorkstrSettings;
   support: SupportState;
   nwc: NwcViewState;
+  // The public Monero payment target shown in Settings while Monero Mode is on. Session
+  // state, not a setting: the relays own the address.
+  monero: MoneroAddressState;
   signerType: 'nip07' | 'nip46' | 'local' | null;
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
