@@ -19,6 +19,7 @@ export const MONERO_METHOD = 'monero';
 const MONERO_METHOD_ALIASES = ['monero', 'xmr'];
 
 const FETCH_TIMEOUT_MS = 5000;
+const AUTHOR_BATCH_SIZE = 40;
 const SIGN_TIMEOUT_MS = 120000;
 const PUBLISH_TIMEOUT_MS = 8000;
 
@@ -136,9 +137,33 @@ async function queryPaymentTargetsEvent(relays: string[], pubkey: string, timeou
   }
 }
 
+// One relay query for many authors, so opening Discover in Monero Mode costs a single
+// round trip rather than one per card. `kind:10133` is replaceable, so relays may still
+// answer with more than one event per author when they disagree about which is current;
+// the newest `created_at` wins, the same rule a relay applies itself.
+async function queryAuthorPaymentTargets(relays: string[], pubkeys: string[], timeoutMs: number): Promise<SignedNostrEvent[]> {
+  const pool = new SimplePool();
+  try {
+    return await withTimeout(
+      pool.querySync(relays, { kinds: [PAYMENT_TARGETS_KIND], authors: pubkeys }, { maxWait: timeoutMs }) as Promise<SignedNostrEvent[]>,
+      timeoutMs,
+      'payment target lookup timed out'
+    );
+  } finally {
+    pool.close(relays);
+  }
+}
+
 export interface PaymentTargetLookupOptions {
   timeoutMs?: number;
   query?: typeof queryPaymentTargetsEvent;
+}
+
+export interface AuthorPaymentTargetsOptions {
+  timeoutMs?: number;
+  query?: typeof queryAuthorPaymentTargets;
+  /** Authors per relay query. Relays cap filter sizes, so a long Discover list is chunked. */
+  batchSize?: number;
 }
 
 /**
@@ -172,6 +197,50 @@ export async function fetchMoneroPaymentTarget(
   } catch {
     return null;
   }
+}
+
+/**
+ * The Monero address of each author, keyed by pubkey.
+ *
+ * An author the relays answered for but who advertises no Monero target maps to null, which
+ * is what lets a caller cache "asked, and there is none" and stop asking. An author whose
+ * batch failed is absent from the result entirely rather than null — the difference is a
+ * card that shows no tip action for a moment against one that hides it until the next
+ * reload.
+ *
+ * Never throws. A relay outage must leave Discover rendering.
+ */
+export async function fetchAuthorMoneroPaymentTargets(
+  pubkeys: string[],
+  relays: string[] = DEFAULT_PUBLIC_RELAYS,
+  options: AuthorPaymentTargetsOptions = {}
+): Promise<Record<string, string | null>> {
+  const authors = [...new Set(pubkeys.filter(Boolean))];
+  if (!authors.length) return {};
+  const query = options.query || queryAuthorPaymentTargets;
+  const timeoutMs = options.timeoutMs ?? FETCH_TIMEOUT_MS;
+  const size = Math.max(1, options.batchSize ?? AUTHOR_BATCH_SIZE);
+  const lookups = relays.length ? paymentTargetRelays(relays) : paymentTargetRelays();
+  const batches: string[][] = [];
+  for (let at = 0; at < authors.length; at += size) batches.push(authors.slice(at, at + size));
+
+  const answered = await Promise.allSettled(batches.map((batch) => query(lookups, batch, timeoutMs)));
+  const targets: Record<string, string | null> = {};
+  const newest: Record<string, number> = {};
+  answered.forEach((result, index) => {
+    if (result.status !== 'fulfilled') return;
+    // Only a batch that answered may report an absence, so the ones that failed leave their
+    // authors unknown and are asked again on the next refresh.
+    for (const pubkey of batches[index]) targets[pubkey] = targets[pubkey] ?? null;
+    for (const event of result.value || []) {
+      const pubkey = event?.pubkey;
+      if (!pubkey || !(pubkey in targets)) continue;
+      if ((event.created_at || 0) < (newest[pubkey] ?? 0)) continue;
+      newest[pubkey] = event.created_at || 0;
+      targets[pubkey] = parseMoneroPaymentTarget(event) ?? null;
+    }
+  });
+  return targets;
 }
 
 function publishReason(result?: PromiseSettledResult<string>): string {

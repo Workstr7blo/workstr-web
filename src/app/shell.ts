@@ -32,6 +32,7 @@ import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
 import { createNwcController } from './nwc-controller';
 import { createMoneroAddressController } from './monero-address-controller';
+import { createMoneroTipController } from './monero-tip-controller';
 import { createProgramPublishController } from './program-publish-controller';
 import type { ShellHandle, ShellOptions } from './shell-types';
 export { launchSignerUri };
@@ -44,7 +45,7 @@ function profileName(profile: RelayProfile | null): string | null {
 }
 
 export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' }, monero: { status: 'idle', address: '' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], programZapTotals: {}, programZapAttempts: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', equipment: '' }, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' }, monero: { status: 'idle', address: '' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], programZapTotals: {}, programZapAttempts: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', equipment: '' }, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -180,9 +181,9 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void preferences.saveUnitPreference((event.target as HTMLSelectElement).value); });
     root.querySelectorAll('input[name="payment-mode"]').forEach((input) => input.addEventListener('change', (event) => {
       const rail = event.target as HTMLInputElement;
-      // Picking Monero reveals the payment-address section, so the first read of the user's
-      // kind:10133 is kicked off as soon as the rerender has put that section on the page.
-      if (rail.checked) void preferences.savePaymentMode(rail.value).then(() => moneroAddress.refreshIfNeeded());
+      // Picking Monero reveals the payment-address section and makes Discover's authors
+      // worth asking about, so both lookups start once the rerender has landed.
+      if (rail.checked) void preferences.savePaymentMode(rail.value).then(() => { moneroAddress.refreshIfNeeded(); void catalog.refreshAuthorPaymentTargets(); });
     }));
     root.querySelectorAll('.equip-toggle').forEach((box) => box.addEventListener('change', () => { void preferences.saveOwnedEquipment(); }));
     root.querySelector('#auto-backup')?.addEventListener('change', (event) => { void backup.setEnabled((event.target as HTMLInputElement).checked); }); root.querySelector('#enable-sync')?.addEventListener('click', () => { void backup.setEnabled(true); });
@@ -313,7 +314,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       state.expandedSessionId = state.expandedSessionId === id ? null : id;
       render();
     }));
-    bindHistoryCalendar(); nwc.bind(); moneroAddress.bind();
+    bindHistoryCalendar(); nwc.bind(); moneroAddress.bind(); moneroTip.bind();
     preferences.bindRecoveryControls();
     preferences.bindBodyControls();
   }
@@ -366,13 +367,10 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root, state, render, toast, openModal, closeModal, wDisplay, wFmt, unitLabel,
     persistCanonCache: catalog.persistCanonCache, loadFinishedSessions: sessionPersistence.loadFinished, getActiveSigner: identity.getActiveSigner
   });
-  const preferences = createPreferencesController({
-    root, state, render, toast,
-    startTrainingSession: sessionRunner.startTrainingSession,
-    loadFinishedSessions: sessionPersistence.loadFinished
-  });
+  const preferences = createPreferencesController({ root, state, render, toast, startTrainingSession: sessionRunner.startTrainingSession, loadFinishedSessions: sessionPersistence.loadFinished });
   const nwc = createNwcController({ root, state, render, toast, openModal, closeModal, getSigner: identity.getActiveSigner, refreshFunding: preferences.refreshFunding, refreshProgramZapTotals: catalog.refreshProgramZapTotals });
   const moneroAddress = createMoneroAddressController({ root, state, toast, getSigner: identity.getActiveSigner });
+  const moneroTip = createMoneroTipController({ root, state, toast, openModal });
   const backup = createBackupController({ state, render, toast, getSigner: identity.getActiveSigner, onSignerStalled: identity.dropActiveSigner, onRestored: () => { void refreshFromStore(); }, requestSignIn: () => { identity.startAccountChoice(); } });
 
   function unitLabel(): string { return normalizeWeightUnit(state.settings.unit); }

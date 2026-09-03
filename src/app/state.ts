@@ -72,6 +72,10 @@ export interface AppState {
   profilePicture?: string | null;
   profileNames: Record<string, string>;
   authorProfiles?: Record<string, RelayProfile>;
+  // Program authors' public NIP-A3 Monero addresses, by pubkey, as the relays answered.
+  // `null` means "asked, and this author advertises none" — the value that stops Discover
+  // asking again — while a missing key means nobody has looked yet.
+  authorPaymentTargets?: Record<string, string | null>;
   store: WorkstrStore | null;
   settings: WorkstrSettings;
   support: SupportState;

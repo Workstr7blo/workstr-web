@@ -4,6 +4,7 @@ import { programImportState } from '../../nostr/programImport';
 import type { AppState } from '../../app/state';
 import { html } from '../../app/format';
 import { beastModeEligibility } from './beast-mode';
+import { moneroMode } from './monero-tip-view';
 
 function isLocalProgram(program: RelayProgram): boolean {
   return program.address.startsWith('local:');
@@ -25,6 +26,9 @@ function latestProgramZap(program: RelayProgram, state: AppState): WorkoutProgra
 }
 
 export function programZapStatus(program: RelayProgram, state: AppState): string {
+  // A Lightning receipt on a Monero card reads as a claim about the wrong network. The
+  // record is the device's own and comes straight back when the Lightning rail does.
+  if (moneroMode(state)) return '';
   const attempt = latestProgramZap(program, state);
   if (!attempt) return '';
   const message = attempt.status === 'succeeded'
