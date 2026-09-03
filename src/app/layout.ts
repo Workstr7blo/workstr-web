@@ -214,17 +214,30 @@ function equipmentRows(state: AppState): string {
   </div>`;
 }
 
-// Foundation-only for now: the checkbox flips `settings.paymentMode` and the
-// `data-payment-mode` theme attribute. It does not yet touch NWC, zap, or Discover surfaces —
-// later Monero Mode phases read this flag to replace those.
+// Which rail carries creator support. Presented as a choice rather than an on/off switch,
+// because that is what it is — the app is on Lightning or on Monero, never on "neither".
+// Selecting a rail only flips `settings.paymentMode` and the `data-payment-mode` attribute
+// for now; later phases read the flag to replace the NWC and Discover payment surfaces.
+// Marks are `₿` (U+20BF) and `ɱ` (U+0271), the Bitcoin and Monero symbols. Real typographic
+// characters rather than icon assets, so the pair stays symmetric and needs nothing vendored;
+// #132 brings official Monero artwork in for the Tip CTA, where it carries more weight.
 function paymentModeCard(state: AppState): string {
   const monero = normalizePaymentMode(state.settings.paymentMode) === 'monero';
+  const rail = (value: 'lightning' | 'monero', mark: string, label: string, hint: string) => {
+    const on = (value === 'monero') === monero;
+    return `<label class="payment-rail-option${on ? ' selected' : ''}">
+      <input type="radio" name="payment-mode" value="${value}" ${on ? 'checked' : ''} />
+      <span class="payment-rail-mark" aria-hidden="true">${mark}</span>
+      <span class="payment-rail-copy"><strong>${label}</strong><small>${hint}</small></span>
+    </label>`;
+  };
   return `<details class="settings-category payment-mode-card">
-    <summary><span class="settings-category-copy"><strong>Monero Mode</strong><small>${monero ? 'Monero payment targets' : 'Lightning zaps (default)'}</small></span><span class="status-pill ${monero ? 'ok' : ''}">${monero ? 'MONERO' : 'LIGHTNING'}</span></summary>
+    <summary><span class="settings-category-copy"><strong>Monero Mode</strong><small>${monero ? 'Monero tips' : 'Lightning zaps'}</small></span><span class="status-pill ${monero ? 'ok' : ''}">${monero ? 'MONERO' : 'LIGHTNING'}</span></summary>
     <div class="settings-category-body">
-      <div class="settings-row-main payment-mode-row">
-        <div><strong>Monero Mode</strong><small>Use public Monero payment targets for creator support instead of Lightning zaps. Workouts, programs, and sync stay the same.</small></div>
-        <label class="payment-mode-switch"><input type="checkbox" id="payment-mode-toggle" ${monero ? 'checked' : ''} /><span>${monero ? 'On' : 'Off'}</span></label>
+      <p class="section-help">Switch creator support from Lightning zaps to public Monero payment targets. Workouts and programs stay the same.</p>
+      <div class="payment-rail" role="radiogroup" aria-label="Creator support">
+        ${rail('lightning', '₿', 'Lightning zaps', 'Default. Zap creators over NWC.')}
+        ${rail('monero', 'ɱ', 'Monero tips', 'Tip creators at their public Monero address.')}
       </div>
     </div>
   </details>`;

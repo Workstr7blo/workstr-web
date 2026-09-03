@@ -1,5 +1,6 @@
 import { mergeOwnedEquipment, MY_EQUIPMENT, ownedEquipmentKeys } from '../core/equipment';
 import { normalizeWeightUnit, storeWeightInput } from '../core/units';
+import { normalizePaymentMode } from '../core/types';
 import { sessionDayKey } from '../core/dates';
 import { LOCAL_NAMESPACE } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
@@ -160,11 +161,11 @@ async function saveUnitPreference(value: string): Promise<void> {
   render();
 }
 
-// Only flips the stored mode and the theme/attribute layer it drives; NWC, zap, and
+// Only flips the stored rail and the theme/attribute layer it drives; NWC, zap, and
 // Discover behavior are untouched until the later Monero Mode phases read this flag.
-async function savePaymentMode(enabled: boolean): Promise<void> {
+async function savePaymentMode(value: string): Promise<void> {
   if (!state.store) return;
-  state.settings = { ...state.settings, paymentMode: enabled ? 'monero' : 'lightning' };
+  state.settings = { ...state.settings, paymentMode: normalizePaymentMode(value) };
   await state.store.saveSettings(state.settings);
   render();
 }

@@ -78,6 +78,20 @@ describe('theme tokens', () => {
     expect(orphans).toEqual([]);
   });
 
+  it('has no payment token that nothing consumes', () => {
+    // --payment-glow sat defined-but-unread through three PRs. A payment token no rule
+    // references is the same failure as the original dead-token Monero Mode, just quieter.
+    const defined = [...reference.matchAll(/^\s*(--payment-[a-z-]+|--on-payment)\s*:/gm)].map((m) => m[1]);
+    expect(defined.length).toBeGreaterThan(0);
+    const consumers = [all, PAINTERS.map((f) => readFileSync(resolve(root, f), 'utf8')).join('\n')].join('\n');
+    const orphans = defined.filter((token) => {
+      const uses = consumers.split(`var(${token})`).length - 1;
+      // The definition line itself never counts as a use.
+      return uses === 0;
+    });
+    expect(orphans).toEqual([]);
+  });
+
   it('keeps the payment accent separate from the training gold action colour', () => {
     // --bitcoin-gold doubles as the log/train action colour, so Monero Mode must not move it.
     const block = all.match(MONERO_BLOCK)?.[0] ?? '';

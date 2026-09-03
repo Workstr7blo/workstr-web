@@ -50,7 +50,7 @@ describe('shell', () => {
     expect(settings?.textContent).toContain('Training Preferences');
     expect(settings?.textContent).toContain('Support Workstr');
     expect(settings?.textContent).toContain('Monero Mode');
-    expect(settings?.textContent).toContain('Lightning zaps (default)');
+    expect(settings?.textContent).toContain('Lightning zaps');
     expect(settings?.querySelector('.advanced-settings:not([open])')).toBeTruthy();
     expect(settings?.querySelectorAll('.settings-category:not([open])')).toHaveLength(8);
     expect(settings?.querySelector('.account-card summary')?.textContent).toContain('Local only');
@@ -75,18 +75,28 @@ describe('shell', () => {
     await shell.ready;
     root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
 
-    const toggle = () => root.querySelector<HTMLInputElement>('#payment-mode-toggle');
-    expect(toggle()?.checked).toBe(false);
+    const rail = (value: string) => root.querySelector<HTMLInputElement>(`input[name="payment-mode"][value="${value}"]`);
+    const selected = () => root.querySelector('.payment-rail-option.selected .payment-rail-copy strong')?.textContent;
+    const pick = (value: string) => {
+      const input = rail(value)!;
+      input.checked = true;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    // Lightning is the default rail, and it is a choice rather than an off state.
+    expect(rail('lightning')?.checked).toBe(true);
+    expect(rail('monero')?.checked).toBe(false);
+    expect(selected()).toBe('Lightning zaps');
     expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false);
 
-    toggle()!.checked = true;
-    toggle()!.dispatchEvent(new Event('change', { bubbles: true }));
+    pick('monero');
     await vi.waitFor(() => expect(document.documentElement.getAttribute('data-payment-mode')).toBe('monero'));
-    expect(root.querySelector('.settings-page')?.textContent).toContain('Monero payment targets');
+    expect(selected()).toBe('Monero tips');
+    expect(root.querySelector('.payment-mode-card .status-pill.ok')?.textContent).toBe('MONERO');
 
-    toggle()!.checked = false;
-    toggle()!.dispatchEvent(new Event('change', { bubbles: true }));
+    pick('lightning');
     await vi.waitFor(() => expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false));
+    expect(selected()).toBe('Lightning zaps');
   });
 
   it('opens a single tabbed account modal from the signed-out chip', () => {
