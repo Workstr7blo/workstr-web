@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// Monero Mode repaints the app purely by overriding channel tokens. That only works while
-// the stylesheets keep routing colour through those tokens, so these guards fail loudly if
-// a raw theme literal creeps back in or an override stops being consumed. The first version
-// of Monero Mode shipped tokens that no rule referenced, which looked correct in review and
-// did nothing in the browser.
+// Two guards, protecting two different mistakes this feature has already made.
+//
+// 1. Colour must route through tokens. The first Monero Mode shipped tokens that no rule
+//    referenced — it looked right in review and did nothing in the browser.
+// 2. Monero Mode must only override the creator-payment layer. The second version swapped
+//    the app accent and surface ramp too, which repainted navigation, cards, recovery and
+//    identity orange and cost Workstr its Nostr identity.
+//
+// Purple is Workstr/Nostr. Orange is Monero. These tests keep those layers apart.
 const root = resolve(__dirname, '..');
 const reference = readFileSync(resolve(root, 'src/workstr-reference.css'), 'utf8');
 const style = readFileSync(resolve(root, 'src/style.css'), 'utf8');
@@ -14,6 +18,17 @@ const all = `${reference}\n${style}`.replace(/\/\*[\s\S]*?\*\//g, '');
 
 // Modules that paint inline SVG `style="fill:..."` and so consume tokens outside the CSS.
 const PAINTERS = ['src/app/bodymap.ts', 'src/features/recovery/views.ts'];
+
+// The Workstr/Nostr app theme. Owned by :root, never by a payment mode.
+const APP_THEME_TOKENS = [
+  '--accent-rgb', '--accent-soft-rgb', '--accent-line-rgb', '--accent-alt-rgb',
+  '--accent-deep', '--accent-pale', '--accent', '--accent-soft', '--accent-glow', '--on-accent',
+  '--surface-rgb', '--surface-raised-rgb', '--surface-panel-rgb', '--surface-track-rgb',
+  '--void-rgb', '--void-deep-rgb', '--void',
+  '--chrome-raised', '--chrome-fill', '--chrome-fill-strong', '--chrome-inset',
+  '--chrome-body', '--chrome-menu', '--chrome-input',
+  '--text', '--muted', '--dim', '--shadow', '--panel', '--border', '--border-hot'
+];
 
 const MONERO_BLOCK = /:root\[data-payment-mode="monero"\]\s*\{[^}]*\}/;
 // Colour literals are legal in exactly two places: the `:root` token definitions and the
@@ -30,19 +45,31 @@ describe('theme tokens', () => {
     expect(rules).not.toMatch(/#4d1fd1/i);
   });
 
-  it('defines the Monero override and actually changes the accent channel', () => {
+  it('keeps the Workstr/Nostr identity while changing creator payments', () => {
     const block = all.match(MONERO_BLOCK)?.[0];
     expect(block).toBeTruthy();
-    expect(block).toContain('--accent-rgb: 255, 102, 0');
     expect(block).toContain('--payment-rgb: 255, 102, 0');
-    // Light grey, not orange: most --accent-soft usages are body text.
-    expect(block).toContain('--accent-soft-rgb: 229, 229, 229');
+
+    // Everything below belongs to Workstr, not to the payment mode. An active nav item,
+    // a selected card or a recovery map means "this is where you are in Workstr" — never
+    // "this is Monero" — so none of it may change with the payment mode.
+    for (const token of APP_THEME_TOKENS) {
+      expect(block, `${token} is Workstr identity and must not change with the payment mode`)
+        .not.toMatch(new RegExp(`^\\s*${token}\\s*:`, 'm'));
+    }
   });
 
-  it('has no override token that nothing consumes', () => {
+  it('only overrides creator-payment tokens in Monero Mode', () => {
     const block = all.match(MONERO_BLOCK)?.[0] ?? '';
     const overridden = [...block.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)].map((m) => m[1]);
-    expect(overridden.length).toBeGreaterThan(10);
+    expect(overridden.length).toBeGreaterThan(0);
+
+    // Fewer overrides are better here: the smaller this block, the more of Workstr survives
+    // the mode switch intact.
+    const allowed = new Set(['--payment-rgb', '--payment-accent', '--payment-accent-strong', '--on-payment']);
+    for (const token of overridden) {
+      expect(allowed.has(token), `${token} should not be overridden by Monero Mode`).toBe(true);
+    }
 
     // Tokens are consumed by CSS rules, by another token's value, or by the modules that
     // paint inline SVG fills.
