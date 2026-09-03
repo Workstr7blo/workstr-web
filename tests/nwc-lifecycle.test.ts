@@ -60,6 +60,7 @@ function state(overrides: Partial<AppState> = {}): AppState {
     settings: { unit: 'kg', publicRelays: [] },
     support: { status: 'idle', receipts: [] },
     nwc: { active: false, status: 'idle' },
+    monero: { status: 'idle', address: '' },
     signerType: 'local',
     view: 'settings',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },

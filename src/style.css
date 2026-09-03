@@ -47,8 +47,24 @@
   background: rgba(var(--payment-rgb), .09);
 }
 
+/* The public Monero payment address. Field, focus ring and publish action are Monero
+   surfaces and take --payment-*; the card around them stays Workstr purple. Monospace
+   because the only thing a user does with a 95-character address is compare it. */
+.monero-address-section { display: grid; gap: 10px; margin-top: 2px; padding-top: 12px; border-top: 1px solid rgba(var(--payment-rgb), .2); }
+.monero-address-input { border-color: rgba(var(--payment-rgb), .38); font: 500 13px/1.4 ui-monospace, monospace; }
+.monero-address-input:focus { border-color: rgba(var(--payment-rgb), .72); box-shadow: 0 0 0 3px rgba(var(--payment-rgb), .18); }
+.monero-address-input:disabled { opacity: .62; }
+.monero-address-status { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.monero-address-status.ok { color: var(--payment-accent); }
+.monero-address-status.bad { color: #ffd6df; }
+/* The one action that publishes a Monero target, so the one button that is orange. */
+.button.payment { border-color: transparent; color: var(--on-payment); background: linear-gradient(135deg, var(--payment-accent), var(--payment-accent-strong)); box-shadow: 0 0 26px rgba(var(--payment-rgb), .26); }
+.button.payment:hover { filter: brightness(1.05); }
+.monero-address-section .settings-row-actions { justify-content: flex-start; }
+
 @media (max-width: 760px) {
   .payment-rail { grid-template-columns: 1fr; }
+  .monero-address-section .settings-row-actions .button { flex: 1; }
 }
 
 .topbar-actions .button.small { padding: 8px 11px; font-size: 12px; }

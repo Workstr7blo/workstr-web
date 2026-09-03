@@ -59,6 +59,7 @@ or set updates would make full-root rendering inappropriate.
 | Nostr Wallet Connect parsing, client, and secure wallet link | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts` | `src/db/export.ts`, payment/support UI | `tests/nwc.test.ts`, `tests/nwc-client.test.ts`, `tests/nwc-storage.test.ts` |
 | Workout program zaps | `src/nostr/program-zap.ts`, `src/nostr/program-zap-status.ts` | `src/nostr/zaps.ts`, `src/nostr/zap-request.ts`, `src/nostr/lnurl.ts`, `src/nostr/nwc-client.ts`, `src/db/store.ts`, `src/signer/types.ts` | `tests/program-zap.test.ts`, `tests/program-zap-status.test.ts`, `tests/zaps.test.ts`, `tests/nwc-client.test.ts` |
 | NIP-A3 Monero payment targets (`kind:10133`) | `src/nostr/payment-targets.ts` | `src/nostr/pool.ts`, `src/signer/types.ts` | `tests/payment-targets.test.ts` |
+| Monero Mode Settings card and the user's public Monero address | `src/features/support/payment-mode-views.ts`, `src/app/monero-address-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/layout.ts`, `src/features/support/views.ts` | `tests/monero-address-controller.test.ts`, `tests/nwc-ui.test.ts`, `tests/shell.test.ts` |
 | IndexedDB schema | `src/db/schema.ts` | `src/core/types.ts`, `src/db/store.ts` | `tests/store.test.ts`, `tests/export.test.ts`, `tests/adopt.test.ts` |
 | IndexedDB repository operations | `src/db/store.ts` | schema and domain types | `tests/store.test.ts` |
 | Anonymous/signed-in namespace adoption | `src/db/adopt.ts` | schema, shell sign-in flow | `tests/adopt.test.ts`, `tests/shell.test.ts` |
@@ -112,6 +113,14 @@ or set updates would make full-root rendering inappropriate.
   backup controls, support funding refresh, and Quick Workout/recovery handlers.
 - `src/app/nwc-controller.ts` owns zap-wallet connection modals, active NWC restore,
   disconnect, and in-app support zap UI execution.
+- `src/app/monero-address-controller.ts` owns the current user's public NIP-A3 Monero
+  address: the `kind:10133` lookup, validation, publish and clear, and the in-place repaint
+  of that Settings section. It never writes the address to the database, so the relays stay
+  the only source of truth and nothing about it enters encrypted sync.
+- `src/features/support/payment-mode-views.ts` renders the Monero Mode Settings card: the
+  creator-support rail picker and, in Monero Mode, the public payment-address section.
+  While that mode is on, `src/app/layout.ts` renders no NWC wallet card and
+  `src/features/support/views.ts` drops its in-app zap controls.
 - `src/app/session-persistence.ts` adapts stored session rows into live/history state.
 - `src/app/layout.ts` composes top-level pages from feature view functions. It owns the
   Settings category order and disclosure shell; backup, wallet, support, and Beast Mode

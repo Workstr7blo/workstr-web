@@ -42,6 +42,7 @@ function state(partial: Partial<AppState> = {}): AppState {
     settings: { unit: 'kg' },
     support: { status: 'idle', receipts: [] },
     nwc: { active: false, status: 'idle' },
+    monero: { status: 'idle', address: '' },
     signerType: null,
     view: 'settings',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },

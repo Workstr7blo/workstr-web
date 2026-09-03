@@ -31,6 +31,7 @@ import { createIdentityController, launchSignerUri } from './identity-controller
 import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
 import { createNwcController } from './nwc-controller';
+import { createMoneroAddressController } from './monero-address-controller';
 import { createProgramPublishController } from './program-publish-controller';
 import type { ShellHandle, ShellOptions } from './shell-types';
 export { launchSignerUri };
@@ -43,7 +44,7 @@ function profileName(profile: RelayProfile | null): string | null {
 }
 
 export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], programZapTotals: {}, programZapAttempts: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', equipment: '' }, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' }, monero: { status: 'idle', address: '' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], programZapTotals: {}, programZapAttempts: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', equipment: '' }, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
@@ -96,6 +97,9 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
 
   async function loadNamespace(namespace: string): Promise<void> {
     state.store?.close();
+    // The Monero address belongs to whoever is signed in, so it is dropped with the
+    // namespace rather than carried into the next account's Settings.
+    state.monero = { status: 'idle', address: '' };
     state.store = await WorkstrStore.open(namespace);
     state.settings = await state.store.getSettings();
     // A saved kit is the useful default view; without one the option does not
@@ -151,7 +155,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       render({ toTop: true });
       if (state.view === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
       if (state.view === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
-      if (state.view === 'settings') void preferences.refreshFunding();
+      if (state.view === 'settings') { void preferences.refreshFunding(); moneroAddress.refreshIfNeeded(); }
     }));
     root.querySelectorAll<HTMLElement>('[data-subtab]').forEach((button) => button.addEventListener('click', () => {
       const parent = button.dataset.parent as keyof AppState['subState'];
@@ -164,7 +168,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
         if (parent === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
       }
     }));
-    root.querySelector('#account-chip')?.addEventListener('click', () => { if (!state.pubkey) { identity.startAccountChoice(); return; } state.view = 'settings'; render({ toTop: true }); void preferences.refreshFunding(); });
+    root.querySelector('#account-chip')?.addEventListener('click', () => { if (!state.pubkey) { identity.startAccountChoice(); return; } state.view = 'settings'; render({ toTop: true }); void preferences.refreshFunding(); moneroAddress.refreshIfNeeded(); });
     root.querySelectorAll<HTMLElement>('[data-copy]').forEach((button) => button.addEventListener('click', () => {
       void navigator.clipboard.writeText(button.dataset.copy || '')
         .then(() => toast('Copied'), () => toast('Could not copy', 'bad'));
@@ -176,7 +180,9 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void preferences.saveUnitPreference((event.target as HTMLSelectElement).value); });
     root.querySelectorAll('input[name="payment-mode"]').forEach((input) => input.addEventListener('change', (event) => {
       const rail = event.target as HTMLInputElement;
-      if (rail.checked) void preferences.savePaymentMode(rail.value);
+      // Picking Monero reveals the payment-address section, so the first read of the user's
+      // kind:10133 is kicked off as soon as the rerender has put that section on the page.
+      if (rail.checked) void preferences.savePaymentMode(rail.value).then(() => moneroAddress.refreshIfNeeded());
     }));
     root.querySelectorAll('.equip-toggle').forEach((box) => box.addEventListener('change', () => { void preferences.saveOwnedEquipment(); }));
     root.querySelector('#auto-backup')?.addEventListener('change', (event) => { void backup.setEnabled((event.target as HTMLInputElement).checked); }); root.querySelector('#enable-sync')?.addEventListener('click', () => { void backup.setEnabled(true); });
@@ -307,7 +313,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       state.expandedSessionId = state.expandedSessionId === id ? null : id;
       render();
     }));
-    bindHistoryCalendar(); nwc.bind();
+    bindHistoryCalendar(); nwc.bind(); moneroAddress.bind();
     preferences.bindRecoveryControls();
     preferences.bindBodyControls();
   }
@@ -366,6 +372,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     loadFinishedSessions: sessionPersistence.loadFinished
   });
   const nwc = createNwcController({ root, state, render, toast, openModal, closeModal, getSigner: identity.getActiveSigner, refreshFunding: preferences.refreshFunding, refreshProgramZapTotals: catalog.refreshProgramZapTotals });
+  const moneroAddress = createMoneroAddressController({ root, state, toast, getSigner: identity.getActiveSigner });
   const backup = createBackupController({ state, render, toast, getSigner: identity.getActiveSigner, onSignerStalled: identity.dropActiveSigner, onRestored: () => { void refreshFromStore(); }, requestSignIn: () => { identity.startAccountChoice(); } });
 
   function unitLabel(): string { return normalizeWeightUnit(state.settings.unit); }

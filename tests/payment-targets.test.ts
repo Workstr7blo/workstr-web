@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../src/signer/types';
 import {
   MONERO_METHOD,
@@ -14,6 +14,23 @@ import {
   withMoneroPaymentTarget,
   type PaymentTargetsPool
 } from '../src/nostr/payment-targets';
+
+// The default lookup path talks to a real SimplePool, so the connection behaviour it
+// depends on is faked here rather than replaced with an injected query.
+const { poolCalls } = vi.hoisted(() => ({ poolCalls: { reachable: new Set<string>(), got: [] as string[][], events: [] as unknown[] } }));
+
+vi.mock('nostr-tools', async (importOriginal) => ({
+  ...await importOriginal<typeof import('nostr-tools')>(),
+  SimplePool: class {
+    async ensureRelay(url: string) {
+      if (!poolCalls.reachable.has(url)) throw new Error(`connection to ${url} failed`);
+      return { url };
+    }
+    async get(relays: string[]) { poolCalls.got.push(relays); return poolCalls.events.shift() ?? null; }
+    publish(relays: string[]) { return relays.map(async () => 'accepted'); }
+    close() {}
+  }
+}));
 
 const ADDRESS = '8AWERgm6PdpNXHAaEjRHhBVGiPjcvfHZjLXpvQFRnHDsWaWaBrRZnBQwCEmpZbNQ5tKu9hLZQBjVdRUcCLbxJHVYPxnhQ2s';
 const OTHER = '4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge';
@@ -241,6 +258,39 @@ describe('fetchMoneroPaymentTarget', () => {
   it('swallows relay failures so card rendering never breaks', async () => {
     const query = vi.fn(async () => { throw new Error('relays unreachable'); });
     await expect(fetchMoneroPaymentTarget('a'.repeat(64), [], { query })).resolves.toBeNull();
+  });
+});
+
+// The distinction this suite protects is the one the publish path is built on: "no event"
+// and "no relay" must never arrive as the same answer. A pool that cannot connect resolves
+// null from `get`, which read as an empty event would drop targets on the next write.
+describe('the default relay lookup', () => {
+  beforeEach(() => {
+    poolCalls.reachable = new Set();
+    poolCalls.got = [];
+    poolCalls.events = [];
+  });
+
+  it('rejects when not one relay could be reached', async () => {
+    await expect(fetchPaymentTargetsEvent('a'.repeat(64), ['wss://relay.example']))
+      .rejects.toThrow('no relay could be reached');
+    expect(poolCalls.got).toEqual([]);
+  });
+
+  it('queries only the relays that answered', async () => {
+    poolCalls.reachable = new Set(['wss://up.example']);
+    poolCalls.events = [event([[PAYTO_TAG, 'monero', ADDRESS]])];
+
+    const found = await fetchPaymentTargetsEvent('a'.repeat(64), ['wss://up.example', 'wss://down.example']);
+
+    expect(parseMoneroPaymentTarget(found)).toBe(ADDRESS);
+    expect(poolCalls.got[0]).toContain('wss://up.example');
+    expect(poolCalls.got[0]).not.toContain('wss://down.example');
+  });
+
+  it('still answers null when a reachable relay has no event for the author', async () => {
+    poolCalls.reachable = new Set(['wss://up.example']);
+    await expect(fetchPaymentTargetsEvent('a'.repeat(64), ['wss://up.example'])).resolves.toBeNull();
   });
 });
 

@@ -114,8 +114,20 @@ export function buildPaymentTargetsEvent(existingTags: string[][] = [], address:
 async function queryPaymentTargetsEvent(relays: string[], pubkey: string, timeoutMs: number): Promise<SignedNostrEvent | null> {
   const pool = new SimplePool();
   try {
+    // Connections are opened first, and explicitly. `pool.get` resolves null both when the
+    // author publishes no event and when not one relay could be reached, and the caller
+    // must not confuse those: a browser that is simply offline would otherwise be told the
+    // user has no payment targets, and the next publish would overwrite the ones it never
+    // managed to read.
+    const connections = await Promise.allSettled(relays.map((relay) => withTimeout(
+      pool.ensureRelay(relay, { connectionTimeout: timeoutMs }),
+      timeoutMs,
+      `${relay} did not answer`
+    )));
+    const reachable = relays.filter((_relay, index) => connections[index].status === 'fulfilled');
+    if (!reachable.length) throw new Error('no relay could be reached for the payment target lookup');
     return await withTimeout(
-      pool.get(relays, { kinds: [PAYMENT_TARGETS_KIND], authors: [pubkey] }) as Promise<SignedNostrEvent | null>,
+      pool.get(reachable, { kinds: [PAYMENT_TARGETS_KIND], authors: [pubkey] }) as Promise<SignedNostrEvent | null>,
       timeoutMs,
       'payment target lookup timed out'
     );
