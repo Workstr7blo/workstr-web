@@ -70,16 +70,16 @@ describe('shell', () => {
 
     const toggle = () => root.querySelector<HTMLInputElement>('#payment-mode-toggle');
     expect(toggle()?.checked).toBe(false);
-    expect(document.body.hasAttribute('data-payment-mode')).toBe(false);
+    expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false);
 
     toggle()!.checked = true;
     toggle()!.dispatchEvent(new Event('change', { bubbles: true }));
-    await vi.waitFor(() => expect(document.body.getAttribute('data-payment-mode')).toBe('monero'));
+    await vi.waitFor(() => expect(document.documentElement.getAttribute('data-payment-mode')).toBe('monero'));
     expect(root.querySelector('.settings-page')?.textContent).toContain('Monero payment targets');
 
     toggle()!.checked = false;
     toggle()!.dispatchEvent(new Event('change', { bubbles: true }));
-    await vi.waitFor(() => expect(document.body.hasAttribute('data-payment-mode')).toBe(false));
+    await vi.waitFor(() => expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false));
   });
 
   it('opens a single tabbed account modal from the signed-out chip', () => {

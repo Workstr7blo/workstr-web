@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Monero Mode setting: a Settings toggle and theme foundation for a future all-Monero payment
-  surface. Off by default — Lightning zaps and NWC are unchanged either way; this phase adds
-  only the persisted preference and its dark/orange theme tokens.
+- Monero Mode setting: a Settings toggle for a future all-Monero payment surface. Off by
+  default — Lightning zaps and NWC are unchanged either way; this phase adds only the
+  persisted preference and the theme it switches to.
+- Monero Mode theme: turning it on now repaints the app — dark charcoal and graphite
+  surfaces, a soft orange glow, neutral text, and Monero orange kept to accents, active
+  states, and creator-payment buttons.
 
 ### Changed
 
