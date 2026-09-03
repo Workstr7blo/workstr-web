@@ -174,7 +174,10 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void identity.signOut(); });
     root.querySelector('#remove-account-data')?.addEventListener('click', () => { void identity.signOutAndRemoveData(); });
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void preferences.saveUnitPreference((event.target as HTMLSelectElement).value); });
-    root.querySelector('#payment-mode-toggle')?.addEventListener('change', (event) => { void preferences.savePaymentMode((event.target as HTMLInputElement).checked); });
+    root.querySelectorAll('input[name="payment-mode"]').forEach((input) => input.addEventListener('change', (event) => {
+      const rail = event.target as HTMLInputElement;
+      if (rail.checked) void preferences.savePaymentMode(rail.value);
+    }));
     root.querySelectorAll('.equip-toggle').forEach((box) => box.addEventListener('change', () => { void preferences.saveOwnedEquipment(); }));
     root.querySelector('#auto-backup')?.addEventListener('change', (event) => { void backup.setEnabled((event.target as HTMLInputElement).checked); }); root.querySelector('#enable-sync')?.addEventListener('click', () => { void backup.setEnabled(true); });
     root.querySelector('#sync-now')?.addEventListener('click', () => { void backup.syncNow(); });

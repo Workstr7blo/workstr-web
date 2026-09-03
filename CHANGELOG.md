@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   purple Nostr look in both modes — navigation, cards, workouts, statistics, recovery and
   profile are untouched — and Monero orange appears only on payment controls and the Monero
   setting itself.
+- Creator support is now picked from a two-option control in Settings — Lightning zaps or
+  Monero tips — instead of an on/off switch, since the app is always on one rail or the
+  other. The selected rail carries its own colour: Lightning gold or Monero orange.
 
 ### Changed
 

@@ -1,11 +1,55 @@
 @import './workstr-reference.css';
 
-.payment-mode-row { gap: 14px; }
-.payment-mode-switch { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; color: var(--muted); font: 800 11px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
-.payment-mode-switch input { width: 16px; height: 16px; accent-color: var(--payment-accent); cursor: pointer; }
+/* Creator-support rail picker. Both options are styled from --payment-* rather than the app
+   accent, so the selected rail carries Lightning gold or Monero orange and the rest of
+   Settings stays Workstr purple. */
+.payment-rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.payment-rail-option {
+  position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 11px 12px;
+  border: 1px solid var(--border); border-radius: 14px; background: rgba(255, 255, 255, .03);
+  cursor: pointer; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.payment-rail-option:hover { border-color: var(--border-hot); }
+.payment-rail-option input { position: absolute; opacity: 0; pointer-events: none; }
+.payment-rail-mark {
+  width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border-radius: 9px;
+  border: 1px solid var(--border); background: rgba(0, 0, 0, .24);
+  color: var(--muted); font: 800 15px/1 ui-monospace, monospace;
+}
+.payment-rail-copy { min-width: 0; }
+.payment-rail-copy strong { display: block; color: var(--text); font-weight: 850; font-size: 13px; }
+.payment-rail-copy small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+.payment-rail-option.selected {
+  border-color: rgba(var(--payment-rgb), .55);
+  background: rgba(var(--payment-rgb), .08);
+  box-shadow: 0 0 22px rgba(var(--payment-rgb), .14);
+}
+.payment-rail-option.selected .payment-rail-mark {
+  border-color: transparent; color: var(--on-payment);
+  background: linear-gradient(135deg, var(--payment-accent), var(--payment-accent-strong));
+}
+.payment-rail-option:focus-within { outline: 2px solid rgba(var(--payment-rgb), .6); outline-offset: 2px; }
+
 /* The mode badge is the one place the payment accent is named outright. Only reachable
    while Monero Mode is on, so the default Lightning card is untouched. */
 .payment-mode-card .status-pill.ok { color: var(--payment-accent); border-color: rgba(var(--payment-rgb), .38); background: rgba(var(--payment-rgb), .08); }
+
+/* Monero Mode gives its own Settings card an orange identity — a descendant rule, not a
+   token override, so it cannot leak into any other surface. This is what finally consumes
+   --payment-glow. */
+:root[data-payment-mode="monero"] .payment-mode-card {
+  border-color: rgba(var(--payment-rgb), .35);
+  background: rgba(var(--payment-rgb), .06);
+  box-shadow: 0 0 24px var(--payment-glow);
+}
+:root[data-payment-mode="monero"] .payment-mode-card[open] > summary {
+  border-bottom-color: rgba(var(--payment-rgb), .28);
+  background: rgba(var(--payment-rgb), .09);
+}
+
+@media (max-width: 760px) {
+  .payment-rail { grid-template-columns: 1fr; }
+}
 
 .topbar-actions .button.small { padding: 8px 11px; font-size: 12px; }
 
