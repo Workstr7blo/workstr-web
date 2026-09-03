@@ -2,6 +2,9 @@ import type { Event } from 'nostr-tools';
 import { SimplePool, verifyEvent } from 'nostr-tools';
 import { DEFAULT_PUBLIC_RELAYS } from './pool';
 
+// NIP-101e workout template. Named here so the signer permission list and the publisher
+// agree with the reader on what Workstr asks to sign.
+export const CREATOR_PROGRAM_KIND = 33402;
 export const CREATOR_PROGRAM_D_PREFIX = 'workstr:beastmode:program:';
 export const INCIDENT_CREATOR_PROGRAM_EVENT_ID = '3db8e166847c6e11830de700cd21e0433bbaa722906a88e54f16e2fbb4dff9cb';
 export const INCIDENT_CREATOR_PROGRAM_PUBKEY = '0a6c41ba921a01e0139aaf6bb7cd344c3e5b7d35a035b186456648149138e728';
@@ -24,7 +27,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = QUERY_TIMEOUT_MS): Prom
 }
 
 function isCreatorProgramEvent(event: Event): boolean {
-  if (event.kind !== 33402) return false;
+  if (event.kind !== CREATOR_PROGRAM_KIND) return false;
   const tags = event.tags as string[][];
   const dTag = tagValue(tags, 'd');
   if (!dTag.startsWith(CREATOR_PROGRAM_D_PREFIX)) return false;
@@ -61,7 +64,7 @@ export function selectCreatorProgramEvents(events: Event[]): Event[] {
 export async function queryCreatorPrograms(limit: number, relays = DEFAULT_PUBLIC_RELAYS): Promise<Event[]> {
   const pool = new SimplePool();
   try {
-    const filter = { kinds: [33402], '#t': ['beastmode', 'workstr-program'], limit };
+    const filter = { kinds: [CREATOR_PROGRAM_KIND], '#t': ['beastmode', 'workstr-program'], limit };
     const results = await Promise.allSettled(
       relays.map((relay) => withTimeout(pool.querySync([relay], filter)))
     );

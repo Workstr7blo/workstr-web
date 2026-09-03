@@ -15,6 +15,9 @@ beforeEach(() => {
     clientSecret: CLIENT_SECRET,
     bunker: { pubkey: BUNKER_PUBKEY, relays: ['wss://stalled.test', 'wss://relay.test'], secret: null }
   }));
+  // A connection whose grant is already current, so these cases are about the request they
+  // make and not about the permission upgrade that a stale grant sends first.
+  localStorage.setItem('workstr.nip46.grantedPerms', SIGNER_PERMS.join(','));
 });
 
 describe('a reconnected bunker signer', () => {
@@ -112,6 +115,48 @@ describe('a reconnected bunker signer', () => {
 // request, and a backup is one request per record — several per month of training, twice
 // over, because each record is encrypted and then signed. Permission has to be granted
 // once, at connection, or the flow is unusable.
+// A grant is fixed when the connection is made, so a release that starts signing a new kind
+// leaves every existing connection unable to sign it. Re-sending connect is the only way to
+// widen it without making the user disconnect and reconnect.
+describe('widening the grant of a connection that already exists', () => {
+  function fakeRelay() {
+    return { subscribe: () => ({ close: () => {} }), publish: async () => 'ok' };
+  }
+
+  it('asks for the current permissions before the first request goes out', async () => {
+    localStorage.setItem('workstr.nip46.grantedPerms', 'get_public_key,nip44_encrypt');
+    const methods: string[] = [];
+    const ensure = vi.spyOn(SimplePool.prototype, 'ensureRelay').mockImplementation((async () => fakeRelay()) as never);
+    const sendRequest = vi.spyOn(BunkerSigner.prototype, 'sendRequest')
+      .mockImplementation((async (method: string) => { methods.push(method); return 'ack'; }) as never);
+
+    const signer = createCachedNip46Signer(USER_PUBKEY)!;
+    await signer.nip44Encrypt(USER_PUBKEY, 'a workout').catch(() => {});
+
+    expect(methods[0]).toBe('connect');
+    expect(sendRequest).toHaveBeenCalledWith('connect', [BUNKER_PUBKEY, '', SIGNER_PERMS.join(','), expect.any(String)]);
+    // Remembered only once the signer answered, so a grant that was never approved is asked
+    // for again rather than assumed.
+    expect(localStorage.getItem('workstr.nip46.grantedPerms')).toBe(SIGNER_PERMS.join(','));
+    sendRequest.mockRestore();
+    ensure.mockRestore();
+  });
+
+  it('does not ask again once the signer has granted them', async () => {
+    const methods: string[] = [];
+    const ensure = vi.spyOn(SimplePool.prototype, 'ensureRelay').mockImplementation((async () => fakeRelay()) as never);
+    const sendRequest = vi.spyOn(BunkerSigner.prototype, 'sendRequest')
+      .mockImplementation((async (method: string) => { methods.push(method); return 'ack'; }) as never);
+
+    const signer = createCachedNip46Signer(USER_PUBKEY)!;
+    await signer.nip44Encrypt(USER_PUBKEY, 'a workout').catch(() => {});
+
+    expect(methods).not.toContain('connect');
+    sendRequest.mockRestore();
+    ensure.mockRestore();
+  });
+});
+
 describe('what the app asks a signer for', () => {
   it('names each event kind rather than asking to sign anything', () => {
     expect(SIGNER_PERMS).toContain('sign_event:30078');
@@ -122,6 +167,14 @@ describe('what the app asks a signer for', () => {
     expect(SIGNER_PERMS).toContain('sign_event:9734');
     // Blanket signing would let Workstr sign anything at all in the user's name.
     expect(SIGNER_PERMS).not.toContain('sign_event');
+  });
+
+  // The failure this list exists to prevent, seen in the wild: publishing a public Monero
+  // address hung until it timed out, because kind 10133 was not in the grant and the bunker
+  // was waiting on an approval the user was never shown.
+  it('names every kind the app signs, not only the ones it started with', () => {
+    expect(SIGNER_PERMS).toContain('sign_event:33402');
+    expect(SIGNER_PERMS).toContain('sign_event:10133');
   });
 
   it('asks for NIP-44 both ways, since a backup is written and read', () => {

@@ -172,6 +172,24 @@ describe('Monero payment address settings', () => {
     expect(app.field()?.value).toBe('not-an-address');
   });
 
+  // A remote signer that has not been granted kind:10133 waits on a person, and the prompt
+  // is in an app the user is not looking at. "No reason given from a relay" would send them
+  // to the wrong place entirely.
+  it('sends the user to their signer when the signer never answered', async () => {
+    publishMoneroPaymentTargetMock.mockRejectedValueOnce(new Error('signer approval timed out'));
+    const app = harness();
+
+    app.field()!.value = ADDRESS;
+    await app.controller.save();
+
+    expect(app.text()).toContain('Your signer did not answer');
+    expect(app.text()).toContain('approve the request');
+    expect(app.text()).not.toContain('Could not publish (');
+    expect(app.toast).toHaveBeenCalledWith('Your signer did not answer', 'bad');
+    // Still typed in, so approving in the signer app and saving again is one tap.
+    expect(app.field()?.value).toBe(ADDRESS);
+  });
+
   it('reports a failed publish without losing the known address', async () => {
     fetchPaymentTargetsEventMock.mockResolvedValueOnce(targetsEvent([['payto', 'monero', ADDRESS]]));
     publishMoneroPaymentTargetMock.mockRejectedValueOnce(new Error('no relay accepted the payment target (wss://relay.example: blocked)'));

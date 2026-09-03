@@ -4,6 +4,8 @@ import { decrypt as nip44DecryptPayload, getConversationKey } from 'nostr-tools/
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { BunkerSigner, createNostrConnectURI, parseBunkerInput, type BunkerPointer } from 'nostr-tools/nip46';
 import { PRIVATE_RECORD_KIND } from '../nostr/codecs30078';
+import { CREATOR_PROGRAM_KIND } from '../nostr/creator-programs';
+import { PAYMENT_TARGETS_KIND } from '../nostr/payment-targets';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from './types';
 
 // Everything Workstr ever asks a signer to do, named as narrowly as NIP-46 allows.
@@ -11,23 +13,33 @@ import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from './types';
 // about every request instead, and a backup is one request per record — several per month
 // of training, twice over, since each record is encrypted and then signed.
 //
-// The two kinds are the whole surface: 30078 is the encrypted sync record
+// These kinds are the whole surface: 30078 is the encrypted sync record
 // (`src/nostr/codecs30078.ts`), kind 1 the workout summary a user chooses to share
-// (`src/nostr/share.ts`), and kind 9734 the NIP-57 zap request a user signs before the
-// app can request a creator invoice. Naming them rather than asking for blanket
+// (`src/nostr/share.ts`), kind 9734 the NIP-57 zap request a user signs before the app can
+// request a creator invoice, 33402 a published creator program
+// (`src/nostr/program-publish.ts`) and 10133 the public payment target
+// (`src/nostr/payment-targets.ts`). Naming them rather than asking for blanket
 // `sign_event` means a signer can show what it is granting, and Workstr cannot quietly
 // sign anything else.
+//
+// Every kind the app signs has to be listed. A signer holds the user to what it was
+// granted, so an unlisted kind is not a silent success: the request waits on a human who
+// was never shown a prompt — the signer app is in a pocket, not in front of them — and the
+// publish fails on a timeout with nothing to act on.
 export const SIGNER_PERMS = [
   'get_public_key',
   'nip44_encrypt',
   'nip44_decrypt',
   `sign_event:${PRIVATE_RECORD_KIND}`,
   'sign_event:1',
-  'sign_event:9734'
+  'sign_event:9734',
+  `sign_event:${CREATOR_PROGRAM_KIND}`,
+  `sign_event:${PAYMENT_TARGETS_KIND}`
 ];
 
 const CLIENT_SECRET_KEY = 'workstr.nip46.clientSecret';
 const CACHED_CONNECTION_KEY = 'workstr.nip46.connection';
+const GRANTED_PERMS_KEY = 'workstr.nip46.grantedPerms';
 const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol'];
 const NOSTR_CONNECT_KIND = 24133;
 const CONNECT_WAIT_MS = 300000;
@@ -146,6 +158,62 @@ function wrapBunkerSigner(signer: BunkerSigner, ready: () => Promise<void>, know
   };
 }
 
+// How long a request will wait for a permission grant to be extended before going out
+// anyway. The grant needs a human on a signer app, so waiting for it outright would stall
+// every request behind a tap that may never come; sending the request regardless only costs
+// the prompt the user would have had before this existed.
+const GRANT_UPGRADE_TIMEOUT_MS = 15000;
+
+function clientMetadata(): string {
+  return JSON.stringify({ name: 'Workstr', url: window.location.origin });
+}
+
+// The connect request is what carries `perms`, so it is also the only way to widen a grant
+// on a connection that already exists. Params are [remote pubkey, secret, permissions,
+// client metadata].
+function sendConnect(signer: BunkerSigner, bunker: BunkerPointer): Promise<string> {
+  return signer.sendRequest('connect', [bunker.pubkey, bunker.secret || '', SIGNER_PERMS.join(','), clientMetadata()]);
+}
+
+function rememberGrantedPerms(): void {
+  try {
+    localStorage.setItem(GRANTED_PERMS_KEY, SIGNER_PERMS.join(','));
+  } catch {
+    // Only costs a redundant connect on the next page load.
+  }
+}
+
+function grantedPermsAreCurrent(): boolean {
+  try {
+    return localStorage.getItem(GRANTED_PERMS_KEY) === SIGNER_PERMS.join(',');
+  } catch {
+    return false;
+  }
+}
+
+// A connection is granted the permissions asked for when it was made, and nothing widens it
+// afterwards — so a release that starts signing a new kind leaves every already-connected
+// signer unable to sign it, which is exactly how the public payment target failed: the
+// request sat unanswered until it timed out, because the bunker was waiting on an approval
+// no one was shown.
+//
+// Re-sending connect asks for the current list on the existing connection. It is tried once
+// per signer instance and only while the remembered grant is out of date, so a user who
+// approves it is never asked again.
+function grantUpgrade(signer: BunkerSigner, bunker: BunkerPointer): () => Promise<void> {
+  let attempt: Promise<void> | null = null;
+  return () => {
+    if (grantedPermsAreCurrent()) return Promise.resolve();
+    if (!attempt) {
+      const connected = sendConnect(signer, bunker).then(() => { rememberGrantedPerms(); }, () => undefined);
+      // Capped rather than awaited: the answer may be a person picking up their phone, and
+      // the request behind this is better off sent late than not at all.
+      attempt = Promise.race([connected, sleep(GRANT_UPGRADE_TIMEOUT_MS)]).then(() => undefined);
+    }
+    return attempt;
+  };
+}
+
 function cacheConnection(clientSecret: Uint8Array, bunker: BunkerPointer): void {
   localStorage.setItem(CACHED_CONNECTION_KEY, JSON.stringify({
     clientSecret: bytesToHex(clientSecret),
@@ -171,6 +239,7 @@ function readCachedConnection(): CachedConnection | null {
 
 export function clearCachedNip46Signer(): void {
   localStorage.removeItem(CACHED_CONNECTION_KEY);
+  localStorage.removeItem(GRANTED_PERMS_KEY);
 }
 
 // Sign-out wipes every trace of the NIP-46 client: the cached connection, and the
@@ -179,6 +248,7 @@ export function clearCachedNip46Signer(): void {
 export function clearNip46State(): void {
   localStorage.removeItem(CACHED_CONNECTION_KEY);
   localStorage.removeItem(CLIENT_SECRET_KEY);
+  localStorage.removeItem(GRANTED_PERMS_KEY);
 }
 
 export async function createBunkerSigner(input: string, options: BunkerOptions = {}): Promise<Signer> {
@@ -193,15 +263,10 @@ export async function createBunkerSigner(input: string, options: BunkerOptions =
   // Before `connect`, not after: that request needs an answer like any other.
   await openRelays(pool, pointer.relays);
   // Not `signer.connect()`: nostr-tools sends an empty permission string there, which asks
-  // the signer for nothing and leaves it prompting on every request afterwards. The
-  // connect params are [remote pubkey, secret, permissions, client metadata].
-  await signer.sendRequest('connect', [
-    pointer.pubkey,
-    pointer.secret || '',
-    SIGNER_PERMS.join(','),
-    JSON.stringify({ name: 'Workstr', url: window.location.origin })
-  ]);
+  // the signer for nothing and leaves it prompting on every request afterwards.
+  await sendConnect(signer, pointer);
   cacheConnection(secret, pointer);
+  rememberGrantedPerms();
 
   return wrapBunkerSigner(signer, () => openRelays(pool, pointer.relays));
 }
@@ -233,6 +298,8 @@ export function createNostrConnectSignerRequest(relays = DEFAULT_RELAYS, options
       .catch(() => waitForStoredConnectResponse(pool, secret, cleanRelays, clientPubkey, connectionSecret, createdSince, options))
       .catch(() => { throw new Error('signer did not answer within 5 minutes'); }).then((signer) => {
       cacheConnection(secret, signer.bp);
+      // The URI the signer scanned carried the current list, so the grant it approved is it.
+      rememberGrantedPerms();
       return {
         pubkey: signer.bp.pubkey,
         signer: wrapBunkerSigner(signer, () => openRelays(pool, signer.bp.relays))
@@ -249,9 +316,17 @@ export function createCachedNip46Signer(knownPubkey?: string, options: BunkerOpt
   if (!cached) return null;
   const pool = new SimplePool();
   const signer = BunkerSigner.fromBunker(hexToBytes(cached.clientSecret), cached.bunker, { pool, onauth: options.onAuthUrl });
+  const upgrade = grantUpgrade(signer, cached.bunker);
   // Every reconnection starts cold, and this is the path a stalled signer is rebuilt on,
   // so without the wait a retry loses its first answer exactly like the attempt before it.
-  return wrapBunkerSigner(signer, () => openRelays(pool, cached.bunker.relays), knownPubkey);
+  // The grant is widened in the same place and for the same reason: both have to happen
+  // before a request goes out, or the request is the thing that discovers the problem.
+  // A connection whose grant is current is left on exactly the path it was on before.
+  const ready = (): Promise<void> => {
+    const opening = openRelays(pool, cached.bunker.relays);
+    return grantedPermsAreCurrent() ? opening : opening.then(upgrade);
+  };
+  return wrapBunkerSigner(signer, ready, knownPubkey);
 }
 
 export function isLikelyBunkerInput(value: string): boolean {

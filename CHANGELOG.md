@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Publishing a public Monero address no longer hangs and fails on a remote (NIP-46) signer.
+  Workstr asks a remote signer for permission to sign every kind it actually signs — the
+  payment target and a published creator program were missing — and an already-connected
+  signer is asked to widen its grant instead of having to be disconnected and reconnected.
+  A signer that never answers now says so and points at the signer app rather than reporting
+  a relay failure.
 - Settings no longer creates horizontal document overflow on narrow mobile viewports.
 - Signed-in identity names and avatars now render from a per-browser kind-0 cache and
   refresh in the background across configured and default relays with a retry, avoiding

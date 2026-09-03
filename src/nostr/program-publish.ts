@@ -3,7 +3,7 @@ import type { SheetExercise } from '../core/types';
 import { slugify } from '../core/ids';
 import type { SheetWithExercises } from '../db/store';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../signer/types';
-import { CREATOR_PROGRAM_D_PREFIX } from './creator-programs';
+import { CREATOR_PROGRAM_D_PREFIX, CREATOR_PROGRAM_KIND } from './creator-programs';
 import { redactNwcSecrets } from './nwc';
 import { DEFAULT_PUBLIC_RELAYS } from './pool';
 
@@ -176,7 +176,7 @@ export function buildCreatorProgramEvent(sheet: SheetWithExercises): UnsignedNos
   }
   tags.push(['workstr_meta', JSON.stringify(programMeta(sheet))]);
   return {
-    kind: 33402,
+    kind: CREATOR_PROGRAM_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags,
     content: sheet.notes || ''
@@ -219,7 +219,7 @@ export async function publishCreatorProgram(
       confirmed = Boolean(await pool.get?.(okRelays, {
         ids: [signed.id],
         authors: [signed.pubkey],
-        kinds: [33402],
+        kinds: [CREATOR_PROGRAM_KIND],
         limit: 1
       }, { maxWait: CONFIRM_TIMEOUT_MS }));
     } catch {

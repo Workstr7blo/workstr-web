@@ -18,6 +18,15 @@ export interface MoneroAddressControllerContext {
 
 const INVALID_ADDRESS = 'That does not look like a Monero address. Mainnet addresses are 95 characters (106 when integrated) and start with 4 or 8.';
 const SIGN_IN_FIRST = 'Sign in with your Nostr signer to publish a public Monero address.';
+// A remote signer that has not been granted this kind waits on a person, and the prompt is
+// in a signer app the user is not looking at. The publish looks identical to a relay
+// failure from here, so the one thing worth saying is where to look.
+const SIGNER_SILENT = 'Your signer did not answer. Open your signer app and approve the request, then save again. Nothing was changed on the relays.';
+
+function isSignerTimeout(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /signer approval timed out|Signer did not respond/i.test(message);
+}
 
 // Relay and signer failures are worth showing — "which relay refused, and why" is the only
 // actionable part — but they arrive as raw remote text, so only the first line is kept and
@@ -115,10 +124,12 @@ export function createMoneroAddressController(ctx: MoneroAddressControllerContex
         // current; only a session that never managed to read one stays unread.
         status: state.monero.event === undefined ? 'error' : 'ready',
         draft: next,
-        message: `Could not publish (${reason(error)}). Nothing was changed on the relays — try again.`,
+        message: isSignerTimeout(error)
+          ? SIGNER_SILENT
+          : `Could not publish (${reason(error)}). Nothing was changed on the relays — try again.`,
         messageKind: 'bad'
       });
-      toast('Could not publish the Monero address', 'bad');
+      toast(isSignerTimeout(error) ? 'Your signer did not answer' : 'Could not publish the Monero address', 'bad');
     }
   }
 
