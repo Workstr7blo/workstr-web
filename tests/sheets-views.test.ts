@@ -218,7 +218,8 @@ describe('sheetToProgram', () => {
     const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets: [baseSheet], finishedSessions: [], pubkey: null, profilePicture: null, programZapAttempts: [] } as unknown as AppState);
     expect(card).toContain('data-publish-program="local:7"');
     expect(card).toContain('>Publish</button>');
-    expect(card).toContain('button ghost small');
+    // Available, but not the lead action while Beast Mode is locked.
+    expect(/<button class="([^"]*)"[^>]*data-publish-program="local:7"/.exec(card)?.[1]).toBe('button small');
   });
   it('marks the local Publish action primary when Beast Mode is unlocked', () => {
     const completed = [1, 2, 3, 4, 5].map((id) => ({ id, sheetName: `S${id}`, startedAt: `2026-08-0${Math.min(id, 3)}T10:00:00`, finishedAt: `2026-08-0${Math.min(id, 3)}T10:30:00`, exercises: [], sets: [] }));

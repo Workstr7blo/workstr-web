@@ -63,7 +63,7 @@ export function workoutHistory(state: AppState, now?: Date): string {
         <b>${html(relativeDayLabel(selected, todayKey))}</b>
         <span>${sessions.length ? `${sessions.length} workout${sessions.length === 1 ? '' : 's'} on ${html(dateLabel(selected))}` : `Nothing logged on ${html(dateLabel(selected))}`}</span>
       </div>
-      <button class="button ghost small" id="history-clear-filter" type="button">Show all</button>
+      <button class="button small" id="history-clear-filter" type="button">Show all</button>
     </div>`;
     const body = sessions.length
       ? `<div id="history-list">${renderGroups([{ key: selected, sessions }], state, unit, todayKey)}</div>`

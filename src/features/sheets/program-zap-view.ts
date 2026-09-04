@@ -58,18 +58,18 @@ export function zapBolt(size = 16): string {
 
 export function programZapButton(program: RelayProgram, state: AppState): string {
   if (!canZapProgram(program, state)) return '';
-  return `<button class="button gold small program-zap-cta" type="button" data-zap-program="${html(program.address)}" aria-label="Zap creator of ${html(program.name)}">${zapBolt(16)}<span class="program-zap-label">Zap</span></button>`;
+  return `<button class="button payment small program-zap-cta" type="button" data-zap-program="${html(program.address)}" aria-label="Zap creator of ${html(program.name)}">${zapBolt(16)}<span class="program-zap-label">Zap</span></button>`;
 }
 
 export function programActions(program: RelayProgram, state: AppState): string {
   const importState = isLocalProgram(program) ? null : programImportState(program, state.sheets);
-  const publishClass = beastModeEligibility(state).unlocked ? 'primary' : 'ghost';
+  const publishClass = beastModeEligibility(state).unlocked ? ' primary' : '';
   return importState === null
-    ? `<button class="button gold small start-workout-action" type="button" data-start-program="${html(program.address)}">Start workout</button>
-      <button class="button ${publishClass} small" type="button" data-publish-program="${html(program.address)}">Publish</button>
-      <button class="button ghost small" type="button" data-edit-sheet="${localSheetId(program)}">Edit</button>
-      <button class="button danger small" type="button" data-del-sheet="${localSheetId(program)}">Delete</button>`
+    ? `<button class="button primary small start-workout-action" type="button" data-start-program="${html(program.address)}">Start workout</button>
+      <button class="button${publishClass} small" type="button" data-publish-program="${html(program.address)}">Publish</button>
+      <button class="button small" type="button" data-edit-sheet="${localSheetId(program)}">Edit</button>
+      <button class="button quiet danger small" type="button" data-del-sheet="${localSheetId(program)}">Delete</button>`
     : importState === 'in-library'
-      ? `<button class="button ghost small" type="button" disabled>In library</button>`
-      : `<button class="button ${importState === 'update' ? 'gold' : 'primary'} small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>`;
+      ? `<button class="button small" type="button" disabled>In library</button>`
+      : `<button class="button primary small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>`;
 }

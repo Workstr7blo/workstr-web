@@ -182,9 +182,9 @@ function openExerciseDetail(exercise: Exercise, source: 'library' | 'discover'):
   const showDescription = description && normalize(description) !== normalize(instructions.join(' '));
   const importState = discoverImportState(exercise, state.library);
   const importLabel = importState === 'update' ? 'Update' : importState === 'in-library' ? 'In library' : 'Import';
-  const importCls = importState === 'update' ? 'gold' : importState === 'in-library' ? 'ghost' : 'primary';
+  const importCls = importState === 'in-library' ? '' : 'primary';
   const actions = source === 'library'
-    ? `<button class="button danger" id="ex-detail-delete">Delete</button>`
+    ? `<button class="button quiet danger" id="ex-detail-delete">Delete</button>`
     : `<button class="button ${importCls}" id="ex-import"${importState === 'in-library' ? ' disabled' : ''}>${importLabel}</button>`;
   openModal(`
     <div class="detail-img${src ? '' : ' placeholder'}">${src ? `<img src="${html(src)}" alt="" loading="lazy" onerror="this.parentElement.classList.add('placeholder');this.remove()">` : EX_PLACEHOLDER}</div>

@@ -74,11 +74,11 @@ describe('NWC support UI', () => {
 
   it('enables in-app zaps only when signed in with an active NWC wallet', () => {
     const inactive = supportPanel({ status: 'idle', receipts: [] }, { active: false, status: 'idle' }, true);
-    expect(inactive).toContain('id="open-nwc-zap" class="button primary" disabled');
+    expect(inactive).toContain('id="open-nwc-zap" class="button payment" disabled');
     expect(inactive).toContain('Connect a zap wallet in Settings');
 
     const active = supportPanel({ status: 'idle', receipts: [] }, { active: true, status: 'idle', walletLabel: 'Alby', relayLabel: 'relay.example.com' }, true);
-    expect(active).toContain('id="open-nwc-zap" class="button primary" >Zap with wallet</button>');
+    expect(active).toContain('id="open-nwc-zap" class="button payment" >Zap with wallet</button>');
     expect(active).toContain('NWC wallet ready');
     expect(active).toContain('Alby · relay.example.com');
   });

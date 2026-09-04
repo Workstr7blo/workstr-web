@@ -57,9 +57,6 @@
 .monero-address-status { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .monero-address-status.ok { color: var(--payment-accent); }
 .monero-address-status.bad { color: #ffd6df; }
-/* The one action that publishes a Monero target, so the one button that is orange. */
-.button.payment { border-color: transparent; color: var(--on-payment); background: linear-gradient(135deg, var(--payment-accent), var(--payment-accent-strong)); box-shadow: 0 0 26px rgba(var(--payment-rgb), .26); }
-.button.payment:hover { filter: brightness(1.05); }
 .monero-address-section .settings-row-actions { justify-content: flex-start; }
 
 /* The tip sheet. Monero owns the mark, the QR frame and the paying action; the sheet around
@@ -198,33 +195,12 @@
 .workout-card-map.has-map polygon { vector-effect: non-scaling-stroke; }
 .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 148px minmax(0,1fr) 22px; align-items: start; }
 .workout-card-media { display: grid; gap: 9px; align-content: start; justify-items: stretch; }
-/* The card's payment action, one rule for both rails. Everything here resolves from
-   --payment-*, so Lightning and Monero emit the same control and differ only in hue and
-   glyph — the parity is structural rather than two rules kept in step by hand. The surface
-   stays dark and the glyph carries the colour: a mark filled with the rail's own accent is
-   invisible on a slab painted that same accent, which is what both rails used to do.
-   Colour stops at this control. The card, its title, its creator and its border stay
-   Workstr on either rail. */
+/* The card's payment action. This control is where the glass recipe started, and it is now
+   just `.button.payment` at card width — both rails emit the same element and differ only
+   in the hue `--payment-*` resolves to and in the glyph. Colour stops here: the card, its
+   title, its creator and its border stay Workstr on either rail. */
 .workout-card-media .program-zap-cta,
-.workout-card-media .monero-tip-cta {
-  width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  box-sizing: border-box; min-height: 38px; padding-inline: 0; line-height: 1;
-  border-color: rgba(var(--payment-rgb), .34);
-  color: var(--payment-accent-strong);
-  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0) 58%), rgba(var(--payment-rgb), .09);
-  backdrop-filter: blur(10px);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 20px -14px rgba(var(--payment-rgb), .55);
-  transition: transform .08s ease, border-color .16s ease, background-color .16s ease, box-shadow .16s ease;
-}
-.workout-card-media .program-zap-cta:hover,
-.workout-card-media .monero-tip-cta:hover {
-  filter: none;
-  border-color: rgba(var(--payment-rgb), .64);
-  background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,0) 58%), rgba(var(--payment-rgb), .16);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 10px 26px -12px rgba(var(--payment-rgb), .66);
-}
-.workout-card-media .program-zap-cta:focus-visible,
-.workout-card-media .monero-tip-cta:focus-visible { outline: 2px solid rgba(var(--payment-rgb), .7); outline-offset: 2px; }
+.workout-card-media .monero-tip-cta { width: 100%; min-height: 38px; padding-inline: 0; gap: 8px; }
 .program-zap-cta .program-zap-icon,
 .monero-tip-cta .monero-mark,
 .monero-tip-cta .monero-badge { display: block; flex: none; filter: drop-shadow(0 0 7px rgba(var(--payment-rgb), .45)); }
@@ -371,7 +347,8 @@
 .session-instructions { margin-top: 12px; }
 .session-instructions-toggle { padding: 11px 13px; }
 .session-footer { padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-.session-log-primary { background: linear-gradient(135deg, var(--bitcoin-gold), #ffb347); color: #1d1202; box-shadow: 0 0 28px rgba(247,147,26,.28); }
+/* The footer copy of the log action, full width: one step more lift than the in-card one. */
+.session-log-primary { --btn-cast: .95; }
 .session-rest-overlay,
 .session-overlay > .session-rest-overlay {
   position: fixed !important;
@@ -429,7 +406,9 @@
 .emom-next-card strong { font-size: 18px; }
 .emom-next-card small { color: var(--muted); }
 .session-footer.emom-live-controls { position: relative; justify-content: center; min-height: 92px; border-top: 0; background: transparent; backdrop-filter: none; }
-.emom-pause-btn { width: 64px; height: 64px; display: grid; place-items: center; flex: 0 0 64px; padding: 0; border: 1px solid rgba(var(--accent-line-rgb), .5); border-radius: 50%; color: var(--on-accent); background: linear-gradient(135deg, var(--chrome-fill-strong), var(--accent-deep)); box-shadow: 0 10px 30px rgba(77,31,209,.3); }
+/* The EMOM transport. Round, but the runner's glass: the same lit rim and tight cast the
+   log and next actions carry, not the solid purple disc with a 30px bloom it used to be. */
+.emom-pause-btn { width: 64px; height: 64px; display: grid; place-items: center; flex: 0 0 64px; padding: 0; border: 1px solid rgba(var(--accent-line-rgb), .85); border-radius: 50%; color: var(--text); background: linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,0) 58%), rgba(var(--accent-line-rgb), .2); box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 10px 26px -14px rgba(var(--accent-line-rgb), .7); }
 .emom-pause-btn svg { width: 25px; height: 25px; fill: currentColor; }
 .emom-finish-action { position: absolute; right: clamp(20px, 4vw, 34px); padding: 8px 0; border: 0; color: var(--muted); background: transparent; box-shadow: none; font: 800 11px/1 ui-monospace, monospace; letter-spacing: .04em; }
 .emom-finish-action:hover { color: var(--text); background: transparent; }

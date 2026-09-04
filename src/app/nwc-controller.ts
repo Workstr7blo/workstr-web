@@ -117,8 +117,8 @@ function connectModal(message = ''): string {
       <label><span>NWC connection string</span><textarea id="nwc-connection-string" name="nwcConnection" class="auth-key-input" autocomplete="off" spellcheck="false" placeholder="nostr+walletconnect://..."></textarea></label>
       ${message ? `<div class="auth-error">${html(message)}</div>` : ''}
       <div class="web-empty-actions">
-        <button class="button primary" type="submit">Validate and save</button>
-        <button class="button ghost" type="button" id="nwc-connect-cancel">Cancel</button>
+        <button class="button payment" type="submit">Validate and save</button>
+        <button class="button quiet" type="button" id="nwc-connect-cancel">Cancel</button>
       </div>
       <p class="section-help compact-note">Use a wallet budget limit. Workstr only requests payments you confirm.</p>
     </form>`;
@@ -132,8 +132,8 @@ function zapModal(nwc: NwcViewState, message = ''): string {
       <label><span>Note (optional)</span><textarea id="nwc-zap-comment" name="comment" maxlength="280" placeholder="Thanks for Workstr"></textarea></label>
       ${message ? `<div class="auth-error">${html(message)}</div>` : ''}
       <div class="web-empty-actions">
-        <button class="button primary" type="submit">Confirm zap</button>
-        <button class="button ghost" type="button" id="nwc-zap-cancel">Cancel</button>
+        <button class="button payment" type="submit">Confirm zap</button>
+        <button class="button quiet" type="button" id="nwc-zap-cancel">Cancel</button>
       </div>
     </form>`;
 }
@@ -159,8 +159,8 @@ function programZapModal(program: WorkoutProgramZapSource, nwc: NwcViewState, me
       ${message ? `<div class="auth-error">${html(redactNwcSecrets(message))}</div>` : ''}
       <div class="web-empty-actions">
         <button class="button primary" type="submit" ${walletReady && !busy ? '' : 'disabled'}>${busy ? 'Sending zap…' : 'Confirm zap'}</button>
-        ${walletReady ? '' : '<button class="button primary" type="button" id="nwc-program-connect">Connect wallet</button>'}
-        <button class="button ghost" type="button" id="nwc-program-zap-cancel">Cancel</button>
+        ${walletReady ? '' : '<button class="button payment" type="button" id="nwc-program-connect">Connect wallet</button>'}
+        <button class="button quiet" type="button" id="nwc-program-zap-cancel">Cancel</button>
       </div>
     </form>`;
 }

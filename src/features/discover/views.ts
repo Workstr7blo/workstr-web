@@ -21,8 +21,8 @@ export function discoverImportState(exercise: Exercise, library: Exercise[]): Di
 
 function importButton(exercise: Exercise, importState: DiscoverImportState): string {
   const address = html(exercise.nostr_address || exercise.slug);
-  if (importState === 'in-library') return `<button class="button ghost discover-import" data-import-address="${address}" disabled>In library</button>`;
-  if (importState === 'update') return `<button class="button gold discover-import" data-import-address="${address}">Update</button>`;
+  if (importState === 'in-library') return `<button class="button discover-import" data-import-address="${address}" disabled>In library</button>`;
+  if (importState === 'update') return `<button class="button primary discover-import" data-import-address="${address}">Update</button>`;
   return `<button class="button primary discover-import" data-import-address="${address}">Import</button>`;
 }
 
@@ -67,13 +67,13 @@ export function discoverPanel(state: AppState): string {
   const allVisibleSelected = importable.length > 0 && importable.every((exercise) => sel.addresses.has(exercise.nostr_address || exercise.slug));
   const headActions = sel.active
     ? `<span class="head-actions">
-        <button class="button ghost small" id="discover-select-all">${allVisibleSelected ? 'Clear all' : 'Select all'}</button>
+        <button class="button small" id="discover-select-all">${allVisibleSelected ? 'Clear all' : 'Select all'}</button>
         <button class="button primary small" id="discover-import-selected"${sel.addresses.size ? '' : ' disabled'}>Import (${sel.addresses.size})</button>
         <button class="button small" id="discover-select-cancel">Done</button>
       </span>`
     : `<span class="head-actions">
-        <button class="button ghost small" id="discover-select-toggle"${importable.length ? '' : ' disabled'}>Select</button>
-        <button class="button ghost small" id="discover-refresh">Refresh catalog</button>
+        <button class="button small" id="discover-select-toggle"${importable.length ? '' : ' disabled'}>Select</button>
+        <button class="button small" id="discover-refresh">Refresh catalog</button>
       </span>`;
   return `<div class="panel discover-exercise-panel">
     <div class="panel-head"><span>Discover exercises</span>${headActions}</div>

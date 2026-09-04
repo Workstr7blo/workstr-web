@@ -116,7 +116,7 @@ describe('the panel', () => {
   });
 
   it('disables sync-now while a sync is already running', () => {
-    expect(backupPanel(panelState({ sync: { state: 'syncing', pending: 0 } }))).toContain('id="sync-now" class="button ghost" disabled');
+    expect(backupPanel(panelState({ sync: { state: 'syncing', pending: 0 } }))).toContain('id="sync-now" class="button" disabled');
   });
 
   it('escapes a relay error rather than rendering it as markup', () => {

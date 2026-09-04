@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Every button in the app is now one material: a pane of dark tinted glass with a lit lip
+  along its top edge, instead of the mix of solid gradient slabs, outlined ghosts and gold
+  fills it had grown into. Colour now says what a control touches — violet for training,
+  gold for money, red for destroying something, neutral for everything else — and rank is
+  carried by how much light the lip catches rather than by a second colour, so a lead
+  action and the buttons beside it read as the same object. The `ghost` and `gold` variants
+  are gone: a plain button is the neutral rank, and a new `quiet` variant carries
+  dismissals and destructive actions that should not look as pressable as the thing they
+  sit next to. Disabled controls now look disabled — "In library" and "Published" report a
+  fact and no longer wear the same pane as the action beside them.
+- The live runner's controls — log, next, finish, previous, the EMOM transport, End
+  session, and the rest overlay's Skip and adjust pills — take the same glass, sized for a
+  screen read at arm's length. Their 30px colour blooms are replaced by the lit rim, which
+  is what makes glass read; finishing a workout and skipping rest take the done green the
+  rest of the app already uses. Reduced-motion users get no transitions or press movement.
 - A Discover card's payment action is now a dark glass control carrying a coloured glyph,
   on both rails, rather than a solid button with a dark glyph inside it. The glyph was
   effectively invisible at button size; the tip sheet already showed that a coloured mark on

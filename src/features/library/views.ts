@@ -15,12 +15,12 @@ export function libraryPanel(state: AppState): string {
   const allVisibleSelected = list.length > 0 && list.every((exercise) => sel.slugs.has(exercise.slug));
   const headActions = sel.active
     ? `<span class="head-actions">
-        <button class="button ghost small" id="lib-select-all">${allVisibleSelected ? 'Clear all' : 'Select all'}</button>
+        <button class="button small" id="lib-select-all">${allVisibleSelected ? 'Clear all' : 'Select all'}</button>
         <button class="button danger small" id="lib-delete-selected"${sel.slugs.size ? '' : ' disabled'}>Delete (${sel.slugs.size})</button>
         <button class="button small" id="lib-select-cancel">Done</button>
       </span>`
     : `<span class="head-actions">
-        <button class="button ghost small" id="lib-select-toggle"${state.library.length ? '' : ' disabled'}>Select</button>
+        <button class="button small" id="lib-select-toggle"${state.library.length ? '' : ' disabled'}>Select</button>
       </span>`;
   return `<div class="panel library-panel">
     <div class="panel-head"><span>Exercise library</span>${headActions}</div>

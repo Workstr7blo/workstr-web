@@ -49,7 +49,7 @@ export function sessionMuscleGroupNames(session: ActiveSession, exercises: Exerc
 }
 
 export function publishSummaryButton(session: ActiveSession, canPublish: boolean, publishing = false, size = 'small', publishingLabel = 'Waiting for signer...'): string {
-  if (session.nostrEventId) return `<button class="button ghost ${size}" disabled title="Summary already published to Nostr">Published</button>`;
+  if (session.nostrEventId) return `<button class="button ${size}" disabled title="Summary already published to Nostr">Published</button>`;
   if (publishing) return `<button class="button primary ${size}" disabled>${html(publishingLabel)}</button>`;
   if (!canPublish) return `<button class="button primary ${size}" disabled title="Sign in with your Nostr signer in Settings to publish">Publish summary</button>`;
   return `<button class="button primary ${size}" data-publish-session="${session.id}">Publish summary</button>`;
@@ -61,7 +61,7 @@ export function publishSummaryButton(session: ActiveSession, canPublish: boolean
 export function repeatWorkoutButton(session: ActiveSession): string {
   const blocked = repeatBlockedReason(session);
   return blocked
-    ? `<button class="button ghost small repeat-workout-action" disabled title="${html(blocked)}">Repeat workout</button>`
+    ? `<button class="button small repeat-workout-action" disabled title="${html(blocked)}">Repeat workout</button>`
     : `<button class="button primary small repeat-workout-action" data-repeat-session="${session.id}">Repeat workout</button>`;
 }
 
@@ -107,7 +107,7 @@ export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPubli
          operable without new state; the confirm dialog still guards the click. -->
     <details class="session-danger">
       <summary>More actions</summary>
-      <button class="button danger small" data-delete-session="${session.id}">Delete session</button>
+      <button class="button quiet danger small" data-delete-session="${session.id}">Delete session</button>
     </details>
   </div>`;
 }
