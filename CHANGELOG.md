@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Recovery no longer claims you are fully recovered before you have trained. A profile with
+  no logged sessions used to show 100%, "10 of 10 ready" and "All trained groups are ready."
+  — a hardcoded fallback, a count that treated never-trained muscles as ready, and a
+  sentence that was vacuously true of nothing. It now says there is no training logged and
+  points at your programs. The body map stays, because it is honest there.
+- Muscles you have not trained in the last ten days are one line naming them instead of a
+  row each. With no history that was ten identical rows reading "Fresh / not logged
+  recently", most of the tab's height; Recovery is now 832px on a 390px phone instead of
+  1368px.
 - Statistics tells the truth once instead of three times. A profile with no finished
   sessions used to show an empty chart box plus "No volume logged yet.", "No logged sets
   yet." and "No records yet." under three headings, none of which said what to do; it now

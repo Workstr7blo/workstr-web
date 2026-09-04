@@ -369,6 +369,24 @@
 .tag-pill.auto { opacity: .82; }
 .builder-auto-empty { color: var(--dim); font-size: 13px; }
 
+/* Recovery's first-run state, and the one line that replaced a row per untrained muscle.
+   Ten rows reading "Fresh / not logged recently" was most of the tab's height. */
+.recovery-first-run {
+  display: grid; justify-items: center; gap: 9px;
+  margin-bottom: 14px; padding: 22px 18px; text-align: center;
+  border: 1px dashed rgba(var(--accent-line-rgb), .22); border-radius: 16px;
+  background: rgba(255, 255, 255, .02);
+}
+.recovery-first-run strong { font-size: 15px; font-weight: 850; letter-spacing: -.02em; }
+.recovery-first-run p { margin: 0; max-width: 36ch; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.recovery-fresh-summary {
+  display: grid; gap: 5px; padding: 11px 13px;
+  border: 1px solid var(--border); border-radius: 13px; background: rgba(255, 255, 255, .022);
+}
+.recovery-fresh-summary strong { color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.recovery-fresh-summary span { color: var(--text); font-size: 13px; font-weight: 700; line-height: 1.45; }
+.recovery-fresh-summary small { color: var(--dim); font-size: 11px; }
+
 /* .bars, .dist and .list each set their own `display`, which beats the `hidden` attribute's
    default rule. These three are kept in the DOM while empty only because the shell patches
    them by id, so they have to be told to stay out of the way. */
