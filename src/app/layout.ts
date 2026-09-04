@@ -4,6 +4,7 @@ import { APP_VERSION } from './version';
 import { countdownAudioState } from '../features/train/countdown-audio';
 import { supportPanel } from '../features/support/views';
 import { paymentModeCard } from '../features/support/payment-mode-views';
+import { moneroMark } from '../features/sheets/monero-tip-view';
 import { isFreeEquipment, ownedEquipmentKeys } from '../core/equipment';
 import { normalizePaymentMode } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
@@ -30,12 +31,24 @@ const navItems: Array<{ view: View; label: string; icon: string }> = [
 export function shellMarkup(state: AppState): string {
   const identity = displayIdentity(state);
   const initial = identity.trim().slice(0, 1).toUpperCase() || 'W';
-  const avatar = state.pubkey && state.profilePicture
+  // The image must stay immediately before its fallback: the `onerror` handler reaches the
+  // fallback through `nextElementSibling`, so anything inserted between them breaks a broken
+  // avatar into a blank hole. The signed-in badge therefore goes last, after the fallback.
+  const avatarFace = state.pubkey && state.profilePicture
     ? `<img class="connection-avatar" src="${html(state.profilePicture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="connection-avatar fallback" hidden>${html(initial)}</span>`
     : `<span class="connection-avatar fallback">${html(initial)}</span>`;
+  const avatar = `<span class="connection-avatar-wrap">${avatarFace}${state.pubkey ? '<span class="connection-identity-status" role="img" aria-label="Signed in"></span>' : ''}</span>`;
   const status = state.pubkey
-    ? '<span class="connection-dot" aria-label="Signed in"></span>'
+    ? ''
     : '<span class="connection-chip-status"><span class="connection-dot"></span><span class="connection-chip-text">Local</span></span>';
+  // Two separate states share the pill: the badge on the avatar answers "is my identity
+  // connected", the medallion answers "which rail pays creators". Signed out, the rail is
+  // not actionable and the chip already carries a second line, so only the badge is dropped.
+  const monero = normalizePaymentMode(state.settings.paymentMode) === 'monero';
+  const paymentLabel = monero ? 'Monero payments' : 'Lightning payments';
+  const paymentMark = state.pubkey
+    ? `<span class="connection-payment-mark" role="img" aria-label="${paymentLabel}" title="${monero ? 'Monero' : 'Lightning'} payment mode">${monero ? moneroMark(13) : '₿'}</span>`
+    : '';
   return `
     <div class="noise"></div>
     <div class="cyber-grid"></div>
@@ -52,9 +65,9 @@ export function shellMarkup(state: AppState): string {
           ${avatar}
           <span class="connection-chip-main">
             <span class="connection-chip-label">${state.pubkey ? html(identity) : 'Account'}</span>
-            ${state.pubkey ? '' : status}
+            ${status}
           </span>
-          ${state.pubkey ? status : ''}
+          ${paymentMark}
           <svg class="connection-chip-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
