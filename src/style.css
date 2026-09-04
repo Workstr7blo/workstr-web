@@ -369,6 +369,23 @@
 .tag-pill.auto { opacity: .82; }
 .builder-auto-empty { color: var(--dim); font-size: 13px; }
 
+/* .bars, .dist and .list each set their own `display`, which beats the `hidden` attribute's
+   default rule. These three are kept in the DOM while empty only because the shell patches
+   them by id, so they have to be told to stay out of the way. */
+.bars[hidden], .dist[hidden], .list[hidden] { display: none; }
+
+/* One first-run state for the whole Training tab. Three separate "nothing here" blocks
+   under three headings said the same thing three times and none of them said what to do. */
+.stats-first-run {
+  display: grid; justify-items: center; gap: 10px;
+  padding: 30px 22px calc(30px + 4px); text-align: center;
+  border: 1px dashed rgba(var(--accent-line-rgb), .22); border-radius: 18px;
+  background: rgba(255, 255, 255, .02);
+}
+.stats-first-run strong { font-size: 15px; font-weight: 850; letter-spacing: -.02em; }
+.stats-first-run p { margin: 0; max-width: 34ch; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.stats-first-run .button { margin-top: 4px; }
+
 /* The exercise views are the grid plus their toolbar now; the panel that used to frame
    them is gone, so the surface treatment went with it. */
 .exercise-library-grid,
