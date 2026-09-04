@@ -121,7 +121,7 @@ describe('Monero Tip on program cards', () => {
     }));
 
     expect(lightning).toContain('program-zap-cta');
-    expect(lightning).toContain('⚡ 2,000 sats');
+    expect(lightning).toContain('2,000 sats');
     expect(lightning).toContain('#1 top zapped');
     // The Monero action belongs to the Monero rail, even for an author who has an address.
     expect(lightning).not.toContain('monero-tip-cta');

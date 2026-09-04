@@ -166,7 +166,10 @@ describe('NWC workout-program zap UI', () => {
     const discoverTab = shellMarkup(state({ view: 'workouts', subState: { exercises: 'library', workouts: 'discover', statistics: 'training' }, programs: [program] }));
     expect(discoverTab).toContain('program-zap-cta');
     expect(discoverTab).toContain(`data-zap-program=\"${program.address}\"`);
-    expect(discoverTab).toContain('⚡ 0 sats');
+    expect(discoverTab).toContain('0 sats');
+    // The bolt is a vendored path, never the U+26A1 emoji a platform repaints for itself.
+    expect(discoverTab).toContain('<svg class="program-zap-icon"');
+    expect(discoverTab).not.toContain('⚡');
   });
 
   it('highlights the top three discover programs by visible zap sats', () => {
@@ -188,7 +191,7 @@ describe('NWC workout-program zap UI', () => {
       }
     }));
 
-    expect(markup).toContain('⚡ 2,000 sats');
+    expect(markup).toContain('2,000 sats');
     expect(markup).toContain('<div class="workout-card-media">\n        <div class="program-zap-rank">#1 top zapped</div>');
     expect(markup).toContain('workout-card-author');
     expect(markup).toContain('rank-1');

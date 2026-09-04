@@ -9,12 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The Monero tip action on a Discover card is now a dark glass control carrying an orange
-  Monero mark, rather than a solid orange button with a dark mark inside it. The mark was
-  effectively invisible at button size; the tip sheet already showed that orange-on-dark is
-  what reads, so the card now uses the same lockup. The action also stops out-shouting the
-  program title it sits under, and no longer competes with the amber difficulty badge.
-  Lightning cards are untouched.
+- A Discover card's payment action is now a dark glass control carrying a coloured glyph,
+  on both rails, rather than a solid button with a dark glyph inside it. The glyph was
+  effectively invisible at button size; the tip sheet already showed that a coloured mark on
+  a dark ground is what reads, so the cards now use the same lockup. The action also stops
+  out-shouting the program title it sits under, and no longer competes with the amber
+  difficulty badge. Both rails render from one rule, so Lightning and Monero differ only in
+  hue and glyph and a card cannot change shape between them.
+- The Lightning bolt on the zap action and the sats total is drawn artwork rather than the
+  U+26A1 character, which iOS and Android paint as their own colour emoji. The bolt now
+  takes the rail's colour on every device.
 
 ## [2.3.0] - 2026-09-04
 
