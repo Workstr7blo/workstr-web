@@ -32,7 +32,7 @@ Milestones are releases. A milestone is done when it is tagged and on the domain
 
 All four Phase 1 pillars are shipped and the app is public. It is a complete offline
 tracker with a working Nostr read path, optional identity, and live training modes,
-deployed to the domain and prepared for v2.2.0 (2026-09-01).
+deployed to the domain and released as v2.3.0 (2026-09-04).
 
 **Shipped**
 
@@ -61,16 +61,14 @@ deployed to the domain and prepared for v2.2.0 (2026-09-01).
   tagged, released with build artifacts, and live on the domain.
 - **Creator support rails** — Settings picks Lightning zaps or Monero tips. Monero Mode
   swaps the NWC wallet card for a public `kind:10133` address and Discover's zap surfaces
-  for a tip action, and touches nothing else; merged to `main` and shipping with the next
-  tag.
+  for a tip action, and touches nothing else. Released in v2.3.0.
 - **Delivery** — Pages workflow deploys `main` to the custom domain; more than 700 tests
   across the unit, integration, and browser surfaces are green.
 
 **Next**
 
-No numbered growth milestone is scheduled beyond v2.3, which is built and waiting on a
-tag. New work is selected from observed product needs and recorded as a focused issue when
-it is ready to build.
+No numbered growth milestone is scheduled. New work is selected from observed product
+needs and recorded as a focused issue when it is ready to build.
 
 ---
 
@@ -212,11 +210,10 @@ The catalog-growth target (#23) was completed by the live operator catalog with 
 
 ## v2.3 — Monero Mode
 
-Built 2026-09-03 and merged to `main`; unreleased, sitting in `[Unreleased]` and shipping
-with the next tag. Creator support stopped being a Lightning assumption and became a rail
-the user picks in Settings. Lightning is still the default and is unchanged: NWC setup, the
-zap CTA, verified sats totals and the top-zapped ranking all behave exactly as they did in
-v2.2. Monero Mode swaps the payment layer and nothing else.
+Released 2026-09-04 as v2.3.0. Creator support stopped being a Lightning assumption and
+became a rail the user picks in Settings. Lightning is still the default and is unchanged:
+NWC setup, the zap CTA, verified sats totals and the top-zapped ranking all behave exactly
+as they did in v2.2. Monero Mode swaps the payment layer and nothing else.
 
 1. ~~Mode setting and theme foundation~~ — done (#129, PRs #134, #136, #138, #139). The
    setting is a two-option rail, Lightning zaps or Monero tips, rather than an on/off
