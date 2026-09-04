@@ -59,13 +59,18 @@ deployed to the domain and prepared for v2.2.0 (2026-09-01).
 - **Release and support** — starter seed of three beginner programs, the zap-only support
   and funding panel, and the tag-triggered release pipeline. v0.9.0, v1.0.0 and v1.1.0 are
   tagged, released with build artifacts, and live on the domain.
+- **Creator support rails** — Settings picks Lightning zaps or Monero tips. Monero Mode
+  swaps the NWC wallet card for a public `kind:10133` address and Discover's zap surfaces
+  for a tip action, and touches nothing else; merged to `main` and shipping with the next
+  tag.
 - **Delivery** — Pages workflow deploys `main` to the custom domain; more than 700 tests
   across the unit, integration, and browser surfaces are green.
 
 **Next**
 
-No numbered growth milestone is scheduled. New work is selected from observed product
-needs and recorded as a focused issue when it is ready to build.
+No numbered growth milestone is scheduled beyond v2.3, which is built and waiting on a
+tag. New work is selected from observed product needs and recorded as a focused issue when
+it is ready to build.
 
 ---
 
@@ -204,6 +209,45 @@ encrypted-sync writes before they can deepen a key fork.
 The proposed EMOM transition tone (#60) was retired by owner direction rather than shipped.
 The catalog-growth target (#23) was completed by the live operator catalog with more than
 55 exercises and five programs.
+
+## v2.3 — Monero Mode
+
+Built 2026-09-03 and merged to `main`; unreleased, sitting in `[Unreleased]` and shipping
+with the next tag. Creator support stopped being a Lightning assumption and became a rail
+the user picks in Settings. Lightning is still the default and is unchanged: NWC setup, the
+zap CTA, verified sats totals and the top-zapped ranking all behave exactly as they did in
+v2.2. Monero Mode swaps the payment layer and nothing else.
+
+1. ~~Mode setting and theme foundation~~ — done (#129, PRs #134, #136, #138, #139). The
+   setting is a two-option rail, Lightning zaps or Monero tips, rather than an on/off
+   toggle, because the app is always on one rail or the other.
+2. ~~NIP-A3 payment-target primitives~~ — done (#130, PR #140). `kind:10133` `payto` tags,
+   parsed and built; `kind:10133` is canonical for Monero and `kind:0` `lud16`/`lud06`
+   stays canonical for Lightning, with neither read as a substitute for the other.
+3. ~~Public Monero address in Settings~~ — done (#131, PR #141). Monero Mode replaces the
+   NWC wallet card with the signed-in user's address, read from relays and published
+   through the same signer as every other event; clearing it removes only the Monero
+   target. The address is public Nostr metadata — never in IndexedDB, never in encrypted
+   sync, never beside NWC credentials — so auto-sync is unchanged on either rail.
+4. ~~Monero tips in Discover~~ — done (#132, PR #142). A card carries a tip action only
+   when its author publishes a Monero address, looked up for every visible author in one
+   batched, cached query. The zap CTA, sats totals and top-zapped ranking are withdrawn
+   rather than recoloured, and nothing is invented to replace them: Workstr cannot see a
+   Monero transfer, so there is no Monero total, ranking or receipt. An author with no
+   address gets no payment control at all — not a disabled button, not "no address".
+5. ~~Boundary documented and gated~~ — done (#133, PR #143). `docs/instruction.md` §6.4
+   carries the two-rail table and the theme rule.
+
+The theme boundary is the lesson of this milestone. It eroded twice — first as tokens that
+repainted nothing, then as an app repainted graphite and orange — before #137 pinned the
+rule down: purple is Workstr and Nostr, orange is Monero. The shell tokens are owned by
+`:root` and identical in every mode; only `--payment-*` and `--on-payment` may be
+overridden, and `tests/theme-tokens.test.ts` fails the build otherwise. A view with no
+payment control on screen must look the same on both rails, which a computed-style diff
+across seven views confirms rather than a screenshot hash.
+
+Workstr never holds Monero keys, custody, balances or transaction status, and Monero
+direct payments are never presented as NIP-57 zaps.
 
 ## Fallback — paid relay access
 
