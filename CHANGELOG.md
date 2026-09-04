@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-09-04
+
 ### Changed
 
 - Training statistics can be scoped to the last 4 weeks, 3 months, a year, or all time.
@@ -644,7 +646,8 @@ Nostr read path; it is versioned here so releases are traceable while v1.0 is fi
 - Weights are stored canonically in kilograms; the display unit is a user preference.
 - `session_sets.rpe` exists in the schema but is never written — see `ROADMAP.md`.
 
-[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.0.0...v2.2.0
 [2.0.0]: https://github.com/Workstr7blo/workstr-web/compare/v1.3.0...v2.0.0

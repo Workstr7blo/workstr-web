@@ -1,7 +1,7 @@
 {
   "name": "workstr-web",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.4.0",
   "type": "module",
   "description": "Static local-first Nostr workout tracker PWA.",
   "scripts": {

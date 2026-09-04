@@ -32,7 +32,7 @@ Milestones are releases. A milestone is done when it is tagged and on the domain
 
 All four Phase 1 pillars are shipped and the app is public. It is a complete offline
 tracker with a working Nostr read path, optional identity, and live training modes,
-deployed to the domain and released as v2.3.0 (2026-09-04).
+deployed to the domain and released as v2.4.0 (2026-09-04).
 
 **Shipped**
 
@@ -62,8 +62,14 @@ deployed to the domain and released as v2.3.0 (2026-09-04).
 - **Creator support rails** — Settings picks Lightning zaps or Monero tips. Monero Mode
   swaps the NWC wallet card for a public `kind:10133` address and Discover's zap surfaces
   for a tip action, and touches nothing else. Released in v2.3.0.
-- **Delivery** — Pages workflow deploys `main` to the custom domain; more than 700 tests
-  across the unit, integration, and browser surfaces are green.
+- **Mobile-first browsing** — Programs, Discover and the exercise library each put search,
+  a filter sheet and their own actions in one toolbar row, cutting the distance from the
+  sub-tabs to the first card from 322px and 214px to 76px on a phone. Statistics scopes to
+  a date range, and its empty states, Recovery's and the Body tab's each say one true thing
+  rather than several. Released in v2.4.0.
+- **Delivery** — Pages workflow deploys `main` to the custom domain; more than 900 tests
+  across the unit, integration, and browser surfaces are green, and `tests/setup.ts` bars
+  any test from reaching the network.
 
 **Next**
 
