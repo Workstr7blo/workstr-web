@@ -15,14 +15,91 @@ export interface StandardSessionViewInput {
   unitLabel(): string;
   loggedSetCount(slug: string): number;
   superset: SupersetTransition | null;
+  instructionsOpen: boolean;
   startEmom?: boolean;
   emomPending?: boolean;
   bindControls(): void;
 }
 
+interface SetPlanEntry {
+  index: number;
+  done?: SessionSetLog;
+  previous?: SessionSetLog;
+  carried?: SessionSetLog;
+  defaultReps: string;
+  defaultWeight: string;
+}
+
+// One sheet of columns shared by every row state, so the eye reads down a column instead of
+// across three different card shapes.
+interface SetSheet {
+  setCount: number;
+  targetReps: string;
+  weightDisplay(weight: number | string | null | undefined): string;
+  formatSetHint(set: SessionSetLog): string;
+  suggestedSetHint(set: SessionSetLog, targetReps: string): string;
+}
+
 export function updateStandardSessionProgress(root: HTMLElement, session: ActiveSession, percent: number): void {
   const fill = root.querySelector<HTMLElement>('#session-progress-fill');
   if (fill) fill.style.width = `${percent}%`;
+}
+
+function isTimedTarget(target: string): boolean {
+  return /\b\d+\s*(?:-\s*\d+\s*)?(?:s|sec|secs|second|seconds)\b/i.test(target);
+}
+
+function repsInputValue(reps: string | number | null | undefined): string {
+  if (reps == null) return '';
+  const raw = String(reps);
+  return /^\d+(\.\d+)?$/.test(raw) ? raw : raw.match(/\d+(?:\.\d+)?/)?.[0] || '';
+}
+
+function doneSetRow(entry: SetPlanEntry, sheet: SetSheet): string {
+  const done = entry.done as SessionSetLog;
+  const weight = done.weight == null ? '' : sheet.weightDisplay(done.weight);
+  return `<div class="session-set-block done" data-set-block="${entry.index}" role="listitem" aria-label="Set ${entry.index + 1}, done">
+    <div class="session-set-row">
+      <div class="session-set-num done" data-set-num="${entry.index}">${entry.index + 1}</div>
+      <div class="session-set-value logged">${done.reps ?? '—'}</div>
+      <div class="session-set-value logged">${html(weight || '—')}</div>
+      <span class="session-set-state done" data-set-log-btn="${entry.index}">Done</span>
+    </div>
+  </div>`;
+}
+
+function activeSetRow(entry: SetPlanEntry, sheet: SetSheet, unit: string): string {
+  const hintSet = entry.previous || entry.carried;
+  const hints = hintSet
+    ? `<div class="session-current-hints"><span>Previous ${html(sheet.formatSetHint(hintSet))}</span><span>${sheet.suggestedSetHint(hintSet, sheet.targetReps)}</span></div>`
+    : '';
+  const repsPlaceholder = sheet.targetReps || String(hintSet?.reps ?? '');
+  return `<div class="session-set-block active" data-set-block="${entry.index}" role="listitem" aria-label="Set ${entry.index + 1} of ${sheet.setCount}, current">
+    <div class="session-set-row">
+      <div class="session-set-num" data-set-num="${entry.index}">${entry.index + 1}</div>
+      <label class="session-set-field">
+        <span class="sr-only">Reps for set ${entry.index + 1}</span>
+        <input class="session-set-input" data-session-reps="${entry.index}" type="number" inputmode="numeric" placeholder="${html(repsPlaceholder)}" value="${html(entry.defaultReps)}">
+      </label>
+      <label class="session-set-field">
+        <span class="sr-only">Load in ${html(unit)} for set ${entry.index + 1}</span>
+        <input class="session-set-input" data-session-weight="${entry.index}" type="number" inputmode="decimal" step="0.5" placeholder="${html(entry.defaultWeight || '—')}" value="${html(entry.defaultWeight)}">
+      </label>
+      <span class="session-set-state current">Current</span>
+    </div>${hints}
+  </div>`;
+}
+
+function upcomingSetRow(entry: SetPlanEntry, sheet: SetSheet): string {
+  const planTarget = sheet.targetReps || String(entry.previous?.reps || entry.carried?.reps || 'free');
+  return `<div class="session-set-block upcoming" data-set-block="${entry.index}" role="listitem" aria-label="Set ${entry.index + 1}, upcoming">
+    <div class="session-set-row">
+      <div class="session-set-num" data-set-num="${entry.index}">${entry.index + 1}</div>
+      <div class="session-set-value">${html(planTarget)}</div>
+      <div class="session-set-value">${html(entry.defaultWeight || '—')}</div>
+      <span class="session-set-state">Upcoming</span>
+    </div>
+  </div>`;
 }
 
 export function renderStandardSessionView(input: StandardSessionViewInput): void {
@@ -39,6 +116,7 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   if (!exercises.length) {
     title.textContent = session.sheetName || 'Freestyle';
     meta.textContent = 'No exercises yet';
+    nav.classList.remove('session-ex-track');
     nav.innerHTML = '';
     body.innerHTML = '<div class="empty">This session has no exercises yet.</div>';
     footer.innerHTML = '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>';
@@ -51,57 +129,55 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   const restSec = Number(exercise.restSec) || 90;
   const targetSets = Number(exercise.sets) || setCounts[slug] || 1;
   const targetReps = exercise.reps || '';
-  const repsInputValue = (reps: string | number | null | undefined): string => {
-    if (reps == null) return '';
-    const raw = String(reps);
-    return /^\d+(\.\d+)?$/.test(raw) ? raw : raw.match(/\d+(?:\.\d+)?/)?.[0] || '';
-  };
-  const isTimedTarget = (target: string): boolean => /\b\d+\s*(?:-\s*\d+\s*)?(?:s|sec|secs|second|seconds)\b/i.test(target);
   const targetValue = targetReps || 'free';
-  const targetUnit = isTimedTarget(targetValue) ? '' : ' reps';
+  const timed = isTimedTarget(targetValue);
+  const targetUnit = timed ? '' : ' reps';
+  const unit = input.unitLabel();
   const logged = session.sets.filter((set) => set.exerciseSlug === slug);
+  // The exercise rail is one connected track, so each button is a pip on it rather than a
+  // free-standing tile. The jump binding and the tap target are unchanged.
+  nav.classList.add('session-ex-track');
   nav.innerHTML = exercises.map((candidate, index) => {
     const target = Number(candidate.sets) || setCounts[candidate.exerciseSlug] || 1;
-    const cls = index === exerciseIndex ? 'current' : input.loggedSetCount(candidate.exerciseSlug) >= target ? 'done' : '';
-    return `<button class="session-ex-dot ${cls}" data-jump-ex="${index}" type="button">${index + 1}</button>`;
+    const complete = input.loggedSetCount(candidate.exerciseSlug) >= target;
+    const cls = index === exerciseIndex ? 'current' : complete ? 'done' : '';
+    const state = index === exerciseIndex ? ', current' : complete ? ', done' : '';
+    return `<button class="session-ex-dot ${cls}" data-jump-ex="${index}" type="button" aria-label="Exercise ${index + 1} of ${exercises.length}${state}"${index === exerciseIndex ? ' aria-current="step"' : ''}><span class="session-ex-pip">${index + 1}</span></button>`;
   }).join('');
   const activeSetIndex = Math.max(0, Array.from({ length: setCounts[slug] }, (_, index) => index).find((index) => !logged.find((set) => Number(set.setNumber) === index + 1)) ?? setCounts[slug] - 1);
   const allSetsDone = input.loggedSetCount(slug) >= setCounts[slug];
-  const setPlan = Array.from({ length: setCounts[slug] }, (_, index) => {
+  const setPlan: SetPlanEntry[] = Array.from({ length: setCounts[slug] }, (_, index) => {
     const done = logged.find((set) => Number(set.setNumber) === index + 1);
     const previous = input.previousSets[index];
-    const defaultReps = done?.reps != null ? String(done.reps) : repsInputValue(targetReps || previous?.reps);
-    const defaultWeight = done?.weight != null ? input.weightDisplay(done.weight) : (previous?.weight != null ? input.weightDisplay(previous.weight) : input.weightDisplay(exercise.weight));
-    return { index, done, previous, defaultReps, defaultWeight };
+    // Carry forward what was actually just lifted: after a rerender the next set opens on the
+    // last logged set of this exercise rather than back on the untouched prescription.
+    const carried = logged.filter((set) => Number(set.setNumber) < index + 1).pop();
+    const defaultReps = done?.reps != null ? String(done.reps)
+      : carried?.reps != null ? String(carried.reps)
+        : repsInputValue(targetReps || previous?.reps);
+    const source = done?.weight != null ? done : carried?.weight != null ? carried : previous;
+    const defaultWeight = source?.weight != null ? input.weightDisplay(source.weight) : input.weightDisplay(exercise.weight);
+    return { index, done, previous, carried, defaultReps, defaultWeight };
   });
+  const sheet: SetSheet = {
+    setCount: setCounts[slug], targetReps,
+    weightDisplay: input.weightDisplay, formatSetHint: input.formatSetHint, suggestedSetHint: input.suggestedSetHint
+  };
   const current = setPlan[activeSetIndex];
-  const currentHints = current?.previous ? `<div class="session-current-hints"><span>Previous: ${html(input.formatSetHint(current.previous))}</span><span>${input.suggestedSetHint(current.previous, targetReps)}</span></div>` : '';
-  const currentSet = current && !allSetsDone ? `<div class="session-current-set" data-set-block="${current.index}">
-    <div class="session-current-head"><span>Log set ${current.index + 1} of ${setCounts[slug]}</span><strong>${html(targetValue)}${targetUnit}</strong></div>
-    <div class="session-current-inputs">
-      <label><span>Reps to log</span><input class="session-set-input" data-session-reps="${current.index}" type="number" inputmode="numeric" placeholder="${html(targetReps || current.previous?.reps || 'reps')}" value="${html(current.defaultReps)}"></label>
-      <label><span>${html(input.unitLabel())} load</span><input class="session-set-input" data-session-weight="${current.index}" type="number" inputmode="decimal" step="0.5" placeholder="${html(current.defaultWeight || input.unitLabel())}" value="${html(current.defaultWeight)}"></label>
-    </div>${currentHints}
-  </div>` : '<div class="session-current-set complete"><span>Exercise complete</span><strong>All sets logged</strong></div>';
-  const rows = setPlan.map(({ index, done, previous, defaultReps, defaultWeight }) => {
-    const state = done ? 'done' : index === activeSetIndex && !allSetsDone ? 'active' : 'upcoming';
-    const planTarget = targetReps || String(previous?.reps || 'free');
-    const summary = done ? `${done.reps ?? '—'} reps${done.weight == null ? '' : ` · ${input.weightDisplay(done.weight)} ${input.unitLabel()}`}` : `${planTarget}${isTimedTarget(planTarget) ? '' : ' reps'}${defaultWeight ? ` · ${defaultWeight} ${input.unitLabel()}` : ''}`;
-    return `<div class="session-set-block ${state}" data-set-block="${index}">
-      <div class="session-set-row">
-        <div class="session-set-num ${done ? 'done' : ''}" data-set-num="${index}">${index + 1}</div>
-        <div class="session-set-summary"><strong>${state === 'active' ? 'Current set' : done ? 'Done' : 'Upcoming'}</strong><span>${html(summary)}</span></div>
-        ${done ? `<span class="session-set-status done" data-set-log-btn="${index}">Done</span>` : ''}
-      </div>
-    </div>`;
+  const rows = setPlan.map((entry) => {
+    if (entry.done) return doneSetRow(entry, sheet);
+    if (entry.index === activeSetIndex && !allSetsDone) return activeSetRow(entry, sheet, unit);
+    return upcomingSetRow(entry, sheet);
   }).join('');
   const instructions = exercise.instructions || [];
-  const instructionsMarkup = instructions.length ? `<div class="session-instructions" id="session-instructions">
-    <div class="session-instructions-toggle" data-toggle-instructions>
+  // The accordion's open state is owned by the controller, not the DOM: a shell re-render
+  // rebuilds the whole overlay, and a class toggled in place does not survive it.
+  const instructionsMarkup = instructions.length ? `<div class="session-instructions ${input.instructionsOpen ? 'open' : ''}" id="session-instructions">
+    <button class="session-instructions-toggle" data-toggle-instructions="${html(slug)}" type="button" aria-expanded="${input.instructionsOpen}" aria-controls="session-instructions-body">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       <span>How to perform</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-    </div>
-    <div class="session-instructions-body">${instructions.map((step, index) => `<div class="session-instructions-step"><b>${index + 1}</b>${html(step)}</div>`).join('')}</div>
+    </button>
+    <div class="session-instructions-body" id="session-instructions-body">${instructions.map((step, index) => `<div class="session-instructions-step"><b>${index + 1}</b>${html(step)}</div>`).join('')}</div>
   </div>` : '';
   title.textContent = name;
   // A mixed session names its section on every card, so reaching the last strength
@@ -111,17 +187,22 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   meta.textContent = input.superset
     ? `${sectionPrefix}${session.sheetName || 'Workout'} · Round ${input.superset.roundIndex + 1} of ${input.superset.rounds} · Move ${input.superset.stepIndex + 1} of ${input.superset.stepCount}${sectionSuffix}`
     : `${session.sheetName || 'Workout'} · Exercise ${exerciseIndex + 1}/${exercises.length}${sectionSuffix}`;
-  body.innerHTML = `<div class="session-focus-card">
-      ${exercise.imageUrl ? `<img class="session-ex-image compact" src="${html(exercise.imageUrl)}" alt="${html(name)}" loading="eager" onerror="this.classList.add('placeholder');this.removeAttribute('src');this.textContent='No image'">` : '<div class="session-ex-image compact placeholder">No image</div>'}
-      <div class="session-focus-copy">
-        <span class="sr-only">${html(name)}</span>
-        <div class="session-focus-label">Target</div>
-        <div class="session-ex-target"><b>${targetSets}</b> sets <span class="dot"></span> <b>${html(targetValue)}</b>${targetUnit} <span class="dot"></span> <b>${restSec}s</b> rest</div>
-      </div>
+  const media = exercise.imageUrl
+    ? `<img class="session-ex-image wide" src="${html(exercise.imageUrl)}" alt="${html(name)}" loading="eager" onerror="this.classList.add('placeholder');this.removeAttribute('src');this.textContent='No image'">`
+    : '<div class="session-ex-image wide placeholder">No image</div>';
+  body.innerHTML = `<h2 class="sr-only">${html(name)}</h2>
+    ${media}
+    <div class="session-target-row">
+      <span class="session-target-label">Target</span>
+      <div class="session-ex-target"><b>${targetSets}</b> sets <span class="dot"></span> <b>${html(targetValue)}</b>${targetUnit} <span class="dot"></span> <b>${restSec}s</b> rest</div>
     </div>
-    ${currentSet}
-    <div class="session-set-plan"><div class="session-sets-label">Set plan</div><div class="session-sets">${rows}</div></div>
-    <button class="session-add-set" data-add-session-set="${html(slug)}" type="button">+ Add set</button>${instructionsMarkup}`;
+    <section class="session-set-plan" aria-label="Sets for ${html(name)}">
+      <div class="session-sets-label">Sets</div>
+      <div class="session-set-row session-set-columns" aria-hidden="true"><span></span><span>${timed ? 'Time' : 'Reps'}</span><span>Load ${html(unit)}</span><span></span></div>
+      <div class="session-sets" role="list">${rows}</div>
+      ${allSetsDone ? `<div class="session-ex-complete"><span>Exercise complete</span><strong>${setCounts[slug]} set${setCounts[slug] === 1 ? '' : 's'} logged</strong></div>` : ''}
+      <button class="session-add-set" data-add-session-set="${html(slug)}" type="button">+ Add set</button>
+    </section>${instructionsMarkup}`;
   const isLast = exerciseIndex >= exercises.length - 1;
   const nextLabel = input.superset && !input.superset.roundComplete ? 'Next move' : 'Next exercise';
   const prev = exerciseIndex > 0 ? `<button class="session-prev-btn" data-jump-ex="${exerciseIndex - 1}" type="button">Prev</button>` : '';

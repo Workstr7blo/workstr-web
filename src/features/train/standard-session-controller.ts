@@ -20,6 +20,7 @@ export class StandardSessionController {
   private exerciseIndex = 0;
   private setCounts: Record<string, number> = {};
   private readonly previousSets = new Map<string, SessionSetLog[]>();
+  private readonly expandedInstructions = new Set<string>();
   private readonly rest: RestTimer;
   private restAdvanceIndex: number | null = null;
 
@@ -72,7 +73,13 @@ export class StandardSessionController {
       void this.render(session);
     }; });
     const instructions = this.ctx.root.querySelector<HTMLElement>('[data-toggle-instructions]');
-    if (instructions) instructions.onclick = () => this.ctx.root.querySelector('#session-instructions')?.classList.toggle('open');
+    if (instructions) instructions.onclick = () => {
+      const key = instructions.dataset.toggleInstructions || '';
+      const open = !this.expandedInstructions.has(key);
+      if (open) this.expandedInstructions.add(key); else this.expandedInstructions.delete(key);
+      this.ctx.root.querySelector('#session-instructions')?.classList.toggle('open', open);
+      instructions.setAttribute('aria-expanded', String(open));
+    };
   }
 
   reconcileRest(): void { if (this.rest.active) this.rest.reconcile(); }
@@ -82,6 +89,7 @@ export class StandardSessionController {
     this.exerciseIndex = 0;
     this.setCounts = {};
     this.previousSets.clear();
+    this.expandedInstructions.clear();
     this.restAdvanceIndex = null;
   }
 
@@ -112,6 +120,7 @@ export class StandardSessionController {
         suggestedSetHint: (set, reps) => this.suggestedSetHint(set, reps),
         unitLabel: this.ctx.unitLabel,
         loggedSetCount: (slug) => this.loggedSetCount(session, slug), superset: null,
+        instructionsOpen: false,
         bindControls: () => this.bindControls()
       });
       return;
@@ -130,6 +139,7 @@ export class StandardSessionController {
       unitLabel: this.ctx.unitLabel,
       loggedSetCount: (slug) => this.loggedSetCount(session, slug),
       superset: supersetTransition(session, exercise.exerciseSlug, logged.length + 1),
+      instructionsOpen: this.expandedInstructions.has(exercise.exerciseSlug),
       startEmom: this.canStartEmom(session, exercises),
       emomPending: isEmomSession(session) && !session.emomStartedAt,
       bindControls: () => this.bindControls()

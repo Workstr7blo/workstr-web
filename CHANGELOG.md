@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The live workout screen is one worksheet instead of a stack of cards. The separate
+  "Log set 2 of 3" card is gone: the reps and load fields now sit in the set they belong to,
+  inside a list where every row shares the same Reps and Load columns, so a completed, the
+  current and an upcoming set line up under one heading and differ by weight rather than by
+  being three different boxes. The current set is the only lit row on the screen; previous
+  and suggested numbers sit under its fields rather than in a card of their own.
+- Set numbers carry forward. After you log a set, the next one opens on what you just
+  lifted rather than on the untouched prescription, and the previous/suggested hints now
+  appear from your second set onward instead of only when older history exists.
+- The exercise rail is a connected progress track rather than a row of tiles, and the
+  exercise image is a wide frame across the top. An exercise with no image gets a slim
+  strip instead of a screen-sized empty box.
+- Target sets, reps and rest are one line under the image, and the load column names your
+  unit once at the top instead of repeating kg or lbs on every row.
+
+### Fixed
+
+- "How to perform" opens again during a workout. Expanding it worked, but the first
+  background catalog refresh after a session starts rebuilds the screen and closed it
+  straight away; the session now remembers which exercise's instructions you opened.
+
 ## [2.4.0] - 2026-09-04
 
 ### Changed
