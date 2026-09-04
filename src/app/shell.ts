@@ -17,6 +17,8 @@ import type { ActiveSession, AppState, SubView, View } from './state';
 import { EX_PLACEHOLDER, exerciseImage, exerciseSourceLabel, filterExercises, formatMinutes, html } from './format';
 import { shellMarkup } from './layout';
 import { bindProgramBrowser } from './program-browser-controller';
+import { bindExerciseBrowser } from './exercise-browser-controller';
+import { exerciseResults } from './exercise-browser';
 import { createSessionRunner } from './session-runner';
 import { paintBodyMapSvg } from './bodymap';
 import { preservingScroll } from './scroll';
@@ -195,10 +197,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void catalog.refreshExercises(); }));
     root.querySelectorAll('#refresh-programs').forEach((button) => button.addEventListener('click', () => { void catalog.refreshPrograms(); }));
     root.querySelector('#ex-search')?.addEventListener('input', (event) => { state.filter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#ex-search'); input?.focus(); input?.setSelectionRange(state.filter.length, state.filter.length); });
-    root.querySelector('#ex-cat')?.addEventListener('change', (event) => { state.exFilter.cat = (event.target as HTMLSelectElement).value; render(); });
-    root.querySelector('#ex-muscle')?.addEventListener('change', (event) => { state.exFilter.muscle = (event.target as HTMLSelectElement).value; render(); });
-    root.querySelector('#ex-diff')?.addEventListener('change', (event) => { state.exFilter.diff = (event.target as HTMLSelectElement).value; render(); });
-    root.querySelector('#ex-equip')?.addEventListener('change', (event) => { state.exFilter.equip = (event.target as HTMLSelectElement).value; render(); });
+    bindExerciseBrowser({ root, state, render });
     root.querySelector('#ex-grid')?.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
       const card = target.closest<HTMLElement>('[data-slug]');
@@ -219,7 +218,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root.querySelector('#lib-select-toggle')?.addEventListener('click', () => { state.librarySelect = { active: true, slugs: new Set() }; render(); });
     root.querySelector('#lib-select-cancel')?.addEventListener('click', () => { state.librarySelect = { active: false, slugs: new Set() }; render(); });
     root.querySelector('#lib-select-all')?.addEventListener('click', () => {
-      const visible = filterExercises(state.library, { ...state.exFilter, q: state.filter, ownedEquipment: state.settings.ownedEquipment }).map((exercise) => exercise.slug);
+      const visible = exerciseResults('library', state).map((exercise) => exercise.slug);
       const allSelected = visible.length > 0 && visible.every((slug) => state.librarySelect.slugs.has(slug));
       state.librarySelect.slugs = allSelected ? new Set() : new Set(visible);
       render();
@@ -228,10 +227,6 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root.querySelector('#discover-refresh')?.addEventListener('click', () => { void catalog.refreshExercises(); });
     root.querySelector('#program-discover-refresh')?.addEventListener('click', () => { void catalog.refreshPrograms(); });
     root.querySelector('#discover-search')?.addEventListener('input', (event) => { state.discoverFilter.q = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#discover-search'); input?.focus(); input?.setSelectionRange(state.discoverFilter.q.length, state.discoverFilter.q.length); });
-    root.querySelector('#discover-cat')?.addEventListener('change', (event) => { state.discoverFilter.cat = (event.target as HTMLSelectElement).value; render(); });
-    root.querySelector('#discover-muscle')?.addEventListener('change', (event) => { state.discoverFilter.muscle = (event.target as HTMLSelectElement).value; render(); });
-    root.querySelector('#discover-diff')?.addEventListener('change', (event) => { state.discoverFilter.diff = (event.target as HTMLSelectElement).value; render(); });
-    root.querySelector('#discover-equip')?.addEventListener('change', (event) => { state.discoverFilter.equip = (event.target as HTMLSelectElement).value; render(); });
     root.querySelector('#discover-grid')?.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
       const card = target.closest<HTMLElement>('[data-address]');
@@ -253,7 +248,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root.querySelector('#discover-select-toggle')?.addEventListener('click', () => { state.discoverSelect = { active: true, addresses: new Set() }; render(); });
     root.querySelector('#discover-select-cancel')?.addEventListener('click', () => { state.discoverSelect = { active: false, addresses: new Set() }; render(); });
     root.querySelector('#discover-select-all')?.addEventListener('click', () => {
-      const visible = filterExercises(state.discoverExercises, { ...state.discoverFilter, ownedEquipment: state.settings.ownedEquipment });
+      const visible = exerciseResults('discover', state);
       const importable = discoverImportable(visible, state.library).map((exercise) => exercise.nostr_address || exercise.slug);
       const allSelected = importable.length > 0 && importable.every((address) => state.discoverSelect.addresses.has(address));
       state.discoverSelect.addresses = allSelected ? new Set() : new Set(importable);

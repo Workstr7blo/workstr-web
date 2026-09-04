@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { libraryPanel } from '../src/features/library/views';
 import { discoverPanel } from '../src/features/discover/views';
 import { shellMarkup } from '../src/app/layout';
+import { exerciseFilterSheet } from '../src/app/exercise-browser';
 import { MY_EQUIPMENT } from '../src/core/equipment';
 import type { Exercise, WorkstrSettings } from '../src/core/types';
 import type { AppState } from '../src/app/state';
@@ -42,34 +43,39 @@ function state(partial: Partial<AppState> = {}, settings: Partial<WorkstrSetting
 }
 
 describe('equipment filter in the grids', () => {
-  it('marks both exercise grids with compact non-scrolling polish hooks', () => {
+  // The permanent selects became a filter sheet, so the equipment control is asserted where
+  // it lives now. What is guaranteed has not changed: both views offer it, it lists what the
+  // grid actually holds, and "My equipment" appears only once a kit exists.
+  it('gives both grids a compact toolbar instead of a panel of selects', () => {
     const html = libraryPanel(state());
     const discover = discoverPanel(state({ discoverExercises: library }));
-    expect(html).toContain('class="panel library-panel"');
-    expect(html).toContain('class="filter-bar library-filter-bar"');
-    expect(html).toContain('class="library-filter-chips"');
+    expect(html).toContain('class="program-toolbar"');
     expect(html).toContain('id="ex-grid" class="ex-grid exercise-library-grid"');
-    expect(discover).toContain('class="panel discover-exercise-panel"');
-    expect(discover).toContain('class="filter-bar discover-filter-bar"');
-    expect(discover).toContain('class="discover-filter-chips"');
+    expect(html).not.toContain('library-filter-chips');
+    expect(html).not.toContain('<select');
+    expect(discover).toContain('class="program-toolbar"');
     expect(discover).toContain('id="discover-grid" class="ex-grid discover-exercise-grid"');
+    expect(discover).not.toContain('discover-filter-chips');
+    expect(discover).not.toContain('<select');
   });
 
-  it('renders an equipment select in both filter bars', () => {
-    expect(libraryPanel(state())).toContain('id="ex-equip"');
-    expect(discoverPanel(state({ discoverExercises: library }))).toContain('id="discover-equip"');
+  it('offers an equipment group in each view\'s filter sheet', () => {
+    const library = exerciseFilterSheet(state({ exerciseFilterSheet: 'library' }));
+    const discover = exerciseFilterSheet(state({ exerciseFilterSheet: 'discover', discoverExercises: [] }));
+    expect(library).toContain('id="exercise-filter-group-equip"');
+    expect(discover).toContain('id="exercise-filter-group-equip"');
   });
 
   it('lists each equipment value found in the grid', () => {
-    const html = libraryPanel(state());
+    const html = exerciseFilterSheet(state({ exerciseFilterSheet: 'library' }));
     expect(html).toContain('>Body Weight<');
     expect(html).toContain('>Dumbbell<');
     expect(html).toContain('>Barbell<');
   });
 
   it('offers My equipment only once a kit is saved', () => {
-    expect(libraryPanel(state())).not.toContain('My equipment');
-    expect(libraryPanel(state({}, { ownedEquipment: ['dumbbell'] }))).toContain('My equipment');
+    expect(exerciseFilterSheet(state({ exerciseFilterSheet: 'library' }))).not.toContain('My equipment');
+    expect(exerciseFilterSheet(state({ exerciseFilterSheet: 'library' }, { ownedEquipment: ['dumbbell'] }))).toContain('My equipment');
   });
 
   it('narrows the grid to the kit and keeps the empty state honest', () => {

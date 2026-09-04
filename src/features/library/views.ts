@@ -1,38 +1,18 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
-import { difficultyBadgeClass, equipmentSelectHtml, EX_PLACEHOLDER, exerciseFilterValues, exerciseSourceLabel, fillSelectHtml, filterExercises, html } from '../../app/format';
-import { ownedEquipmentKeys } from '../../core/equipment';
+import { difficultyBadgeClass, EX_PLACEHOLDER, exerciseSourceLabel, html } from '../../app/format';
+import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults, exerciseToolbar } from '../../app/exercise-browser';
 
 export function libraryPanel(state: AppState): string {
-  const filters = exerciseFilterValues(state.library);
-  const owned = ownedEquipmentKeys(state.settings.ownedEquipment);
-  const list = filterExercises(state.library, { ...state.exFilter, q: state.filter, ownedEquipment: owned });
-  const hasFilters = Boolean(state.filter || state.exFilter.cat || state.exFilter.muscle || state.exFilter.diff || state.exFilter.equip);
+  const list = exerciseResults('library', state);
+  const sel = state.librarySelect;
+  const hasFilters = Boolean(exerciseQuery('library', state) || activeFacetCount('library', state));
   const emptyText = state.library.length === 0 && !hasFilters
     ? '<p>Your library is empty. Add exercises from the Workstr catalog.</p><button class="button primary" data-parent="exercises" data-subtab="discover">Browse Discover</button>'
     : 'No exercises match.';
-  const sel = state.librarySelect;
-  const allVisibleSelected = list.length > 0 && list.every((exercise) => sel.slugs.has(exercise.slug));
-  const headActions = sel.active
-    ? `<span class="head-actions">
-        <button class="button small" id="lib-select-all">${allVisibleSelected ? 'Clear all' : 'Select all'}</button>
-        <button class="button danger small" id="lib-delete-selected"${sel.slugs.size ? '' : ' disabled'}>Delete (${sel.slugs.size})</button>
-        <button class="button small" id="lib-select-cancel">Done</button>
-      </span>`
-    : `<span class="head-actions">
-        <button class="button small" id="lib-select-toggle"${state.library.length ? '' : ' disabled'}>Select</button>
-      </span>`;
-  return `<div class="panel library-panel">
-    <div class="panel-head"><span>Exercise library</span>${headActions}</div>
-    <div class="filter-bar library-filter-bar">
-      <input class="grow" id="ex-search" placeholder="Search exercises..." autocomplete="off" value="${html(state.filter)}" />
-      <div class="library-filter-chips">
-        ${fillSelectHtml('ex-cat', filters.categories, 'All categories', state.exFilter.cat)}
-        ${fillSelectHtml('ex-muscle', filters.muscles, 'All muscles', state.exFilter.muscle)}
-        ${fillSelectHtml('ex-diff', filters.difficulties, 'All levels', state.exFilter.diff)}
-        ${equipmentSelectHtml('ex-equip', filters.equipment, state.exFilter.equip, owned.length)}
-      </div>
-    </div>
+  return `<div class="library-panel">
+    ${exerciseToolbar('library', state)}
+    ${exerciseActiveFilters('library', state)}
     <div id="ex-grid" class="ex-grid exercise-library-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => exerciseCardHtml(exercise, sel.active, sel.slugs.has(exercise.slug))).join('')}</div>
     <div id="ex-empty" class="empty" style="display:${list.length ? 'none' : 'block'}">${emptyText}</div>
   </div>`;

@@ -330,6 +330,11 @@
 }
 @keyframes program-sheet-in { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .program-filter-sheet { animation: none; } }
+/* The selection bar is rendered only while selecting, so it mounts already open and the
+   stylesheet's translate transition has nothing to animate from. Give it the same entry
+   the sheet has. */
+.bulk-bar.open { animation: program-sheet-in .2s cubic-bezier(.22, .61, .36, 1); }
+@media (prefers-reduced-motion: reduce) { .bulk-bar.open { animation: none; } }
 .program-filter-sheet-handle { width: 40px; height: 4px; margin: 10px auto 2px; border-radius: 999px; background: var(--chrome-raised); }
 .program-filter-sheet-header { padding: 8px 20px 4px; text-align: center; }
 .program-filter-sheet-header h2 { margin: 0; font: 850 15px/1.2 inherit; letter-spacing: -.02em; }
@@ -364,39 +369,11 @@
 .tag-pill.auto { opacity: .82; }
 .builder-auto-empty { color: var(--dim); font-size: 13px; }
 
-/* Exercise tab polish: keep the purple atmosphere, but make browsing feel lighter
-   than a full-height showcase card stack. */
-.library-panel,
-.discover-exercise-panel {
-  padding: clamp(16px, 3.5vw, 20px);
-  border-color: rgba(var(--accent-line-rgb), .14);
-  background:
-    radial-gradient(circle at 18% 0%, rgba(var(--accent-rgb), .16), transparent 34%),
-    linear-gradient(180deg, rgba(var(--surface-panel-rgb), .84), rgba(var(--void-deep-rgb), .68));
-  box-shadow: 0 18px 54px rgba(0,0,0,.32);
-}
-.library-panel .panel-head,
-.discover-exercise-panel .panel-head { margin-bottom: 10px; }
-.library-filter-bar,
-.discover-filter-bar { display: grid; gap: 8px; margin-top: 4px; }
-.library-filter-chips,
-.discover-filter-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.library-filter-bar input,
-.library-filter-bar select,
-.discover-filter-bar input,
-.discover-filter-bar select {
-  min-height: 40px;
-  padding: 9px 12px;
-  border-radius: 999px;
-  background: rgba(0,0,0,.22);
-  font-size: 13px;
-}
-.library-filter-bar .grow,
-.discover-filter-bar .grow { width: 100%; min-width: 0; }
-.library-filter-bar select,
-.discover-filter-bar select { width: 100%; min-width: 0; }
+/* The exercise views are the grid plus their toolbar now; the panel that used to frame
+   them is gone, so the surface treatment went with it. */
 .exercise-library-grid,
-.discover-exercise-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 14px; }
+.discover-exercise-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 4px; }
+.discover-status { margin-bottom: 12px; }
 .library-panel .ex-card,
 .discover-exercise-panel .ex-card { border-radius: 16px; background: rgba(255,255,255,.026); }
 .library-panel .card-img,
@@ -424,10 +401,22 @@
 }
 
 @media (max-width: 430px) {
-  .library-panel,
-  .discover-exercise-panel { padding: 15px; border-radius: 20px; }
+  /* Two per row. A full-width photo card is ~390px tall, so barely two were visible at
+     once in a library you scan by picture. */
+  .exercise-library-grid,
+  .discover-exercise-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .library-panel .card-body,
-  .discover-exercise-panel .card-body { padding: 9px 11px 11px; }
+  .discover-exercise-panel .card-body { padding: 8px 9px 10px; }
+  .library-panel .card-name,
+  .discover-exercise-panel .card-name { font-size: 13px; gap: 4px; }
+  .library-panel .card-meta,
+  .discover-exercise-panel .card-meta { gap: 5px; }
+  .library-panel .card-meta .card-tag,
+  .discover-exercise-panel .card-meta .card-tag { padding: 3px 6px; font-size: 9px; }
+  .library-panel .source-badge,
+  .discover-exercise-panel .source-badge,
+  .library-panel .diff-badge,
+  .discover-exercise-panel .diff-badge { padding: 3px 6px; font-size: 8px; letter-spacing: .02em; }
   .builder-goal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 

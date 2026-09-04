@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Exercises gets the same treatment Programs did. The panel, its heading and the four
+  permanent Category/Muscle/Level/Equipment selects are gone, replaced by one row: search, a
+  filter button, and the view's own actions. On a 390px phone the first exercise now sits
+  76px below the sub-tabs instead of 214px in Library and 365px in Discover. Advanced
+  filters moved into the same kind of sheet, with removable chips for whatever is active,
+  and Library and Discover keep their filters separate exactly as before — filtering one
+  does not touch the other. Select mode's actions moved into a bar that slides up above the
+  bottom navigation, so search stays usable while you pick things. Discover's paragraph
+  about importing now appears in the empty state instead of above every visit.
+- Exercise cards show two per row on phones. A full-width photo card was around 390px tall,
+  so barely two were visible at once in a library you scan by picture; ten now fit one
+  screen.
 - Workouts → Programs is a program browser instead of a form. The panel wrapper, the second
   "Programs" heading, the helper line and the four permanent Goal/Focus/Format/Equipment
   selects are gone, replaced by one row: search, a filter button, and create. On a 390px
