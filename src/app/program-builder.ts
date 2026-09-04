@@ -146,7 +146,7 @@ function renderModal(): void {
         <div class="subsection-head"><span>Normal strength section</span></div>`
       : `<div class="subsection-head"><span>EMOM sections</span></div>`}
     <div id="builder-rows" class="builder-rows"></div>
-    ${current.mode !== 'normal' ? '<button class="button ghost emom-add-section" id="add-emom-section" type="button">+ Add EMOM section</button>' : ''}
+    ${current.mode !== 'normal' ? '<button class="button emom-add-section" id="add-emom-section" type="button">+ Add EMOM section</button>' : ''}
     <div class="form-actions"><button class="button primary" id="sheet-save" type="button">${current.sheetId ? 'Save program' : 'Create program'}</button></div>
     </div>`);
   renderRows();

@@ -77,7 +77,7 @@ export function moneroAddressBody(monero: MoneroAddressState = IDLE, signedIn = 
     <p class="section-help">Use a fresh Monero subaddress. This address is public and replicated across relays. It is not stored in Workstr sync.</p>
     <div class="settings-row-actions">
       <button id="monero-address-save" class="button payment" ${busy ? 'disabled' : ''}>${clearing ? 'Remove address' : 'Save address'}</button>
-      <button id="monero-address-refresh" class="button ghost" ${busy ? 'disabled' : ''}>Refresh from relays</button>
+      <button id="monero-address-refresh" class="button" ${busy ? 'disabled' : ''}>Refresh from relays</button>
     </div>`;
 }
 

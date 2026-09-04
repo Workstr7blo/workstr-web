@@ -121,7 +121,7 @@ export function createSessionSummary(ctx: SessionSummaryContext): SessionSummary
       <div class="summary-compare"><div class="empty">First local web session — comparison appears after you repeat this workout.</div></div>
       <div class="form-actions">
         ${state.pubkey ? '<button class="button primary" id="finish-publish" type="button">Publish summary</button>' : '<button class="button primary" id="finish-publish" type="button" disabled title="Sign in with your Nostr signer in Settings to publish">Publish summary</button>'}
-        <button class="button ghost" id="finish-done" type="button">Done</button>
+        <button class="button quiet" id="finish-done" type="button">Done</button>
       </div>`);
     root.querySelector('#finish-publish')?.addEventListener('click', (event) => { void publish(session, event.currentTarget as HTMLButtonElement); });
     root.querySelector('#finish-done')?.addEventListener('click', ctx.closeModal);

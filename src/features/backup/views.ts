@@ -108,7 +108,7 @@ export function backupPanel(state: BackupPanelState): string {
   const syncAction = !state.signedIn
     ? '<span class="settings-muted-action">Use Account above</span>'
     : state.enabled
-      ? `<label class="settings-switch"><input type="checkbox" id="auto-backup" checked />Auto-sync</label><button id="sync-now" class="button ghost" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button>`
+      ? `<label class="settings-switch"><input type="checkbox" id="auto-backup" checked />Auto-sync</label><button id="sync-now" class="button" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button>`
       : '<button id="enable-sync" class="button primary">Turn on sync</button>';
   const live = state.enabled
     ? `<div class="backup-live" id="backup-status"><span class="settings-live-label">${html(statusLine(state))}</span>${progressMarkup(state.sync.progress)}</div>${eraLine}`
@@ -129,7 +129,7 @@ export function backupPanel(state: BackupPanelState): string {
         <div class="settings-control-heading"><span><strong>Manual backup</strong><small>A portable archive for this device.</small></span></div>
         <div class="settings-row-main manual-backup-row">
           <div><strong>Export or import</strong><small>JSON includes all local training data.</small></div>
-          <div class="settings-row-actions"><button id="export-data" class="button ghost">Export JSON</button><button id="import-data" class="button ghost">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
+          <div class="settings-row-actions"><button id="export-data" class="button">Export JSON</button><button id="import-data" class="button">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
         </div>
       </section>
     </div>

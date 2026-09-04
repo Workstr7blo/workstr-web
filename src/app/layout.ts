@@ -177,7 +177,7 @@ function workoutsView(state: AppState): string {
       <div class="panel"><div class="panel-head"><span>Programs</span><button class="button primary small" id="new-program">+ New program</button></div><p class="section-help">Build, edit, and start your training programs.</p>${programFilterBar('program-filter', 'Search programs...', state)}<div class="program-list">${locals.map((program) => programCard(program, state, { showPayment: false })).join('') || '<div class="empty">No programs match yet. Build one, import from Discover, or clear a filter.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
-      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button ghost small" id="program-discover-refresh" type="button">Refresh</button></div><p class="section-help">Relay programs published by Workstr and Beast Mode creators. Import a program to add a local copy to your Programs library before editing or running it.</p>${programFilterBar('program-discover-filter', 'Search relay programs...', state)}<div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div><div class="program-list">${programs.map((program) => programCard(program, state, { showPayment: true, zapRank: topProgramRanks.get(program.address) })).join('') || '<div class="empty">No relay programs match. Refresh or clear a filter.</div>'}</div></div>
+      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button small" id="program-discover-refresh" type="button">Refresh</button></div><p class="section-help">Relay programs published by Workstr and Beast Mode creators. Import a program to add a local copy to your Programs library before editing or running it.</p>${programFilterBar('program-discover-filter', 'Search relay programs...', state)}<div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div><div class="program-list">${programs.map((program) => programCard(program, state, { showPayment: true, zapRank: topProgramRanks.get(program.address) })).join('') || '<div class="empty">No relay programs match. Refresh or clear a filter.</div>'}</div></div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Your training month at a glance, then every session below.</p>${historyCalendarPanel(state)}${workoutHistory(state)}</div>
@@ -226,8 +226,8 @@ function nwcWalletRows(state: AppState): string {
   return `<div class="settings-row-main nwc-wallet-row">
     <div><strong>Zap wallet (NWC)</strong><small>${html(redactNwcSecrets(detail))}</small></div>
     <div class="settings-row-actions">
-      <button id="nwc-connect" class="button ${state.nwc.active ? 'ghost' : 'primary'}">${state.nwc.active ? 'Replace wallet' : 'Connect wallet'}</button>
-      ${state.nwc.active ? '<button id="nwc-disconnect" class="button ghost">Disconnect</button>' : ''}
+      <button id="nwc-connect" class="button ${state.nwc.active ? '' : 'payment'}">${state.nwc.active ? 'Replace wallet' : 'Connect wallet'}</button>
+      ${state.nwc.active ? '<button id="nwc-disconnect" class="button quiet">Disconnect</button>' : ''}
     </div>
   </div>`;
 }
@@ -242,7 +242,7 @@ function settingsView(state: AppState): string {
     ? `<img class="settings-account-avatar" src="${html(state.profilePicture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="settings-account-avatar fallback" hidden>${html(initial)}</span>`
     : `<span class="settings-account-avatar fallback">${html(initial)}</span>`;
   const account = state.pubkey
-    ? `<div class="settings-row-main account-row"><div class="settings-account-identity">${accountAvatar}<span><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></span></div><div class="settings-row-actions"><button id="sign-out-settings" class="button ghost small">Sign out</button><button id="remove-account-data" class="button danger small">Remove data</button></div></div>`
+    ? `<div class="settings-row-main account-row"><div class="settings-account-identity">${accountAvatar}<span><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></span></div><div class="settings-row-actions"><button id="sign-out-settings" class="button small">Sign out</button><button id="remove-account-data" class="button quiet danger small">Remove data</button></div></div>`
     : `<div class="settings-row-main account-row"><div><strong>Local only</strong><small>Use Workstr now, add encrypted sync when ready.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Account</button></div></div>`;
   const relay = state.settings.workstrRelay || 'default Workstr relay';
   const signerType = state.signerType || (state.pubkey ? 'unknown' : 'none');

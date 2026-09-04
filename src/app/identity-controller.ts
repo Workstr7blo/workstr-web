@@ -90,7 +90,7 @@ function askAdoptChoice(pubkey: string, signerType: AppState['signerType']): voi
     <p class="section-help">This identity already has Workstr data on this device. Pick the dataset to continue with — the two are never merged. Keeping this device's data replaces the identity's copy on this device.</p>
     <div class="web-empty-actions">
       <button id="adopt-keep-device" class="button primary">Keep this device's data</button>
-      <button id="adopt-use-account" class="button ghost">Use the account's data</button>
+      <button id="adopt-use-account" class="button">Use the account's data</button>
     </div>`);
   root.querySelector('#adopt-keep-device')?.addEventListener('click', () => { closeModal(); void adoptLocalAndOpen(pubkey, signerType); });
   root.querySelector('#adopt-use-account')?.addEventListener('click', () => { closeModal(); void openAndRender(pubkey, signerType); });
@@ -186,8 +186,8 @@ function loginTabMarkup(): string {
     <p class="section-help">Restore an existing Workstr account with your recovery key, or connect a mobile signer.</p>
     <div class="settings-auth-options single-column">
       <button id="restore-local-account" class="button primary" type="button">Restore with recovery key</button>
-      <button id="connect-remote-signer" class="button ghost" type="button">Use mobile signer</button>
-      ${hasNip07() ? '<button id="connect-extension-signer" class="button ghost" type="button">Use browser extension</button>' : ''}
+      <button id="connect-remote-signer" class="button" type="button">Use mobile signer</button>
+      ${hasNip07() ? '<button id="connect-extension-signer" class="button" type="button">Use browser extension</button>' : ''}
     </div>
     <button id="continue-local" class="auth-link-button" type="button">Continue locally on this device</button>
   </div>`;
@@ -198,8 +198,8 @@ function createTabMarkup(): string {
     <p class="section-help">Create a device-managed account for fast encrypted sync. Workstr will show a recovery key next — save it in your password manager.</p>
     <div class="settings-auth-options single-column">
       <button id="create-local-account" class="button primary" type="button">Create encrypted sync account</button>
-      <button id="connect-remote-signer" class="button ghost" type="button">Use mobile signer instead</button>
-      ${hasNip07() ? '<button id="connect-extension-signer" class="button ghost" type="button">Use browser extension instead</button>' : ''}
+      <button id="connect-remote-signer" class="button" type="button">Use mobile signer instead</button>
+      ${hasNip07() ? '<button id="connect-extension-signer" class="button" type="button">Use browser extension instead</button>' : ''}
     </div>
     <button id="continue-local" class="auth-link-button" type="button">Continue locally for now</button>
   </div>`;
@@ -221,7 +221,7 @@ function showRecoveryKeyModal(pubkey: string, nsec: string): void {
     <p class="section-help">This key restores your encrypted training data on another device. Workstr cannot recover it for you. Store it in a password manager and never share it.</p>
     <div class="terminal-mini recovery-key-box">${html(nsec)}</div>
     <div class="web-empty-actions">
-      <button id="copy-recovery-key" class="button ghost" type="button">Copy recovery key</button>
+      <button id="copy-recovery-key" class="button" type="button">Copy recovery key</button>
       <button id="continue-local-account" class="button primary" type="button">I saved it</button>
     </div>
     <p class="section-help">Workstr saves this key only in this browser profile on this device. This is convenient, but less protected than a dedicated signer.</p>`);
@@ -240,7 +240,7 @@ function showRestoreLocalAccountModal(input = '', error: string | null = null): 
     <p class="section-help">Only use this on a device you trust. For maximum key protection, use a dedicated signer instead.</p>
     <div class="web-empty-actions">
       <button id="restore-local-key" class="button primary" type="button">Use this key</button>
-      <button id="restore-use-signer" class="button ghost" type="button">Use signer instead</button>
+      <button id="restore-use-signer" class="button" type="button">Use signer instead</button>
     </div>`);
   const keyInput = root.querySelector<HTMLTextAreaElement>('#local-key-input');
   if (input && keyInput) {
@@ -277,8 +277,8 @@ function renderConnectModal(): void {
       : 'Scan the QR code with your NIP-46 signer app (Clave, Amber, ...). Once you approve, this tab signs in automatically.'}</p>
     <div class="signer-qr">${renderSVG(uri, { border: 2 })}</div>
     <div class="web-empty-actions">
-      <button id="connect-copy" class="button ghost" type="button">Copy secret</button>
-      <button id="connect-open" class="button ghost" type="button">Open signer app</button>
+      <button id="connect-copy" class="button" type="button">Copy secret</button>
+      <button id="connect-open" class="button" type="button">Open signer app</button>
     </div>
     <details class="auth-bunker-details">
       <summary>Paste bunker URL instead</summary>

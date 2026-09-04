@@ -100,13 +100,13 @@ export function quickWorkoutPanel(state: AppState): string {
             <div class="qw-item-meta">${html(exercise.muscleGroup)} · ${exercise.sets} × ${html(exercise.reps)}</div>
           </div>
           <div class="qw-item-actions">
-            ${hasSwap ? `<button class="button ghost small" data-qw-swap="${index}">Swap</button>` : ''}
-            <button class="button ghost small" data-qw-remove="${index}" title="Remove">✕</button>
+            ${hasSwap ? `<button class="button small" data-qw-swap="${index}">Swap</button>` : ''}
+            <button class="button quiet small" data-qw-remove="${index}" title="Remove">✕</button>
           </div>
         </div>`;
       }).join('')}</div>
       <div class="qw-actions">
-        <button class="button gold" id="qw-start">Start workout</button>
+        <button class="button primary" id="qw-start">Start workout</button>
       </div>
     </div>
   </div>`;

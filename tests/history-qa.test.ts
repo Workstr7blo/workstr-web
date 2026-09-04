@@ -212,7 +212,7 @@ describe('neighbouring features read the same rows', () => {
   it('still reports a published session as published', () => {
     const published = { ...session(6, at(2026, 8, 19)), nostrEventId: 'event-id' };
     const doc = parse(sessionDetail(published, 'kg', true));
-    expect(doc.querySelector('.workout-card-actions .button.ghost')?.textContent).toBe('Published');
+    expect(doc.querySelector('.workout-card-actions .button[disabled]')?.textContent).toBe('Published');
     expect(doc.querySelector('[data-publish-session]')).toBeNull();
     // A published workout can still be repeated.
     expect(doc.querySelector('[data-repeat-session]')).not.toBeNull();

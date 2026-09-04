@@ -74,7 +74,7 @@ function emomSectionsMarkup(current: BuilderState, unit: WeightUnit): string {
         <small>${Math.ceil(sectionSeconds / 60)} rounds · every 1:00</small>
       </div>
       <div class="emom-section-exercises">
-        <div class="emom-section-exercise-head"><span>Every minute</span><button class="button ghost small" type="button" data-toggle-section-picker="${sectionIndex}">+ Add move</button></div>
+        <div class="emom-section-exercise-head"><span>Every minute</span><button class="button small" type="button" data-toggle-section-picker="${sectionIndex}">+ Add move</button></div>
         <div class="emom-library-picker" data-section-picker="${sectionIndex}" hidden>${exerciseOptions.replaceAll('SECTION_INDEX', String(sectionIndex)) || '<div class="empty">Your library is empty.</div>'}</div>
         ${rows.length ? `<div class="emom-rx-list">${rows.map(({ row, index }) => rowMarkup(row, index, current, unit)).join('')}</div>` : '<div class="empty emom-section-empty">Choose one exercise for this section.</div>'}
       </div>

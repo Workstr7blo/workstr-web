@@ -133,7 +133,7 @@ export function bodyView(state: AppState): string {
         <div class="body-goal-bar"><div class="body-goal-fill" style="width:${pct.toFixed(0)}%"></div></div>
         <div class="body-goal-labels"><span>${wd(startW).toFixed(1)} ${unit}</span><span>${remaining > 0 ? '+' : ''}${wd(remaining).toFixed(1)} ${unit} to go</span><span>${wd(targetKg).toFixed(1)} ${unit}</span></div>`;
     }
-    listHtml = `<div id="body-list" class="list">${entries.map((entry) => `<div class="row"><div><strong>${wd(entry.weight_kg)} ${unit}</strong><small>${html(entry.date)}${entry.notes ? ' · ' + html(entry.notes) : ''}</small></div><button class="button danger small" data-del-body="${entry.id}">×</button></div>`).join('')}</div>`;
+    listHtml = `<div id="body-list" class="list">${entries.map((entry) => `<div class="row"><div><strong>${wd(entry.weight_kg)} ${unit}</strong><small>${html(entry.date)}${entry.notes ? ' · ' + html(entry.notes) : ''}</small></div><button class="button quiet danger small" data-del-body="${entry.id}">×</button></div>`).join('')}</div>`;
   }
   return `<div class="panel">
     <div class="panel-head"><span>Body weight</span><span class="section-label" id="body-unit">${unit}</span></div>

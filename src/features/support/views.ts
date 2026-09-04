@@ -86,9 +86,9 @@ export function supportPanel(state: SupportState = { status: 'idle', receipts: [
         <small>${html(summary)}</small>
       </div>
       <div class="settings-row-actions">
-        ${moneroMode ? '' : `<button id="open-nwc-zap" class="button primary" ${nwc.active && signedIn ? '' : 'disabled'}>Zap with wallet</button>`}
-        <a id="open-zap-target" class="button ghost" href="${html(OPERATOR_NOSTR_URL)}" target="_blank" rel="noreferrer">External zap</a>
-        <button id="copy-npub" class="button ghost" data-copy="${html(npub)}">Copy npub</button>
+        ${moneroMode ? '' : `<button id="open-nwc-zap" class="button payment" ${nwc.active && signedIn ? '' : 'disabled'}>Zap with wallet</button>`}
+        <a id="open-zap-target" class="button" href="${html(OPERATOR_NOSTR_URL)}" target="_blank" rel="noreferrer">External zap</a>
+        <button id="copy-npub" class="button" data-copy="${html(npub)}">Copy npub</button>
       </div>
     </div>
     ${moneroMode ? `<div class="nwc-support-status">

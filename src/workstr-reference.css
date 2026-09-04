@@ -9,9 +9,10 @@
    for anything that should follow the payment mode, `--chrome-*`/`--surface-*` for dark
    panel fills, and `--payment-accent` for creator-payment affordances specifically.
 
-   `--bitcoin-gold` is deliberately NOT a payment token: it doubles as the primary
-   log/train action colour (see `.button.gold`), so payment surfaces use `--payment-accent`
-   and leave gold alone. */
+   `--bitcoin-gold` is deliberately NOT a payment token: it marks records, badges and
+   training accents across the app, so payment surfaces use `--payment-accent` and leave
+   gold alone. Buttons take no colour token directly at all — they set the `--btn-*` dials
+   documented above `.button`. */
 :root {
   /* Accent channels */
   --accent-rgb: 124, 60, 255;        /* primary accent */
@@ -45,8 +46,9 @@
   --on-accent: #fff;                 /* foreground on an accent fill */
 
   /* Creator-payment accent. Defaults to Lightning gold; Monero Mode swaps it.
-     Kept separate from --bitcoin-gold on purpose: gold is also the log/train action
-     colour, so repointing it would drag the training UI along with the payment UI. */
+     Kept separate from --bitcoin-gold on purpose: gold also marks records, badges and
+     training accents, so repointing it would drag the training UI along with the payment
+     UI. */
   --payment-rgb: 247, 147, 26;
   --payment-accent: rgb(var(--payment-rgb));
   --payment-accent-strong: #ffbd4a;  /* second stop of the payment CTA gradient */
@@ -63,8 +65,13 @@
   --dim: #685b82;
   --monero-orange: #ff6600;
   --bitcoin-gold: #f7931a;
-  --danger-red: #ff3864;
-  --success-green: #00d084;
+  --danger-rgb: 255, 56, 100;
+  --danger-red: rgb(var(--danger-rgb));
+  --danger-ink: #ffd6df;                /* label on a red pane */
+  --danger-soft: #c08b98;               /* label at rest with no pane behind it */
+  --danger-lit: #ff8fa6;                /* the same label once it is pointed at */
+  --success-rgb: 0, 208, 132;
+  --success-green: rgb(var(--success-rgb));
   --shadow: 0 0 60px rgba(var(--accent-rgb), 0.2), inset 0 1px 0 rgba(255,255,255,0.04);
   --sidebar-w: 88px;
   --topbar-h: 62px;
@@ -151,15 +158,104 @@ h2, h3 { letter-spacing: -.03em; }
 .sub-panel { display: none; }
 .sub-panel.active { display: block; }
 
-.button { display: inline-flex; align-items: center; gap: 7px; border-radius: 12px; padding: 12px 16px; text-decoration: none; font-weight: 800; border: 1px solid var(--border); cursor: pointer; font: inherit; color: var(--text); background: rgba(255,255,255,.035); transition: transform .08s ease, opacity .15s ease, border-color .15s ease; }
+/* Buttons: one material, three ranks, four domains.
+
+   Every control in the app is the same pane of tinted glass. A dark translucent fill with
+   the domain's hue dissolved into it, a lit lip along the top edge, and the hue carried by
+   the label rather than by a saturated slab behind it.
+
+   Hue encodes domain and nothing else:
+
+     violet   --accent-rgb    Workstr acting on your training
+     gold     --payment-rgb   money, and only money (Monero Mode repaints it)
+     red      --danger-rgb    destroys something
+     neutral  white           everything else
+
+   Rank is *not* a second hue. It is how much light the lip catches, so a lead action and
+   the buttons beside it stay recognisably the same object:
+
+     lead      the lip is lit in the domain's own hue
+     standard  a faint white lip
+     quiet     no lip and no pane at all until the pointer or focus arrives
+
+   `--btn-cast` is a tight downward lift shadow, not a bloom. Glass is lit from its edge;
+   the app already glows in five other places and a sixth halo would read as more neon
+   rather than more important.
+
+   Six dials drive the one rule below. A variant sets dials; it never restates the recipe. */
+.button {
+  --btn-tint: 255, 255, 255;
+  --btn-fill: .055;
+  --btn-edge: .16;
+  --btn-lip: rgba(255, 255, 255, .07);
+  --btn-sheen: .06;
+  --btn-ink: var(--text);
+  --btn-cast: 0;
+
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 12px 16px; border-radius: 12px;
+  border: 1px solid rgba(var(--btn-tint), var(--btn-edge));
+  color: var(--btn-ink);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, var(--btn-sheen)), rgba(255, 255, 255, 0) 58%),
+    rgba(var(--btn-tint), var(--btn-fill));
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 var(--btn-lip), 0 8px 20px -14px rgba(var(--btn-tint), var(--btn-cast));
+  /* Explicit, because `font: inherit` here used to hand a button whatever the container
+     had: monospace 700 inside a panel head, sans 700 inside a card, and never the weight
+     this rule asked for. Monospace stays reserved for data and labels. */
+  font: 800 14px/1 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-decoration: none; cursor: pointer;
+  transition: transform .08s ease, opacity .15s ease, border-color .16s ease,
+              background-color .16s ease, box-shadow .16s ease, color .16s ease;
+}
+.button:hover {
+  border-color: rgba(var(--btn-tint), calc(var(--btn-edge) + .18));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, calc(var(--btn-sheen) + .03)), rgba(255, 255, 255, 0) 58%),
+    rgba(var(--btn-tint), calc(var(--btn-fill) + .055));
+}
+.button:focus-visible { outline: 2px solid rgba(var(--btn-tint), .75); outline-offset: 2px; }
 .button:active { transform: translateY(1px) scale(.985); }
 .button.busy { opacity: .55; cursor: progress; }
-.button:disabled { pointer-events: none; }
-.button.primary { color: var(--on-accent); background: linear-gradient(135deg, var(--sovereign-purple), var(--accent-deep)); box-shadow: 0 0 30px rgba(var(--accent-rgb), .34); border-color: transparent; }
-.button.ghost { background: rgba(255,255,255,.035); }
-.button.danger { border-color: rgba(255,56,100,.42); background: rgba(255,56,100,.14); color: #ffd6df; }
+
+/* Lead. One per surface: the lip lights up in the domain's hue and the pane lifts. */
+.button.primary {
+  --btn-tint: var(--accent-rgb); --btn-fill: .2; --btn-edge: .62;
+  --btn-lip: rgba(var(--accent-line-rgb), .5); --btn-cast: .55;
+}
+/* Money. The only gold left in the app, and the only variant Monero Mode repaints. */
+.button.payment {
+  --btn-tint: var(--payment-rgb); --btn-fill: .1; --btn-edge: .38;
+  --btn-lip: rgba(var(--payment-rgb), .38); --btn-ink: var(--payment-accent-strong);
+  --btn-cast: .55;
+}
+.button.danger {
+  --btn-tint: var(--danger-rgb); --btn-fill: .1; --btn-edge: .34;
+  --btn-lip: rgba(var(--danger-rgb), .3); --btn-ink: var(--danger-ink);
+}
+/* Quiet. Dismissals and retreats: no pane until the pointer or focus arrives, so a modal
+   footer offers one thing to press rather than two competing ones. */
+.button.quiet {
+  --btn-fill: 0; --btn-edge: 0; --btn-lip: transparent; --btn-sheen: 0; --btn-ink: var(--muted);
+  backdrop-filter: none;
+}
+.button.quiet:hover { --btn-ink: var(--text); }
+.button.quiet.danger { --btn-tint: var(--danger-rgb); --btn-ink: var(--danger-soft); }
+.button.quiet.danger:hover { --btn-ink: var(--danger-lit); }
 .button.small { padding: 8px 11px; font-size: 12px; }
-.button.gold { color: #1d1202; background: linear-gradient(135deg, var(--bitcoin-gold), #ffb347); border-color: transparent; box-shadow: 0 0 26px rgba(247,147,26,.3); }
+/* Disabled is a state, not an affordance. "In library" and "Published" report a fact, and
+   until now they looked exactly as pressable as the control beside them. */
+.button:disabled {
+  pointer-events: none;
+  --btn-fill: .025; --btn-edge: .1; --btn-lip: transparent; --btn-sheen: .02; --btn-cast: 0;
+  --btn-ink: var(--dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button { transition: none; }
+  .button:active { transform: none; }
+}
 
 .view { display: none; }
 .view.active-view { display: block; }
@@ -235,7 +331,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .bulk-bar { position: fixed; bottom: 0; left: var(--sidebar-w); right: 0; z-index: 95; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); background: rgba(14,9,24,.94); backdrop-filter: blur(12px); border-top: 1px solid var(--border-hot); transform: translateY(110%); transition: transform .22s ease; }
 .bulk-bar.open { transform: translateY(0); }
 .bulk-count { color: var(--muted); font: 700 12px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; min-width: 96px; text-align: center; }
-.bulk-bar .button:disabled { opacity: .4; }
 
 /* Raw published-event inspector */
 .raw-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
@@ -491,7 +586,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 /* ============================================================================
    Active training surface — same sovereign language as Idenstr/Feedstr:
    void-black + sovereign-purple, cyber-grid, Inter + ui-monospace labels,
-   bitcoin-gold reserved for the primary "log/train" action.
+   bitcoin-gold reserved for records, badges and training accents.
    ============================================================================ */
 
 /* Resume card on the Train tab */
@@ -565,8 +660,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .wk-ex-detail-cell .lbl { margin-top: 5px; color: var(--purple-2); font: 800 9px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
 .wk-ex-detail-note { margin-top: 9px; padding: 9px 11px; border-left: 3px solid var(--bitcoin-gold); border-radius: 8px; background: rgba(247,147,26,.06); color: var(--muted); font-size: 13px; line-height: 1.5; }
 .workout-card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-.workout-card-actions .start-workout-action { grid-column: 1 / -1; justify-content: center; min-height: 40px; }
-.workout-card-actions .button:not(.start-workout-action) { justify-content: center; }
+.workout-card-actions .start-workout-action { grid-column: 1 / -1; min-height: 40px; }
+/* Delete leaves the action row. It spans the full width so it is easy to find, but it is
+   quiet, so it can never be mistaken for the peer of Edit that a half-width slot made it. */
+.workout-card-actions .button.quiet.danger { grid-column: 1 / -1; }
 
 /* History (completed sessions) */
 .history-session-card .workout-card-meta { color: var(--text); }
@@ -583,7 +680,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .session-detail-index { color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .08em; }
 .session-detail-sets { display: flex; flex-wrap: wrap; gap: 6px; }
 .session-actions { grid-template-columns: 1fr; }
-.session-actions .button { justify-content: center; }
 .session-actions .repeat-workout-action { justify-content: center; min-height: 40px; }
 .set-pill { font: 700 12px/1 ui-monospace, monospace; color: var(--muted); padding: 5px 9px; border: 1px solid var(--border); border-radius: 999px; background: rgba(0,0,0,.24); }
 
@@ -603,7 +699,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .qw-item-meta { margin-top: 3px; color: var(--muted); font: 700 12px/1 ui-monospace, monospace; }
 .qw-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .qw-actions { display: flex; gap: 8px; margin-top: 14px; }
-.qw-actions .button.gold { flex: 1; }
+.qw-actions .button { flex: 1; }
 
 /* The overlay */
 .session-overlay { display: none; position: fixed; inset: 0; z-index: 300; flex-direction: column; color: var(--text);
@@ -633,8 +729,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .session-elapsed-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: rgba(0,0,0,.3); color: var(--text); }
 .session-elapsed-chip svg { width: 13px; height: 13px; color: var(--bitcoin-gold); }
 .session-elapsed { font: 800 13px/1 ui-monospace, monospace; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
-.session-close-btn { flex: 0 0 auto; border: 1px solid rgba(255,56,100,.32); border-radius: 11px; padding: 12px 16px; color: #ffd6df; background: rgba(255,56,100,.1); font: 800 11px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
-.session-close-btn:hover { border-color: rgba(255,56,100,.6); background: rgba(255,56,100,.16); }
+/* Ending a session early is the runner's one destructive control, so it carries the same
+   danger pane as `.button.danger` rather than red literals of its own. */
+.session-close-btn { flex: 0 0 auto; border: 1px solid rgba(var(--danger-rgb), .34); border-radius: 11px; padding: 12px 16px; color: var(--danger-ink); background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0) 58%), rgba(var(--danger-rgb), .1); box-shadow: inset 0 1px 0 rgba(var(--danger-rgb), .3); font: 800 11px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: border-color .16s ease, background-color .16s ease; }
+.session-close-btn:hover { border-color: rgba(var(--danger-rgb), .6); background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,0) 58%), rgba(var(--danger-rgb), .16); }
 
 .session-progress { height: 4px; background: rgba(255,255,255,.06); overflow: hidden; }
 .session-progress-fill { height: 100%; width: 0; border-radius: 0 99px 99px 0; background: linear-gradient(90deg, var(--sovereign-purple), var(--success-green)); box-shadow: 0 0 14px rgba(var(--accent-rgb), .5); transition: width .4s cubic-bezier(.22,.61,.36,1); }
@@ -668,9 +766,36 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .session-set-input { height: 54px; text-align: center; border-radius: 12px; background: rgba(0,0,0,.3); border: 1px solid rgba(var(--accent-line-rgb), .18); color: var(--text); font: 800 17px/1 ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 .session-set-input:focus { border-color: var(--border-hot); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .18); }
 .session-set-input:disabled { opacity: .6; }
-.session-log-btn { height: 54px; padding: 0 14px; border: none; border-radius: 12px; color: #1d1202; background: linear-gradient(135deg, var(--bitcoin-gold), #ffb347); font: 900 13px/1 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; box-shadow: 0 0 22px rgba(247,147,26,.26); transition: transform .08s ease, opacity .15s ease; }
+/* The live runner's own controls. Same glass as `.button`, sized for a screen you read at
+   arm's length between reps: taller, monospace, and with the dials pushed past the app's
+   lead rank, because each of these is the only thing on its surface worth pressing. They
+   used to be solid slabs with a 30px bloom; the bloom is what the lit lip replaces. */
+.session-log-btn, .session-next-btn, .session-finish-btn, .session-prev-btn, .session-emom-btn {
+  /* The light accent, not the deep one: over a near-black runner a fill can only get so
+     bright before it stops being glass, so the rim does the carrying. A hairline of
+     #bc97ff reads across a room; the same alpha of #7c3cff reads as a dark edge. */
+  --btn-tint: var(--accent-line-rgb); --btn-fill: .2; --btn-edge: .85;
+  --btn-lip: rgba(255, 255, 255, .3); --btn-sheen: .1; --btn-cast: .7;
+  border: 1px solid rgba(var(--btn-tint), var(--btn-edge));
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, var(--btn-sheen)), rgba(255, 255, 255, 0) 58%),
+    rgba(var(--btn-tint), var(--btn-fill));
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 var(--btn-lip), 0 10px 26px -14px rgba(var(--btn-tint), var(--btn-cast));
+  font: 900 13px/1 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase;
+  cursor: pointer;
+  transition: transform .08s ease, background-color .16s ease, box-shadow .16s ease;
+}
+.session-log-btn { height: 54px; padding: 0 14px; border-radius: 12px; }
 .session-log-btn:active { transform: translateY(1px) scale(.97); }
-.session-log-btn.done { color: #04140d; background: linear-gradient(135deg, var(--success-green), #36e0a0); box-shadow: none; cursor: default; }
+/* Logged. Green is the app's "done" everywhere else, and the pane drops back to a resting
+   weight so a finished set stops asking to be pressed. */
+.session-log-btn.done {
+  --btn-tint: var(--success-rgb); --btn-fill: .14; --btn-edge: .42;
+  --btn-lip: rgba(var(--success-rgb), .34); --btn-cast: 0;
+  color: var(--success-green); cursor: default;
+}
 .session-log-btn:disabled { opacity: .7; pointer-events: none; }
 .session-set-hint { margin: 6px 0 0 50px; font: 700 11px/1.3 ui-monospace, monospace; letter-spacing: .02em; }
 .session-set-hint.prev { color: var(--dim); }
@@ -690,13 +815,15 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .session-instructions-step b { color: var(--purple-2); font: 800 12px/1 ui-monospace, monospace; margin-right: 8px; }
 
 .session-footer { display: flex; gap: 10px; align-items: center; padding: 14px clamp(20px, 4vw, 34px) calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(var(--accent-line-rgb), .14); background: rgba(var(--void-rgb), .74); backdrop-filter: blur(18px); }
-.session-next-btn, .session-finish-btn, .session-prev-btn, .session-emom-btn { min-height: 58px; border-radius: 14px; padding: 0 18px; font: 900 13px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: transform .08s ease; }
+/* Geometry only; the pane, the hue and the lip come from the shared runner rule above. */
+.session-next-btn, .session-finish-btn, .session-prev-btn, .session-emom-btn { min-height: 58px; border-radius: 14px; padding: 0 18px; letter-spacing: .08em; }
 .session-next-btn:active, .session-finish-btn:active, .session-prev-btn:active, .session-emom-btn:active { transform: translateY(1px) scale(.99); }
-.session-next-btn { flex: 1; border: none; color: var(--on-accent); background: linear-gradient(135deg, var(--sovereign-purple), var(--accent-deep)); box-shadow: 0 0 30px rgba(var(--accent-rgb), .32); }
-.session-finish-btn { flex: 1; border: none; color: #04140d; background: linear-gradient(135deg, var(--success-green), #36e0a0); box-shadow: 0 0 30px rgba(0,208,132,.26); }
-.session-emom-btn { flex: 1; border: none; color: var(--on-accent); background: linear-gradient(135deg, var(--sovereign-purple), var(--accent-deep)); box-shadow: 0 0 30px rgba(var(--accent-rgb), .32); }
-.session-prev-btn { border: 1px solid var(--border); color: var(--text); background: rgba(255,255,255,.04); }
-.session-prev-btn:hover { border-color: var(--border-hot); }
+.session-next-btn, .session-finish-btn, .session-emom-btn { flex: 1; }
+/* Finishing is the one thing here that is not "keep going", so it takes the done green. */
+.session-finish-btn { --btn-tint: var(--success-rgb); --btn-fill: .16; --btn-lip: rgba(255, 255, 255, .26); color: var(--success-green); }
+/* Going back a set is a retreat: standard rank, no hue. */
+.session-prev-btn { --btn-tint: 255, 255, 255; --btn-fill: .055; --btn-edge: .16; --btn-lip: rgba(255, 255, 255, .07); --btn-cast: 0; }
+.session-prev-btn:hover { --btn-edge: .34; }
 
 /* PR celebration toast (inside overlay) */
 .pr-toast { position: absolute; left: 50%; top: calc(96px + env(safe-area-inset-top)); transform: translate(-50%, -16px); z-index: 6; display: flex; align-items: center; gap: 11px; padding: 13px 18px; border: 1px solid rgba(247,147,26,.5); border-radius: 14px; background: radial-gradient(circle at 0% 0%, rgba(247,147,26,.26), transparent 70%), rgba(var(--surface-rgb), .97); box-shadow: 0 18px 50px rgba(0,0,0,.5), 0 0 30px rgba(247,147,26,.24); opacity: 0; pointer-events: none; transition: opacity .3s ease, transform .3s cubic-bezier(.22,.61,.36,1); }
@@ -719,9 +846,13 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .rest-nextup { color: var(--dim); font: 700 11px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .1em; min-height: 12px; }
 .rest-nextup b { color: var(--purple-2); }
 .rest-adjust-btns { display: flex; gap: 10px; }
-.rest-adjust-btn, .rest-skip-btn { border: 1px solid var(--border); border-radius: 999px; padding: 11px 18px; color: var(--text); background: rgba(255,255,255,.05); font: 800 12px/1 ui-monospace, monospace; letter-spacing: .04em; cursor: pointer; transition: border-color .15s ease; }
-.rest-adjust-btn:hover { border-color: var(--border-hot); }
-.rest-skip-btn { color: #04140d; background: linear-gradient(135deg, var(--success-green), #36e0a0); border-color: transparent; font-weight: 900; text-transform: uppercase; }
+/* The rest overlay's controls. Pills rather than rounded rectangles, but the same glass:
+   neutral for the two adjusters, the done green for Skip Rest, which is the only one here
+   that moves the session on. */
+.rest-adjust-btn, .rest-skip-btn { border: 1px solid rgba(255,255,255,.16); border-radius: 999px; padding: 11px 18px; color: var(--text); background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0) 58%), rgba(255,255,255,.055); box-shadow: inset 0 1px 0 rgba(255,255,255,.07); font: 800 12px/1 ui-monospace, monospace; letter-spacing: .04em; cursor: pointer; transition: border-color .16s ease, background-color .16s ease; }
+.rest-adjust-btn:hover { border-color: rgba(255,255,255,.34); }
+.rest-skip-btn { border-color: rgba(var(--success-rgb), .42); color: var(--success-green); background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 58%), rgba(var(--success-rgb), .16); box-shadow: inset 0 1px 0 rgba(var(--success-rgb), .34), 0 10px 26px -14px rgba(var(--success-rgb), .7); font-weight: 900; text-transform: uppercase; }
+.rest-skip-btn:hover { border-color: rgba(var(--success-rgb), .62); }
 
 /* Finished-session summary (rendered into the Train panel) */
 .summary-hero { display: flex; align-items: center; gap: 16px; margin: 4px 0 18px; }

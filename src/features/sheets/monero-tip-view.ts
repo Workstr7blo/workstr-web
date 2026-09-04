@@ -67,7 +67,7 @@ export function moneroTipModal(details: MoneroTipDetails): string {
     <code class="monero-tip-address" id="monero-tip-address">${html(address)}</code>
     <div class="web-empty-actions monero-tip-actions">
       <button id="monero-tip-copy" class="button payment" type="button">Copy address</button>
-      <a id="monero-tip-open" class="button ghost" href="${html(uri)}">Open wallet</a>
+      <a id="monero-tip-open" class="button" href="${html(uri)}">Open wallet</a>
     </div>
     <p class="section-help">Paid directly from your wallet to the creator. Workstr holds no Monero keys or funds, sees no payment, and records nothing about it.</p>
   </div>`;
