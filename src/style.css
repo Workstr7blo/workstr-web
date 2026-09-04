@@ -206,10 +206,26 @@
 /* The Monero rail's payment action, in the slot the zap CTA occupies so a card keeps its
    shape between rails. Orange stops here: the card, its title, its creator and its border
    stay Workstr. */
-.workout-card-media .monero-tip-cta { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 7px; box-sizing: border-box; min-height: 38px; padding-inline: 0; line-height: 1; }
-.workout-card-media .monero-tip-cta:hover { filter: brightness(1.05); box-shadow: 0 0 28px rgba(var(--payment-rgb), .34); }
-.monero-tip-cta .monero-mark { display: block; flex: none; }
-.monero-tip-cta .monero-tip-label { display: inline-block; line-height: 1; letter-spacing: .04em; text-transform: uppercase; }
+.workout-card-media .monero-tip-cta {
+  width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  box-sizing: border-box; min-height: 38px; padding-inline: 0; line-height: 1;
+  border-color: rgba(var(--payment-rgb), .34);
+  color: var(--payment-accent-strong);
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0) 58%), rgba(var(--payment-rgb), .09);
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 20px -14px rgba(var(--payment-rgb), .55);
+  transition: transform .08s ease, border-color .16s ease, background-color .16s ease, box-shadow .16s ease;
+}
+.workout-card-media .monero-tip-cta:hover {
+  filter: none;
+  border-color: rgba(var(--payment-rgb), .64);
+  background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,0) 58%), rgba(var(--payment-rgb), .16);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 10px 26px -12px rgba(var(--payment-rgb), .66);
+}
+.workout-card-media .monero-tip-cta:focus-visible { outline: 2px solid rgba(var(--payment-rgb), .7); outline-offset: 2px; }
+.monero-tip-cta .monero-mark,
+.monero-tip-cta .monero-badge { display: block; flex: none; filter: drop-shadow(0 0 7px rgba(var(--payment-rgb), .45)); }
+.monero-tip-cta .monero-tip-label { display: inline-block; line-height: 1; letter-spacing: .01em; }
 .diff-badge.inline { position: static; display: inline-flex; align-items: center; padding: 4px 7px; }
 .program-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .program-tag-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; max-width: 230px; }

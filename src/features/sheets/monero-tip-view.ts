@@ -42,7 +42,7 @@ export function moneroTipAddress(program: RelayProgram, state: AppState): string
 
 export function moneroTipButton(program: RelayProgram, state: AppState): string {
   if (!moneroTipAddress(program, state)) return '';
-  return `<button class="button payment small monero-tip-cta" type="button" data-monero-tip="${html(program.address)}" aria-label="Tip the creator of ${html(program.name)} with Monero">${moneroMark(14)}<span class="monero-tip-label">Tip</span></button>`;
+  return `<button class="button payment small monero-tip-cta" type="button" data-monero-tip="${html(program.address)}" aria-label="Tip the creator of ${html(program.name)} with Monero">${moneroBadge(18)}<span class="monero-tip-label">Tip</span></button>`;
 }
 
 export interface MoneroTipDetails {
