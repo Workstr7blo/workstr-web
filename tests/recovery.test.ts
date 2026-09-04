@@ -68,28 +68,36 @@ describe('getRecovery', () => {
 });
 
 describe('recoveryView', () => {
-  it('reports no training rather than a readiness it cannot support', () => {
+  it('counts untrained muscles as ready, because nothing is fatiguing them', () => {
     const markup = recoveryView(appState());
-    // With nothing trained, overallReadiness falls back to a literal 100 and readyCount
-    // counts untrained groups as ready. Showing either claimed full recovery from no data.
-    expect(markup).not.toContain('100%');
-    expect(markup).not.toContain('10 of 10');
-    expect(markup).not.toContain('All trained groups are ready.');
-    expect(markup).toContain('No training logged yet');
-    expect(markup).toContain('data-subtab="programs"');
+    // An untrained muscle is available to train, and Quick Workout already draws from it
+    // (quickWorkout.ts selects on percent, and untrained groups carry 100). The readiness
+    // figures are therefore meaningful before the first session, not fabricated.
+    expect(markup).toContain('100%');
+    expect(markup).toContain('10 of 10');
   });
 
-  it('keeps the body map on an untrained profile, since it is honest there', () => {
+  it('does not talk about trained groups when there are none', () => {
+    const markup = recoveryView(appState());
+    expect(markup).not.toContain('All trained groups are ready.');
+    expect(markup).toContain('Nothing trained recently, so everything is available.');
+    expect(markup).toContain('Finish a workout and this fills in');
+  });
+
+  it('keeps the body map and its ids on an untrained profile', () => {
     const markup = recoveryView(appState());
     expect(markup).toContain('id="recovery-body"');
     expect(markup).toContain('id="recovery-list"');
     expect(markup).toContain('id="recovery-tip"');
+    expect(markup).toContain('id="recovery-overall"');
+    expect(markup).toContain('id="recovery-ready"');
   });
 
-  it('lists no per-muscle rows at all before anything is trained', () => {
+  it('lists no per-muscle rows before anything is trained, only the fresh line', () => {
     const markup = recoveryView(appState());
     expect(markup).not.toContain('recovery-row');
     expect(markup).not.toContain('class="rmeta"');
+    expect(markup).toContain('recovery-fresh-summary');
   });
 
   it('separates recently trained muscles from the rest', () => {
@@ -98,6 +106,7 @@ describe('recoveryView', () => {
     expect(markup).toContain('Chest');
     expect(markup).toContain('71%');
     expect(markup).toContain('Readiness from your last 10 days of training.');
+    expect(markup).not.toContain('Nothing trained recently');
   });
 
   it('collapses the untrained groups into one line instead of a row each', () => {

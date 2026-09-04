@@ -52,7 +52,17 @@ export function recoveryView(state: AppState): string {
   const sorted = [...data.muscleGroups].sort((a, b) => (order[a.status] - order[b.status]) || a.percent - b.percent);
   const trained = sorted.filter((group) => group.status !== 'untrained');
   const fresh = sorted.filter((group) => group.status === 'untrained');
-  const statusLine = data.readyCount === data.totalCount ? 'All trained groups are ready.' : `${data.readyCount} of ${data.totalCount} groups ready.`;
+  // An untrained muscle is a ready one: nothing is fatiguing it, and Quick Workout draws
+  // from it. So the readiness figures are meaningful before the first session too, and the
+  // only thing that needed fixing at zero was a sentence about trained groups when there
+  // are none.
+  const nothingTrained = trained.length === 0;
+  const statusLine = nothingTrained
+    ? 'Nothing trained recently, so everything is available.'
+    : data.readyCount === data.totalCount ? 'All trained groups are ready.' : `${data.readyCount} of ${data.totalCount} groups ready.`;
+  const helpLine = nothingTrained
+    ? 'Finish a workout and this fills in with how recovered each muscle group is.'
+    : 'Readiness from your last 10 days of training.';
   const trainedSection = trained.length ? `<div class="recovery-section"><div class="recovery-section-title">Recently trained</div>${recoveryRows(trained)}</div>` : '';
   // One line for every muscle that is simply available. These used to be a full row each -
   // name, empty track, "Fresh", "not logged recently" - which said the same thing ten times
@@ -66,24 +76,13 @@ export function recoveryView(state: AppState): string {
       </div>
     </div>`
     : '';
-  // Nothing trained means the readiness figures have nothing behind them: `overallReadiness`
-  // falls back to a literal 100 and `readyCount` counts untrained groups as ready, so the
-  // header would claim full recovery from no data. Report the absence instead of the numbers.
-  const nothingTrained = trained.length === 0;
-  const summary = nothingTrained
-    ? `<div class="recovery-first-run">
-      <strong>No training logged yet</strong>
-      <p>Finish a workout and this shows how recovered each muscle group is, so you know what is ready to train next.</p>
-      <button class="button primary" data-parent="workouts" data-subtab="programs" type="button">Pick a program</button>
-    </div>`
-    : `<div class="recovery-summary">
+  return `<div class="panel recovery-panel">
+    <div class="panel-head"><span>Muscle recovery</span><strong id="recovery-overall">${data.overallReadiness}%</strong></div>
+    <div class="recovery-summary">
       <strong><span id="recovery-ready">${data.readyCount} of ${data.totalCount}</span> ready</strong>
       <small>${html(statusLine)}</small>
     </div>
-    <p class="section-help">Readiness from your last 10 days of training.</p>`;
-  return `<div class="panel recovery-panel">
-    <div class="panel-head"><span>Muscle recovery</span>${nothingTrained ? '' : `<strong id="recovery-overall">${data.overallReadiness}%</strong>`}</div>
-    ${summary}
+    <p class="section-help">${html(helpLine)}</p>
     <div class="recovery-layout compact">
       <div class="recovery-map">
         ${recoveryBodySvg(byMuscle)}
@@ -95,7 +94,7 @@ export function recoveryView(state: AppState): string {
         </div>
         <div id="recovery-tip" class="recovery-tip" hidden></div>
       </div>
-      <div id="recovery-list" class="recovery">${nothingTrained ? '' : `${trainedSection}${freshSection}`}</div>
+      <div id="recovery-list" class="recovery">${trainedSection}${freshSection}</div>
     </div>
     <details class="recovery-explainer"><summary>How this works</summary><p class="section-help">Bigger groups recover slower, and higher set volume extends recovery. Muscles not logged recently are marked Fresh so they stay available for quick workouts.</p></details>
   </div>`;

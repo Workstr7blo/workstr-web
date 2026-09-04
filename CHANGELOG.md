@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Recovery no longer claims you are fully recovered before you have trained. A profile with
-  no logged sessions used to show 100%, "10 of 10 ready" and "All trained groups are ready."
-  — a hardcoded fallback, a count that treated never-trained muscles as ready, and a
-  sentence that was vacuously true of nothing. It now says there is no training logged and
-  points at your programs. The body map stays, because it is honest there.
+- Recovery no longer says "All trained groups are ready." to someone with no trained groups.
+  A muscle you have not trained is a muscle nothing is fatiguing, so it counts as ready and
+  Quick Workout draws on it — the readiness figures mean something before your first session
+  too. What was wrong was the sentence under them, which now reads "Nothing trained recently,
+  so everything is available.", with a line explaining what fills in once you train.
 - Muscles you have not trained in the last ten days are one line naming them instead of a
   row each. With no history that was ten identical rows reading "Fresh / not logged
   recently", most of the tab's height; Recovery is now 832px on a 390px phone instead of
