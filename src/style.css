@@ -384,6 +384,24 @@
    them by id, so they have to be told to stay out of the way. */
 .bars[hidden], .dist[hidden], .list[hidden] { display: none; }
 
+/* The window the Training figures describe. Same segmented shape as the quick-workout
+   duration picker, sized for a thumb and scrolling rather than wrapping on a narrow phone. */
+.stats-range { display: flex; gap: 7px; margin: 0 0 14px; }
+.stats-range-btn { flex: 1 1 0; }
+.stats-range::-webkit-scrollbar { display: none; }
+.stats-range-btn {
+  flex: 0 0 auto; min-height: 38px; padding: 9px 14px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: rgba(0, 0, 0, .24); color: var(--muted);
+  font: 800 12px/1 inherit; cursor: pointer; white-space: nowrap;
+  transition: border-color .12s ease, color .12s ease, background .12s ease;
+}
+.stats-range-btn:hover { border-color: var(--border-hot); color: var(--text); }
+.stats-range-btn.active { border-color: rgba(var(--accent-rgb), .68); background: rgba(var(--accent-rgb), .18); color: var(--accent-pale); }
+/* The scope note repeats on several headings, so it stays quiet enough to skip. */
+.stat-scope { color: var(--dim); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: none; }
+.summary-stat .ss-label .stat-scope { display: block; margin-top: 2px; }
+
 /* One first-run state for the whole Training tab. Three separate "nothing here" blocks
    under three headings said the same thing three times and none of them said what to do. */
 .stats-first-run {

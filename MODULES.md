@@ -303,6 +303,20 @@ targets, or muscle metadata solely from the current exercise library.
 Update this map when files move, responsibilities split, or the persistence/data flow
 changes. A stale map costs more agent context than no map.
 
+## Statistics date range
+
+`src/features/progress/stats.ts` scopes Training statistics to a window. `getStats` takes a
+`StatsRange` and filters on `sessionDayKey`, the same "which day was that?" answer History,
+the calendar and the streak use, so a late-evening session lands in the range that shows it
+in History.
+
+Two populations, deliberately. Sessions, volume and muscle distribution follow the range.
+**Personal records and the day streak do not**: a record scoped to four weeks would report a
+lower number under a heading that still says "personal record", and a streak is a fact about
+right now rather than about a window. Volume bars bucket weekly for 4W and 3M and monthly
+beyond, because a year is 52 bars. `state.statsRange` is transient view state; the binding
+lives in `src/app/preferences-controller.ts` beside the quick-workout duration.
+
 ## Tests may not reach the network
 
 `tests/setup.ts` blocks every non-loopback WebSocket and `fetch`. Background relay work

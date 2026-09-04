@@ -136,9 +136,70 @@ describe('trainingStatsView', () => {
       finishedSessions: [session],
       exercises: [{ slug: 'squat', name: 'Squat', muscles: ['Quadriceps'] }]
     } as unknown as AppState);
-    expect(out).toContain('Weekly volume');
+    expect(out).toContain('volume</span>');
     expect(out).toContain('Muscle distribution');
     expect(out).toContain('Personal records');
     expect(out).not.toContain('Nothing logged yet');
+  });
+});
+
+describe('trainingStatsView date range', () => {
+  const session = (daysAgo: number) => ({
+    id: daysAgo, date: new Date(Date.now() - daysAgo * 86400000).toISOString(),
+    startedAt: new Date(Date.now() - daysAgo * 86400000).toISOString(),
+    finishedAt: new Date(Date.now() - daysAgo * 86400000).toISOString(),
+    name: 'Day', exercises: [{ exerciseSlug: 'squat', exerciseName: 'Squat', muscleGroup: 'Quadriceps', sets: 1, reps: '5', restSec: 90 }],
+    sets: [{ exerciseSlug: 'squat', setNumber: 1, weight: 100, reps: 5, done: true }]
+  });
+  const withRange = (range: string | undefined, days: number[] = [0, 60]) => trainingStatsView({
+    settings: { unit: 'kg' },
+    finishedSessions: days.map(session),
+    exercises: [{ slug: 'squat', name: 'Squat', muscles: ['Quadriceps'] }],
+    statsRange: range
+  } as unknown as AppState);
+
+  it('labels the buttons short enough to fit, keeping the full name for screen readers', () => {
+    const out = withRange('all');
+    expect(out).toContain('>4W</button>');
+    expect(out).toContain('aria-label="4 weeks"');
+    expect(out).toContain('aria-label="All time"');
+  });
+
+  it('offers every range and marks the active one', () => {
+    const out = withRange('3m');
+    for (const option of ['4w', '3m', '1y', 'all']) {
+      expect(out).toContain(`data-stats-range="${option}"`);
+    }
+    expect(out).toContain('data-stats-range="3m" aria-pressed="true"');
+    expect(out).toContain('data-stats-range="4w" aria-pressed="false"');
+  });
+
+  it('defaults to all time when nothing is selected', () => {
+    expect(withRange(undefined)).toContain('data-stats-range="all" aria-pressed="true"');
+    expect(withRange(undefined)).toContain('Total sessions');
+  });
+
+  it('says which window the totals describe, and drops "Total" when scoped', () => {
+    const scoped = withRange('4w');
+    expect(scoped).not.toContain('Total sessions');
+    expect(scoped).toContain('>Sessions <small class="stat-scope">');
+    expect(scoped).toContain('4 weeks');
+  });
+
+  it('names the bucket on the volume heading', () => {
+    expect(withRange('4w')).toContain('Weekly volume');
+    expect(withRange('1y')).toContain('Monthly volume');
+  });
+
+  it('keeps the records heading honest about being all-time', () => {
+    expect(withRange('4w')).toContain('all time');
+  });
+
+  it('narrows the figures without touching the streak', () => {
+    // One session today, one sixty days back.
+    expect(withRange('4w')).toContain('id="stat-sessions">1<');
+    expect(withRange('all')).toContain('id="stat-sessions">2<');
+    expect(withRange('4w')).toContain('id="stat-streak">1<');
+    expect(withRange('all')).toContain('id="stat-streak">1<');
   });
 });

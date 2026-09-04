@@ -106,6 +106,9 @@ export interface AppState {
   // Which exercise view has the filter sheet open, and null when none does. The facet
   // values themselves stay in exFilter/discoverFilter, which are deliberately separate.
   exerciseFilterSheet?: 'library' | 'discover' | null;
+  // Which window the Training statistics describe. Transient view state: it scopes what is
+  // shown, never what is stored, and is not worth syncing between devices.
+  statsRange?: '4w' | '3m' | '1y' | 'all';
   activeSession: ActiveSession | null;
   finishedSessions: ActiveSession[];
   publishingSessionId: number | null;

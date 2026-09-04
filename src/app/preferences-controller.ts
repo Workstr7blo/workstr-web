@@ -2,6 +2,7 @@ import { mergeOwnedEquipment, MY_EQUIPMENT, ownedEquipmentKeys } from '../core/e
 import { normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { normalizePaymentMode } from '../core/types';
 import { sessionDayKey } from '../core/dates';
+import { normalizeStatsRange } from '../features/progress/stats';
 import { LOCAL_NAMESPACE } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
 import { fetchMonthlyZapReceipts } from '../nostr/zaps';
@@ -92,6 +93,12 @@ function bindRecoveryControls(): void {
     });
     body.addEventListener('mouseleave', () => { if (tip) tip.hidden = true; highlight(null); });
   }
+  // A range change rewrites every figure on the tab, so it redraws rather than toggling a
+  // class the way the quick-workout duration below can.
+  root.querySelectorAll<HTMLElement>('[data-stats-range]').forEach((button) => button.addEventListener('click', () => {
+    state.statsRange = normalizeStatsRange(button.dataset.statsRange);
+    render();
+  }));
   root.querySelectorAll<HTMLElement>('[data-qw-dur]').forEach((button) => button.addEventListener('click', () => {
     state.qw.duration = Number(button.dataset.qwDur) || 45;
     root.querySelectorAll<HTMLElement>('#qw-duration .qw-dur-btn').forEach((el) => el.classList.toggle('active', el === button));

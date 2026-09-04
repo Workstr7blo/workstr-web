@@ -2,13 +2,22 @@ import type { BodyWeightEntry } from '../../core/types';
 import { displayWeightKg, normalizeWeightUnit, type WeightUnit } from '../../core/units';
 import type { AppState } from '../../app/state';
 import { html } from '../../app/format';
-import { getStats } from './stats';
+import { monthLabel, type MonthKey } from '../../core/dates';
+import { getStats, normalizeStatsRange, STATS_RANGE_LABELS, STATS_RANGE_SHORT, STATS_RANGES } from './stats';
 
 export function trainingStatsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
-  const stats = getStats(state.finishedSessions, state.exercises);
+  const range = normalizeStatsRange(state.statsRange);
+  const stats = getStats(state.finishedSessions, state.exercises, new Date(), range);
+  const scopeNote = range === 'all' ? '' : ` <small class="stat-scope">${html(STATS_RANGE_LABELS[range].toLowerCase())}</small>`;
+  const rangeBar = `<div class="stats-range" role="group" aria-label="Statistics date range">
+    ${STATS_RANGES.map((option) => `<button class="stats-range-btn ${option === range ? 'active' : ''}" type="button" data-stats-range="${option}" aria-pressed="${option === range}" aria-label="${html(STATS_RANGE_LABELS[option])}">${html(STATS_RANGE_SHORT[option])}</button>`).join('')}
+  </div>`;
   const max = Math.max(1, ...stats.weekly.map((week) => week.volume));
-  const bars = stats.weekly.map((week) => `<div class="bar"><div class="fill" style="height:${Math.round((week.volume / max) * 100)}%"></div><span class="blabel">${html(week.week.split('-')[1])}</span></div>`).join('');
+  const barLabel = (key: string) => stats.bucket === 'month'
+    ? monthLabel(key as MonthKey).slice(0, 3)
+    : key.split('-')[1];
+  const bars = stats.weekly.map((week) => `<div class="bar"><div class="fill" style="height:${Math.round((week.volume / max) * 100)}%"></div><span class="blabel">${html(barLabel(week.week))}</span></div>`).join('');
   const distMax = Math.max(1, ...stats.muscle.map((entry) => entry.sets));
   const dist = stats.muscle.length
     ? `<div id="prog-dist" class="dist">${stats.muscle.map((entry) => `<div class="dist-row"><small>${html(entry.muscle)}</small><div class="track"><div class="fill" style="width:${Math.round((entry.sets / distMax) * 100)}%"></div></div><small>${entry.sets}</small></div>`).join('')}</div>`
@@ -28,11 +37,11 @@ export function trainingStatsView(state: AppState): string {
       <button class="button primary" data-view="workouts" type="button">Go to Workouts</button>
     </div>`
     : `<div class="panel">
-    <div class="panel-head"><span>Weekly volume</span></div>
+    <div class="panel-head"><span>${stats.bucket === 'month' ? 'Monthly' : 'Weekly'} volume</span>${scopeNote}</div>
     <div id="prog-bars" class="bars">${bars}</div>
-    <div class="subsection-head"><span>Muscle distribution</span><small>by working sets</small></div>
+    <div class="subsection-head"><span>Muscle distribution</span><small>by working sets${range === 'all' ? '' : `, ${html(STATS_RANGE_LABELS[range].toLowerCase())}`}</small></div>
     ${dist}
-    <div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley)</small></div>
+    <div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley), all time</small></div>
     ${prs}
   </div>`;
   return `<div class="stats-hero">
@@ -42,13 +51,14 @@ export function trainingStatsView(state: AppState): string {
     </div>
     <div class="summary-stat">
       <div class="ss-val"><span id="stat-sessions">${stats.totalSessions}</span></div>
-      <div class="ss-label">Total sessions</div>
+      <div class="ss-label">${range === 'all' ? 'Total sessions' : 'Sessions'}${scopeNote}</div>
     </div>
     <div class="summary-stat">
       <div class="ss-val"><span id="stat-volume">${Math.round(displayWeightKg(stats.totalVolume, unit) || 0).toLocaleString()}</span><small id="stat-volume-unit" class="ss-unit">${unit}</small></div>
-      <div class="ss-label">Total volume</div>
+      <div class="ss-label">${range === 'all' ? 'Total volume' : 'Volume'}${scopeNote}</div>
     </div>
   </div>
+  ${rangeBar}
   ${body}`;
 }
 

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Training statistics can be scoped to the last 4 weeks, 3 months, a year, or all time.
+  Sessions, volume and muscle distribution follow the window and say which one they are
+  describing. Your personal records and day streak deliberately do not: a record scoped to a
+  month would report a smaller lift under a heading that still calls it your record, and a
+  streak describes today rather than a window. Volume charts by week for the shorter ranges
+  and by month for a year and all time, so the bars stay readable on a phone — which means
+  the default all-time view now shows monthly bars where it used to show the last eight
+  weeks.
 - Recovery no longer says "All trained groups are ready." to someone with no trained groups.
   A muscle you have not trained is a muscle nothing is fatiguing, so it counts as ready and
   Quick Workout draws on it — the readiness figures mean something before your first session
