@@ -4,9 +4,11 @@ import { launchSignerUri, renderShell } from '../src/app/shell';
 import { shellMarkup } from '../src/app/layout';
 import type { AppState } from '../src/app/state';
 
-// Boot and settings-view rendering both kick off background relay fetches unrelated to this
-// file's assertions; without mocks they open real sockets that outlive a synchronous test and
-// surface as unhandled errors once some other test actually awaits long enough to observe them.
+// Boot and settings-view rendering kick off background relay fetches unrelated to this file's
+// assertions. `tests/setup.ts` now blocks every non-loopback socket, so an unmocked one fails
+// fast and loudly instead of outliving the test and rendering into a torn-down jsdom. These
+// mocks remain because these paths need to resolve with data, not merely be prevented — they
+// are no longer the thing keeping the suite from flaking.
 vi.mock('../src/nostr/zaps', async (importOriginal) => ({
   ...await importOriginal<typeof import('../src/nostr/zaps')>(),
   fetchMonthlyZapReceipts: vi.fn(async () => [])
@@ -17,8 +19,8 @@ vi.mock('../src/nostr/canon', async (importOriginal) => ({
   fetchCanonPrograms: vi.fn(async () => [])
 }));
 // `renderShell` also fires a background kind-0 lookup whenever a session pubkey is present.
-// That one was missed, so the suite still opened real relay sockets and intermittently failed
-// the run with an undici/jsdom `Event` mismatch even though every test passed.
+// Missing one used to be invisible until the run failed somewhere else; the guard makes that
+// class of omission fail here instead.
 vi.mock('../src/nostr/profile', async (importOriginal) => ({
   ...await importOriginal<typeof import('../src/nostr/profile')>(),
   fetchProfile: vi.fn(async () => null)

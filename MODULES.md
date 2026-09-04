@@ -303,6 +303,20 @@ targets, or muscle metadata solely from the current exercise library.
 Update this map when files move, responsibilities split, or the persistence/data flow
 changes. A stale map costs more agent context than no map.
 
+## Tests may not reach the network
+
+`tests/setup.ts` blocks every non-loopback WebSocket and `fetch`. Background relay work
+started by `renderShell` is not awaited, so a socket opened during a test outlives it and
+calls `render()` after the jsdom environment is gone — which failed runs at random with
+`ReferenceError: document is not defined`, on whichever file happened to be running, with
+every assertion passing. Naming each fetch in a `vi.mock` did not hold: the list fell behind
+every new relay call.
+
+A test that needs relay data mocks the module it calls, or injects a fake pool through the
+`poolFactory` option `src/nostr/payment-targets.ts` and `src/nostr/program-publish.ts`
+accept. Loopback is allowed so a test can stand up its own server, as the NWC mock wallet
+does. `tests/no-network.test.ts` asserts the guard itself.
+
 ## Automated drift check
 
 Run `npm run modules` for the fast structural check or `npm run check` for the full
