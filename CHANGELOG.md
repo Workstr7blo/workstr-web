@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Workouts → Programs is a program browser instead of a form. The panel wrapper, the second
+  "Programs" heading, the helper line and the four permanent Goal/Focus/Format/Equipment
+  selects are gone, replaced by one row: search, a filter button, and create. On a 390px
+  phone the first program card now sits 76px below the sub-tabs instead of 322px — the list
+  is the page again. Advanced filters moved into a sheet behind the filter button, which
+  carries a badge when any are on, and whatever is active shows as removable chips above the
+  list. The sheet's "Show N programs" is produced by the same matcher that filters the list,
+  so the number and the list cannot disagree. Discover gets the same toolbar with Refresh in
+  place of create, and its explanation of what importing does now appears in the empty state,
+  where someone is actually stuck, rather than above every visit.
+- Program cards keep their source and difficulty badges on one row on narrow phones, as the
+  approved design shows, instead of wrapping them onto two.
 - The account pill in the top right now reports two states instead of one. The green dot
   that sat beside your name has moved onto the avatar, where it means what it always meant
   — this Nostr identity is connected — and the space it left carries a small medallion for

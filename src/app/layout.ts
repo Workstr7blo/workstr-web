@@ -15,7 +15,8 @@ import { historyCalendarPanel } from '../features/train/history-calendar';
 import { workoutHistory } from '../features/train/history-timeline';
 import { bodyView, trainingStatsView } from '../features/progress/views';
 import { quickWorkoutPanel, recoveryView } from '../features/recovery/views';
-import { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, programCard, programSearchTags, sheetToProgram } from '../features/sheets/views';
+import { programCard, sheetToProgram } from '../features/sheets/views';
+import { programActiveFilters, programFilterSheet, programMatcher, programToolbar } from '../features/sheets/program-browser';
 import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { moneroMode } from '../features/sheets/monero-tip-view';
 import { backupPanel } from '../features/backup/views';
@@ -81,6 +82,7 @@ export function shellMarkup(state: AppState): string {
       ${appView(state)}
     </main>
     ${sessionOverlayMarkup(state)}
+    ${programFilterSheet(state)}
     <div id="modal" class="modal"><div class="modal-card"><button id="modal-close" class="modal-close" type="button">×</button><div id="modal-content"></div></div></div>
     <div id="toast"></div>`;
 }
@@ -125,27 +127,6 @@ function subTabs(parent: View, active: string, tabs: string[]): string {
   }).join('')}</div>`;
 }
 
-function titleLabel(value: string): string {
-  return value.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
-}
-
-function programFilterSelect(key: keyof NonNullable<AppState['programFilters']>, label: string, values: string[], current: string): string {
-  return `<label><span>${html(label)}</span><select data-program-filter="${key}"><option value="">Any</option>${values.map((value) => `<option value="${html(value)}" ${current === value ? 'selected' : ''}>${html(titleLabel(value))}</option>`).join('')}</select></label>`;
-}
-
-function programFilterBar(inputId: string, placeholder: string, state: AppState): string {
-  const current = state.programFilters || { goal: '', focus: '', format: '', equipment: '' };
-  return `<div class="program-filter-panel">
-    <input class="grow" id="${inputId}" placeholder="${html(placeholder)}" autocomplete="off" value="${html(state.programFilter)}" />
-    <div class="program-filter-selects">
-      ${programFilterSelect('goal', 'Goal', PROGRAM_GOALS, current.goal)}
-      ${programFilterSelect('focus', 'Focus', PROGRAM_FOCUS_LABELS, current.focus)}
-      ${programFilterSelect('format', 'Format', PROGRAM_FORMAT_LABELS, current.format)}
-      ${programFilterSelect('equipment', 'Equipment', PROGRAM_EQUIPMENT_LABELS, current.equipment)}
-    </div>
-  </div>`;
-}
-
 function exercisesView(state: AppState): string {
   const active = state.subState.exercises;
   return `<div class="page active" id="page-exercises">
@@ -162,16 +143,7 @@ function exercisesView(state: AppState): string {
 
 function workoutsView(state: AppState): string {
   const active = state.subState.workouts;
-  const query = state.programFilter.toLowerCase();
-  const programMatches = (program: { name: string; description: string; difficulty?: string; tags: string[]; exercises: unknown[]; blocks?: unknown[] }) => {
-    const labels = programSearchTags(program as never, state.exercises);
-    const filter = state.programFilters || { goal: '', focus: '', format: '', equipment: '' };
-    return [program.name, program.description, program.difficulty || '', ...labels].join(' ').toLowerCase().includes(query)
-      && (!filter.goal || labels.includes(filter.goal))
-      && (!filter.focus || labels.includes(filter.focus))
-      && (!filter.format || labels.includes(filter.format))
-      && (!filter.equipment || labels.includes(filter.equipment));
-  };
+  const programMatches = programMatcher(state);
   const locals = state.sheets.map(sheetToProgram).filter(programMatches);
   const programs = state.programs.filter(programMatches);
   // Lightning popularity is not Monero popularity, so the top-zapped badge is not carried
@@ -187,10 +159,15 @@ function workoutsView(state: AppState): string {
     <div class="page-title">Workouts</div>
     ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
     <div class="sub-panel ${active === 'programs' ? 'active' : ''}" id="sub-workouts-programs">
-      <div class="panel"><div class="panel-head"><span>Programs</span><button class="button primary small" id="new-program">+ New program</button></div><p class="section-help">Build, edit, and start your training programs.</p>${programFilterBar('program-filter', 'Search programs...', state)}<div class="program-list">${locals.map((program) => programCard(program, state, { showPayment: false })).join('') || '<div class="empty">No programs match yet. Build one, import from Discover, or clear a filter.</div>'}</div></div>
+      ${programToolbar('programs', state)}
+      ${programActiveFilters('programs', state)}
+      <div class="program-list">${locals.map((program) => programCard(program, state, { showPayment: false })).join('') || '<div class="empty">No programs match yet. Build one, import from Discover, or clear a filter.</div>'}</div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
-      <div class="panel"><div class="panel-head"><span>Discover programs</span><button class="button small" id="program-discover-refresh" type="button">Refresh</button></div><p class="section-help">Relay programs published by Workstr and Beast Mode creators. Import a program to add a local copy to your Programs library before editing or running it.</p>${programFilterBar('program-discover-filter', 'Search relay programs...', state)}<div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div><div class="program-list">${programs.map((program) => programCard(program, state, { showPayment: true, zapRank: topProgramRanks.get(program.address) })).join('') || '<div class="empty">No relay programs match. Refresh or clear a filter.</div>'}</div></div>
+      ${programToolbar('discover', state)}
+      ${programActiveFilters('discover', state)}
+      <div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div>
+      <div class="program-list">${programs.map((program) => programCard(program, state, { showPayment: true, zapRank: topProgramRanks.get(program.address) })).join('') || `<div class="empty">${state.programs.length ? 'No relay programs match. Refresh or clear a filter.' : 'Relay programs published by Workstr and Beast Mode creators appear here. Importing one adds a local copy to your Programs library, which is what you edit and run.'}</div>`}</div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Your training month at a glance, then every session below.</p>${historyCalendarPanel(state)}${workoutHistory(state)}</div>
