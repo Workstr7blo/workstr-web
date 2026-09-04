@@ -50,6 +50,7 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
   const footer = root.querySelector('#session-footer');
   if (!title || !meta || !nav || !body || !footer) return;
   nav.classList.add('emom-round-nav');
+  nav.classList.remove('session-ex-track');
   footer.classList.remove('emom-live-controls');
   title.textContent = session.sheetName || 'EMOM';
   nav.innerHTML = '';

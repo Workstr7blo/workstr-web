@@ -192,6 +192,60 @@ describe('session runner', () => {
     expect(sets[0]).toMatchObject({ session_id: 7, exercise_slug: 'bench-press', set_number: 2 });
   });
 
+  it('puts the current set inputs in the active row instead of a separate current-set card', async () => {
+    await runner.startTrainingSession(oneExerciseProgram());
+    expect(root.querySelector('.session-current-set')).toBeNull();
+    const active = root.querySelector('.session-set-block.active');
+    expect(active?.querySelector('[data-session-reps="0"]')).toBeTruthy();
+    expect(active?.querySelector('[data-session-weight="0"]')).toBeTruthy();
+    expect(root.querySelectorAll('.session-set-block.upcoming').length).toBe(1);
+    expect(root.querySelectorAll('.session-set-block [data-session-reps]').length).toBe(1);
+  });
+
+  it('carries the logged reps and load into the next set row after the rerender', async () => {
+    await runner.startTrainingSession(oneExerciseProgram());
+    (root.querySelector('[data-session-reps="0"]') as HTMLInputElement).value = '9';
+    (root.querySelector('[data-session-weight="0"]') as HTMLInputElement).value = '22.5';
+    (root.querySelector('[data-set-log-btn="0"]') as HTMLButtonElement).click();
+    await tick();
+    expect(root.querySelector('.session-set-block.done [data-set-log-btn="0"]')?.textContent).toBe('Done');
+    expect((root.querySelector('[data-session-reps="1"]') as HTMLInputElement).value).toBe('9');
+    expect((root.querySelector('[data-session-weight="1"]') as HTMLInputElement).value).toBe('22.5');
+    expect(root.querySelector('.session-current-hints')?.textContent).toContain('Previous');
+  });
+
+  it('keeps the how-to-perform accordion open across a shell rerender', async () => {
+    state.activeSession = {
+      id: 9, sheetName: 'Push', startedAt: '2026-08-14T12:00:00.000Z',
+      exercises: [{ exerciseSlug: 'bench-press', exerciseName: 'Bench Press', sets: 2, reps: '8', restSec: 60, instructions: ['Unrack the bar.', 'Press.'] }],
+      sets: []
+    };
+    await runner.openSessionOverlay(state.activeSession);
+    (root.querySelector('[data-toggle-instructions]') as HTMLElement).click();
+    expect(root.querySelector('#session-instructions')?.classList.contains('open')).toBe(true);
+
+    root.innerHTML = shellMarkup(state);
+    await runner.openSessionOverlay(state.activeSession);
+
+    expect(root.querySelector('#session-instructions')?.classList.contains('open')).toBe(true);
+    expect(root.querySelector('[data-toggle-instructions]')?.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('keeps a timed target free of reps and gives a missing image a compact placeholder', async () => {
+    state.activeSession = {
+      id: 11, sheetName: 'Core', startedAt: '2026-08-14T12:00:00.000Z',
+      exercises: [{ exerciseSlug: 'plank', exerciseName: 'Plank', sets: 2, reps: '30 sec', restSec: 60 }],
+      sets: []
+    };
+    await runner.openSessionOverlay(state.activeSession);
+    const target = root.querySelector('.session-ex-target')?.textContent || '';
+    expect(target).toContain('30 sec');
+    expect(target).not.toContain('reps');
+    expect(root.querySelector('.session-set-columns')?.textContent).toContain('Time');
+    expect(root.querySelector('.session-ex-image.wide.placeholder')).toBeTruthy();
+    expect(root.querySelector('.session-set-columns')?.textContent).toContain('Load kg');
+  });
+
   it('reconciles and dismisses an active rest timer after its deadline', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
