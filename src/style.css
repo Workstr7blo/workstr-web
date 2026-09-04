@@ -256,11 +256,102 @@
 .workout-card-author .author-pill { min-width: 0; }
 .program-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .program-tags .tag-pill { padding: 4px 8px; font-size: 10px; }
-.program-filter-panel { display: grid; gap: 9px; margin: 12px 0 14px; }
-.program-filter-panel input { width: 100%; min-width: 0; }
-.program-filter-selects { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.program-filter-selects label { display: grid; gap: 5px; color: var(--dim); font: 900 10px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
-.program-filter-selects select { width: 100%; min-width: 0; min-height: 38px; border-radius: 999px; padding: 8px 10px; }
+
+/* Program browser chrome: one toolbar row, chips only when something is filtering, and the
+   filter sheet behind the toggle. The four permanent selects this replaced pushed the first
+   program card 322px below the sub-tabs on a 390px phone. */
+.program-toolbar { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; }
+.program-search-wrap { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
+.program-search-icon { position: absolute; left: 14px; width: 17px; height: 17px; color: var(--dim); pointer-events: none; }
+.program-search {
+  width: 100%; min-width: 0; min-height: 46px; padding: 10px 14px 10px 40px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--chrome-input); color: var(--text); font: 600 13px/1.2 inherit;
+}
+.program-search::placeholder { color: var(--dim); }
+.program-search::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.program-toolbar-action {
+  position: relative; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-width: 46px; height: 46px; padding: 0 15px;
+  border: 1px solid var(--border); border-radius: 15px;
+  background: var(--chrome-fill); color: var(--text); cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.program-toolbar-action svg { width: 20px; height: 20px; flex: none; }
+.program-toolbar-action-text { font: 800 12px/1 ui-monospace, monospace; letter-spacing: .04em; white-space: nowrap; }
+/* The filter toggle is icon-only everywhere - its state is the badge, not a word. */
+.program-filter-toggle { width: 46px; padding: 0; }
+.program-toolbar-action:hover { border-color: var(--border-hot); background: rgba(var(--accent-rgb), .1); }
+.program-toolbar-action.accent { border-color: rgba(var(--accent-rgb), .5); background: rgba(var(--accent-rgb), .16); color: var(--accent-pale); }
+.program-toolbar-action.accent:hover { border-color: rgba(var(--accent-rgb), .75); background: rgba(var(--accent-rgb), .24); }
+.program-filter-toggle.on { border-color: rgba(var(--accent-rgb), .5); color: var(--accent-pale); }
+.program-filter-count {
+  position: absolute; top: -6px; right: -6px; min-width: 19px; height: 19px; padding: 0 5px;
+  display: grid; place-items: center; box-sizing: border-box;
+  border: 2px solid var(--void); border-radius: 999px;
+  background: var(--accent); color: var(--on-accent);
+  font: 900 10px/1 ui-monospace, monospace;
+}
+
+/* One scrolling row, never a stacked block - the point of the redesign is vertical space. */
+.program-active-filters { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+.program-active-filters::-webkit-scrollbar { display: none; }
+.program-filter-chip {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 12px;
+  border: 1px solid rgba(var(--accent-rgb), .45); border-radius: 999px;
+  background: rgba(var(--accent-rgb), .12); color: var(--accent-pale);
+  font: 800 12px/1 inherit; cursor: pointer;
+}
+.program-filter-chip:hover { border-color: rgba(var(--accent-rgb), .7); background: rgba(var(--accent-rgb), .2); }
+.program-filter-chip svg { width: 13px; height: 13px; flex: none; opacity: .8; }
+.program-filter-clear {
+  flex: 0 0 auto; min-height: 36px; padding: 7px 13px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: transparent; color: var(--muted); font: 800 12px/1 inherit; cursor: pointer;
+}
+.program-filter-clear:hover { border-color: var(--border-hot); color: var(--text); }
+
+/* Filter sheet. Same bottom sheet at every width: one layout to style and verify, and a
+   sheet is unremarkable on a desktop now. */
+/* Above the topbar and the mobile bottom nav, both z-index 100, and below the toast (200)
+   and the session overlay (300). A modal sheet the nav sat on top of would hide its own
+   footer on a phone. */
+.program-filter-backdrop { position: fixed; inset: 0; z-index: 110; background: rgba(2, 1, 6, .72); backdrop-filter: blur(3px); }
+.program-filter-sheet {
+  position: fixed; z-index: 111; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column; max-height: min(82vh, 680px);
+  margin: 0 auto; max-width: 560px;
+  border: 1px solid rgba(var(--accent-rgb), .3); border-bottom: 0;
+  border-radius: 22px 22px 0 0;
+  background: var(--chrome-menu);
+  box-shadow: 0 -18px 50px -20px rgba(var(--accent-rgb), .5), 0 -2px 0 rgba(255, 255, 255, .05) inset;
+  animation: program-sheet-in .22s cubic-bezier(.22, .61, .36, 1);
+}
+@keyframes program-sheet-in { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .program-filter-sheet { animation: none; } }
+.program-filter-sheet-handle { width: 40px; height: 4px; margin: 10px auto 2px; border-radius: 999px; background: var(--chrome-raised); }
+.program-filter-sheet-header { padding: 8px 20px 4px; text-align: center; }
+.program-filter-sheet-header h2 { margin: 0; font: 850 15px/1.2 inherit; letter-spacing: -.02em; }
+.program-filter-sheet-body { padding: 12px 20px 4px; overflow-y: auto; display: grid; gap: 18px; }
+.program-filter-group-title { margin: 0 0 9px; color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.program-filter-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.program-filter-option {
+  min-height: 44px; padding: 11px 15px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--chrome-fill); color: var(--muted);
+  font: 800 12px/1 inherit; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.program-filter-option:hover { border-color: var(--border-hot); color: var(--text); }
+.program-filter-option.active { border-color: rgba(var(--accent-rgb), .68); background: rgba(var(--accent-rgb), .18); color: var(--accent-pale); }
+.program-filter-sheet-footer {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+}
+.program-filter-sheet-footer .button { flex: 1; min-height: 46px; }
+.program-filter-sheet-footer #program-filter-apply { flex: 1.4; }
 .builder-goals { margin: 12px 0; }
 .builder-goals .subsection-head { align-items: end; }
 .builder-goals .subsection-head small { color: var(--dim); font-size: 12px; text-transform: none; letter-spacing: 0; }
@@ -318,6 +409,10 @@
 .discover-exercise-panel .card-meta { gap: 6px; }
 
 @media (max-width: 760px) {
+  /* Phones get icon-only actions: the icon plus its aria-label carries the button, and the
+     words cost the search field width it needs more. */
+  .program-toolbar-action { width: 46px; padding: 0; }
+  .program-toolbar-action-text { display: none; }
   .library-panel,
   .discover-exercise-panel { margin-top: 10px; }
   .library-filter-bar input,
@@ -333,7 +428,6 @@
   .discover-exercise-panel { padding: 15px; border-radius: 20px; }
   .library-panel .card-body,
   .discover-exercise-panel .card-body { padding: 9px 11px 11px; }
-  .program-filter-selects { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .builder-goal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -482,6 +576,11 @@
   .workout-card-media .program-zap-cta { min-height: 36px; padding: 8px 7px; font-size: 14px; }
   .workout-card-media .monero-tip-cta { min-height: 36px; padding: 8px 7px; font-size: 14px; }
   .monero-tip-qr { width: 180px; }
+  /* Source and difficulty are one line, as in the approved rendering. They wrapped because
+     the info column is ~230px at this width and the two pills together just missed it. */
+  .program-badge-row { flex-wrap: nowrap; gap: 5px; margin-top: 7px; }
+  .program-badge-row .program-status,
+  .program-badge-row .diff-badge.inline { min-width: 0; padding: 4px 6px; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .program-tag-grid { gap: 6px; max-width: none; }
   .program-tag-grid .tag-pill { padding: 6px 7px; font-size: 10px; letter-spacing: .02em; }
   .workout-card-name { font-size: 15px; }

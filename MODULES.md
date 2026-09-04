@@ -34,6 +34,7 @@ or set updates would make full-root rendering inappropriate.
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
 | Programs and program builder | `src/app/program-builder.ts`, `src/app/program-publish-controller.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-zap-view.ts`, `src/features/sheets/beast-mode.ts` | `src/db/store.ts`, `src/nostr/programImport.ts`, `src/nostr/program-publish.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/beast-mode.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/program-publish-controller.test.ts`, `tests/program-publish.test.ts`, `tests/nwc-ui.test.ts`, browser verification |
+| Programs/Discover browsing chrome: toolbar, filter chips, filter sheet | `src/features/sheets/program-browser.ts`, `src/app/program-browser-controller.ts` | `src/app/layout.ts`, `src/features/sheets/program-labels.ts` | `tests/program-browser.test.ts`, browser verification |
 | Live-session orchestration | `src/app/session-runner.ts` | the applicable controller/view below, `src/features/train/repeat-workout.ts` | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | Repeat a completed workout | `src/features/train/repeat-workout.ts` | `src/app/session-runner.ts`, `src/features/train/views.ts` | `tests/repeat-workout.test.ts`, `tests/session-runner.test.ts` |
 | History release regressions (scale, JSON round trip, neighbouring features) | `tests/history-qa.test.ts` | `docs/RELEASE-QA.md` | `tests/history-qa.test.ts` |
@@ -129,6 +130,14 @@ or set updates would make full-root rendering inappropriate.
   creator-support rail picker and, in Monero Mode, the public payment-address section.
   While that mode is on, `src/app/layout.ts` renders no NWC wallet card and
   `src/features/support/views.ts` drops its in-app zap controls.
+- `src/features/sheets/program-browser.ts` owns the search/filter/action toolbar above
+  Programs and Discover, the active-filter chips, and the filter sheet. Both browsers share
+  `state.programFilter` and `state.programFilters`; `state.programFilterSheet` only records
+  which one has the sheet open. One exported `programMatcher(state)` filters both rendered
+  lists and produces the sheet's "Show N" count, so the number and the list cannot disagree.
+  The sheet is rendered next to the modal in `shellMarkup`, not inside the page: `.content`
+  is a fixed stacking context at z-index 1, so a sheet inside it cannot paint over the
+  mobile bottom nav. `src/app/program-browser-controller.ts` owns its event bindings.
 - The account pill in `src/app/layout.ts` reports the active rail on every view: a `₿` or
   Monero-mark medallion plus a payment-tinted perimeter, both painted from the payment
   tokens. It reads the mode and never sets it — the rail is chosen in the Settings card

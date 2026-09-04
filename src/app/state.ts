@@ -111,6 +111,9 @@ export interface AppState {
   filter: string;
   programFilter: string;
   programFilters?: { goal: string; focus: string; format: string; equipment: string };
+  // Which browser's filter sheet is open, and null when none is. Transient view state:
+  // the filter values themselves stay in programFilters, shared by both browsers.
+  programFilterSheet?: 'programs' | 'discover' | null;
   expandedProgramAddress: string | null;
   exerciseStatus: string;
   programStatus: string;
