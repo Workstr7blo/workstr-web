@@ -1,7 +1,7 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
-import { authorPill, difficultyBadgeClass, equipmentSelectHtml, EX_PLACEHOLDER, exerciseFilterValues, fillSelectHtml, filterExercises, html } from '../../app/format';
-import { ownedEquipmentKeys } from '../../core/equipment';
+import { authorPill, difficultyBadgeClass, EX_PLACEHOLDER, html } from '../../app/format';
+import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults, exerciseToolbar } from '../../app/exercise-browser';
 
 export type DiscoverImportState = 'new' | 'in-library' | 'update';
 
@@ -59,35 +59,18 @@ export function discoverImportable(list: Exercise[], library: Exercise[]): Exerc
 }
 
 export function discoverPanel(state: AppState): string {
-  const filters = exerciseFilterValues(state.discoverExercises);
-  const owned = ownedEquipmentKeys(state.settings.ownedEquipment);
-  const list = filterExercises(state.discoverExercises, { ...state.discoverFilter, ownedEquipment: owned });
+  const list = exerciseResults('discover', state);
   const sel = state.discoverSelect;
-  const importable = discoverImportable(list, state.library);
-  const allVisibleSelected = importable.length > 0 && importable.every((exercise) => sel.addresses.has(exercise.nostr_address || exercise.slug));
-  const headActions = sel.active
-    ? `<span class="head-actions">
-        <button class="button small" id="discover-select-all">${allVisibleSelected ? 'Clear all' : 'Select all'}</button>
-        <button class="button primary small" id="discover-import-selected"${sel.addresses.size ? '' : ' disabled'}>Import (${sel.addresses.size})</button>
-        <button class="button small" id="discover-select-cancel">Done</button>
-      </span>`
-    : `<span class="head-actions">
-        <button class="button small" id="discover-select-toggle"${importable.length ? '' : ' disabled'}>Select</button>
-        <button class="button small" id="discover-refresh">Refresh catalog</button>
-      </span>`;
-  return `<div class="panel discover-exercise-panel">
-    <div class="panel-head"><span>Discover exercises</span>${headActions}</div>
-    <p class="section-help">Official Workstr catalog. Import exercises into your local library; updates appear when catalog versions are newer.</p>
-    <div class="filter-bar discover-filter-bar">
-      <input class="grow" id="discover-search" placeholder="Search exercises..." autocomplete="off" value="${html(state.discoverFilter.q)}" />
-      <div class="discover-filter-chips">
-        ${fillSelectHtml('discover-cat', filters.categories, 'All categories', state.discoverFilter.cat)}
-        ${fillSelectHtml('discover-muscle', filters.muscles, 'All muscles', state.discoverFilter.muscle)}
-        ${fillSelectHtml('discover-diff', filters.difficulties, 'All levels', state.discoverFilter.diff)}
-        ${equipmentSelectHtml('discover-equip', filters.equipment, state.discoverFilter.equip, owned.length)}
-      </div>
-    </div>
+  const hasFilters = Boolean(exerciseQuery('discover', state) || activeFacetCount('discover', state));
+  // The explanation of what importing does moved here from a permanent paragraph: it is
+  // what someone needs when the grid is empty, not on every visit.
+  const empty = state.discoverExercises.length === 0 && !hasFilters
+    ? 'The official Workstr catalog loads here. Importing an exercise copies it into your local library, which is what you edit and add to programs; updates appear when catalog versions are newer.'
+    : 'No exercises match.';
+  return `<div class="discover-exercise-panel">
+    ${exerciseToolbar('discover', state)}
+    ${exerciseActiveFilters('discover', state)}
     <div id="discover-status" class="discover-status">${html(state.exerciseStatus)}</div>
-    <div id="discover-grid" class="ex-grid discover-exercise-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => discoverCardHtml(exercise, state)).join('') || '<div class="empty">No exercises match.</div>'}</div>
+    <div id="discover-grid" class="ex-grid discover-exercise-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => discoverCardHtml(exercise, state)).join('') || `<div class="empty">${empty}</div>`}</div>
   </div>`;
 }

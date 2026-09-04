@@ -17,6 +17,7 @@ import { bodyView, trainingStatsView } from '../features/progress/views';
 import { quickWorkoutPanel, recoveryView } from '../features/recovery/views';
 import { programCard, sheetToProgram } from '../features/sheets/views';
 import { programActiveFilters, programFilterSheet, programMatcher, programToolbar } from '../features/sheets/program-browser';
+import { exerciseFilterSheet, exerciseSelectionBar } from './exercise-browser';
 import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { moneroMode } from '../features/sheets/monero-tip-view';
 import { backupPanel } from '../features/backup/views';
@@ -83,6 +84,8 @@ export function shellMarkup(state: AppState): string {
     </main>
     ${sessionOverlayMarkup(state)}
     ${programFilterSheet(state)}
+    ${exerciseFilterSheet(state)}
+    ${exerciseSelectionBar(state)}
     <div id="modal" class="modal"><div class="modal-card"><button id="modal-close" class="modal-close" type="button">×</button><div id="modal-content"></div></div></div>
     <div id="toast"></div>`;
 }

@@ -35,6 +35,7 @@ or set updates would make full-root rendering inappropriate.
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
 | Programs and program builder | `src/app/program-builder.ts`, `src/app/program-publish-controller.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-zap-view.ts`, `src/features/sheets/beast-mode.ts` | `src/db/store.ts`, `src/nostr/programImport.ts`, `src/nostr/program-publish.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/beast-mode.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/program-publish-controller.test.ts`, `tests/program-publish.test.ts`, `tests/nwc-ui.test.ts`, browser verification |
 | Programs/Discover browsing chrome: toolbar, filter chips, filter sheet | `src/features/sheets/program-browser.ts`, `src/app/program-browser-controller.ts` | `src/app/layout.ts`, `src/features/sheets/program-labels.ts` | `tests/program-browser.test.ts`, browser verification |
+| Exercise browsing chrome: toolbar, filter chips, filter sheet, selection bar | `src/app/exercise-browser.ts`, `src/app/exercise-browser-controller.ts` | `src/app/format.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts` | `tests/exercise-browser.test.ts`, `tests/equipment-views.test.ts`, browser verification |
 | Live-session orchestration | `src/app/session-runner.ts` | the applicable controller/view below, `src/features/train/repeat-workout.ts` | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | Repeat a completed workout | `src/features/train/repeat-workout.ts` | `src/app/session-runner.ts`, `src/features/train/views.ts` | `tests/repeat-workout.test.ts`, `tests/session-runner.test.ts` |
 | History release regressions (scale, JSON round trip, neighbouring features) | `tests/history-qa.test.ts` | `docs/RELEASE-QA.md` | `tests/history-qa.test.ts` |
@@ -143,6 +144,16 @@ or set updates would make full-root rendering inappropriate.
   tokens. It reads the mode and never sets it — the rail is chosen in the Settings card
   above. The green connection badge on the avatar is a separate state and does not follow
   the payment mode.
+- `src/app/exercise-browser.ts` owns the Library and Discover toolbar, chips, filter sheet
+  and selection bar. It lives in `app/` rather than either feature because both features use
+  it and a feature-to-feature import is not allowed. Unlike the program browser, the two
+  exercise views keep **separate** filter state — Library in `state.filter` +
+  `state.exFilter`, Discover in `state.discoverFilter` (whose `q` is its search, not a
+  facet) — so every function takes the view as an argument and `state.exerciseFilterSheet`
+  only records which one has the sheet open. `exerciseResults(view, state)` produces both
+  the grid and the sheet's "Show N". Sheet options are derived from the exercises that view
+  holds, and a selected value whose option has disappeared stays listed so the filter can
+  still be undone. `src/app/exercise-browser-controller.ts` owns its event bindings.
 - `src/app/session-persistence.ts` adapts stored session rows into live/history state.
 - `src/app/layout.ts` composes top-level pages from feature view functions. It owns the
   Settings category order and disclosure shell; backup, wallet, support, and Beast Mode

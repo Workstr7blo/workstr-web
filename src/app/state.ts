@@ -103,6 +103,9 @@ export interface AppState {
   discoverExercises: Exercise[];
   exFilter: { cat: string; muscle: string; diff: string; equip: string };
   discoverFilter: { q: string; cat: string; muscle: string; diff: string; equip: string };
+  // Which exercise view has the filter sheet open, and null when none does. The facet
+  // values themselves stay in exFilter/discoverFilter, which are deliberately separate.
+  exerciseFilterSheet?: 'library' | 'discover' | null;
   activeSession: ActiveSession | null;
   finishedSessions: ActiveSession[];
   publishingSessionId: number | null;
