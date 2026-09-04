@@ -8,9 +8,7 @@ export function trainingStatsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   const stats = getStats(state.finishedSessions, state.exercises);
   const max = Math.max(1, ...stats.weekly.map((week) => week.volume));
-  const bars = stats.weekly.length
-    ? stats.weekly.map((week) => `<div class="bar"><div class="fill" style="height:${Math.round((week.volume / max) * 100)}%"></div><span class="blabel">${html(week.week.split('-')[1])}</span></div>`).join('')
-    : '<div class="empty">No volume logged yet.</div>';
+  const bars = stats.weekly.map((week) => `<div class="bar"><div class="fill" style="height:${Math.round((week.volume / max) * 100)}%"></div><span class="blabel">${html(week.week.split('-')[1])}</span></div>`).join('');
   const distMax = Math.max(1, ...stats.muscle.map((entry) => entry.sets));
   const dist = stats.muscle.length
     ? `<div id="prog-dist" class="dist">${stats.muscle.map((entry) => `<div class="dist-row"><small>${html(entry.muscle)}</small><div class="track"><div class="fill" style="width:${Math.round((entry.sets / distMax) * 100)}%"></div></div><small>${entry.sets}</small></div>`).join('')}</div>`
@@ -18,6 +16,25 @@ export function trainingStatsView(state: AppState): string {
   const prs = stats.prs.length
     ? `<div id="prog-prs" class="list">${stats.prs.map((record) => `<div class="row"><div><strong>${html(record.name)}</strong><small>top ${displayWeightKg(record.topWeight, unit)} ${unit}</small></div><span class="badge muscle">${displayWeightKg(record.e1rm, unit)} ${unit} 1RM</span></div>`).join('')}</div>`
     : '<div id="prog-prs" class="list empty">No records yet.</div>';
+  // Volume, distribution and records are all empty for the same reason, so a profile with
+  // no finished session gets one message naming what to do instead of three restatements
+  // of the same absence under three headings.
+  const nothingLogged = !stats.weekly.length && !stats.muscle.length && !stats.prs.length;
+  const body = nothingLogged
+    ? `<div id="prog-bars" class="bars" hidden></div><div id="prog-dist" class="dist" hidden></div><div id="prog-prs" class="list" hidden></div>
+    <div class="stats-first-run">
+      <strong>Nothing logged yet</strong>
+      <p>Finish a workout and this fills in: weekly volume, which muscles you are actually training, and your best estimated 1RM for every lift.</p>
+      <button class="button primary" data-view="workouts" type="button">Go to Workouts</button>
+    </div>`
+    : `<div class="panel">
+    <div class="panel-head"><span>Weekly volume</span></div>
+    <div id="prog-bars" class="bars">${bars}</div>
+    <div class="subsection-head"><span>Muscle distribution</span><small>by working sets</small></div>
+    ${dist}
+    <div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley)</small></div>
+    ${prs}
+  </div>`;
   return `<div class="stats-hero">
     <div class="summary-stat">
       <div class="ss-val"><svg id="stat-streak-flame" class="flame ${stats.streak > 0 ? 'active' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c-4-2.5-7-6.5-7-11 0-3 2-5.5 4-7 .5 2.5 2 4 4 5 0-3 1.5-6 3-8 1.5 2 3 5 3 8 2-1 3.5-2.5 4-5 1.5 2.5 1 6-1 9s-5.5 5.5-10 9z"/></svg><span id="stat-streak">${stats.streak}</span></div>
@@ -32,14 +49,7 @@ export function trainingStatsView(state: AppState): string {
       <div class="ss-label">Total volume</div>
     </div>
   </div>
-  <div class="panel">
-    <div class="panel-head"><span>Weekly volume</span></div>
-    <div id="prog-bars" class="bars">${bars}</div>
-    <div class="subsection-head"><span>Muscle distribution</span><small>by working sets</small></div>
-    ${dist}
-    <div class="subsection-head"><span>Personal records</span><small>best estimated 1RM (Epley)</small></div>
-    ${prs}
-  </div>`;
+  ${body}`;
 }
 
 export function bmiMarkup(bmi: number): string {
@@ -105,7 +115,9 @@ export function bodyView(state: AppState): string {
   const wd = (kg: number) => displayWeightKg(kg, unit) || 0;
   const entries = state.bodyEntries;
   let cards = '', bmi = '', chart = '', goal = '';
-  let listHtml = '<div id="body-list" class="list empty">No entries yet.</div>';
+  // Empty says it once, at the top, where it can also say what to do. The list keeps its
+  // id either way because the shell patches that node directly.
+  let listHtml = '<div id="body-list" class="list" hidden></div>';
   if (entries.length) {
     // Entries are newest-first; sort oldest-first for trend/average maths.
     const sorted = entries.slice().sort((a, b) => a.date.localeCompare(b.date));
@@ -142,13 +154,14 @@ export function bodyView(state: AppState): string {
     <div id="body-bmi">${bmi}</div>
     <div id="body-chart">${chart}</div>
     <div id="body-goal">${goal}</div>
+    ${entries.length ? '<div class="subsection-head"><span>Entries</span><small>newest first</small></div>' : ''}
+    ${listHtml}
     <div class="subsection-head"><span>Log weight</span></div>
     <form id="body-form" class="form-grid">
       <label>Date<input type="date" name="date" /></label>
       <label><span>Weight (<span class="body-unit-lbl">${unit}</span>)</span><input type="number" name="weightKg" step="0.1" placeholder="e.g. 80" /></label>
       <div class="form-actions span-2"><button class="button primary" type="submit">Log weight</button></div>
     </form>
-    ${listHtml}
     <div class="subsection-head"><span>Profile</span><small>for BMI &amp; goal</small></div>
     <form id="body-profile-form" class="form-grid">
       <label>Height (cm)<input type="number" name="heightCm" step="1" min="100" max="250" placeholder="e.g. 175" value="${state.settings.heightCm || ''}" /></label>

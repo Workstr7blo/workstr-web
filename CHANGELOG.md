@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Statistics tells the truth once instead of three times. A profile with no finished
+  sessions used to show an empty chart box plus "No volume logged yet.", "No logged sets
+  yet." and "No records yet." under three headings, none of which said what to do; it now
+  shows one message explaining what finishing a workout fills in, and a way to get there.
+  The three summary tiles stay, because a zero streak is honest rather than empty.
+- Body no longer says "No entries yet." twice, once at the top and again below the form, and
+  your logged weights now sit with the numbers they belong to instead of between the log
+  form and the profile form.
 - Exercises gets the same treatment Programs did. The panel, its heading and the four
   permanent Category/Muscle/Level/Equipment selects are gone, replaced by one row: search, a
   filter button, and the view's own actions. On a 390px phone the first exercise now sits
