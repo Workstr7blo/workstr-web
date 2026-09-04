@@ -7,7 +7,7 @@ import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 import { programDisplayTags } from './program-labels';
-import { programActions, programZapButton, programZapStatus } from './program-zap-view';
+import { programActions, programZapButton, programZapStatus, zapBolt } from './program-zap-view';
 import { moneroMode, moneroTipButton } from './monero-tip-view';
 export { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, inferProgramLabels, programDisplayTags, programSearchTags, selectedProgramGoals } from './program-labels';
 
@@ -257,7 +257,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
   const monero = moneroMode(state);
   const payment = options.showPayment !== false;
   const zapTotals = state.programZapTotals?.[program.address];
-  const zapStats = !payment || monero ? '' : `<div class="program-zap-stats">⚡ ${(zapTotals?.sats || 0).toLocaleString('en-US')} sats</div>`;
+  const zapStats = !payment || monero ? '' : `<div class="program-zap-stats">${zapBolt(10)} ${(zapTotals?.sats || 0).toLocaleString('en-US')} sats</div>`;
   const paymentCta = !payment ? '' : monero ? moneroTipButton(program, state) : programZapButton(program, state);
   const rank = !monero && options.zapRank && options.zapRank >= 1 && options.zapRank <= 3 ? options.zapRank : 0;
   const rankBadge = rank ? `<div class="program-zap-rank">#${rank} top zapped</div>` : '';

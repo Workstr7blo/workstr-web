@@ -46,9 +46,19 @@ export function canZapProgram(program: RelayProgram, state: AppState): boolean {
   return Boolean(state.sheets.find((sheet) => sheet.id === localSheetId(program))?.nostr_address);
 }
 
+// The bolt, vendored as a path rather than the U+26A1 character: that codepoint is an
+// emoji, so iOS and Android paint their own colour glyph and the rail loses control of it.
+// Drawn on the same 24-unit grid as the Monero mark and filled with `currentColor`, so one
+// rule can colour either rail's payment action.
+const ZAP_BOLT = 'M13.6 2 4.8 13.9h5.2L8.7 22 19.2 9.6h-5.3z';
+
+export function zapBolt(size = 16): string {
+  return `<svg class="program-zap-icon" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="${ZAP_BOLT}"/></svg>`;
+}
+
 export function programZapButton(program: RelayProgram, state: AppState): string {
   if (!canZapProgram(program, state)) return '';
-  return `<button class="button gold small program-zap-cta" type="button" data-zap-program="${html(program.address)}" aria-label="Zap creator of ${html(program.name)}"><span class="program-zap-icon" aria-hidden="true">⚡</span><span class="program-zap-label">Zap</span></button>`;
+  return `<button class="button gold small program-zap-cta" type="button" data-zap-program="${html(program.address)}" aria-label="Zap creator of ${html(program.name)}">${zapBolt(16)}<span class="program-zap-label">Zap</span></button>`;
 }
 
 export function programActions(program: RelayProgram, state: AppState): string {
