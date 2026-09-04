@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The account pill in the top right now reports two states instead of one. The green dot
+  that sat beside your name has moved onto the avatar, where it means what it always meant
+  — this Nostr identity is connected — and the space it left carries a small medallion for
+  the rail that pays creators: `₿` for Lightning, the Monero mark for Monero Mode. The pill
+  takes a thin perimeter in the payment colour, firmer in Monero Mode because the two
+  oranges are close enough that a matching edge would read the same in both. It stays a
+  dark Workstr surface: the rail is ambient state, not a repaint, and the logo, navigation,
+  training accents and muscle maps are untouched. The medallion is informational — the pill
+  still opens Settings, which is still where the rail is chosen. A local account keeps its
+  compact Account/Local chip with neither badge nor medallion.
 - Every button in the app is now one material: a pane of dark tinted glass with a lit lip
   along its top edge, instead of the mix of solid gradient slabs, outlined ghosts and gold
   fills it had grown into. Colour now says what a control touches — violet for training,

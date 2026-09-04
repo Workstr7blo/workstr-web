@@ -78,7 +78,7 @@
 
 .topbar-actions .button.small { padding: 8px 11px; font-size: 12px; }
 
-/* Compact identity chip: profile avatar + name + ambient status dot, opens Settings. */
+/* Compact identity chip: avatar + name + identity badge + payment rail, opens Settings. */
 .topbar-actions .connection-chip { max-width: min(46vw, 260px); }
 .connection-chip {
   display: flex; align-items: center; justify-content: space-between; gap: 9px;
@@ -89,9 +89,18 @@
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .connection-chip:hover { border-color: var(--border-hot); background: rgba(var(--accent-rgb), 0.1); }
+.connection-avatar-wrap { position: relative; width: 30px; height: 30px; flex: 0 0 30px; }
 .connection-avatar { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); object-fit: cover; background: rgba(var(--accent-rgb), .18); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .07); }
 .connection-avatar.fallback { display: grid; place-items: center; color: var(--text); font: 900 12px/1 ui-monospace, monospace; }
 .connection-avatar[hidden] { display: none; }
+/* Sits over the avatar, so it reads as a property of the identity rather than as one more
+   chip in the row. The ring is the chip's own ground, not a colour, so it stays legible over
+   an arbitrary profile picture. */
+.connection-identity-status {
+  position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px;
+  border-radius: 999px; border: 2px solid var(--void);
+  background: var(--success-green); box-shadow: 0 0 6px rgba(var(--success-rgb), .45);
+}
 .connection-chip-main { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; flex: 1; }
 .connection-chip-label { font-size: 12px; font-weight: 850; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .connection-chip-status { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--dim); }
@@ -99,11 +108,42 @@
 .connection-chip-chevron { width: 16px; height: 16px; flex: 0 0 auto; color: var(--dim); }
 .connection-chip:hover .connection-chip-chevron { color: var(--purple-2); }
 .connection-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--dim); box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04); }
-.connection-chip.ok .connection-dot { background: var(--success-green); box-shadow: 0 0 0 3px rgba(0, 208, 132, 0.14); }
 .connection-chip.warn .connection-dot { background: var(--bitcoin-gold); box-shadow: 0 0 0 3px rgba(247, 147, 26, 0.16); }
 .connection-chip.error .connection-dot { background: var(--danger-red); box-shadow: 0 0 0 3px rgba(255, 56, 100, 0.16); }
-.connection-chip.ok { border-color: rgba(0, 208, 132, 0.24); }
 .connection-chip.error { border-color: rgba(255, 56, 100, 0.32); }
+/* The active rail, one medallion for both modes: the fill and its foreground come from the
+   payment tokens, so Monero Mode swaps the colour without a second component. Bitcoin has a
+   typographic mark, Monero has none in a system font, so it uses the vendored path. */
+.connection-payment-mark {
+  width: 19px; height: 19px; flex: 0 0 19px;
+  display: grid; place-items: center; border-radius: 999px;
+  background: var(--payment-accent); color: var(--on-payment);
+  font: 900 12px/1 ui-monospace, monospace;
+  box-shadow: 0 0 8px rgba(var(--payment-rgb), .18);
+}
+.connection-payment-mark .monero-mark { display: block; }
+/* Payment tint on the perimeter only. The chip stays a dark Workstr surface: the rail is
+   ambient state, not the identity of the app. */
+.connection-chip.ok {
+  border-color: rgba(var(--payment-rgb), .28);
+  box-shadow: 0 0 0 1px rgba(var(--payment-rgb), .03), 0 0 14px rgba(var(--payment-rgb), .06);
+}
+.connection-chip.ok:hover {
+  border-color: rgba(var(--payment-rgb), .46);
+  background: rgba(var(--payment-rgb), .06);
+  box-shadow: 0 0 18px rgba(var(--payment-rgb), .10);
+}
+/* Lightning gold and Monero orange are close enough in hue that an identical perimeter reads
+   the same in both modes. Monero gets a firmer edge so the two are distinguishable without
+   reading the medallion — the difference is weight, not a second palette. */
+:root[data-payment-mode="monero"] .connection-chip.ok {
+  border-color: rgba(var(--payment-rgb), .5);
+  box-shadow: 0 0 0 1px rgba(var(--payment-rgb), .07), 0 0 16px rgba(var(--payment-rgb), .13);
+}
+:root[data-payment-mode="monero"] .connection-chip.ok:hover {
+  border-color: rgba(var(--payment-rgb), .68);
+  box-shadow: 0 0 20px rgba(var(--payment-rgb), .17);
+}
 .web-empty-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .settings-auth-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
 .settings-auth-options.single-column { grid-template-columns: 1fr; }

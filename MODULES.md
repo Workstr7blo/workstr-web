@@ -129,6 +129,11 @@ or set updates would make full-root rendering inappropriate.
   creator-support rail picker and, in Monero Mode, the public payment-address section.
   While that mode is on, `src/app/layout.ts` renders no NWC wallet card and
   `src/features/support/views.ts` drops its in-app zap controls.
+- The account pill in `src/app/layout.ts` reports the active rail on every view: a `₿` or
+  Monero-mark medallion plus a payment-tinted perimeter, both painted from the payment
+  tokens. It reads the mode and never sets it — the rail is chosen in the Settings card
+  above. The green connection badge on the avatar is a separate state and does not follow
+  the payment mode.
 - `src/app/session-persistence.ts` adapts stored session rows into live/history state.
 - `src/app/layout.ts` composes top-level pages from feature view functions. It owns the
   Settings category order and disclosure shell; backup, wallet, support, and Beast Mode

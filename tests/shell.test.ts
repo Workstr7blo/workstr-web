@@ -133,55 +133,127 @@ describe('shell', () => {
     expect(createModal.querySelector('#restore-local-account')).toBeNull();
   });
 
+  // The account pill carries two independent states — is this identity connected, and which
+  // rail pays creators — so most of its tests differ from each other by one field.
+  const signedIn = (overrides: Partial<AppState> = {}): AppState => ({
+    pubkey: 'f'.repeat(64),
+    npub: null,
+    profileName: 'Settebello',
+    profilePicture: 'https://example.com/avatar.png',
+    profileNames: {},
+    authorProfiles: {},
+    store: null,
+    settings: { unit: 'kg', publicRelays: [] },
+    support: { status: 'idle', receipts: [] },
+    nwc: { active: false, status: 'idle' },
+    monero: { status: 'idle', address: '' },
+    signerType: 'local',
+    view: 'exercises',
+    subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
+    exercises: [],
+    programs: [],
+    programZapAttempts: [],
+    activeSession: null,
+    finishedSessions: [],
+    publishingSessionId: null,
+    publishingStatus: null,
+    editingId: null,
+    filter: '',
+    programFilter: '',
+    expandedProgramAddress: null,
+    exerciseStatus: '',
+    programStatus: '',
+    signInStatus: null,
+    backup: { state: 'off', pending: 0 },
+    expandedSessionId: null,
+    history: { monthKey: null, selectedDate: null },
+    qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false },
+    bodyEntries: [],
+    sheets: [],
+    library: [],
+    librarySelect: { active: false, slugs: new Set() },
+    discoverSelect: { active: false, addresses: new Set() },
+    discoverExercises: [],
+    exFilter: { cat: '', muscle: '', diff: '', equip: '' },
+    discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' },
+    ...overrides
+  } as AppState);
+
+  // The account chip's own row: avatar wrapper, then name, then the payment medallion, then
+  // the chevron. Slicing to the button keeps `₿` assertions off the Settings rail selector,
+  // which renders the same glyph further down the same markup.
+  const accountChip = (markup: string): string =>
+    markup.slice(markup.indexOf('id="account-chip"'), markup.indexOf('</header>'));
+
   it('renders a compact kind 0 identity chip when signed in', () => {
-    const markup = shellMarkup({
-      pubkey: 'f'.repeat(64),
-      npub: null,
-      profileName: 'Settebello',
-      profilePicture: 'https://example.com/avatar.png',
-      profileNames: {},
-      authorProfiles: {},
-      store: null,
-      settings: { unit: 'kg', publicRelays: [] },
-      support: { status: 'idle', receipts: [] },
-      nwc: { active: false, status: 'idle' },
-      monero: { status: 'idle', address: '' },
-      signerType: 'local',
-      view: 'exercises',
-      subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
-      exercises: [],
-      programs: [],
-      programZapAttempts: [],
-      activeSession: null,
-      finishedSessions: [],
-      publishingSessionId: null,
-      publishingStatus: null,
-      editingId: null,
-      filter: '',
-      programFilter: '',
-      expandedProgramAddress: null,
-      exerciseStatus: '',
-      programStatus: '',
-      signInStatus: null,
-      backup: { state: 'off', pending: 0 },
-      expandedSessionId: null,
-      history: { monthKey: null, selectedDate: null },
-      qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false },
-      bodyEntries: [],
-      sheets: [],
-      library: [],
-      librarySelect: { active: false, slugs: new Set() },
-      discoverSelect: { active: false, addresses: new Set() },
-      discoverExercises: [],
-      exFilter: { cat: '', muscle: '', diff: '', equip: '' },
-      discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' }
-    } as AppState);
+    const markup = shellMarkup(signedIn());
 
     expect(markup).toContain('class="connection-avatar" src="https://example.com/avatar.png"');
     expect(markup).toContain('>Settebello</span>');
     expect(markup).toContain('aria-label="Signed in"');
     expect(markup).not.toContain('>Connected</span>');
     expect(markup).not.toContain('connection-chip-label">Account');
+  });
+
+  it('badges the avatar with the signed-in dot instead of floating it beside the name', () => {
+    const chip = accountChip(shellMarkup(signedIn()));
+
+    expect(chip).toContain('class="connection-avatar-wrap"');
+    expect(chip).toContain('class="connection-identity-status" role="img" aria-label="Signed in"');
+    // The status badge is inside the avatar wrapper, and the name is not.
+    expect(chip.indexOf('connection-identity-status')).toBeLessThan(chip.indexOf('connection-chip-main'));
+    // The old bare dot beside the username is gone.
+    expect(chip).not.toContain('<span class="connection-dot" aria-label="Signed in">');
+  });
+
+  it('keeps the broken-avatar fallback adjacent to the image it replaces', () => {
+    const chip = accountChip(shellMarkup(signedIn()));
+    // `onerror` reaches the fallback through `nextElementSibling`, so nothing may sit between
+    // them. The status badge has to come after the fallback, not before it.
+    expect(chip).toContain('onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="connection-avatar fallback" hidden>S</span><span class="connection-identity-status"');
+  });
+
+  it('falls back to the profile initial and still badges the avatar', () => {
+    const chip = accountChip(shellMarkup(signedIn({ profilePicture: null })));
+
+    expect(chip).toContain('<span class="connection-avatar fallback">S</span>');
+    expect(chip).toContain('connection-identity-status');
+    expect(chip).not.toContain('<img class="connection-avatar"');
+  });
+
+  it('marks the account pill with the Lightning rail by default', () => {
+    const chip = accountChip(shellMarkup(signedIn()));
+
+    expect(chip).toContain('class="connection-payment-mark" role="img" aria-label="Lightning payments"');
+    expect(chip).toContain('title="Lightning payment mode"');
+    expect(chip).toContain('₿');
+    expect(chip).not.toContain('monero-mark');
+    // Informational only: the pill stays one button, so no nested control appears.
+    expect(chip).not.toContain('<button');
+    // The rail sits between the name and the chevron.
+    expect(chip.indexOf('connection-payment-mark')).toBeLessThan(chip.indexOf('connection-chip-chevron'));
+  });
+
+  it('swaps the account pill to the Monero rail without changing its structure', () => {
+    const chip = accountChip(shellMarkup(signedIn({ settings: { unit: 'kg', publicRelays: [], paymentMode: 'monero' } })));
+
+    expect(chip).toContain('class="connection-payment-mark" role="img" aria-label="Monero payments"');
+    expect(chip).toContain('title="Monero payment mode"');
+    expect(chip).toContain('monero-mark');
+    expect(chip).not.toContain('₿');
+    // Same component, same identity badge — only the rail changed.
+    expect(chip).toContain('connection-identity-status');
+    expect(chip).toContain('class="connection-avatar-wrap"');
+  });
+
+  it('leaves a local account unbadged and without a payment rail', () => {
+    const chip = accountChip(shellMarkup(signedIn({ pubkey: null, profileName: null, profilePicture: null })));
+
+    expect(chip).toContain('connection-chip-label">Account');
+    expect(chip).toContain('>Local</span>');
+    expect(chip).not.toContain('aria-label="Signed in"');
+    expect(chip).not.toContain('connection-identity-status');
+    expect(chip).not.toContain('connection-payment-mark');
   });
 
   it('renders Beast Mode as unlocked in Settings from objective local state', () => {
