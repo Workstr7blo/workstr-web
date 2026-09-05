@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { launchSignerUri, renderShell } from '../src/app/shell';
 import { shellMarkup } from '../src/app/layout';
 import type { AppState } from '../src/app/state';
+import { clearLocalSecret, LEGACY_LOCAL_KEY_STORAGE, loadLocalSecret } from '../src/signer/local-key-storage';
 
 // Boot and settings-view rendering kick off background relay fetches unrelated to this file's
 // assertions. `tests/setup.ts` now blocks every non-loopback socket, so an unmocked one fails
@@ -334,5 +335,24 @@ describe('signer app launch', () => {
     launchSignerUri('nostrconnect://example', false);
     expect(click).toHaveBeenCalledOnce();
     click.mockRestore();
+  });
+});
+
+describe('boot migrates a pre-encryption recovery key', () => {
+  it('moves the plaintext key out of localStorage without anyone asking for a signer', async () => {
+    // Regression guard for a real gap: migration used to run only when something wanted a
+    // signer, so opening the app to look at history left the plaintext key on disk. Boot
+    // has to do it, whether or not the person signs in or syncs.
+    const secret = 'ab'.repeat(32);
+    localStorage.clear();
+    await clearLocalSecret();
+    localStorage.setItem(LEGACY_LOCAL_KEY_STORAGE, secret);
+
+    document.body.innerHTML = '<div id="app"></div>';
+    renderShell(document.getElementById('app') as HTMLElement, { skipCatalogRefresh: true });
+
+    await vi.waitFor(() => expect(localStorage.getItem(LEGACY_LOCAL_KEY_STORAGE)).toBeNull());
+    expect(await loadLocalSecret()).toBe(secret);
+    await clearLocalSecret();
   });
 });
