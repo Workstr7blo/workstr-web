@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The live EMOM screen is the same screen as a standard workout, in interval mode. Rounds
+  are the connected progress track the exercise rail already uses - green for done, lit for
+  the round you are in, tappable to jump - instead of a separate row of numbered boxes. The
+  exercise photo is the full-width frame across the top, the timer sits under it as one line
+  of phase, clock and interval detail rather than a card competing with the photo, and the
+  duplicate "Now" card is gone because the header already names what you are doing.
+- Logging an interval works like logging a set: actual reps and load side by side with one
+  full-width Log interval button under them, easier to hit mid-effort than the small button
+  at the end of a row. A logged interval shows what you recorded and stops asking to be
+  pressed.
+- Pause and Finish early sit in the normal session footer, so the controls do not move when
+  a workout crosses from its strength half into its EMOM half. The floating round pause
+  button is gone.
+- The EMOM header reads `EMOM · Round 1/4 · Interval 1/2`, and names its section only when
+  a workout has more than one. Starting and finishing an EMOM both read as the same kind of
+  screen, and the start hand-off shows the movement it opens on.
 - The live workout screen is one worksheet instead of a stack of cards. The separate
   "Log set 2 of 3" card is gone: the reps and load fields now sit in the set they belong to,
   inside a list where every row shares the same Reps and Load columns, so a completed, the

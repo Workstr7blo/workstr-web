@@ -770,7 +770,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
    arm's length between reps: taller, monospace, and with the dials pushed past the app's
    lead rank, because each of these is the only thing on its surface worth pressing. They
    used to be solid slabs with a 30px bloom; the bloom is what the lit lip replaces. */
-.session-log-btn, .session-next-btn, .session-finish-btn, .session-prev-btn, .session-emom-btn {
+.session-log-btn, .session-next-btn, .session-finish-btn, .session-prev-btn, .session-emom-btn, .session-pause-btn {
   /* The light accent, not the deep one: over a near-black runner a fill can only get so
      bright before it stops being glass, so the rim does the carrying. A hairline of
      #bc97ff reads across a room; the same alpha of #7c3cff reads as a dark edge. */
@@ -816,8 +816,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 
 .session-footer { display: flex; gap: 10px; align-items: center; padding: 14px clamp(20px, 4vw, 34px) calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(var(--accent-line-rgb), .14); background: rgba(var(--void-rgb), .74); backdrop-filter: blur(18px); }
 /* Geometry only; the pane, the hue and the lip come from the shared runner rule above. */
-.session-next-btn, .session-finish-btn, .session-prev-btn, .session-emom-btn { min-height: 58px; border-radius: 14px; padding: 0 18px; letter-spacing: .08em; }
-.session-next-btn:active, .session-finish-btn:active, .session-prev-btn:active, .session-emom-btn:active { transform: translateY(1px) scale(.99); }
+.session-next-btn, .session-finish-btn, .session-prev-btn, .session-emom-btn, .session-pause-btn { min-height: 58px; border-radius: 14px; padding: 0 18px; letter-spacing: .08em; }
+.session-next-btn:active, .session-finish-btn:active, .session-prev-btn:active, .session-emom-btn:active, .session-pause-btn:active { transform: translateY(1px) scale(.99); }
 .session-next-btn, .session-finish-btn, .session-emom-btn { flex: 1; }
 /* Finishing is the one thing here that is not "keep going", so it takes the done green. */
 .session-finish-btn { --btn-tint: var(--success-rgb); --btn-fill: .16; --btn-lip: rgba(255, 255, 255, .26); color: var(--success-green); }

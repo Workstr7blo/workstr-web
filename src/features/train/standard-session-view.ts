@@ -111,8 +111,7 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   const body = root.querySelector('#session-body');
   const footer = root.querySelector('#session-footer');
   if (!title || !meta || !nav || !body || !footer) return;
-  footer.classList.remove('emom-live-controls');
-  nav.classList.remove('emom-round-nav');
+  nav.classList.remove('emom-round-track');
   if (!exercises.length) {
     title.textContent = session.sheetName || 'Freestyle';
     meta.textContent = 'No exercises yet';
