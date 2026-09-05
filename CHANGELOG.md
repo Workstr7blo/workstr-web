@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Groundwork for signing in on a new device by scanning a QR code from a device already
+  signed in. This release carries the encryption and relay transport only; the screens that
+  use them come next, so there is nothing to try yet.
 - The relay write policy accepts a second Workstr protocol family: ephemeral device-pairing
   events on kind 20078, for the QR sign-in flow. They are validated separately from
   encrypted sync, must carry a pairing namespace, a supported protocol version and an expiry
