@@ -26,6 +26,7 @@ or set updates would make full-root rendering inappropriate.
 | Boot and application coordination | `src/main.ts`, `src/app/shell.ts` | `src/app/state.ts`, `src/app/layout.ts` | `tests/shell.test.ts` |
 | Identity, signer connection, and adoption | `src/app/identity-controller.ts` | `src/signer/types.ts`, `src/db/adopt.ts` | `tests/shell.test.ts`, `tests/adopt.test.ts`, browser verification |
 | Local account keys and where the secret lives | `src/signer/local-key.ts` | `src/signer/local-key-storage.ts` | `tests/local-key-signer.test.ts`, `tests/local-key-storage.test.ts` |
+| QR device pairing crypto and relay transport | `src/signer/pairing.ts` | `src/nostr/device-pairing.ts`, `relay/write-policy.mjs`, `docs/device-pairing-architecture.md` | `tests/pairing.test.ts`, `tests/pairing-relay.integration.test.ts` |
 | Catalog/library actions and cache | `src/app/catalog-controller.ts` | `src/nostr/canon.ts`, `src/nostr/programImport.ts`, `src/db/store.ts` | `tests/discover.test.ts`, `tests/programImport.test.ts`, browser verification |
 | Preferences, recovery, history actions, and backup controls | `src/app/preferences-controller.ts` | `src/db/export.ts`, recovery modules, `src/nostr/zaps.ts` | feature tests, `tests/export.test.ts` |
 | NWC wallet connection and in-app support zaps | `src/app/nwc-controller.ts`, `src/nostr/support-zap.ts` | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts`, `src/features/support/views.ts` | `tests/nwc-ui.test.ts`, `tests/support-zap.test.ts`, NWC tests |
