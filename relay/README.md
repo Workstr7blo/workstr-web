@@ -5,20 +5,42 @@ write, there is no allowlist, and NIP-42 AUTH is not used. Reads are open too �
 are NIP-44 ciphertext, and cleartext `d` tags are an accepted trade (`docs/instruction.md`
 §13).
 
-That makes `write-policy.mjs` the only control on what the relay stores. It accepts an
-event when:
-
-- `kind` is `30078`, **and**
-- the first `d` tag starts with `workstr:v2:` and carries something after the prefix.
-
-Everything else is rejected, `kind:1` included. This is what stops the relay becoming a
+That makes `write-policy.mjs` the only control on what the relay stores. It accepts exactly
+two narrowly defined Workstr protocol families, each validated on its own terms, and
+rejects everything else — `kind:1` included. This is what stops the relay becoming a
 general-purpose relay carrying other clients' notes, and there is no second line of
 defence: the relay URL ships inside public JavaScript and relay crawlers index it whether
 or not anyone advertises it.
 
+**Encrypted sync** — persistent user records:
+
+- `kind` is `30078`, **and**
+- the first `d` tag starts with `workstr:v2:` and carries something after the prefix.
+
+**Device pairing** — ephemeral transport for the QR sign-in flow:
+
+- `kind` is `20078`, **and**
+- exactly three tags: `d` = `workstr:pair:<32 lowercase hex>`, `expiration` (NIP-40, in the
+  future and no more than 300 seconds ahead), `v` = `1`, **and**
+- non-empty content, and a serialised event of 2 KB or less.
+
+The two are kept apart deliberately. Sync records are addressable, persistent and charged
+against a per-author quota; pairing events are ephemeral, tiny, expire in minutes and are
+bounded by a rate window instead. A single predicate accepting both prefixes would let
+pairing inherit sync's storage budget and let sync inherit pairing's laxer shape, so
+`decide()` dispatches to `decideSync()` or `decidePairing()` and they share nothing. Either
+can be changed — or the pairing branch removed outright to roll back — without touching the
+other.
+
 **Why the `d` prefix and not the kind alone.** Kind `30078` is NIP-78 "arbitrary app data",
 a shared kind that unrelated clients also publish. Filtering on kind alone would let their
 records accumulate on the disk.
+
+**What the relay never sees.** Pairing content is NIP-44 ciphertext holding a recovery key,
+encrypted to an ephemeral public key that exists only in the QR code on the new device's
+screen. The relay cannot decrypt it, and neither can anyone reading the relay. See
+`docs/device-pairing-architecture.md` for the protocol and its security argument — in
+particular why the recipient's ephemeral pubkey must never appear as a tag.
 
 ## Install
 
@@ -119,12 +141,22 @@ docker exec <container> wget -qO- --header="Accept: application/nostr+json" http
 
 `npm test -- write-policy` covers the decision table and drives the executable over the
 real stdin/stdout protocol, but it cannot prove the relay is wired up. Against the
-deployed relay, confirm all four:
+deployed relay, confirm all seven:
 
 1. A `kind:30078` with a `workstr:v2:` `d` tag is accepted.
 2. A `kind:1` note is rejected, with the reason visible in the `OK` message.
 3. A `kind:30078` with a foreign `d` prefix is rejected.
 4. NIP-11 still serves over HTTPS and reads still work — the policy is write-path only.
+5. A well-formed `kind:20078` pairing event is accepted, and is retrievable by a `#d`
+   filter on a *new* connection — that is what a backgrounded PWA relies on.
+6. A pairing event with a foreign namespace, a stale or far-future `expiration`, an extra
+   tag, or an oversized payload is rejected in each case.
+7. The accepted pairing event is gone from the relay once its lifetime passes, without
+   anyone deleting it.
+
+A rejection must carry the plugin's own `blocked: ...` message. If it reads
+`error: internal error`, the plugin is not running — most often because the file lost mode
+755 in transit — and strfry is failing closed on every write, valid records included.
 
 Publish those from a throwaway key, then remove the accepted event so verification does
 not leave data behind:
@@ -147,6 +179,16 @@ honest user's footprint is capped by their distinct `d` tags — deliberate abus
 | Total storage ceiling | 20 GB | `WORKSTR_CEILING_BYTES` |
 | Alert threshold | 80% of the ceiling | `WORKSTR_ALERT_RATIO` |
 | State directory | — | `WORKSTR_POLICY_STATE` |
+| Pairing events per pubkey per hour | 30 | `WORKSTR_PAIR_MAX_PER_AUTHOR` |
+| Pairing events relay-wide per hour | 600 | `WORKSTR_PAIR_MAX_TOTAL` |
+
+**Pairing is counted, not weighed.** It never touches the quota ledger. Those events are
+reaped by strfry within `ephemeralEventsLifetimeSeconds`, so charging an author permanently
+for bytes nobody holds would be wrong, and letting pairing consume a backup quota would be
+worse. The bound is instead how many pairing events a pubkey may publish per rolling hour,
+held in memory and never persisted — after a restart the counts are empty, which is correct,
+because the events they described are gone too. The storage ceiling still applies: a relay
+already over it stops accepting writes of either kind.
 
 The state directory must be **writable by the container user**, and must be a mounted
 volume — the plugin itself is mounted read-only. If it cannot be written the plugin says so
