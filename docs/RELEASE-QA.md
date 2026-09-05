@@ -8,7 +8,9 @@ Every line states an expected result, so a failure is unambiguous. If a line is 
 when you get to it, fix the line — a checklist you have to interpret is not a checklist.
 
 **Time:** about an afternoon. **You need:** an iPhone, a desktop browser with a NIP-07
-extension, a NIP-46 signer (Amber), and a second Nostr client (Damus, Primal or Amethyst).
+extension, a NIP-46 signer (Amber), a second Nostr client (Damus, Primal or Amethyst), and
+a second device with a camera — an Android phone if you have one, because it takes the
+native decoder path an iPhone never will.
 
 ---
 
@@ -34,6 +36,15 @@ spends the afternoon re-testing them:
   repeat-workout seeding and refusals, and the JSON round trip. The headless driver also
   covers 320/390/768/1280 layouts, keyboard operation, offline, and deletion refresh.
   The full suite is run under eight timezones (see below) — do not redo any of this by hand.
+- **Device pairing:** identifier entropy and expiry bounds, the QR round trip carrying no
+  private half, sealing and opening including a tampered ciphertext, a response bound to
+  another session, and one whose key does not match its sender, the ephemeral secret wipe,
+  the exact three-tag envelope and its size, the approval gate holding the key until the
+  button is pressed, and every camera teardown and error path against a fake camera. The
+  opt-in relay suite proves a real strfry accepts the response and serves it to a
+  connection that was not listening (see the evidence section below). What none of it
+  reaches: a real camera pointed at a real screen, the iOS decoder, and a PWA that
+  backgrounds mid-transfer.
 
 ---
 
@@ -201,6 +212,59 @@ copy; these steps cover the real wallet/relay round trip that CI cannot exercise
       Application → Local Storage/Session Storage, JSON export, and any saved screenshots.
       None contain the raw NWC URI, `secret=`, the NWC 64-hex secret, or `nostr+walletconnect://`.
 
+## 6d. Device pairing by QR
+
+Needs **two real devices** and the deployed site on both, one of them an iPhone. Run the
+seven relay checks under "Verify after deploying" in `relay/README.md` first: a relay that
+is not carrying the pairing branch fails every line here for one reason, and finding that
+out on the second device wastes an afternoon.
+
+The account being transferred must be a local Workstr account. An external signer cannot be
+copied, and refusing to try is itself a check below.
+
+- [ ] **The code.** New device, signed out, Account → Scan code from another device. A QR
+      appears with the minutes until it expires and the line saying the code carries no
+      private key.
+- [ ] **Approval is asked for.** Trusted device, Settings → Add device, camera opens, point
+      it at the QR. The camera stops at the scan, and the approval screen says approving
+      copies the recovery key. Nothing has left the device yet.
+- [ ] **Cancel sends nothing.** Cancel on that approval screen. The new device is still
+      waiting, no account arrives on it, and the camera indicator on the trusted device is
+      out.
+- [ ] **The transfer.** Scan again and press Approve transfer. The trusted device says
+      Device added; the new device says Signed in and shows a shortened npub.
+- [ ] **The npub matches.** It is the same account Settings shows on the trusted device.
+      This line is the only defence against a response that is cryptographically perfect
+      and from somebody else's key — read it, do not skim it because the flow felt smooth.
+- [ ] **The account works.** On the new device log a workout and open Settings: the
+      identity signs, and if Auto-sync is on it settles rather than erroring.
+- [ ] **iOS decoder is on demand.** iPhone, cold load with the network panel open: nothing
+      fetches the WASM decoder at startup. It downloads when the scanner opens, and
+      scanning then works in the installed PWA, not only in Safari.
+- [ ] **Android native path.** On an Android phone the scan works with no decoder download
+      at all. A device that exposes `BarcodeDetector` but supports no formats must fall
+      back rather than fail — a scan that never resolves means the format check regressed.
+- [ ] **Camera refused.** Deny the camera permission at the prompt. The screen says access
+      was refused and stays usable; granting it and trying again scans normally.
+- [ ] **Wrong code.** Scan any other QR — a Lightning invoice, a URL, another app's code.
+      Transfer failed appears with Try again, and the camera is released.
+- [ ] **Expiry.** Show a code, leave it more than five minutes, then approve it on the
+      trusted device. The new device offers a new code rather than adopting anything, and
+      the late response is ignored.
+- [ ] **Single use.** Photograph the QR before a successful transfer. Afterwards, scan the
+      photograph on the trusted device and approve it: the new device, already signed in,
+      does nothing with the second response.
+- [ ] **External signer refused.** Signed in with NIP-07 or NIP-46, press Add device. The
+      app says it cannot copy the key, and no camera permission is ever requested.
+- [ ] **Backgrounded PWA.** New device shows a code; lock the phone or switch apps, approve
+      on the trusted device, and come back inside the window. The response is collected on
+      reconnect — this is the case the ephemeral relay rendezvous exists for.
+- [ ] **Camera released every way out.** Cancel, success, error, closing the modal and
+      navigating to another tab each leave the camera indicator out.
+- [ ] **Nothing leaks.** On both devices afterwards, inspect the console, Application →
+      Local Storage / Session Storage and a JSON export. No nsec, no pairing payload, and
+      no `workstr://pair` URI is persisted anywhere.
+
 ## 7. Support surface (from v1.0)
 
 The support screen now includes in-app NWC zaps plus the external zap target. Run this in
@@ -220,11 +284,13 @@ addition to section 6c when cutting a release.
 | Date | |
 | iPhone model / iOS version | |
 | Desktop browser(s) | |
+| Pairing devices (trusted → new) | |
 | NIP-46 signing latency (observed) | |
 | Failures found | |
 | Tagged? | |
 
-**A release is blocked** by any failure in sections 1, 3, 4, 5, 5b or 6. Section 2 failures
+**A release is blocked** by any failure in sections 1, 3, 4, 5, 5b, 6 or 6d — pairing moves
+a private key, so a failure there is never cosmetic. Section 2 failures
 on a non-primary browser are recorded, not blocking. Section 0 failing means stop and fix
 the deploy before testing anything else.
 
@@ -327,3 +393,29 @@ round trip in a browser. That gap is exactly section 6b.
 
 All test data was deleted afterwards and the ledger rebuilt; the relay was left at zero
 events, zero authors, zero blocked.
+
+---
+
+## Required evidence: device pairing
+
+Run before a release that carries pairing, against the **production relay**, recording the
+date in sign-off and deleting the throwaway events afterwards.
+
+**The relay's own policy** — the seven checks under "Verify after deploying" in
+`relay/README.md`, all green, with each rejection carrying the plugin's own `blocked: ...`
+reason. An `error: internal error` means the plugin is not running and every write is
+failing closed, valid sync records included. Check 7 has a known wrinkle worth reading
+before it is filed as a bug: the last event written is never reaped until something else is
+written.
+
+**The client loop** — `tests/pairing-relay.integration.test.ts` run with
+`WORKSTR_TEST_RELAY=wss://relay.workstr.fit:43736`: all four must be green. The suite
+carries a recovery key across a real relay, collects the response on a connection that was
+not listening when it was sent, has the relay refuse an envelope that breaks the policy,
+and returns rather than hanging when nothing answers. It is skipped when the variable is
+unset, so a green `npm test` alone is not this evidence.
+
+**What automation could not reach.** No test points a camera at a screen, none runs the
+iOS WASM decoder, and none backgrounds an installed PWA mid-transfer. Section 6d is
+exactly that gap, and the npub check inside it is the one step no amount of relay
+verification substitutes for.
