@@ -77,8 +77,8 @@ Verified against the production strfry image on 2026-09-05:
 - Ephemeral events are **stored and served to a later `REQ` on a new connection**, not only
   broadcast to subscriptions open at the time. This is what lets a backgrounded PWA
   reconnect and still collect its response.
-- They are **reaped automatically** once `ephemeralEventsLifetimeSeconds` passes.
-  Persistent events in the same database are untouched.
+- They are **reaped by the relay itself**, with no operator action. Persistent events in the
+  same database are untouched.
 - `#d` filters work on them, so the new device can find its response by pairing id alone.
 - `rejectEphemeralEventsOlderThanSeconds` (60) refuses stale ones before the write policy
   runs.
@@ -86,6 +86,43 @@ Verified against the production strfry image on 2026-09-05:
 
 So retention needs no code and no cleanup job: production sets
 `ephemeralEventsLifetimeSeconds = 300`, matching `PAIR_MAX_LIFETIME_SECONDS`.
+
+### Exactly when an event is deleted
+
+`RelayCron.cpp` runs a cleanup pass every 9 seconds and deletes ephemeral events whose
+`created_at` is older than `ephemeralEventsLifetimeSeconds`. A pairing event is therefore
+gone within 9 seconds of expiring — but with one exception worth knowing, because it looks
+like a bug the first time it is seen:
+
+```cpp
+if (levId == mostRecent) return true; // don't delete because it could cause levId re-use
+```
+
+**The single most recently written event is never deleted**, whatever its age, until some
+other event is written. On a relay carrying sync traffic this is invisible. On an idle
+relay — a staging box, or production during a quiet hour — the last pairing event published
+sits there indefinitely, and disappears the moment anything else is written.
+
+This is a property of the relay, not of the policy, and it changes nothing about safety:
+the ciphertext is useless without the ephemeral private key, which never leaves the new
+device and is destroyed on success, expiry or cancellation. Relay-side deletion bounds how
+long an inert ciphertext sits on disk; it was never what protects the key.
+
+Verified 2026-09-05 on production: a pairing event 625 seconds old, well past its lifetime,
+survived because it was the most recent write; publishing one further event caused it to be
+reaped within 10 seconds.
+
+### A configuration constraint
+
+**`ephemeralEventsLifetimeSeconds` must be greater than or equal to
+`PAIR_MAX_LIFETIME_SECONDS`.** The write policy accepts an `expiration` up to
+`PAIR_MAX_LIFETIME_SECONDS` ahead, so a shorter relay lifetime would delete pairing
+responses that are still inside their valid window — destroying exactly the case the
+ephemeral kind was chosen to serve, where the new device backgrounds and comes back for its
+response a few minutes later.
+
+Both are 300 seconds today. Lowering one means lowering the other, and shortening the window
+a person has to scan and approve.
 
 Kind 20078 is unassigned in the NIP registry. Assigned kinds in the ephemeral range are
 22242, 23194, 23195, 24133, 24242, 27235 and 28934-28936.
