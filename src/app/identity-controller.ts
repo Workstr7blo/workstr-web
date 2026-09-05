@@ -2,7 +2,9 @@ import { renderSVG } from 'uqr';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
 import { clearNip46State, createBunkerSigner, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
-import { clearLocalKey, createCachedLocalKeySigner, createLocalAccount, importLocalAccount } from '../signer/local-key';
+import { clearLocalKey, createCachedLocalKeySigner, createLocalAccount, exportLocalNsec, importLocalAccount } from '../signer/local-key';
+import { createDevicePairingController } from './device-pairing-controller';
+import { WORKSTR_RELAY_URL } from '../sync/engine';
 import { forgetAutoApprove } from '../signer/auto-approve';
 import type { Signer } from '../signer/types';
 import type { AppState } from './state';
@@ -163,6 +165,31 @@ async function startRemoteSignerRequest(): Promise<void> {
 }
 
 
+const pairing = createDevicePairingController({
+  root,
+  relayUrl: WORKSTR_RELAY_URL,
+  openModal,
+  closeModal,
+  getSigner: getActiveSigner,
+  getLocalNsec: () => (state.signerType === 'local' || !state.pubkey ? exportLocalNsec() : Promise.resolve(null)),
+  adoptTransferredKey: async (nsec: string) => {
+    const account = await importLocalAccount(nsec);
+    activeSigner = account.signer;
+    await completeSignIn(account.pubkey, 'local');
+  }
+});
+
+// The settings account row's own buttons. They live here rather than in the shell because
+// this controller is what they call, and a binding site away from its handler is how one
+// gets missed when the markup changes.
+function bindSettingsAuth(): void {
+  root.querySelector('#sign-in-settings')?.addEventListener('click', () => startAccountChoice());
+  root.querySelector('#sign-in-nip07')?.addEventListener('click', () => { void connectNip07(); });
+  root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void signOut(); });
+  root.querySelector('#remove-account-data')?.addEventListener('click', () => { void signOutAndRemoveData(); });
+  root.querySelector('#add-device-settings')?.addEventListener('click', () => pairing.startScan());
+}
+
 function startAccountChoice(tab: 'login' | 'create' = 'login'): void {
   const isLogin = tab === 'login';
   openModal(`<div class="page-title">Workstr account</div>
@@ -176,6 +203,7 @@ function startAccountChoice(tab: 'login' | 'create' = 'login'): void {
   root.querySelector('#auth-tab-create')?.addEventListener('click', () => startAccountChoice('create'));
   root.querySelector('#create-local-account')?.addEventListener('click', () => void createLocalAccountFlow());
   root.querySelector('#restore-local-account')?.addEventListener('click', () => showRestoreLocalAccountModal());
+  root.querySelector('#pair-new-device')?.addEventListener('click', () => pairing.startNewDevice());
   root.querySelector('#connect-remote-signer')?.addEventListener('click', () => { closeModal(); void startRemoteSignerRequest(); });
   root.querySelector('#connect-extension-signer')?.addEventListener('click', () => { closeModal(); void connectNip07(); });
   root.querySelector('#continue-local')?.addEventListener('click', closeModal);
@@ -185,7 +213,8 @@ function loginTabMarkup(): string {
   return `<div class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-login">
     <p class="section-help">Restore an existing Workstr account with your recovery key, or connect a mobile signer.</p>
     <div class="settings-auth-options single-column">
-      <button id="restore-local-account" class="button primary" type="button">Restore with recovery key</button>
+      <button id="pair-new-device" class="button primary" type="button">Scan code from another device</button>
+      <button id="restore-local-account" class="button" type="button">Restore with recovery key</button>
       <button id="connect-remote-signer" class="button" type="button">Use mobile signer</button>
       ${hasNip07() ? '<button id="connect-extension-signer" class="button" type="button">Use browser extension</button>' : ''}
     </div>
@@ -320,6 +349,7 @@ async function openAndRender(pubkey: string, signerType: AppState['signerType'] 
 }
   return {
     signOut, signOutAndRemoveData, connectNip07, startRemoteSignerRequest, startAccountChoice, startLocalAccount: createLocalAccountFlow, startRestoreLocalAccount: () => showRestoreLocalAccountModal(), getActiveSigner, dropActiveSigner,
+    startAddDevice: () => pairing.startScan(), releasePairing: pairing.release, bindSettingsAuth,
     renderIfPending: () => { if (pendingConnect) renderConnectModal(); },
     clearPending: () => { pendingConnect = null; }
   };
