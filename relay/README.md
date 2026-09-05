@@ -152,7 +152,12 @@ deployed relay, confirm all seven:
 6. A pairing event with a foreign namespace, a stale or far-future `expiration`, an extra
    tag, or an oversized payload is rejected in each case.
 7. The accepted pairing event is gone from the relay once its lifetime passes, without
-   anyone deleting it.
+   anyone deleting it — **after one further event is written**. strfry's cleanup pass runs
+   every 9 seconds, but never deletes the single most recently written event, so on an idle
+   relay the last pairing event published lingers until the next write of any kind. Publish
+   a second event and the first disappears within seconds. See
+   `docs/device-pairing-architecture.md` for why this is a property of the relay rather than
+   a policy failure, and why it does not weaken pairing.
 
 A rejection must carry the plugin's own `blocked: ...` message. If it reads
 `error: internal error`, the plugin is not running — most often because the file lost mode
@@ -181,6 +186,12 @@ honest user's footprint is capped by their distinct `d` tags — deliberate abus
 | State directory | — | `WORKSTR_POLICY_STATE` |
 | Pairing events per pubkey per hour | 30 | `WORKSTR_PAIR_MAX_PER_AUTHOR` |
 | Pairing events relay-wide per hour | 600 | `WORKSTR_PAIR_MAX_TOTAL` |
+
+**`strfry.conf` must keep `ephemeralEventsLifetimeSeconds` at or above the policy's
+`PAIR_MAX_LIFETIME_SECONDS` (300).** The policy accepts a pairing `expiration` up to that
+far ahead, so a shorter relay lifetime would delete responses that are still valid and break
+pairing for any device that backgrounded and came back for its answer. Both are 300 today;
+they move together or not at all.
 
 **Pairing is counted, not weighed.** It never touches the quota ledger. Those events are
 reaped by strfry within `ephemeralEventsLifetimeSeconds`, so charging an author permanently
