@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The relay write policy accepts a second Workstr protocol family: ephemeral device-pairing
+  events on kind 20078, for the QR sign-in flow. They are validated separately from
+  encrypted sync, must carry a pairing namespace, a supported protocol version and an expiry
+  no more than five minutes ahead, and are capped at 2 KB. Self-hosters get two new optional
+  settings, `WORKSTR_PAIR_MAX_PER_AUTHOR` and `WORKSTR_PAIR_MAX_TOTAL`, bounding how many
+  pairing events a pubkey and the relay accept per hour. Pairing never consumes the backup
+  quota, and encrypted sync behaves exactly as before.
+
 ### Changed
 
 - The live EMOM screen is the same screen as a standard workout, in interval mode. Rounds
