@@ -30,6 +30,7 @@ import { createUpdateController } from './update-controller';
 import { createProgramBuilder } from './program-builder';
 import { createSessionPersistence } from './session-persistence';
 import { createCatalogController } from './catalog-controller';
+import { migrateLegacyLocalSecret } from '../signer/local-key-storage';
 import { createIdentityController, launchSignerUri } from './identity-controller';
 import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
@@ -58,8 +59,13 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       localStorage.removeItem(SESSION_KEY);
       localStorage.removeItem(SIGNER_TYPE_KEY);
     }
-    // Paint the shell immediately; data lands on the next render.
+    // Paint the shell immediately; data lands on the next render. Nothing above this line
+    // may await, or the first paint slips to a microtask and the shell renders empty.
     render();
+    // Every boot, not on the first call that wants a signer: someone who only reads their
+    // history would otherwise keep the plaintext key on disk forever. Cleanup, so it runs
+    // after first paint and a failure is swallowed — the key just stays where it was.
+    await migrateLegacyLocalSecret().catch(() => undefined);
     if (state.pubkey) await openIdentity(state.pubkey, false);
     else await openLocal();
     render();
