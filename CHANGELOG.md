@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- A local account's recovery key is no longer kept in browser local storage as plain text.
+  It is encrypted with a non-extractable AES-GCM key and held in a dedicated database,
+  the same way the wallet connection secret already was. Existing accounts move over by
+  themselves the next time the app opens, and the plain copy is deleted; nothing to do and
+  no need to sign in again. This closes the easiest ways a key could be read off a shared
+  or borrowed device - it is not a substitute for a dedicated signer, which is still the
+  stronger option for anyone who wants one.
+
 ### Added
 
 - The relay write policy accepts a second Workstr protocol family: ephemeral device-pairing

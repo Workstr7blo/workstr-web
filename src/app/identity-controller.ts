@@ -37,7 +37,7 @@ export function createIdentityController(ctx: IdentityControllerContext) {
 async function signOut(): Promise<void> {
   activeSigner = null;
   clearNip46State();
-  clearLocalKey();
+  await clearLocalKey();
   // It describes the permissions one connection was granted, not this device. The next
   // signer may prompt for everything, and retrying early at it would prompt twice.
   forgetAutoApprove();
@@ -110,7 +110,7 @@ async function getActiveSigner(): Promise<Signer | null> {
     return activeSigner;
   }
   if (state.signerType === 'local') {
-    activeSigner = createCachedLocalKeySigner();
+    activeSigner = await createCachedLocalKeySigner();
     return activeSigner;
   }
   return null;
@@ -132,7 +132,7 @@ async function connectNip07(): Promise<void> {
     const signer = createNip07Signer();
     const pubkey = await signer.getPublicKey();
     activeSigner = signer;
-    clearLocalKey();
+    await clearLocalKey();
     await completeSignIn(pubkey, 'nip07');
   } catch (error) {
     state.signInStatus = `extension signer error ${(error as Error).message}`;
@@ -152,7 +152,7 @@ async function startRemoteSignerRequest(): Promise<void> {
     if (mobile) launchSignerRequest(request.uri);
     const connected = await request.signer;
     activeSigner = connected.signer;
-    clearLocalKey();
+    await clearLocalKey();
     closeModal();
     await completeSignIn(connected.pubkey, 'nip46');
   } catch (error) {
@@ -174,7 +174,7 @@ function startAccountChoice(tab: 'login' | 'create' = 'login'): void {
     ${isLogin ? loginTabMarkup() : createTabMarkup()}`);
   root.querySelector('#auth-tab-login')?.addEventListener('click', () => startAccountChoice('login'));
   root.querySelector('#auth-tab-create')?.addEventListener('click', () => startAccountChoice('create'));
-  root.querySelector('#create-local-account')?.addEventListener('click', createLocalAccountFlow);
+  root.querySelector('#create-local-account')?.addEventListener('click', () => void createLocalAccountFlow());
   root.querySelector('#restore-local-account')?.addEventListener('click', () => showRestoreLocalAccountModal());
   root.querySelector('#connect-remote-signer')?.addEventListener('click', () => { closeModal(); void startRemoteSignerRequest(); });
   root.querySelector('#connect-extension-signer')?.addEventListener('click', () => { closeModal(); void connectNip07(); });
@@ -205,9 +205,9 @@ function createTabMarkup(): string {
   </div>`;
 }
 
-function createLocalAccountFlow(): void {
+async function createLocalAccountFlow(): Promise<void> {
   try {
-    const account = createLocalAccount();
+    const account = await createLocalAccount();
     activeSigner = account.signer;
     showRecoveryKeyModal(account.pubkey, account.nsec);
   } catch (error) {
@@ -247,10 +247,10 @@ function showRestoreLocalAccountModal(input = '', error: string | null = null): 
     keyInput.focus();
     keyInput.setSelectionRange(keyInput.value.length, keyInput.value.length);
   }
-  root.querySelector('#restore-local-key')?.addEventListener('click', () => {
+  root.querySelector('#restore-local-key')?.addEventListener('click', () => void (async () => {
     const value = keyInput?.value || '';
     try {
-      const account = importLocalAccount(value);
+      const account = await importLocalAccount(value);
       activeSigner = account.signer;
       closeModal();
       void completeSignIn(account.pubkey, 'local');
@@ -259,7 +259,7 @@ function showRestoreLocalAccountModal(input = '', error: string | null = null): 
       // after a typo punishes the exact person this flow exists for.
       showRestoreLocalAccountModal(value, (err as Error).message);
     }
-  });
+  })());
   root.querySelector('#restore-use-signer')?.addEventListener('click', () => { closeModal(); void startRemoteSignerRequest(); });
 }
 
@@ -300,7 +300,7 @@ async function connectBunkerInput(): Promise<void> {
     const signer = await createBunkerSigner(input, { onAuthUrl: launchSignerRequest });
     const pubkey = await signer.getPublicKey();
     activeSigner = signer;
-    clearLocalKey();
+    await clearLocalKey();
     pendingConnect = null;
     closeModal();
     await completeSignIn(pubkey, 'nip46');

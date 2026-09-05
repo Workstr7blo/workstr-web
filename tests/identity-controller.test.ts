@@ -108,7 +108,7 @@ describe('identity controller adoption branching', () => {
     await seedLocalUserData('local');
 
     const controller = createIdentityController(h.ctx);
-    const account = createLocalAccount();
+    const account = await createLocalAccount();
     controller.startRestoreLocalAccount();
     const modal = h.modal();
     modal.querySelector<HTMLTextAreaElement>('#local-key-input')!.value = account.nsec;
@@ -123,7 +123,7 @@ describe('identity controller adoption branching', () => {
     await seedLocalUserData('local');
     const h = harness();
     const controller = createIdentityController(h.ctx);
-    const account = createLocalAccount();
+    const account = await createLocalAccount();
     // Pre-seed under the account pubkey so the already-has-data branch fires.
     const store = await WorkstrStore.open(account.pubkey);
     await store.createSession({ started_at: new Date().toISOString(), sheet_name: 'Old' });
@@ -154,7 +154,7 @@ describe('identity controller adoption branching', () => {
 
     const h = harness();
     const controller = createIdentityController(h.ctx);
-    const account = createLocalAccount();
+    const account = await createLocalAccount();
     controller.startRestoreLocalAccount();
     const modal = h.modal();
     modal.querySelector<HTMLTextAreaElement>('#local-key-input')!.value = account.nsec;
