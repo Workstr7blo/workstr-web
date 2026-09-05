@@ -183,10 +183,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       void navigator.clipboard.writeText(button.dataset.copy || '')
         .then(() => toast('Copied'), () => toast('Could not copy', 'bad'));
     }));
-    root.querySelector('#sign-in-settings')?.addEventListener('click', () => identity.startAccountChoice());
-    root.querySelector('#sign-in-nip07')?.addEventListener('click', () => { void identity.connectNip07(); });
-    root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void identity.signOut(); });
-    root.querySelector('#remove-account-data')?.addEventListener('click', () => { void identity.signOutAndRemoveData(); });
+    identity.bindSettingsAuth();
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void preferences.saveUnitPreference((event.target as HTMLSelectElement).value); });
     root.querySelectorAll('input[name="payment-mode"]').forEach((input) => input.addEventListener('change', (event) => {
       const rail = event.target as HTMLInputElement;
@@ -391,6 +388,9 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
 
   function closeModal(): void {
     identity.clearPending();
+    // Whatever route the modal closed by - the X, the backdrop, a cancel button - the
+    // camera and the relay subscription stop with it. Release is idempotent.
+    identity.releasePairing();
     programBuilder.clear();
     root.querySelector('#modal')?.classList.remove('open');
   }
