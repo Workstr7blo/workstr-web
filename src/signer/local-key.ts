@@ -58,6 +58,14 @@ export async function createCachedLocalKeySigner(): Promise<Signer | null> {
   return secretKey ? createLocalKeySigner(secretKey) : null;
 }
 
+// For QR device transfer, and nothing else. Null when this account is held by an external
+// signer, which Workstr cannot copy because it never had the key. Callers must not log,
+// store or render the result.
+export async function exportLocalNsec(): Promise<string | null> {
+  const secretKey = await secretFromStorage();
+  return secretKey ? nip19.nsecEncode(secretKey) : null;
+}
+
 export async function clearLocalKey(): Promise<void> {
   await clearLocalSecret();
 }

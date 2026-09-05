@@ -168,6 +168,9 @@
 .web-status-note { margin-top: 12px; }
 .signer-qr { width: 240px; max-width: 100%; margin: 16px auto 0; padding: 12px; background: #fff; border-radius: 12px; }
 .signer-qr svg { display: block; width: 100%; height: auto; }
+/* The camera preview is square and cropped: a QR fills the middle of the frame, and a
+   letterboxed portrait video makes people hunt for the alignment. */
+.pairing-video { display: block; width: 100%; max-width: 320px; aspect-ratio: 1; margin: 16px auto 0; border-radius: 12px; background: #000; object-fit: cover; }
 .support-panel {
   padding: 24px;
   overflow: hidden;

@@ -19,9 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Groundwork for signing in on a new device by scanning a QR code from a device already
-  signed in. This release carries the encryption and relay transport only; the screens that
-  use them come next, so there is nothing to try yet.
+- Sign in on a new device by scanning a QR code from a device already signed in. Open
+  Account on the new device and choose Scan code from another device; on the device you
+  already use, open Settings and press Add device. The code holds no private key, expires
+  in five minutes, and nothing is sent until you approve the transfer on the device you are
+  holding. The new device then shows which account arrived, so a code scanned by mistake is
+  visible rather than silent. Scanning works on iPhone and Android; the decoder it needs on
+  iOS is downloaded only when you open the scanner, never at startup.
 - The relay write policy accepts a second Workstr protocol family: ephemeral device-pairing
   events on kind 20078, for the QR sign-in flow. They are validated separately from
   encrypted sync, must carry a pairing namespace, a supported protocol version and an expiry
