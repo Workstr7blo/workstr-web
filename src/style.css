@@ -594,72 +594,100 @@
   z-index: 9999 !important;
 }
 .session-rest-overlay.show { display: flex !important; }
-.emom-hero, .emom-clock { text-align: center; margin: 0 auto 24px; max-width: 620px; }
-.emom-hero { padding: clamp(24px, 6vw, 56px) 20px; }
-.emom-hero p { color: var(--muted); line-height: 1.55; }
-.emom-badge { display: inline-flex; padding: 6px 10px; border: 1px solid var(--border-hot); border-radius: 999px; color: var(--bitcoin-gold); font: 900 11px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
-.emom-countdown { margin-top: 12px; font: 900 clamp(64px, 18vw, 132px)/.9 ui-monospace, monospace; letter-spacing: -.08em; color: var(--text); font-variant-numeric: tabular-nums; }
-.emom-caption { margin-top: 8px; color: var(--dim); font: 800 11px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
-.emom-steps { display: grid; gap: 14px; max-width: 720px; margin: 0 auto; }
-.emom-step { padding: 16px; border: 1px solid rgba(var(--accent-line-rgb), .16); border-radius: 16px; background: rgba(0,0,0,.24); opacity: .58; transition: opacity .2s, border-color .2s, background .2s; }
-.emom-step.active { opacity: 1; border-color: var(--border-hot); background: rgba(var(--accent-rgb), .1); }
-.emom-step.done { opacity: .72; border-color: rgba(54,224,160,.45); }
-.emom-step-head { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 10px; align-items: center; margin-bottom: 12px; }
-.emom-step-head > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: rgba(var(--accent-rgb), .2); font: 900 13px/1 ui-monospace, monospace; }
-.emom-step-head strong, .emom-step-head small { display: block; }
-.emom-step-head small { margin-top: 4px; color: var(--muted); }
-.emom-log-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) 82px; gap: 9px; align-items: end; }
-.emom-next { color: var(--muted); font: 800 12px/1 ui-monospace, monospace; }
-.emom-live-layout { display: grid; gap: 11px; max-width: 760px; margin: 0 auto; }
-.emom-live-hero { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 12px; align-items: stretch; }
-.emom-timer-panel { display: grid; justify-items: center; align-content: center; gap: 6px; padding: 11px 9px; border: 1px solid rgba(var(--accent-line-rgb), .16); border-radius: 18px; background: rgba(0,0,0,.22); }
-.emom-timer-panel.paused { opacity: .78; }
-.emom-timer-wrap, .emom-timer-wrap .rest-ring { width: 88px; height: 88px; }
-.emom-timer-wrap .emom-countdown { position: relative; margin: 0; font-size: 35px; letter-spacing: -.05em; }
+/* EMOM live session. The same worksheet as the standard runner - header, connected track,
+   wide hero, one lit surface, quiet footnote, persistent footer - with the interval clock
+   and its log where the standard screen keeps its set sheet. Purple carries progress and
+   the primary action so the screen follows the theme; gold is the live-timing accent and
+   stays inside the clock band and the interval being logged. */
+.emom-live-layout { display: grid; gap: 14px; }
+/* The hero's own bottom margin would land on top of the grid gap and open a hole between
+   the exercise and its clock. */
+.emom-live-layout .session-ex-image { margin-bottom: 0; }
+/* Paused keeps every position and only lowers the lights, so nothing has to be found again
+   on resume. */
+.emom-live-layout.paused .session-ex-image { opacity: .5; filter: saturate(.65); }
+
+/* Rounds ride the standard exercise track. The arrows are not pips, so they take no share
+   of the track's width and the round after one draws no connector back to it. */
+.session-track-arrow { flex: 0 0 auto; display: grid; place-items: center; width: 30px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--dim); font: 900 22px/1 ui-monospace, monospace; cursor: pointer; }
+.session-track-arrow:hover:not(:disabled) { color: var(--text); }
+.session-track-arrow:disabled { opacity: .25; cursor: default; }
+.session-track-arrow + .session-ex-dot::before { content: none; }
+
+/* Clock band: phase, ring and interval metadata on one line under the hero, so the timer
+   reads as the state of the exercise on screen rather than a dashboard beside it. */
+.emom-status { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid rgba(var(--accent-line-rgb), .12); }
+.emom-phase-label { flex: 0 0 auto; padding: 10px 13px; border: 1px solid rgba(247,147,26,.45); border-radius: 999px; color: var(--bitcoin-gold); font: 900 11px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.emom-status.recovery .emom-phase-label { border-color: rgba(var(--success-rgb), .45); color: var(--success-green); }
+.emom-status.interval .emom-phase-label { border-color: rgba(var(--accent-line-rgb), .4); color: var(--purple-2); }
+.emom-status.paused .emom-phase-label { border-color: rgba(var(--accent-line-rgb), .32); color: var(--muted); }
+.emom-timer-wrap { flex: 0 0 auto; }
+.emom-timer-wrap, .emom-timer-wrap .rest-ring { width: 92px; height: 92px; }
+.emom-countdown { position: relative; color: var(--text); font: 900 34px/1 ui-monospace, monospace; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+.emom-status.paused .emom-timer-wrap { opacity: .6; }
 .emom-work-ring-bg, .emom-work-ring-fg { fill: none; transform: rotate(-90deg); transform-origin: 50% 50%; }
 .emom-work-ring-bg { stroke: rgba(247,147,26,.14); }
 .emom-work-ring-fg { stroke: var(--bitcoin-gold); stroke-linecap: round; transition: stroke-dashoffset .25s linear, stroke .2s ease; }
-.emom-timer-panel.recovery .emom-work-ring-bg { stroke: rgba(54,224,160,.13); }
-.emom-timer-panel.recovery .emom-work-ring-fg { stroke: var(--success-green); }
-.emom-phase-label { color: var(--purple-2); font: 900 11px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
-.emom-timer-panel.recovery .emom-phase-label { color: var(--success-green); }
-.emom-now-card { display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; border: 1px solid rgba(var(--accent-line-rgb), .16); border-radius: 18px; background: rgba(0,0,0,.24); }
-.emom-now-card .session-ex-image.compact { width: 100%; height: 104px; min-height: 0; object-fit: contain; background: #050309; border: 0; border-radius: 0; box-shadow: none; }
-.emom-now-card .session-ex-image.placeholder { display: grid; place-items: center; color: var(--dim); }
-.emom-now-copy { display: grid; gap: 4px; padding: 9px 11px 10px; }
-.emom-now-copy span { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
-.emom-now-copy strong { font-size: 17px; line-height: 1.05; letter-spacing: -.03em; }
-.emom-now-copy small { color: var(--muted); font: 800 11px/1.3 ui-monospace, monospace; }
-.emom-step.emom-workout-card { opacity: .78; display: grid; gap: 9px; padding: 12px; border: 1px solid rgba(var(--accent-line-rgb), .16); border-radius: 18px; background: rgba(0,0,0,.24); }
-.emom-step.emom-workout-card.active { opacity: 1; border-color: rgba(247,147,26,.34); background: radial-gradient(circle at 92% 0%, rgba(247,147,26,.13), transparent 55%), rgba(0,0,0,.26); }
-.emom-step.emom-workout-card.done { background: rgba(0,208,132,.055); border-color: rgba(0,208,132,.24); }
-.emom-step-label { color: var(--bitcoin-gold); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
-.emom-step-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.emom-step-title strong { color: var(--muted); font: 900 11px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .05em; }
-.emom-log-row label { display: grid; gap: 6px; color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
-.emom-next-card { display: grid; gap: 5px; padding: 4px 0; border-top: 1px solid rgba(var(--accent-line-rgb), .12); }
+.emom-status.recovery .emom-work-ring-bg { stroke: rgba(var(--success-rgb), .13); }
+.emom-status.recovery .emom-work-ring-fg { stroke: var(--success-green); }
+.emom-status-meta { flex: 1 1 150px; display: grid; gap: 6px; padding-left: 13px; border-left: 1px solid rgba(var(--accent-line-rgb), .14); color: var(--muted); font: 800 10px/1.2 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.emom-status-meta b { color: var(--text); font-weight: 900; font-variant-numeric: tabular-nums; }
+.emom-status-meta .unit { text-transform: lowercase; }
+
+/* The interval being logged: the EMOM counterpart of the standard runner's active set row,
+   and the only lit surface on the screen. */
+.emom-log { display: grid; gap: 12px; padding: 14px; border: 1px solid rgba(247,147,26,.34); border-radius: 18px; background: radial-gradient(circle at 92% 0%, rgba(247,147,26,.13), transparent 55%), rgba(0,0,0,.26); }
+.emom-log.done { border-color: rgba(var(--success-rgb), .26); background: rgba(var(--success-rgb), .055); }
+.emom-log-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.emom-log-title { color: var(--bitcoin-gold); font: 900 11px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.emom-log-title.done { color: var(--success-green); }
+.emom-log-step { min-width: 0; color: var(--muted); font: 800 10px/1.2 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; text-align: right; }
+.emom-log-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.emom-log-field { display: grid; gap: 7px; min-width: 0; color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.emom-log-field .session-set-input { width: 100%; height: 52px; padding: 0 8px; font-size: 18px; }
+/* Full width and thumb-high: it is pressed mid-interval, one-handed. */
+.emom-log-primary { width: 100%; height: 56px; --btn-cast: .95; }
+.emom-log-done-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.emom-log-done-row + .emom-log-done-row { border-top: 1px solid rgba(var(--accent-line-rgb), .09); }
+.emom-log-done-row span { color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.emom-log-done-row b { color: var(--text); font: 800 16px/1 ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.emom-log .session-instructions { margin-top: 0; }
+
+/* Other movements in the same interval: named and targeted, but nothing to press yet. */
+.emom-upcoming-step { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(var(--accent-line-rgb), .09); }
+.emom-upcoming-step b { min-width: 0; color: var(--muted); font: 700 14px/1.15 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.01em; }
+.emom-upcoming-step span { flex: none; color: var(--dim); font: 800 10px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.emom-upcoming-step.done b, .emom-upcoming-step.done span { color: var(--dim); }
+
+.emom-next-card { display: grid; gap: 5px; padding: 12px 0 0; border-top: 1px solid rgba(var(--accent-line-rgb), .12); }
 .emom-next-card span { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
-.emom-next-card strong { font-size: 18px; }
-.emom-next-card small { color: var(--muted); }
-.session-footer.emom-live-controls { position: relative; justify-content: center; min-height: 92px; border-top: 0; background: transparent; backdrop-filter: none; }
-/* The EMOM transport. Round, but the runner's glass: the same lit rim and tight cast the
-   log and next actions carry, not the solid purple disc with a 30px bloom it used to be. */
-.emom-pause-btn { width: 64px; height: 64px; display: grid; place-items: center; flex: 0 0 64px; padding: 0; border: 1px solid rgba(var(--accent-line-rgb), .85); border-radius: 50%; color: var(--text); background: linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,0) 58%), rgba(var(--accent-line-rgb), .2); box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 10px 26px -14px rgba(var(--accent-line-rgb), .7); }
-.emom-pause-btn svg { width: 25px; height: 25px; fill: currentColor; }
-.emom-finish-action { position: absolute; right: clamp(20px, 4vw, 34px); padding: 8px 0; border: 0; color: var(--muted); background: transparent; box-shadow: none; font: 800 11px/1 ui-monospace, monospace; letter-spacing: .04em; }
-.emom-finish-action:hover { color: var(--text); background: transparent; }
+.emom-next-card strong { font: 800 18px/1.05 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.03em; }
+.emom-next-card small { color: var(--muted); font: 800 11px/1 ui-monospace, monospace; }
+
+/* Start and finish. Both ends of the section read the same way, so the handoff into the
+   clock and the handoff out of it are recognisably one screen. */
+.emom-transition { display: grid; gap: 7px; }
+.emom-transition-label { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.emom-transition.complete .emom-transition-label { color: var(--success-green); }
+.emom-transition strong { font: 800 clamp(22px, 5vw, 30px)/1.05 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.035em; }
+.emom-transition small { color: var(--muted); font: 800 11px/1.3 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
+.emom-transition p { max-width: 44ch; margin: 7px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+
+/* The transport takes the footer's advance slot, so pause sits where Log set and Next
+   exercise sit in the standard runner. */
+.session-pause-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+.session-pause-btn svg { width: 15px; height: 15px; fill: currentColor; }
 
 /* Leaving a mixed session before its EMOM section abandons work, so it is a quiet
-   exception next to the handoff, not a second primary button. Matches .emom-finish-action. */
+   exception next to the handoff, not a second primary button. */
 .session-finish-early { flex: 0 0 auto; min-height: 58px; padding: 8px 2px; border: 0; border-radius: 14px; color: var(--muted); background: transparent; box-shadow: none; font: 800 11px/1 ui-monospace, monospace; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
 .session-finish-early:hover { color: var(--text); background: transparent; }
-.emom-workout-card .session-instructions { margin-top: 18px; }
-.emom-workout-card .session-instructions-toggle { width: 100%; border: 0; border-radius: 0; background: transparent; box-shadow: none; text-align: left; }
 .session-prev-btn:disabled { opacity: .38; cursor: default; }
-.emom-round-nav { justify-content: center; gap: 6px; }
-.emom-round-nav .session-ex-dot { width: 42px; height: 42px; }
-.emom-window-arrow { border-color: transparent; background: transparent; font-size: 24px; }
-.emom-window-arrow:disabled { opacity: .25; cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rest-ring-fg, .emom-work-ring-fg { transition: none; }
+  .session-ex-pip { transition: none; }
+}
 
 @media (max-width: 700px) {
   input, textarea, select, button { font-size: 16px; }
@@ -700,18 +728,16 @@
   .session-ex-nav { padding: 5px 18px !important; gap: 7px; }
   .session-ex-dot { width: 30px !important; height: 30px !important; border-radius: 9px; font-size: 12px; }
   .session-ex-track .session-ex-dot { width: auto !important; height: auto !important; min-width: 30px; min-height: 44px; }
-  .session-ex-image.compact.placeholder { min-height: 108px; }
-  .emom-round-nav { padding-left: 8px !important; padding-right: 8px !important; }
-  .emom-round-nav .session-ex-dot { width: 40px !important; height: 40px !important; }
-  .emom-live-hero { grid-template-columns: 126px minmax(0, 1fr); gap: 10px; }
-  .emom-timer-panel { padding: 10px 8px; }
+  /* Phase, ring and metadata still fit one line at 375px; the ring gives up the least,
+     because it is what is read from arm's length. */
+  .emom-status { gap: 10px; }
+  .emom-phase-label { padding: 9px 11px; letter-spacing: .1em; }
   .emom-timer-wrap, .emom-timer-wrap .rest-ring { width: 84px; height: 84px; }
-  .emom-timer-wrap .emom-countdown { font-size: 34px; }
-  .emom-now-card .session-ex-image.compact { height: 98px; }
-  .emom-log-row { grid-template-columns: minmax(0,1fr) minmax(0,1fr) 76px; gap: 8px; }
-  .session-footer.emom-live-controls { min-height: 78px; padding-top: 6px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
-  .emom-pause-btn { width: 58px; height: 58px; flex-basis: 58px; }
-  .emom-finish-action { right: 18px; }
+  .emom-countdown { font-size: 32px; }
+  .emom-status-meta { flex-basis: 128px; padding-left: 10px; letter-spacing: .05em; }
+  .emom-log { padding: 12px; }
+  .emom-log-fields { gap: 9px; }
+  .emom-live-layout { gap: 12px; }
   .session-set-row { grid-template-columns: 30px minmax(0,1fr) minmax(0,1fr) 52px; gap: 8px; }
   .session-set-num { width: 30px; height: 30px; border-radius: 9px; font-size: 13px; }
   .session-set-value { font-size: 15px; }

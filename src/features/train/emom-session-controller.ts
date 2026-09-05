@@ -18,6 +18,9 @@ export interface EmomSessionControllerContext {
   bindSharedControls(): void;
 }
 
+// How many rounds the track shows at once before it pages.
+const ROUND_WINDOW = 5;
+
 export class EmomSessionController {
   private timer = 0;
   private renderKey = '';
@@ -159,7 +162,7 @@ export class EmomSessionController {
 
   private shiftRoundWindow(direction: -1 | 1): void {
     this.roundWindowManual = true;
-    this.roundWindowStart += direction * 5;
+    this.roundWindowStart += direction * ROUND_WINDOW;
     this.invalidate();
     this.reconcileClocks();
   }
@@ -258,17 +261,23 @@ export class EmomSessionController {
     return cues;
   }
 
+  // Rounds on the standard session's exercise track: same pip, connector, green done and lit
+  // current, seeking a round instead of jumping an exercise. A long EMOM pages five rounds at
+  // a time rather than shrinking twenty pips into an unreadable row.
   private roundNav(schedule: EmomSlot[], current: EmomSlot, complete: boolean): string {
     const rounds = schedule.filter((candidate, index) => candidate.blockIndex === current.blockIndex
       && schedule.findIndex((slot) => slot.blockIndex === candidate.blockIndex && slot.roundIndex === candidate.roundIndex) === index);
-    const maxStart = Math.max(0, rounds.length - 5);
+    const maxStart = Math.max(0, rounds.length - ROUND_WINDOW);
     if (this.roundWindowBlock !== current.blockIndex) { this.roundWindowBlock = current.blockIndex; this.roundWindowManual = false; }
     if (!this.roundWindowManual) this.roundWindowStart = Math.max(0, Math.min(maxStart, current.roundIndex - 2));
     this.roundWindowStart = Math.max(0, Math.min(maxStart, this.roundWindowStart));
-    const buttons = rounds.slice(this.roundWindowStart, this.roundWindowStart + 5).map((candidate) => {
-      const cls = !complete && candidate.roundIndex === current.roundIndex ? 'current' : complete || candidate.roundIndex < current.roundIndex ? 'done' : '';
-      return `<button class="session-ex-dot ${cls}" data-emom-seek="${candidate.startsAtSec}" type="button" title="Go to round ${candidate.roundIndex + 1}">${candidate.roundIndex + 1}</button>`;
+    const pips = rounds.slice(this.roundWindowStart, this.roundWindowStart + ROUND_WINDOW).map((candidate) => {
+      const isCurrent = !complete && candidate.roundIndex === current.roundIndex;
+      const cls = isCurrent ? 'current' : complete || candidate.roundIndex < current.roundIndex ? 'done' : '';
+      const state = isCurrent ? ', current' : cls === 'done' ? ', done' : '';
+      return `<button class="session-ex-dot ${cls}" data-emom-seek="${candidate.startsAtSec}" type="button" aria-label="Go to round ${candidate.roundIndex + 1} of ${rounds.length}${state}"${isCurrent ? ' aria-current="step"' : ''}><span class="session-ex-pip">${candidate.roundIndex + 1}</span></button>`;
     }).join('');
-    return `<button class="session-ex-dot emom-window-arrow" data-emom-window="-1" type="button" aria-label="Show previous rounds" ${this.roundWindowStart === 0 ? 'disabled' : ''}>‹</button>${buttons}<button class="session-ex-dot emom-window-arrow" data-emom-window="1" type="button" aria-label="Show next rounds" ${this.roundWindowStart >= maxStart ? 'disabled' : ''}>›</button>`;
+    if (rounds.length <= ROUND_WINDOW) return pips;
+    return `<button class="session-track-arrow" data-emom-window="-1" type="button" aria-label="Show previous rounds" ${this.roundWindowStart === 0 ? 'disabled' : ''}>&lsaquo;</button>${pips}<button class="session-track-arrow" data-emom-window="1" type="button" aria-label="Show next rounds" ${this.roundWindowStart >= maxStart ? 'disabled' : ''}>&rsaquo;</button>`;
   }
 }
