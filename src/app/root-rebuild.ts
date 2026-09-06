@@ -1,4 +1,4 @@
-import { programStatusLine } from './layout';
+import { updateCatalogStatusLines } from './catalog-surfaces';
 import { preservingScroll } from './scroll';
 import { preservingSettingsDisclosures } from './settings-disclosure';
 import type { AppState } from './state';
@@ -93,9 +93,6 @@ export function rebuildRoot(root: HTMLElement, state: AppState, rebuild: () => v
 function heldForLiveSession(root: HTMLElement, state: AppState): boolean {
   if (!state.activeSession) return false;
   if (!root.querySelector('#session-overlay')?.classList.contains('open')) return false;
-  const exercises = root.querySelector('#discover-status');
-  if (exercises) exercises.textContent = state.exerciseStatus;
-  const programs = root.querySelector('#program-status');
-  if (programs) programs.textContent = programStatusLine(state);
+  updateCatalogStatusLines(root, state);
   return true;
 }

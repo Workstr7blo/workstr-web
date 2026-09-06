@@ -72,7 +72,9 @@ describe('Discover author payment targets', () => {
     address: `33402:${pubkey}:workstr:program:${slug}`, createdAt: 1
   } as RelayProgram);
 
-  function harness(paymentMode: string, programs: RelayProgram[]) {
+  // Whether the reader is on Workouts at all: `appView` renders one page, so a mounted
+  // program list is the same question as a visible one.
+  function harness(paymentMode: string, programs: RelayProgram[], programListMounted = true) {
     const state = {
       settings: { unit: 'kg', paymentMode, publicRelays: ['wss://relay.example'] },
       programs,
@@ -82,7 +84,10 @@ describe('Discover author payment targets', () => {
       discoverExercises: [],
       sheets: []
     } as unknown as AppState;
-    const root = { querySelector: () => null, querySelectorAll: () => [] } as unknown as HTMLElement;
+    const root = {
+      querySelector: (selector: string) => (selector === '.program-list' && programListMounted ? {} : null),
+      querySelectorAll: () => []
+    } as unknown as HTMLElement;
     const render = vi.fn();
     const controller = createCatalogController({
       root, state, render, toast: vi.fn(), openModal: vi.fn(), closeModal: vi.fn(), fetchProfile: vi.fn()
@@ -115,6 +120,20 @@ describe('Discover author payment targets', () => {
     // A known absence is an answer, so a rerender or a refresh does not ask again.
     await app.controller.refreshAuthorPaymentTargets();
     expect(fetchAuthorMoneroPaymentTargetsMock).toHaveBeenCalledTimes(1);
+  });
+
+  // The answer decorates program cards. A reader on Settings or Statistics has none on
+  // screen, and rebuilding the page they are actually reading to change nothing on it is
+  // what #178 is about.
+  it('keeps the answer without rendering when no program card is on screen', async () => {
+    fetchAuthorMoneroPaymentTargetsMock.mockReset();
+    fetchAuthorMoneroPaymentTargetsMock.mockResolvedValueOnce({ [AUTHOR]: ADDRESS });
+    const app = harness('monero', [program(AUTHOR, 'push')], false);
+
+    await app.controller.refreshAuthorPaymentTargets();
+
+    expect(app.state.authorPaymentTargets).toEqual({ [AUTHOR]: ADDRESS });
+    expect(app.render).not.toHaveBeenCalled();
   });
 
   it('keeps Discover rendering when the lookup fails', async () => {

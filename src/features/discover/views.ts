@@ -60,18 +60,26 @@ export function discoverImportable(list: Exercise[], library: Exercise[]): Exerc
 }
 
 export function discoverPanel(state: AppState): string {
-  const list = exerciseResults('discover', state);
   const sel = state.discoverSelect;
-  const hasFilters = Boolean(exerciseQuery('discover', state) || activeFacetCount('discover', state));
-  // The explanation of what importing does moved here from a permanent paragraph: it is
-  // what someone needs when the grid is empty, not on every visit.
-  const empty = state.discoverExercises.length === 0 && !hasFilters
-    ? 'The official Workstr catalog loads here. Importing an exercise copies it into your local library, which is what you edit and add to programs; updates appear when catalog versions are newer.'
-    : 'No exercises match.';
   return `<div class="discover-exercise-panel">
     ${exerciseToolbar('discover', state)}
     ${exerciseActiveFilters('discover', state)}
     <div id="discover-status" class="discover-status">${html(state.exerciseStatus)}</div>
-    <div id="discover-grid" class="ex-grid discover-exercise-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => discoverCardHtml(exercise, state)).join('') || `<div class="empty">${empty}</div>`}</div>
+    <div id="discover-grid" class="ex-grid discover-exercise-grid${sel.active ? ' selecting' : ''}">${discoverGrid(state)}</div>
   </div>`;
+}
+
+// Separate from the panel because the grid is written on its own when the catalog answers:
+// the cards are what changed, and the toolbar, the filters and the status line above them
+// have not. Card clicks are delegated to `#discover-grid` itself, so replacing what is
+// inside it costs no listeners.
+export function discoverGrid(state: AppState): string {
+  const list = exerciseResults('discover', state);
+  const hasFilters = Boolean(exerciseQuery('discover', state) || activeFacetCount('discover', state));
+  // The explanation of what importing does lives here rather than in a permanent paragraph:
+  // it is what someone needs when the grid is empty, not on every visit.
+  const empty = state.discoverExercises.length === 0 && !hasFilters
+    ? 'The official Workstr catalog loads here. Importing an exercise copies it into your local library, which is what you edit and add to programs; updates appear when catalog versions are newer.'
+    : 'No exercises match.';
+  return list.map((exercise) => discoverCardHtml(exercise, state)).join('') || `<div class="empty">${empty}</div>`;
 }

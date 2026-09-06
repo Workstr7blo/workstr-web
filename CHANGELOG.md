@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The Workstr catalog loading in the background no longer redraws the page you are on. It
+  refreshes on every launch and reports twice - once to say it is loading, once with the
+  answer - and both used to rebuild the whole app for exercise cards the page in front of
+  you does not show. Reading Settings or Statistics while it runs is now quiet, and a
+  refresh from Discover itself writes the new cards into the grid without redrawing the
+  photos and controls around them. The same goes for creator profiles, zap totals and
+  Monero payment addresses arriving behind the catalog.
+
 - Your profile arriving from a relay no longer redraws the app. A second or two after
   Workstr opens, the name and picture come back from the network; the whole screen used to
   be rebuilt for them, which closed the Settings category you had expanded and made the
