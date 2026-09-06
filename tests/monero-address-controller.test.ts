@@ -65,7 +65,7 @@ describe('Monero payment address settings', () => {
     expect(monero).toContain('Use a fresh Monero subaddress.');
     expect(monero).toContain('It is not stored in Workstr sync.');
     // Opened by default so the address is reachable straight after picking the rail.
-    expect(monero).toContain('<details class="settings-category payment-mode-card" open>');
+    expect(monero).toContain('<details class="settings-category payment-mode-card" data-settings-section="payment-mode" open>');
   });
 
   it('never calls it a wallet and offers no NWC action', () => {

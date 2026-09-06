@@ -1,5 +1,19 @@
-import { describe, expect, it } from 'vitest';
-import { backupPanel, backupSummary, lastSyncLabel, progressDetail, progressPercent, statusLine, statusPill, type BackupPanelState } from '../src/features/backup/views';
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from 'vitest';
+import { backupPanel, backupSummary, lastSyncLabel, progressDetail, progressPercent, statusLine, statusPill, updateBackupStatus, type BackupPanelState } from '../src/features/backup/views';
+import { createBackupController } from '../src/app/backup-controller';
+import type { AppState } from '../src/app/state';
+import type { SyncEngineContext, SyncStatus } from '../src/sync/engine';
+
+// The controller only reaches a status through the engine it builds, so the engine is
+// replaced with one that hands its `onStatus` back to the test.
+const engines: SyncEngineContext[] = [];
+vi.mock('../src/sync/engine', () => ({
+  createSyncEngine: (ctx: SyncEngineContext) => {
+    engines.push(ctx);
+    return { start: async () => ctx, stop: () => {}, syncNow: async () => ({ state: 'idle', pending: 0 }), status: () => ({ state: 'idle', pending: 0 }) };
+  }
+}));
 
 const panelState = (overrides: Partial<BackupPanelState> = {}): BackupPanelState => ({
   signedIn: true,
@@ -123,5 +137,99 @@ describe('the panel', () => {
     const html = backupPanel(panelState({ sync: { state: 'error', pending: 1, lastError: '<img src=x onerror=alert(1)>' } }));
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img');
+  });
+});
+
+describe('patching the status into a mounted card', () => {
+  const mount = (state: BackupPanelState): HTMLElement => {
+    document.body.innerHTML = `<div id="app"><div class="page settings-page">
+      <img id="unrelated" alt="">
+      ${backupPanel(state)}
+    </div></div>`;
+    return document.getElementById('app') as HTMLElement;
+  };
+
+  it('rewrites the pill, the collapsed summary and the status line', () => {
+    const root = mount(panelState());
+    expect(root.querySelector('.data-sync-card .status-pill')?.textContent).toBe('up to date');
+    updateBackupStatus(root, panelState({ sync: { state: 'syncing', pending: 3 } }));
+    expect(root.querySelector('.data-sync-card .status-pill')?.textContent).toBe('syncing');
+    expect(root.querySelector('.data-sync-card summary .settings-category-copy small')?.textContent).toBe('syncing');
+    expect(root.querySelector('#backup-status')?.textContent).toContain('Syncing now…');
+  });
+
+  // The bug this guards: a status arriving while the reader has Data & Sync open used to
+  // rebuild the root, and the card they were reading closed under them.
+  it('leaves an expanded card open and every other node in place', () => {
+    const root = mount(panelState());
+    const card = root.querySelector<HTMLDetailsElement>('.data-sync-card')!;
+    const image = root.querySelector('#unrelated')!;
+    card.open = true;
+    updateBackupStatus(root, panelState({ sync: { state: 'syncing', pending: 1, progress: { phase: 'upload', done: 2, total: 8 } } }));
+    expect(card.open).toBe(true);
+    expect(root.querySelector('.data-sync-card')).toBe(card);
+    expect(root.querySelector('#unrelated')).toBe(image);
+  });
+
+  it('draws progress while a phase runs and takes it away when it ends', () => {
+    const root = mount(panelState());
+    updateBackupStatus(root, panelState({ sync: { state: 'syncing', pending: 1, progress: { phase: 'upload', done: 2, total: 8 } } }));
+    expect(root.querySelector('.backup-progress')?.getAttribute('aria-valuenow')).toBe('25');
+    expect(root.querySelector('.backup-progress-detail')?.textContent).toBe('2 of 8 records synced');
+    updateBackupStatus(root, panelState({ sync: { state: 'idle', pending: 0, lastSyncAt: '2026-09-06T12:00:00.000Z' } }));
+    expect(root.querySelector('.backup-progress')).toBeNull();
+  });
+
+  it('keeps sync-now unavailable for exactly as long as a sync is running', () => {
+    const root = mount(panelState());
+    updateBackupStatus(root, panelState({ sync: { state: 'syncing', pending: 1 } }));
+    expect(root.querySelector<HTMLButtonElement>('#sync-now')?.disabled).toBe(true);
+    updateBackupStatus(root, panelState());
+    expect(root.querySelector<HTMLButtonElement>('#sync-now')?.disabled).toBe(false);
+  });
+
+  it('escapes a relay error rather than patching it in as markup', () => {
+    const root = mount(panelState());
+    updateBackupStatus(root, panelState({ sync: { state: 'error', pending: 0, lastError: '<img src=x onerror="alert(1)">' } }));
+    expect(root.querySelector('#backup-status img')).toBeNull();
+    expect(root.querySelector('#backup-status')?.textContent).toContain('<img src=x');
+  });
+
+  it('reports that there was nothing on screen when Settings is not the current view', () => {
+    document.body.innerHTML = '<div id="app"><div class="page library-page"></div></div>';
+    expect(updateBackupStatus(document.getElementById('app') as HTMLElement, panelState())).toBe(false);
+  });
+});
+
+describe('what a sync status redraws', () => {
+  // The status arrives many times per pass. Redrawing the root for each one was what
+  // collapsed Settings categories and visibly refreshed the page the user was on.
+  it('patches the mounted card instead of rebuilding the root', async () => {
+    engines.length = 0;
+    document.body.innerHTML = `<div id="app"><div class="page settings-page">${backupPanel(panelState())}</div></div>`;
+    const root = document.getElementById('app') as HTMLElement;
+    const card = root.querySelector<HTMLDetailsElement>('.data-sync-card')!;
+    card.open = true;
+    const render = vi.fn();
+    const state = {
+      pubkey: 'ab'.repeat(32),
+      store: {} as never,
+      settings: { backup: { enabled: true } },
+      backup: { state: 'off', pending: 0 }
+    } as unknown as AppState;
+    const controller = createBackupController({
+      root, state, render, toast: vi.fn(), getSigner: async () => null, requestSignIn: vi.fn()
+    });
+    await controller.resume();
+
+    const status: SyncStatus = { state: 'syncing', pending: 4, progress: { phase: 'upload', done: 1, total: 4 } };
+    engines.at(-1)!.onStatus(status);
+
+    expect(state.backup).toBe(status);
+    expect(render).not.toHaveBeenCalled();
+    expect(root.querySelector('.data-sync-card')).toBe(card);
+    expect(card.open).toBe(true);
+    expect(root.querySelector('.data-sync-card .status-pill')?.textContent).toBe('syncing');
+    expect(root.querySelector('#backup-status')?.textContent).toContain('Syncing local changes…');
   });
 });

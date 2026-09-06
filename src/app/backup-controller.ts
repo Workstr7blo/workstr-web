@@ -1,5 +1,6 @@
 import type { AppState } from './state';
 import type { Signer } from '../signer/types';
+import { backupPanelState, updateBackupStatus } from '../features/backup/views';
 import { createSyncEngine, type SyncEngine, type SyncStatus } from '../sync/engine';
 
 // Survives the sign-in round trip, including a NIP-46 hop out to a signer app and back.
@@ -8,6 +9,9 @@ import { createSyncEngine, type SyncEngine, type SyncStatus } from '../sync/engi
 const INTENT_KEY = 'workstr.backup.pendingEnable';
 
 export interface BackupControllerContext {
+  // The Data & Sync card is patched in place for a status, so the controller needs the tree
+  // it lives in. The other controllers take the same handle.
+  root: ParentNode;
   state: AppState;
   render(): void;
   toast(message: string, kind?: 'ok' | 'bad'): void;
@@ -32,9 +36,14 @@ export interface BackupController {
 export function createBackupController(ctx: BackupControllerContext): BackupController {
   let engine: SyncEngine | null = null;
 
+  // Settings is the only surface that shows sync status, and the engine reports one for
+  // every phase and step of a pass. Rebuilding the root for each of them collapsed open
+  // Settings categories and visibly redrew the page the user was on, throughout the first
+  // seconds after every launch. Turning sync on or off still renders: that changes which
+  // controls the card has, not just what they say.
   const onStatus = (status: SyncStatus): void => {
     ctx.state.backup = status;
-    ctx.render();
+    updateBackupStatus(ctx.root, backupPanelState(ctx.state));
   };
 
   const engineFor = (): SyncEngine | null => {
