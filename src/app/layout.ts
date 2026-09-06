@@ -1,10 +1,10 @@
 import type { AppState, View } from './state';
+import { accountChip, accountIdentity, avatarFace } from './account-chip';
 import { displayIdentity, exerciseFilterValues, html } from './format';
 import { APP_VERSION } from './version';
 import { countdownAudioState } from '../features/train/countdown-audio';
 import { supportPanel } from '../features/support/views';
 import { paymentModeCard } from '../features/support/payment-mode-views';
-import { moneroMark } from '../features/sheets/monero-tip-view';
 import { isFreeEquipment, ownedEquipmentKeys } from '../core/equipment';
 import { normalizePaymentMode } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
@@ -31,26 +31,6 @@ const navItems: Array<{ view: View; label: string; icon: string }> = [
 ];
 
 export function shellMarkup(state: AppState): string {
-  const identity = displayIdentity(state);
-  const initial = identity.trim().slice(0, 1).toUpperCase() || 'W';
-  // The image must stay immediately before its fallback: the `onerror` handler reaches the
-  // fallback through `nextElementSibling`, so anything inserted between them breaks a broken
-  // avatar into a blank hole. The signed-in badge therefore goes last, after the fallback.
-  const avatarFace = state.pubkey && state.profilePicture
-    ? `<img class="connection-avatar" src="${html(state.profilePicture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="connection-avatar fallback" hidden>${html(initial)}</span>`
-    : `<span class="connection-avatar fallback">${html(initial)}</span>`;
-  const avatar = `<span class="connection-avatar-wrap">${avatarFace}${state.pubkey ? '<span class="connection-identity-status" role="img" aria-label="Signed in"></span>' : ''}</span>`;
-  const status = state.pubkey
-    ? ''
-    : '<span class="connection-chip-status"><span class="connection-dot"></span><span class="connection-chip-text">Local</span></span>';
-  // Two separate states share the pill: the badge on the avatar answers "is my identity
-  // connected", the medallion answers "which rail pays creators". Signed out, the rail is
-  // not actionable and the chip already carries a second line, so only the badge is dropped.
-  const monero = normalizePaymentMode(state.settings.paymentMode) === 'monero';
-  const paymentLabel = monero ? 'Monero payments' : 'Lightning payments';
-  const paymentMark = state.pubkey
-    ? `<span class="connection-payment-mark" role="img" aria-label="${paymentLabel}" title="${monero ? 'Monero' : 'Lightning'} payment mode">${monero ? moneroMark(13) : '₿'}</span>`
-    : '';
   return `
     <div class="noise"></div>
     <div class="cyber-grid"></div>
@@ -63,15 +43,7 @@ export function shellMarkup(state: AppState): string {
         </div>
       </div>
       <div class="topbar-actions">
-        <button class="connection-chip ${state.pubkey ? 'ok' : ''}" id="account-chip" type="button" title="Open settings" aria-label="Open settings">
-          ${avatar}
-          <span class="connection-chip-main">
-            <span class="connection-chip-label">${state.pubkey ? html(identity) : 'Account'}</span>
-            ${status}
-          </span>
-          ${paymentMark}
-          <svg class="connection-chip-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
+        ${accountChip(accountIdentity(state))}
       </div>
     </header>
     <nav class="sidebar">
@@ -236,10 +208,7 @@ function settingsView(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   const keyLine = state.signerType === 'local' ? 'Device-managed key for faster sync.' : 'Keys stay in your signer.';
   const accountSummary = state.pubkey ? `Signed in · ${displayIdentity(state)}` : 'Local only';
-  const initial = displayIdentity(state).trim().slice(0, 1).toUpperCase() || 'W';
-  const accountAvatar = state.profilePicture
-    ? `<img class="settings-account-avatar" src="${html(state.profilePicture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="settings-account-avatar fallback" hidden>${html(initial)}</span>`
-    : `<span class="settings-account-avatar fallback">${html(initial)}</span>`;
+  const accountAvatar = avatarFace('settings-account-avatar', accountIdentity(state));
   const account = state.pubkey
     ? `<div class="settings-row-main account-row"><div class="settings-account-identity">${accountAvatar}<span><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></span></div><div class="settings-row-actions"><button id="add-device-settings" class="button small">Add device</button><button id="sign-out-settings" class="button small">Sign out</button><button id="remove-account-data" class="button quiet danger small">Remove data</button></div></div>`
     : `<div class="settings-row-main account-row"><div><strong>Local only</strong><small>Use Workstr now, add encrypted sync when ready.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Account</button></div></div>`;

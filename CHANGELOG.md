@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Your profile arriving from a relay no longer redraws the app. A second or two after
+  Workstr opens, the name and picture come back from the network; the whole screen used to
+  be rebuilt for them, which closed the Settings category you had expanded and made the
+  avatar and every photo on the page flicker. Only the account chip and the Account card
+  are written now, and nothing else moves.
+
 - Exercise photos are fetched at the size they are drawn instead of at full resolution.
   Opening Exercises used to pull about 8 MB of images on a phone; it now pulls about 90 KB
   of the same pictures, and the live-session hero lets the browser pick a sharper one on a
