@@ -91,8 +91,8 @@ function statusBand(slot: EmomSlot, position: EmomPosition, timerPhase: EmomTime
 
 function instructionsMarkup(key: string, instructions: string[], open: boolean): string {
   if (!instructions.length) return '';
-  // The accordion's open state is owned by the controller: a shell re-render rebuilds the
-  // overlay, and a class toggled in place does not survive it.
+  // The accordion's open state is owned by the controller: advancing a round or logging an
+  // interval re-renders this body, and a class toggled in place does not survive it.
   return `<div class="session-instructions ${open ? 'open' : ''}" data-emom-instructions="${html(key)}">
     <button class="session-instructions-toggle" data-toggle-emom-instructions="${html(key)}" type="button" aria-expanded="${open}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span>How to perform</span>

@@ -21,7 +21,7 @@ import { bindExerciseBrowser } from './exercise-browser-controller';
 import { exerciseResults } from './exercise-browser';
 import { createSessionRunner } from './session-runner';
 import { paintBodyMapSvg } from './bodymap';
-import { preservingScroll } from './scroll';
+import { rebuildRoot } from './root-rebuild';
 import { discoverImportable, discoverImportState } from '../features/discover/views';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
 import { getQuickWorkout } from '../features/recovery/quickWorkout';
@@ -149,7 +149,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     // An attribute rather than a class so it survives `root.innerHTML` resets.
     if (state.settings.paymentMode === 'monero') document.documentElement.setAttribute('data-payment-mode', 'monero');
     else document.documentElement.removeAttribute('data-payment-mode');
-    preservingScroll(root, () => {
+    rebuildRoot(root, state, () => {
       root.innerHTML = shellMarkup(state);
       bind();
       if (state.activeSession) void sessionRunner.openSessionOverlay(state.activeSession);

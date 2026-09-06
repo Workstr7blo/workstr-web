@@ -24,6 +24,7 @@ or set updates would make full-root rendering inappropriate.
 | Concern | Start here | Usually read next | Tests |
 |---|---|---|---|
 | Boot and application coordination | `src/main.ts`, `src/app/shell.ts` | `src/app/state.ts`, `src/app/layout.ts` | `tests/shell.test.ts` |
+| Applying a shipped PWA update without interrupting anyone | `src/app/update-controller.ts` | `src/app/pwa.ts`, `public/sw.js` | production-build browser validation |
 | Identity, signer connection, and adoption | `src/app/identity-controller.ts` | `src/signer/types.ts`, `src/db/adopt.ts` | `tests/shell.test.ts`, `tests/adopt.test.ts`, browser verification |
 | Local account keys and where the secret lives | `src/signer/local-key.ts` | `src/signer/local-key-storage.ts` | `tests/local-key-signer.test.ts`, `tests/local-key-storage.test.ts` |
 | QR device pairing crypto and relay transport | `src/signer/pairing.ts` | `src/nostr/device-pairing.ts`, `relay/write-policy.mjs`, `docs/device-pairing-architecture.md` | `tests/pairing.test.ts`, `tests/pairing-relay.integration.test.ts` |
@@ -33,7 +34,7 @@ or set updates would make full-root rendering inappropriate.
 | NWC wallet connection and in-app support zaps | `src/app/nwc-controller.ts`, `src/nostr/support-zap.ts` | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts`, `src/features/support/views.ts` | `tests/nwc-ui.test.ts`, `tests/support-zap.test.ts`, NWC tests |
 | Stored/live session adaptation | `src/app/session-persistence.ts` | `src/db/store.ts`, `src/app/state.ts` | `tests/session-runner.test.ts`, `tests/store.test.ts` |
 | Top-level navigation and page markup | `src/app/layout.ts` | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
-| Redrawing without losing the reader's place | `src/app/scroll.ts` | `src/app/shell.ts` (`render`), the `.content` pane in `src/app/layout.ts` | `tests/scroll.test.ts` |
+| Redrawing the root: when it is held back, and keeping the reader's place | `src/app/root-rebuild.ts`, `src/app/scroll.ts` | `src/app/shell.ts` (`render`), `src/app/session-runner.ts` (`closeSessionOverlay`), the `.content` pane in `src/app/layout.ts` | `tests/root-rebuild.test.ts`, `tests/scroll.test.ts`, `tests/shell.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
 | Programs and program builder | `src/app/program-builder.ts`, `src/app/program-publish-controller.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-zap-view.ts`, `src/features/sheets/beast-mode.ts` | `src/db/store.ts`, `src/nostr/programImport.ts`, `src/nostr/program-publish.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/beast-mode.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/program-publish-controller.test.ts`, `tests/program-publish.test.ts`, `tests/nwc-ui.test.ts`, browser verification |
@@ -93,6 +94,10 @@ or set updates would make full-root rendering inappropriate.
 - `src/app/shell.ts` initializes state and namespaces, renders the root, binds global
   navigation, and composes focused controllers. Feature-specific workflows live behind
   controller interfaces and the shell is below the 400-line target.
+- `src/app/root-rebuild.ts` owns the one way the shell's root is redrawn: held back
+  entirely while the live-session overlay is open, because the current set's typed reps and
+  load and a running rest countdown live only in the DOM, and scroll-preserving through
+  `src/app/scroll.ts` otherwise. The session runner renders once the overlay closes.
 - `src/app/program-builder.ts` owns program-builder modal state, exercise selection,
   normal/superset and EMOM prescriptions, row ordering, validation, and persistence.
 - `src/app/program-publish-controller.ts` owns Beast Mode local program publish

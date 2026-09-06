@@ -72,6 +72,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "How to perform" opens again during a workout. Expanding it worked, but the first
   background catalog refresh after a session starts rebuilds the screen and closed it
   straight away; the session now remembers which exercise's instructions you opened.
+- A live workout no longer loses the set you are in the middle of. Background work - the
+  catalog refresh on every launch, a restore from encrypted sync, your profile arriving -
+  redrew the whole app underneath the session: reps and load you had typed but not yet
+  logged were discarded silently, the row coming back filled with the prescription instead,
+  and a running rest countdown vanished from the screen while its timer kept going. The
+  redraw now waits until the workout ends, which is also the first moment it costs nothing.
+  A restore landing mid-workout no longer swaps the running session out from under the
+  screen either.
 
 ## [2.4.0] - 2026-09-04
 

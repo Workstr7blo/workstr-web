@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSessionPersistence } from '../src/app/session-persistence';
 import { createSessionRunner, restSecondsRemaining, type SessionRunnerContext } from '../src/app/session-runner';
 import { shellMarkup } from '../src/app/layout';
 import type { AppState } from '../src/app/state';
@@ -447,6 +448,50 @@ describe('session runner', () => {
     confirm.mockRestore();
   });
 
+  // The shell holds its rebuild back while the overlay is open, so everything the session
+  // outlasted is repainted the moment it closes - and the session has to be off state before
+  // that repaint, or the render it triggers reopens the workout that was just ended.
+  it('repaints the app behind the overlay once the session ends', async () => {
+    const context = makeContext(root, state, toasts);
+    const activeAtRender: Array<number | null> = [];
+    const counted = { ...context, render: () => { activeAtRender.push(state.activeSession?.id ?? null); context.render(); } };
+    const counting = createSessionRunner(counted);
+    await counting.startTrainingSession(oneExerciseProgram());
+    activeAtRender.length = 0;
+
+    (root.querySelector('[data-session-reps="0"]') as HTMLInputElement).value = '8';
+    (root.querySelector('[data-set-log-btn="0"]') as HTMLButtonElement).click();
+    await tick();
+    (root.querySelector('[data-session-reps="1"]') as HTMLInputElement).value = '8';
+    (root.querySelector('[data-set-log-btn="1"]') as HTMLButtonElement).click();
+    await tick();
+    (root.querySelector('#finish-session') as HTMLButtonElement).click();
+    await tick();
+
+    expect(activeAtRender).toEqual([null]);
+    expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(false);
+    // Opened after the repaint, so the repaint cannot wipe it.
+    expect(root.querySelector('#modal')?.classList.contains('open')).toBe(true);
+  });
+
+  it('repaints the app behind the overlay when the session is cancelled', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const context = makeContext(root, state, toasts);
+    const renders: number[] = [];
+    const counted = { ...context, render: () => { renders.push(1); context.render(); } };
+    const counting = createSessionRunner(counted);
+    await counting.startTrainingSession(oneExerciseProgram());
+    renders.length = 0;
+
+    (root.querySelector('#session-close') as HTMLButtonElement).click();
+    await tick();
+
+    expect(renders).toHaveLength(1);
+    expect(state.activeSession).toBeNull();
+    expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(false);
+    confirm.mockRestore();
+  });
+
   it('starts an EMOM clock and logs actual reps without opening normal rest', async () => {
     await runner.startTrainingSession(emomProgram());
     expect(root.querySelector('#emom-start')).toBeTruthy();
@@ -728,5 +773,46 @@ describe('rest timer timing', () => {
     expect(restSecondsRemaining(65_000, 5_000)).toBe(60);
     expect(restSecondsRemaining(65_000, 64_001)).toBe(1);
     expect(restSecondsRemaining(65_000, 70_000)).toBe(0);
+  });
+});
+
+// `refreshFromStore` re-reads the database after a sync restore or a namespace load, and it
+// runs while a workout can be open. The shell no longer rebuilds during a session, so a
+// swapped object would leave the overlay painted from one copy while every control wrote to
+// another.
+describe('loading the unfinished session', () => {
+  const row = { id: 7, sheet_name: 'Push', started_at: '2026-09-06T09:00:00.000Z', exercises: [] };
+  const storeWith = (sessions: unknown[]): WorkstrStore => ({
+    listSessions: async () => sessions,
+    listSessionSets: async () => []
+  } as unknown as WorkstrStore);
+
+  it('keeps the object the live session is being logged into', async () => {
+    const state = makeState(storeWith([row]));
+    const live = { id: 7, sheetName: 'Push', startedAt: row.started_at, exercises: [], sets: [{ exerciseSlug: 'bench-press', setNumber: 1, reps: 11, weight: 62.5, done: true }] } as never;
+    state.activeSession = live;
+    expect(await createSessionPersistence(state).loadUnfinished()).toBe(live);
+  });
+
+  it('loads the row when nothing is live', async () => {
+    const state = makeState(storeWith([row]));
+    const loaded = await createSessionPersistence(state).loadUnfinished();
+    expect(loaded).not.toBeNull();
+    expect(loaded?.id).toBe(7);
+    expect(loaded?.sheetName).toBe('Push');
+  });
+
+  it('replaces a live session that is no longer the unfinished one', async () => {
+    const state = makeState(storeWith([{ ...row, id: 9, sheet_name: 'Pull' }]));
+    state.activeSession = { id: 7, sheetName: 'Push', startedAt: row.started_at, exercises: [], sets: [] } as never;
+    const loaded = await createSessionPersistence(state).loadUnfinished();
+    expect(loaded?.id).toBe(9);
+    expect(loaded?.sheetName).toBe('Pull');
+  });
+
+  it('clears a live session that the store no longer has unfinished', async () => {
+    const state = makeState(storeWith([{ ...row, finished_at: '2026-09-06T10:00:00.000Z' }]));
+    state.activeSession = { id: 7, sheetName: 'Push', startedAt: row.started_at, exercises: [], sets: [] } as never;
+    expect(await createSessionPersistence(state).loadUnfinished()).toBeNull();
   });
 });

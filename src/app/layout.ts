@@ -144,6 +144,12 @@ function exercisesView(state: AppState): string {
   </div>`;
 }
 
+// Exported because a background refresh repaints this line in place while a live session
+// holds the shell's rebuild back; the fallback wording must not drift between the two.
+export function programStatusLine(state: AppState): string {
+  return state.programStatus || 'program relay cache not loaded yet';
+}
+
 function workoutsView(state: AppState): string {
   const active = state.subState.workouts;
   const programMatches = programMatcher(state);
@@ -169,7 +175,7 @@ function workoutsView(state: AppState): string {
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
       ${programToolbar('discover', state)}
       ${programActiveFilters('discover', state)}
-      <div class="terminal-mini">${html(state.programStatus || 'program relay cache not loaded yet')}</div>
+      <div id="program-status" class="terminal-mini">${html(programStatusLine(state))}</div>
       <div class="program-list">${programs.map((program) => programCard(program, state, { showPayment: true, zapRank: topProgramRanks.get(program.address) })).join('') || `<div class="empty">${state.programs.length ? 'No relay programs match. Refresh or clear a filter.' : 'Relay programs published by Workstr and Beast Mode creators appear here. Importing one adds a local copy to your Programs library, which is what you edit and run.'}</div>`}</div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
