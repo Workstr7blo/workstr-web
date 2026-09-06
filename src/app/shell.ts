@@ -16,7 +16,7 @@ import { planProgramImport, programImportState } from '../nostr/programImport';
 import type { ActiveSession, AppState, SubView, View } from './state';
 import { EX_PLACEHOLDER, exerciseImage, exerciseSourceLabel, filterExercises, formatMinutes, html } from './format';
 import { accountIdentity, updateAccountIdentity } from './account-chip';
-import { shellMarkup } from './layout';
+import { appView, pageOverlays, shellFrame, updateNavigation } from './layout';
 import { bindProgramBrowser } from './program-browser-controller';
 import { bindExerciseBrowser } from './exercise-browser-controller';
 import { exerciseResults } from './exercise-browser';
@@ -61,7 +61,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     }
     // Paint the shell immediately; data lands on the next render. Nothing above this line
     // may await, or the first paint slips to a microtask and the shell renders empty.
-    render({ reason: 'boot-first-paint' });
+    mount();
     // Every boot, not on the first call that wants a signer: someone who only reads their
     // history would otherwise keep the plaintext key on disk forever. Cleanup, so it runs
     // after first paint and a failure is swallowed — the key just stays where it was.
@@ -142,43 +142,79 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     await nwc.loadConnection(); render({ reason: 'store-reload' });
   }
 
-  // `toTop` is a new page to the reader, not a redraw; `reason` is for the trace alone.
-  function render(options: RenderOptions = {}): void {
-    // Monero Mode is a token swap, and the tokens are declared on `:root`, so the flag has
-    // to land there too — an override on `body` cannot win against a `:root` declaration.
-    // An attribute rather than a class so it survives `root.innerHTML` resets.
+  // Written once. The topbar, the navigation, the scroll pane, the live session overlay,
+  // the modal host and the toast outlive every page after this.
+  function mount(): void {
+    applyPaymentMode();
+    root.innerHTML = shellFrame(state);
+    bindFrame();
+    render({ reason: 'boot-first-paint' });
+  }
+
+  // Monero Mode is a token swap, and the tokens are declared on `:root`, so the flag has to
+  // land there too — an override on `body` cannot win against a `:root` declaration.
+  function applyPaymentMode(): void {
     if (state.settings.paymentMode === 'monero') document.documentElement.setAttribute('data-payment-mode', 'monero');
     else document.documentElement.removeAttribute('data-payment-mode');
+  }
+
+  // `render` means the page: the host and the sheets that belong to it. `toTop` is a new
+  // page to the reader, not a redraw; `reason` is for the trace alone.
+  function render(options: RenderOptions = {}): void {
+    applyPaymentMode();
     rebuildRoot(root, state, () => {
-      root.innerHTML = shellMarkup(state);
+      const host = root.querySelector('#page-host');
+      if (host) host.innerHTML = appView(state);
+      const overlays = root.querySelector('#page-overlays');
+      if (overlays) overlays.innerHTML = pageOverlays(state);
       bind();
-      if (state.activeSession) void sessionRunner.openSessionOverlay(state.activeSession);
+      updateNavigation(root, state);
+      updateAccountIdentity(root, accountIdentity(state));
+      // Only when it is not already open: the overlay is mounted with the frame now, so a
+      // page render has nothing to put back. This is the restored-session case at boot.
+      if (state.activeSession && !root.querySelector('#session-overlay')?.classList.contains('open')) void sessionRunner.openSessionOverlay(state.activeSession);
+      // Both re-render modal content that a root wipe used to take away. #178 retires them
+      // with the modal host now standing; they are harmless and behaviour-preserving here.
       identity.renderIfPending();
       programBuilder.renderIfOpen();
     }, { ...options, trace });
   }
 
+  // Bound once, to elements a page render does not replace. Navigation is delegated from
+  // the root because a page can carry a jump of its own - Statistics offers "Go to
+  // Workouts", an empty library offers "Browse Discover" - and those buttons come and go.
+  function bindFrame(): void {
+    root.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      const view = target.closest<HTMLElement>('[data-view]');
+      if (view) return openView(view.dataset.view as View);
+      const subtab = target.closest<HTMLElement>('[data-subtab]');
+      const parent = subtab?.dataset.parent as keyof AppState['subState'] | undefined;
+      if (!subtab || !parent || !(parent in state.subState)) return;
+      (state.subState[parent] as SubView) = subtab.dataset.subtab as SubView;
+      openView(parent as View, 'navigate-subtab');
+    });
+    root.querySelector('#account-chip')?.addEventListener('click', () => {
+      if (!state.pubkey) return identity.startAccountChoice();
+      openView('settings', 'navigate-account-chip');
+    });
+    // The close button belongs to the modal card, which is part of the frame. It used to be
+    // bound on every open because the card was thrown away with the root; binding it there
+    // now would stack one listener per modal opened.
+    root.querySelector('#modal-close')?.addEventListener('click', closeModal);
+  }
+
+  function openView(view: View, reason = 'navigate-view'): void {
+    state.view = view;
+    state.editingId = null;
+    render({ toTop: true, reason });
+    if (view === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
+    if (view === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
+    if (view === 'settings') { void preferences.refreshFunding(); moneroAddress.refreshIfNeeded(); }
+  }
+
+  // Everything a page render replaces, rebound with it.
   function bind(): void {
-    root.querySelectorAll<HTMLElement>('[data-view]').forEach((button) => button.addEventListener('click', () => {
-      state.view = button.dataset.view as View;
-      state.editingId = null;
-      render({ toTop: true, reason: 'navigate-view' });
-      if (state.view === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
-      if (state.view === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
-      if (state.view === 'settings') { void preferences.refreshFunding(); moneroAddress.refreshIfNeeded(); }
-    }));
-    root.querySelectorAll<HTMLElement>('[data-subtab]').forEach((button) => button.addEventListener('click', () => {
-      const parent = button.dataset.parent as keyof AppState['subState'];
-      if (parent && parent in state.subState) {
-        (state.subState[parent] as SubView) = button.dataset.subtab as SubView;
-        state.view = parent as View;
-        state.editingId = null;
-        render({ toTop: true, reason: 'navigate-subtab' });
-        if (parent === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
-        if (parent === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
-      }
-    }));
-    root.querySelector('#account-chip')?.addEventListener('click', () => { if (!state.pubkey) { identity.startAccountChoice(); return; } state.view = 'settings'; render({ toTop: true, reason: 'navigate-account-chip' }); void preferences.refreshFunding(); moneroAddress.refreshIfNeeded(); });
     root.querySelectorAll<HTMLElement>('[data-copy]').forEach((button) => button.addEventListener('click', () => {
       void navigator.clipboard.writeText(button.dataset.copy || '')
         .then(() => toast('Copied'), () => toast('Could not copy', 'bad'));
@@ -200,64 +236,10 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void catalog.refreshExercises(); }));
     root.querySelectorAll('#refresh-programs').forEach((button) => button.addEventListener('click', () => { void catalog.refreshPrograms(); }));
     root.querySelector('#ex-search')?.addEventListener('input', (event) => { state.filter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#ex-search'); input?.focus(); input?.setSelectionRange(state.filter.length, state.filter.length); });
-    bindExerciseBrowser({ root, state, render });
-    root.querySelector('#ex-grid')?.addEventListener('click', (event) => {
-      const target = event.target as HTMLElement;
-      const card = target.closest<HTMLElement>('[data-slug]');
-      if (state.librarySelect.active) {
-        const slug = card?.dataset.slug;
-        if (!slug) return;
-        if (state.librarySelect.slugs.has(slug)) state.librarySelect.slugs.delete(slug);
-        else state.librarySelect.slugs.add(slug);
-        render();
-        return;
-      }
-      const fav = target.closest<HTMLElement>('[data-fav]');
-      if (fav) { void catalog.toggleFavourite(fav.dataset.fav || ''); return; }
-      if (!card) return;
-      const exercise = state.library.find((entry) => entry.slug === card.dataset.slug);
-      if (exercise) catalog.openExerciseDetail(exercise, 'library');
-    });
-    root.querySelector('#lib-select-toggle')?.addEventListener('click', () => { state.librarySelect = { active: true, slugs: new Set() }; render(); });
-    root.querySelector('#lib-select-cancel')?.addEventListener('click', () => { state.librarySelect = { active: false, slugs: new Set() }; render(); });
-    root.querySelector('#lib-select-all')?.addEventListener('click', () => {
-      const visible = exerciseResults('library', state).map((exercise) => exercise.slug);
-      const allSelected = visible.length > 0 && visible.every((slug) => state.librarySelect.slugs.has(slug));
-      state.librarySelect.slugs = allSelected ? new Set() : new Set(visible);
-      render();
-    });
-    root.querySelector('#lib-delete-selected')?.addEventListener('click', () => { void catalog.deleteSelectedExercises(); });
+    bindExerciseBrowser({ root, state, render, catalog });
     root.querySelector('#discover-refresh')?.addEventListener('click', () => { void catalog.refreshExercises(); });
     root.querySelector('#program-discover-refresh')?.addEventListener('click', () => { void catalog.refreshPrograms(); });
     root.querySelector('#discover-search')?.addEventListener('input', (event) => { state.discoverFilter.q = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#discover-search'); input?.focus(); input?.setSelectionRange(state.discoverFilter.q.length, state.discoverFilter.q.length); });
-    root.querySelector('#discover-grid')?.addEventListener('click', (event) => {
-      const target = event.target as HTMLElement;
-      const card = target.closest<HTMLElement>('[data-address]');
-      if (!card) return;
-      const exercise = state.discoverExercises.find((entry) => (entry.nostr_address || entry.slug) === card.dataset.address);
-      if (!exercise) return;
-      if (state.discoverSelect.active) {
-        if (discoverImportState(exercise, state.library) === 'in-library') return;
-        const address = exercise.nostr_address || exercise.slug;
-        if (state.discoverSelect.addresses.has(address)) state.discoverSelect.addresses.delete(address);
-        else state.discoverSelect.addresses.add(address);
-        render();
-        return;
-      }
-      const importButton = target.closest<HTMLButtonElement>('[data-import-address]');
-      if (importButton) { void catalog.importDiscovered(exercise, importButton); return; }
-      catalog.openExerciseDetail(exercise, 'discover');
-    });
-    root.querySelector('#discover-select-toggle')?.addEventListener('click', () => { state.discoverSelect = { active: true, addresses: new Set() }; render(); });
-    root.querySelector('#discover-select-cancel')?.addEventListener('click', () => { state.discoverSelect = { active: false, addresses: new Set() }; render(); });
-    root.querySelector('#discover-select-all')?.addEventListener('click', () => {
-      const visible = exerciseResults('discover', state);
-      const importable = discoverImportable(visible, state.library).map((exercise) => exercise.nostr_address || exercise.slug);
-      const allSelected = importable.length > 0 && importable.every((address) => state.discoverSelect.addresses.has(address));
-      state.discoverSelect.addresses = allSelected ? new Set() : new Set(importable);
-      render();
-    });
-    root.querySelector('#discover-import-selected')?.addEventListener('click', () => { void catalog.importSelectedDiscovered(); });
     root.querySelector('#program-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#program-filter'); input?.focus(); input?.setSelectionRange(state.programFilter.length, state.programFilter.length); });
     root.querySelector('#program-discover-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#program-discover-filter'); input?.focus(); input?.setSelectionRange(state.programFilter.length, state.programFilter.length); });
     bindProgramBrowser({ root, state, render });
@@ -298,7 +280,6 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       render();
       toast('Program deleted');
     }));
-    sessionRunner.bindSessionControls();
     root.querySelectorAll<HTMLElement>('[data-delete-session]').forEach((button) => button.addEventListener('click', () => { void preferences.deleteSession(Number(button.dataset.deleteSession)); }));
     root.querySelectorAll<HTMLElement>('[data-repeat-session]').forEach((button) => button.addEventListener('click', () => {
       const source = state.finishedSessions.find((item) => item.id === Number(button.dataset.repeatSession));
@@ -383,7 +364,6 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     const host = root.querySelector('#modal-content');
     if (host) host.innerHTML = content;
     modal?.classList.add('open');
-    root.querySelector('#modal-close')?.addEventListener('click', closeModal);
   }
 
   function closeModal(): void {

@@ -101,14 +101,17 @@ function catalogExercise(slug: string): Exercise {
 }
 
 describe('shell', () => {
-  // The baseline for #178. Every increment of that issue removes callers from the full-root
+  // The baseline for #178. Every increment of that issue removes callers from the render
   // path, and the only way to tell a render that was removed from one that moved somewhere
   // else is to count them all at the one place they pass through. These numbers are what
   // the app does today, not what it should do: when an increment lands, they go down and
   // this test is updated to the new count. It rising is the regression.
   //
-  // A signed-out cold start, catalog relays stubbed: 3 full rebuilds.
-  it('rebuilds the whole root three times during a local cold start', async () => {
+  // A signed-out cold start, catalog relays stubbed: 3 renders. Since the shell is mounted
+  // once, each of these replaces the page and leaves the frame standing - the count did not
+  // move for the persistent-shell split, what a count costs did. The frame is written once,
+  // and the tests below assert that by node identity rather than by counting.
+  it('renders the page three times during a local cold start', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
     const shell = renderShell(root);
@@ -129,7 +132,7 @@ describe('shell', () => {
   // Signing in adds one, for the cached profile. The relay's answer used to add a second -
   // the flash a moment after launch that rebuilt the topbar, the navigation, every image
   // and the current page to change a name and a picture. It patches the chip now (#184).
-  it('rebuilds the whole root four times when a profile is restored and refreshed', async () => {
+  it('renders the page four times when a profile is restored and refreshed', async () => {
     const pubkey = 'a'.repeat(64);
     localStorage.setItem('workstr.currentPubkey', pubkey);
     vi.mocked(fetchProfile).mockResolvedValueOnce({ pubkey, name: 'Trainer', picture: 'https://example.invalid/a.png' } as RelayProfile);
@@ -146,6 +149,97 @@ describe('shell', () => {
       'boot-account-open'
     ]);
     expect(shell.renders.rebuilds).toBe(4);
+  });
+
+  // The frame is mounted once and pages are written into it. Everything named here used to
+  // be destroyed and rebuilt for any state change at all, which is what made an avatar
+  // flicker, an image redraw and an open modal vanish.
+  it('keeps the frame standing while pages change under it', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    const frame = {
+      topbar: root.querySelector('.topbar'),
+      chip: root.querySelector('#account-chip'),
+      sidebar: root.querySelector('.sidebar'),
+      content: root.querySelector('.content'),
+      host: root.querySelector('#page-host'),
+      session: root.querySelector('#session-overlay'),
+      modal: root.querySelector('#modal'),
+      toast: root.querySelector('#toast')
+    };
+    const page = root.querySelector('#page-exercises');
+
+    for (const view of ['workouts', 'statistics', 'settings', 'exercises']) {
+      root.querySelector<HTMLElement>(`.sidebar [data-view="${view}"]`)?.click();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(root.querySelector('.topbar')).toBe(frame.topbar);
+    expect(root.querySelector('#account-chip')).toBe(frame.chip);
+    expect(root.querySelector('.sidebar')).toBe(frame.sidebar);
+    expect(root.querySelector('.content')).toBe(frame.content);
+    expect(root.querySelector('#page-host')).toBe(frame.host);
+    expect(root.querySelector('#session-overlay')).toBe(frame.session);
+    expect(root.querySelector('#modal')).toBe(frame.modal);
+    expect(root.querySelector('#toast')).toBe(frame.toast);
+    // The page itself is the thing that changed.
+    expect(root.querySelector('#page-exercises')).not.toBe(page);
+    await drainBoot(shell);
+  });
+
+  it('patches the navigation rather than rebuilding it', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    const item = root.querySelector<HTMLElement>('.sidebar [data-view="statistics"]')!;
+
+    item.click();
+
+    expect(root.querySelector('.sidebar [data-view="statistics"]')).toBe(item);
+    expect(item.classList.contains('active')).toBe(true);
+    expect(root.querySelector('.sidebar [data-view="exercises"]')?.classList.contains('active')).toBe(false);
+    await drainBoot(shell);
+  });
+
+  // Navigation is delegated from the root and bound once. Bound per render, as it was, the
+  // handlers would stack one copy per page the reader had visited.
+  it('does not stack navigation handlers as pages come and go', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    for (const view of ['workouts', 'statistics', 'settings', 'exercises', 'workouts']) {
+      root.querySelector<HTMLElement>(`.sidebar [data-view="${view}"]`)?.click();
+    }
+    const rebuiltBefore = shell.renders.rebuilds;
+
+    root.querySelector<HTMLElement>('.sidebar [data-view="statistics"]')?.click();
+
+    expect(shell.renders.rebuilds).toBe(rebuiltBefore + 1);
+    await drainBoot(shell);
+  });
+
+  // The modal host is part of the frame now, so background state cannot take an open modal
+  // away - and the close button is bound once rather than once per modal opened.
+  it('leaves an open modal alone when the page under it is rendered', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    root.querySelector<HTMLElement>('#account-chip')?.click();
+    await waitFor(() => root.querySelector('#modal')?.classList.contains('open') === true, 'the account modal');
+    const modal = root.querySelector('#modal');
+    const content = root.querySelector('#modal-content')?.innerHTML;
+
+    root.querySelector<HTMLElement>('.sidebar [data-view="statistics"]')?.click();
+
+    expect(root.querySelector('#modal')).toBe(modal);
+    expect(root.querySelector('#modal')?.classList.contains('open')).toBe(true);
+    expect(root.querySelector('#modal-content')?.innerHTML).toBe(content);
+    await drainBoot(shell);
   });
 
   // A catalog refresh runs on every launch and reports twice - once to say it is loading,

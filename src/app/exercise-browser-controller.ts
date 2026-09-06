@@ -1,10 +1,16 @@
-import type { ExerciseFacet, ExerciseView } from './exercise-browser';
+import { discoverImportable, discoverImportState } from '../features/discover/views';
+import type { CatalogController } from './catalog-controller';
+import { exerciseResults, type ExerciseFacet, type ExerciseView } from './exercise-browser';
+import type { RenderOptions } from './root-rebuild';
 import type { AppState } from './state';
 
 export interface ExerciseBrowserContext {
   root: HTMLElement;
   state: AppState;
-  render(options?: { toTop?: boolean }): void;
+  render(options?: RenderOptions): void;
+  // Opening a card, importing one, favouriting and deleting are the catalog's work; this
+  // module owns which card was clicked, not what happens to it.
+  catalog: CatalogController;
 }
 
 const NO_FACETS = { cat: '', muscle: '', diff: '', equip: '' };
@@ -19,7 +25,10 @@ const NO_FACETS = { cat: '', muscle: '', diff: '', equip: '' };
  * Rebound after every render, like the rest of the shell's bindings, and every handler
  * redraws — so anything that should still hold focus is refocused by selector.
  */
-export function bindExerciseBrowser({ root, state, render }: ExerciseBrowserContext): void {
+export function bindExerciseBrowser({ root, state, render, catalog }: ExerciseBrowserContext): void {
+  bindLibraryGrid();
+  bindDiscoverGrid();
+
   const setFacet = (view: ExerciseView, facet: ExerciseFacet, value: string) => {
     if (view === 'discover') state.discoverFilter = { ...state.discoverFilter, [facet]: value };
     else state.exFilter = { ...state.exFilter, [facet]: value };
@@ -81,4 +90,66 @@ export function bindExerciseBrowser({ root, state, render }: ExerciseBrowserCont
     clearFacets(button.dataset.exerciseFilterClear as ExerciseView);
     render();
   }));
+
+  // Card clicks are delegated to the grid itself, so writing new cards into it - which a
+  // catalog answer does - costs no listeners.
+  function bindLibraryGrid(): void {
+    root.querySelector('#ex-grid')?.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      const card = target.closest<HTMLElement>('[data-slug]');
+      if (state.librarySelect.active) {
+        const slug = card?.dataset.slug;
+        if (!slug) return;
+        if (state.librarySelect.slugs.has(slug)) state.librarySelect.slugs.delete(slug);
+        else state.librarySelect.slugs.add(slug);
+        render();
+        return;
+      }
+      const fav = target.closest<HTMLElement>('[data-fav]');
+      if (fav) { void catalog.toggleFavourite(fav.dataset.fav || ''); return; }
+      if (!card) return;
+      const exercise = state.library.find((entry) => entry.slug === card.dataset.slug);
+      if (exercise) catalog.openExerciseDetail(exercise, 'library');
+    });
+    root.querySelector('#lib-select-toggle')?.addEventListener('click', () => { state.librarySelect = { active: true, slugs: new Set() }; render(); });
+    root.querySelector('#lib-select-cancel')?.addEventListener('click', () => { state.librarySelect = { active: false, slugs: new Set() }; render(); });
+    root.querySelector('#lib-select-all')?.addEventListener('click', () => {
+      const visible = exerciseResults('library', state).map((exercise) => exercise.slug);
+      const allSelected = visible.length > 0 && visible.every((slug) => state.librarySelect.slugs.has(slug));
+      state.librarySelect.slugs = allSelected ? new Set() : new Set(visible);
+      render();
+    });
+    root.querySelector('#lib-delete-selected')?.addEventListener('click', () => { void catalog.deleteSelectedExercises(); });
+  }
+
+  function bindDiscoverGrid(): void {
+    root.querySelector('#discover-grid')?.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      const card = target.closest<HTMLElement>('[data-address]');
+      if (!card) return;
+      const exercise = state.discoverExercises.find((entry) => (entry.nostr_address || entry.slug) === card.dataset.address);
+      if (!exercise) return;
+      if (state.discoverSelect.active) {
+        if (discoverImportState(exercise, state.library) === 'in-library') return;
+        const address = exercise.nostr_address || exercise.slug;
+        if (state.discoverSelect.addresses.has(address)) state.discoverSelect.addresses.delete(address);
+        else state.discoverSelect.addresses.add(address);
+        render();
+        return;
+      }
+      const importButton = target.closest<HTMLButtonElement>('[data-import-address]');
+      if (importButton) { void catalog.importDiscovered(exercise, importButton); return; }
+      catalog.openExerciseDetail(exercise, 'discover');
+    });
+    root.querySelector('#discover-select-toggle')?.addEventListener('click', () => { state.discoverSelect = { active: true, addresses: new Set() }; render(); });
+    root.querySelector('#discover-select-cancel')?.addEventListener('click', () => { state.discoverSelect = { active: false, addresses: new Set() }; render(); });
+    root.querySelector('#discover-select-all')?.addEventListener('click', () => {
+      const visible = exerciseResults('discover', state);
+      const importable = discoverImportable(visible, state.library).map((exercise) => exercise.nostr_address || exercise.slug);
+      const allSelected = importable.length > 0 && importable.every((address) => state.discoverSelect.addresses.has(address));
+      state.discoverSelect.addresses = allSelected ? new Set() : new Set(importable);
+      render();
+    });
+    root.querySelector('#discover-import-selected')?.addEventListener('click', () => { void catalog.importSelectedDiscovered(); });
+  }
 }
