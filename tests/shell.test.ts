@@ -4,6 +4,8 @@ import { launchSignerUri, renderShell } from '../src/app/shell';
 import { shellMarkup } from '../src/app/layout';
 import type { ShellHandle } from '../src/app/shell-types';
 import type { AppState } from '../src/app/state';
+import type { Exercise } from '../src/core/types';
+import { fetchCanonExercises } from '../src/nostr/canon';
 import type { RelayProfile } from '../src/nostr/pool';
 import { fetchProfile } from '../src/nostr/profile';
 import { LOCAL_NAMESPACE } from '../src/db/adopt';
@@ -89,6 +91,15 @@ async function endSession(root: HTMLElement, shell: ShellHandle, sheetId: number
   await drainBoot(shell);
 }
 
+// A relay catalog answer, as `fetchCanonExercises` hands it over.
+function catalogExercise(slug: string): Exercise {
+  return {
+    slug, name: slug, muscles: [], equipment: [], tags: [], instructions: [],
+    favourite: false, source_type: 'nostr', status: 'active',
+    created_at: '2026-09-06T00:00:00.000Z', updated_at: '2026-09-06T00:00:00.000Z'
+  };
+}
+
 describe('shell', () => {
   // The baseline for #178. Every increment of that issue removes callers from the full-root
   // path, and the only way to tell a render that was removed from one that moved somewhere
@@ -96,8 +107,8 @@ describe('shell', () => {
   // the app does today, not what it should do: when an increment lands, they go down and
   // this test is updated to the new count. It rising is the regression.
   //
-  // A signed-out cold start, catalog relays stubbed: 5 full rebuilds.
-  it('rebuilds the whole root five times during a local cold start', async () => {
+  // A signed-out cold start, catalog relays stubbed: 3 full rebuilds.
+  it('rebuilds the whole root three times during a local cold start', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
     const shell = renderShell(root);
@@ -106,11 +117,9 @@ describe('shell', () => {
     expect(shell.renders.recent.map((record) => record.reason)).toEqual([
       'boot-first-paint',
       'store-reload',
-      'boot-account-open',
-      'exercise-catalog-loading',
-      'exercise-catalog-loaded'
+      'boot-account-open'
     ]);
-    expect(shell.renders.rebuilds).toBe(5);
+    expect(shell.renders.rebuilds).toBe(3);
     expect(shell.renders.held).toBe(0);
     // Nothing on the boot path may render without saying why, or the baseline stops being
     // readable the moment it changes.
@@ -120,7 +129,7 @@ describe('shell', () => {
   // Signing in adds one, for the cached profile. The relay's answer used to add a second -
   // the flash a moment after launch that rebuilt the topbar, the navigation, every image
   // and the current page to change a name and a picture. It patches the chip now (#184).
-  it('rebuilds the whole root six times when a profile is restored and refreshed', async () => {
+  it('rebuilds the whole root four times when a profile is restored and refreshed', async () => {
     const pubkey = 'a'.repeat(64);
     localStorage.setItem('workstr.currentPubkey', pubkey);
     vi.mocked(fetchProfile).mockResolvedValueOnce({ pubkey, name: 'Trainer', picture: 'https://example.invalid/a.png' } as RelayProfile);
@@ -134,11 +143,56 @@ describe('shell', () => {
       'boot-first-paint',
       'store-reload',
       'profile-cached',
-      'boot-account-open',
-      'exercise-catalog-loading',
-      'exercise-catalog-loaded'
+      'boot-account-open'
     ]);
-    expect(shell.renders.rebuilds).toBe(6);
+    expect(shell.renders.rebuilds).toBe(4);
+  });
+
+  // A catalog refresh runs on every launch and reports twice - once to say it is loading,
+  // once with the answer. Both used to rebuild whatever page the reader was on, for cards
+  // that page does not show.
+  it('lands a catalog answer on Settings without rebuilding it', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    let land: (exercises: Exercise[]) => void = () => {};
+    vi.mocked(fetchCanonExercises).mockReturnValueOnce(new Promise((resolve) => { land = resolve; }));
+    const shell = renderShell(root);
+    // Boot renders while the catalog request is still out; the reader arrives on Settings
+    // after that has settled, which is the state the relay answer lands into.
+    await waitFor(() => shell.renders.recent.some((record) => record.reason === 'boot-account-open'), 'boot to settle');
+    root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const page = root.querySelector('.settings-page');
+    const rebuiltBefore = shell.renders.rebuilds;
+
+    land([catalogExercise('barbell-row')]);
+    await drainBoot(shell);
+
+    expect(shell.renders.rebuilds).toBe(rebuiltBefore);
+    expect(root.querySelector('.settings-page')).toBe(page);
+    expect(shell.state.discoverExercises.map((exercise) => exercise.slug)).toEqual(['barbell-row']);
+    expect(shell.state.exerciseStatus).toBe('loaded 1 Workstr exercises');
+  });
+
+  // The other half of the same rule: the reader looking at Discover gets the cards, written
+  // into the grid rather than by rebuilding the app around it.
+  it('writes a catalog answer into the Discover grid when it is the page on screen', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    vi.mocked(fetchCanonExercises).mockResolvedValueOnce([catalogExercise('barbell-row')]);
+    // Arriving on Discover with nothing in it starts the refresh, the way a reader does.
+    root.querySelector<HTMLElement>('[data-parent="exercises"][data-subtab="discover"]')?.click();
+    const grid = root.querySelector('#discover-grid');
+    const rebuiltBefore = shell.renders.rebuilds;
+
+    await drainBoot(shell);
+
+    expect(shell.renders.rebuilds).toBe(rebuiltBefore);
+    expect(root.querySelector('#discover-grid')).toBe(grid);
+    expect(grid?.textContent).toContain('barbell-row');
+    expect(root.querySelector('#discover-status')?.textContent).toBe('loaded 1 Workstr exercises');
   });
 
   // The bug: the reader has settled on a page, and several seconds after launch a relay
