@@ -10,12 +10,13 @@ import type { RelayProgram } from '../nostr/canon';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
 import { getQuickWorkout } from '../features/recovery/quickWorkout';
 import { html } from './format';
+import type { RenderOptions } from './root-rebuild';
 import type { ActiveSession, AppState } from './state';
 
 export interface PreferencesControllerContext {
   root: HTMLElement;
   state: AppState;
-  render(): void;
+  render(options?: RenderOptions): void;
   toast(message: string, kind?: 'ok' | 'bad'): void;
   startTrainingSession(program: RelayProgram): Promise<void>;
   loadFinishedSessions(): Promise<ActiveSession[]>;
@@ -60,13 +61,13 @@ function bindBodyControls(): void {
 async function refreshFunding(): Promise<void> {
   if (state.support.status === 'loading' || state.support.status === 'ready') return;
   state.support = { ...state.support, status: 'loading' };
-  render();
+  render({ reason: 'support-funding-loading' });
   try {
     state.support = { status: 'ready', receipts: await fetchMonthlyZapReceipts(), fetchedAt: Date.now() };
   } catch {
     state.support = { ...state.support, status: 'offline' };
   }
-  render();
+  render({ reason: 'support-funding-loaded' });
 }
 
 function bindRecoveryControls(): void {

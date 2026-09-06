@@ -34,7 +34,7 @@ or set updates would make full-root rendering inappropriate.
 | NWC wallet connection and in-app support zaps | `src/app/nwc-controller.ts`, `src/nostr/support-zap.ts` | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts`, `src/features/support/views.ts` | `tests/nwc-ui.test.ts`, `tests/support-zap.test.ts`, NWC tests |
 | Stored/live session adaptation | `src/app/session-persistence.ts` | `src/db/store.ts`, `src/app/state.ts` | `tests/session-runner.test.ts`, `tests/store.test.ts` |
 | Top-level navigation and page markup | `src/app/layout.ts` | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
-| Redrawing the root: when it is held back, and keeping the reader's place | `src/app/root-rebuild.ts`, `src/app/scroll.ts`, `src/app/settings-disclosure.ts` | `src/app/shell.ts` (`render`), `src/app/session-runner.ts` (`closeSessionOverlay`), the `.content` pane in `src/app/layout.ts` | `tests/root-rebuild.test.ts`, `tests/scroll.test.ts`, `tests/shell.test.ts` |
+| Redrawing the root: when it is held back, what made it happen, and keeping the reader's place | `src/app/root-rebuild.ts`, `src/app/scroll.ts`, `src/app/settings-disclosure.ts` | `src/app/shell.ts` (`render`), `src/app/session-runner.ts` (`closeSessionOverlay`), the `.content` pane in `src/app/layout.ts` | `tests/root-rebuild.test.ts`, `tests/scroll.test.ts`, `tests/shell.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Responsive image delivery for exercise photos | `src/core/media.ts` | `src/features/train/session-hero.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/features/sheets/builder-views.ts`, `src/app/catalog-controller.ts` | `tests/media.test.ts`, `tests/session-runner.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
@@ -98,7 +98,11 @@ or set updates would make full-root rendering inappropriate.
 - `src/app/root-rebuild.ts` owns the one way the shell's root is redrawn: held back
   entirely while the live-session overlay is open, because the current set's typed reps and
   load and a running rest countdown live only in the DOM, and scroll-preserving through
-  `src/app/scroll.ts` otherwise. The session runner renders once the overlay closes.
+  `src/app/scroll.ts` otherwise. The session runner renders once the overlay closes. It also
+  counts them: every full rebuild passes through here, so `createRenderTrace` is the only
+  place that can say how many a cold start costs and what asked for each one. The count is
+  on the shell handle as `renders`; the reasons reach a dev console and are stripped from a
+  production build.
 - `src/app/settings-disclosure.ts` carries the expanded Settings categories across a
   rebuild. Which `<details data-settings-section>` are open is held in the DOM alone, so a
   rebuild collapsed the card being read; it reopens what the reader had open and never

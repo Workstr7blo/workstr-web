@@ -4,6 +4,8 @@ import { launchSignerUri, renderShell } from '../src/app/shell';
 import { shellMarkup } from '../src/app/layout';
 import type { ShellHandle } from '../src/app/shell-types';
 import type { AppState } from '../src/app/state';
+import type { RelayProfile } from '../src/nostr/pool';
+import { fetchProfile } from '../src/nostr/profile';
 import { LOCAL_NAMESPACE } from '../src/db/adopt';
 import { WorkstrStore } from '../src/db/store';
 import { clearLocalSecret, LEGACY_LOCAL_KEY_STORAGE, loadLocalSecret } from '../src/signer/local-key-storage';
@@ -88,6 +90,59 @@ async function endSession(root: HTMLElement, shell: ShellHandle, sheetId: number
 }
 
 describe('shell', () => {
+  // The baseline for #178. Every increment of that issue removes callers from the full-root
+  // path, and the only way to tell a render that was removed from one that moved somewhere
+  // else is to count them all at the one place they pass through. These numbers are what
+  // the app does today, not what it should do: when an increment lands, they go down and
+  // this test is updated to the new count. It rising is the regression.
+  //
+  // A signed-out cold start, catalog relays stubbed: 5 full rebuilds.
+  it('rebuilds the whole root five times during a local cold start', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root);
+    await drainBoot(shell);
+
+    expect(shell.renders.recent.map((record) => record.reason)).toEqual([
+      'boot-first-paint',
+      'store-reload',
+      'boot-account-open',
+      'exercise-catalog-loading',
+      'exercise-catalog-loaded'
+    ]);
+    expect(shell.renders.rebuilds).toBe(5);
+    expect(shell.renders.held).toBe(0);
+    // Nothing on the boot path may render without saying why, or the baseline stops being
+    // readable the moment it changes.
+    expect(shell.renders.recent.filter((record) => record.reason === 'unattributed')).toEqual([]);
+  });
+
+  // Signing in adds two: the cached profile, then the one the relay answers with. The
+  // second is the flash a second or two after launch that #184 removes - it rebuilds the
+  // topbar, the navigation, every image and the current page to change a name and a
+  // picture in the account chip.
+  it('rebuilds the whole root seven times when a profile is restored and refreshed', async () => {
+    const pubkey = 'a'.repeat(64);
+    localStorage.setItem('workstr.currentPubkey', pubkey);
+    vi.mocked(fetchProfile).mockResolvedValueOnce({ pubkey, name: 'Trainer', picture: 'https://example.invalid/a.png' } as RelayProfile);
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root);
+    await drainBoot(shell);
+    localStorage.removeItem('workstr.currentPubkey');
+
+    expect(shell.renders.recent.map((record) => record.reason)).toEqual([
+      'boot-first-paint',
+      'store-reload',
+      'profile-cached',
+      'profile-relay',
+      'boot-account-open',
+      'exercise-catalog-loading',
+      'exercise-catalog-loaded'
+    ]);
+    expect(shell.renders.rebuilds).toBe(7);
+  });
+
   it('renders the app chrome and all views without a signer', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
