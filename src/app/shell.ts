@@ -15,6 +15,7 @@ import { fetchProfile, profileRelays, readCachedProfile, writeCachedProfile } fr
 import { planProgramImport, programImportState } from '../nostr/programImport';
 import type { ActiveSession, AppState, SubView, View } from './state';
 import { EX_PLACEHOLDER, exerciseImage, exerciseSourceLabel, filterExercises, formatMinutes, html } from './format';
+import { accountIdentity, updateAccountIdentity } from './account-chip';
 import { shellMarkup } from './layout';
 import { bindProgramBrowser } from './program-browser-controller';
 import { bindExerciseBrowser } from './exercise-browser-controller';
@@ -90,17 +91,17 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       if (!profile || state.pubkey !== pubkey) return;
       writeCachedProfile(profile);
       state.profileName = profileName(profile); state.profilePicture = profile.picture || null;
-      render({ reason: 'profile-relay' });
+      // A name and a picture change the chip and the Settings Account card and nothing else,
+      // and this lands seconds after launch, wherever the reader has got to by then.
+      if (!updateAccountIdentity(root, accountIdentity(state))) render({ reason: 'profile-relay' });
     });
   }
 
   // Anonymous local account — the default; no signer involved.
   async function openLocal(): Promise<void> {
-    state.pubkey = null;
-    state.npub = null;
+    state.pubkey = null; state.npub = null;
     state.profileName = null; state.profilePicture = null;
-    state.signerType = null;
-    state.signInStatus = null;
+    state.signerType = null; state.signInStatus = null;
     await loadNamespace(LOCAL_NAMESPACE);
   }
 
@@ -141,8 +142,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     await nwc.loadConnection(); render({ reason: 'store-reload' });
   }
 
-  // `toTop`: moving to another view is a new page to the reader, not a redraw. `reason` is
-  // read by a person and never branched on; `root-rebuild.ts` says why it is worth passing.
+  // `toTop` is a new page to the reader, not a redraw; `reason` is for the trace alone.
   function render(options: RenderOptions = {}): void {
     // Monero Mode is a token swap, and the tokens are declared on `:root`, so the flag has
     // to land there too — an override on `body` cannot win against a `:root` declaration.

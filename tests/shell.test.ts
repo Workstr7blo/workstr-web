@@ -117,11 +117,10 @@ describe('shell', () => {
     expect(shell.renders.recent.filter((record) => record.reason === 'unattributed')).toEqual([]);
   });
 
-  // Signing in adds two: the cached profile, then the one the relay answers with. The
-  // second is the flash a second or two after launch that #184 removes - it rebuilds the
-  // topbar, the navigation, every image and the current page to change a name and a
-  // picture in the account chip.
-  it('rebuilds the whole root seven times when a profile is restored and refreshed', async () => {
+  // Signing in adds one, for the cached profile. The relay's answer used to add a second -
+  // the flash a moment after launch that rebuilt the topbar, the navigation, every image
+  // and the current page to change a name and a picture. It patches the chip now (#184).
+  it('rebuilds the whole root six times when a profile is restored and refreshed', async () => {
     const pubkey = 'a'.repeat(64);
     localStorage.setItem('workstr.currentPubkey', pubkey);
     vi.mocked(fetchProfile).mockResolvedValueOnce({ pubkey, name: 'Trainer', picture: 'https://example.invalid/a.png' } as RelayProfile);
@@ -135,12 +134,44 @@ describe('shell', () => {
       'boot-first-paint',
       'store-reload',
       'profile-cached',
-      'profile-relay',
       'boot-account-open',
       'exercise-catalog-loading',
       'exercise-catalog-loaded'
     ]);
-    expect(shell.renders.rebuilds).toBe(7);
+    expect(shell.renders.rebuilds).toBe(6);
+  });
+
+  // The bug: the reader has settled on a page, and several seconds after launch a relay
+  // answers with a name and a picture. Everything they were looking at was rebuilt for it.
+  it('writes an arriving profile into the chip without rebuilding the page under the reader', async () => {
+    const pubkey = 'b'.repeat(64);
+    localStorage.setItem('workstr.currentPubkey', pubkey);
+    let land: (profile: RelayProfile) => void = () => {};
+    vi.mocked(fetchProfile).mockReturnValueOnce(new Promise((resolve) => { land = resolve; }));
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await shell.ready;
+    root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
+    // Opening Settings starts the funding fetch, which renders again when it answers. Let
+    // that finish first, or the render being counted is that one and not the profile's.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const card = root.querySelector('.account-card') as HTMLDetailsElement;
+    card.open = true;
+    const page = root.querySelector('.settings-page');
+    const rebuiltBefore = shell.renders.rebuilds;
+
+    land({ pubkey, name: 'Trainer', picture: 'https://example.invalid/t.png' } as RelayProfile);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(shell.renders.rebuilds).toBe(rebuiltBefore);
+    expect(root.querySelector('.settings-page')).toBe(page);
+    expect(card.open).toBe(true);
+    expect(root.querySelector('.connection-chip-label')?.textContent).toBe('Trainer');
+    expect(root.querySelector('img.connection-avatar')?.getAttribute('src')).toBe('https://example.invalid/t.png');
+    expect(root.querySelector('.account-card .settings-account-identity strong')?.textContent).toBe('Trainer');
+    localStorage.removeItem('workstr.currentPubkey');
+    await drainBoot(shell);
   });
 
   it('renders the app chrome and all views without a signer', async () => {
