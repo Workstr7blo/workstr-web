@@ -9,6 +9,7 @@ import { discoverImportState } from '../features/discover/views';
 import { moneroMode } from '../features/sheets/monero-tip-view';
 import { paintBodyMapSvg } from './bodymap';
 import { EX_PLACEHOLDER, exerciseSourceLabel, html } from './format';
+import { programSurfaceMounted, updateDiscoverExercises, updateExerciseCatalogStatus, updateProgramCatalogStatus } from './catalog-surfaces';
 import type { RenderOptions } from './root-rebuild';
 import type { AppState } from './state';
 import { responsiveImageUrl } from '../core/media';
@@ -48,7 +49,7 @@ async function persistCanonCache(): Promise<void> {
 
 async function refreshExercises(): Promise<void> {
   state.exerciseStatus = 'loading Workstr exercises from relays...';
-  render({ reason: 'exercise-catalog-loading' });
+  updateExerciseCatalogStatus(root, state);
   try {
     const exercises = await fetchCanonExercises();
     state.discoverExercises = exercises;
@@ -62,12 +63,27 @@ async function refreshExercises(): Promise<void> {
       : `catalog relay error: ${(error as Error).message}`;
   }
   refreshMergedExercises();
-  render({ reason: 'exercise-catalog-loaded' });
+  // Recovery reads the merged catalog to work out which muscle a logged exercise trained,
+  // so it is the one page away from Exercises that a catalog answer changes.
+  if (!updateDiscoverExercises(root, state) && recoveryVisible()) render({ reason: 'exercise-catalog-loaded' });
+}
+
+function recoveryVisible(): boolean {
+  return state.view === 'workouts' && state.subState.workouts === 'recovery';
+}
+
+// Program cards carry their own listeners, so the list is rendered rather than written
+// into. What this stops is the rebuild that used to happen when the reader was not on
+// Workouts at all - the status line is still patched wherever it is mounted. #178 narrows
+// this to the page once the shell stops being thrown away with it.
+function renderProgramSurface(reason: string): void {
+  updateProgramCatalogStatus(root, state);
+  if (programSurfaceMounted(root)) render({ reason });
 }
 
 async function refreshPrograms(): Promise<void> {
   state.programStatus = 'loading Workstr and creator programs from public relays...';
-  render({ reason: 'program-catalog-loading' });
+  updateProgramCatalogStatus(root, state);
   try {
     if (!state.exercises.length) {
       try { state.exercises = await fetchCanonExercises(); } catch { /* Program cards can still infer fallback muscles. */ }
@@ -85,7 +101,7 @@ async function refreshPrograms(): Promise<void> {
       ? `offline — showing ${cached} Workstr and creator programs from the last sync`
       : `program relay error: ${(error as Error).message}`;
   }
-  render({ reason: 'program-catalog-loaded' });
+  renderProgramSurface('program-catalog-loaded');
 }
 
 async function refreshProgramZapTotals(programs = state.programs): Promise<void> {
@@ -100,7 +116,7 @@ async function refreshProgramZapTotals(programs = state.programs): Promise<void>
     } else {
       state.programZapTotals = { ...(state.programZapTotals || {}), ...latest };
     }
-    render({ reason: 'program-zap-totals' });
+    renderProgramSurface('program-zap-totals');
   } catch {
     // Zap totals are social proof, not core catalog loading. Keep Discover usable
     // when receipt relays are unavailable.
@@ -124,7 +140,7 @@ async function refreshAuthorPaymentTargets(programs = state.programs): Promise<v
     const targets = await fetchAuthorMoneroPaymentTargets(pubkeys, state.settings.publicRelays);
     if (!Object.keys(targets).length) return;
     state.authorPaymentTargets = { ...state.authorPaymentTargets, ...targets };
-    render({ reason: 'author-payment-targets' });
+    renderProgramSurface('author-payment-targets');
   } catch {
     // A creator's payment address is not part of the catalog. Discover keeps working
     // without it, and the next refresh asks again.
@@ -163,7 +179,9 @@ async function refreshDiscoverProfiles(): Promise<void> {
       changed = true;
     }
   }
-  if (changed) render({ reason: 'author-profiles' });
+  if (!changed) return;
+  // Author names and pictures are on the Discover exercise cards and on the program cards.
+  if (!updateDiscoverExercises(root, state)) renderProgramSurface('author-profiles');
 }
 
 // Sign out returns to the anonymous local account; the identity's database
