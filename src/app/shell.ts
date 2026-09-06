@@ -141,7 +141,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     state.programZapAttempts = await state.store.listWorkoutProgramZapAttempts();
     await catalog.reloadLibrary();
     state.activeSession = await sessionPersistence.loadUnfinished();
-    await nwc.loadConnection(); render({ reason: 'store-reload' });
+    await nwc.loadConnection(); render({ reason: 'store-reload' }); syncSessionOverlay();
   }
 
   // Written once. The topbar, the navigation, the scroll pane, the live session overlay,
@@ -164,7 +164,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   // page to the reader, not a redraw; `reason` is for the trace alone.
   function render(options: RenderOptions = {}): void {
     applyPaymentMode();
-    rebuildRoot(root, state, () => {
+    rebuildRoot(root, () => {
       const host = root.querySelector('#page-host');
       if (host) host.innerHTML = appView(state);
       const overlays = root.querySelector('#page-overlays');
@@ -172,14 +172,18 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       bind();
       updateNavigation(root, state);
       updateAccountIdentity(root, accountIdentity(state));
-      // Only when it is not already open: the overlay is mounted with the frame now, so a
-      // page render has nothing to put back. This is the restored-session case at boot.
-      if (state.activeSession && !root.querySelector('#session-overlay')?.classList.contains('open')) void sessionRunner.openSessionOverlay(state.activeSession);
-      // Both re-render modal content that a root wipe used to take away. #178 retires them
-      // with the modal host now standing; they are harmless and behaviour-preserving here.
-      identity.renderIfPending();
-      programBuilder.renderIfOpen();
     }, { ...options, trace });
+  }
+
+  // The overlay follows the session, not the render. It is opened when a workout starts and
+  // closed when one ends; the only other way state can arrive already holding a session is
+  // the store being read - at boot, or after a restore - so that is where the two are put
+  // back in step. Asking every render to check was how a background refresh got to reach
+  // into a live workout at all.
+  function syncSessionOverlay(): void {
+    if (!state.activeSession) return;
+    if (root.querySelector('#session-overlay')?.classList.contains('open')) return;
+    void sessionRunner.openSessionOverlay(state.activeSession);
   }
 
   // Bound once, to elements a page render does not replace. Navigation is delegated from

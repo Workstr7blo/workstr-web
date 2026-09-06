@@ -172,7 +172,7 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   const instructions = exercise.instructions || [];
   // The accordion's open state is owned by the controller, not the DOM: logging a set or
   // jumping exercises re-renders this body, and a class toggled in place does not survive
-  // it. (The shell's own rebuild is held back during a session, so it is not the cause.)
+  // it. (A page render does not reach in here, so it is not the cause.)
   const instructionsMarkup = instructions.length ? `<div class="session-instructions ${input.instructionsOpen ? 'open' : ''}" id="session-instructions">
     <button class="session-instructions-toggle" data-toggle-instructions="${html(slug)}" type="button" aria-expanded="${input.instructionsOpen}" aria-controls="session-instructions-body">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>

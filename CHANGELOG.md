@@ -36,6 +36,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A live workout no longer freezes the rest of the app. Because a background refresh used to
+  redraw everything, and redrawing everything mid-workout would have taken away the reps you
+  had typed and reset a running rest timer, Workstr simply refused to redraw at all while a
+  session was open - so a workout that started before a sync finished sat behind a screen
+  that was minutes out of date, and caught up in one jump when you finished. The page behind
+  the session updates normally now, and your set and your rest timer are untouched because
+  the session is no longer part of what gets redrawn.
+
+- Anything you have open stays open and keeps what you have typed. The program builder holds
+  a half-written name, an exercise dialog stays where it was, and a sign-in or pairing screen
+  keeps its place while the catalog, a profile or a sync finishes in the background.
+
 - Searching a list redraws the list. Typing a letter into any of the four search fields -
   your exercises, the Workstr catalog, your programs, relay programs - used to rebuild the
   whole app for every keystroke, then find the field it had just destroyed and put your
