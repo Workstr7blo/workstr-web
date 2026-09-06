@@ -370,7 +370,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const nwc = createNwcController({ root, state, render, toast, openModal, closeModal, getSigner: identity.getActiveSigner, refreshFunding: preferences.refreshFunding, refreshProgramZapTotals: catalog.refreshProgramZapTotals });
   const moneroAddress = createMoneroAddressController({ root, state, toast, getSigner: identity.getActiveSigner });
   const moneroTip = createMoneroTipController({ root, state, toast, openModal });
-  const backup = createBackupController({ state, render, toast, getSigner: identity.getActiveSigner, onSignerStalled: identity.dropActiveSigner, onRestored: () => { void refreshFromStore(); }, requestSignIn: () => { identity.startAccountChoice(); } });
+  const backup = createBackupController({ root, state, render, toast, getSigner: identity.getActiveSigner, onSignerStalled: identity.dropActiveSigner, onRestored: () => { void refreshFromStore(); }, requestSignIn: () => { identity.startAccountChoice(); } });
 
   function unitLabel(): string { return normalizeWeightUnit(state.settings.unit); }
 

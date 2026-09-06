@@ -1,5 +1,6 @@
 import type { BackupSettings } from '../../core/types';
 import type { SyncProgress, SyncStatus } from '../../sync/engine';
+import type { AppState } from '../../app/state';
 import { html } from '../../app/format';
 
 export interface BackupPanelState {
@@ -93,6 +94,18 @@ function progressMarkup(progress: SyncProgress | undefined): string {
     <p class="backup-progress-detail">${html(progressDetail(progress))}</p>`;
 }
 
+// The card is written twice: as markup by `backupPanel`, and patched in place by
+// `updateBackupStatus` when a status arrives. Both read the panel's inputs through here, or
+// a patched card would drift from the rendered one.
+export function backupPanelState(state: AppState): BackupPanelState {
+  return {
+    signedIn: Boolean(state.pubkey),
+    enabled: Boolean(state.settings.backup?.enabled),
+    sync: state.backup,
+    backup: state.settings.backup
+  };
+}
+
 export function backupPanel(state: BackupPanelState): string {
   const pill = statusPill(state);
   const summary = backupSummary(state);
@@ -116,7 +129,7 @@ export function backupPanel(state: BackupPanelState): string {
   const olderNote = state.signedIn && state.enabled && localOnly > 0
     ? `<p class="section-help">Those older workouts stay on this device and are included when you export JSON.</p>`
     : '';
-  return `<details class="settings-category data-sync-card">
+  return `<details class="settings-category data-sync-card" data-settings-section="sync">
     <summary><span class="settings-category-copy"><strong>Data &amp; Sync</strong><small>${html(summary)}</small></span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></summary>
     <div class="settings-category-body">
       <section class="settings-control-group sync-control-group" aria-label="Sync">
@@ -134,4 +147,33 @@ export function backupPanel(state: BackupPanelState): string {
       </section>
     </div>
   </details>`;
+}
+
+// The sync engine reports a status for every phase and every step within it, so a single
+// launch produces a stream of them. Each one used to redraw the root: the topbar, the
+// avatar, the navigation, every exercise image and whichever page the user was actually on
+// were all rebuilt so that one line of text inside one Settings card could change. Only the
+// parts the status feeds are written here, and everything else on screen is left alone.
+//
+// False when the card is not mounted, which is every view except Settings. The state has
+// already been updated by then and there is nothing on screen to correct; the card is built
+// from that state the moment the reader navigates to it.
+export function updateBackupStatus(root: ParentNode, state: BackupPanelState): boolean {
+  const card = root.querySelector('.data-sync-card');
+  if (!card) return false;
+  const pill = statusPill(state);
+  const pillEl = card.querySelector(':scope > summary .status-pill');
+  if (pillEl) {
+    pillEl.textContent = pill.label;
+    pillEl.classList.toggle('ok', pill.ok);
+  }
+  const summary = card.querySelector(':scope > summary .settings-category-copy small');
+  if (summary) summary.textContent = backupSummary(state);
+  // The one control whose availability tracks the status rather than the settings.
+  const syncNow = card.querySelector<HTMLButtonElement>('#sync-now');
+  if (syncNow) syncNow.disabled = state.sync.state === 'syncing';
+  // Absent while sync is off, which is also when there is no status worth reporting.
+  const live = card.querySelector('#backup-status');
+  if (live) live.innerHTML = `<span class="settings-live-label">${html(statusLine(state))}</span>${progressMarkup(state.sync.progress)}`;
+  return true;
 }

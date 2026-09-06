@@ -81,7 +81,7 @@ export function beastModeSummary(state: BeastModeState): { label: string; progre
 
 export function beastModeSettingsCard(state: BeastModeState): string {
   const summary = beastModeSummary(state);
-  return `<details class="settings-category beast-mode-card">
+  return `<details class="settings-category beast-mode-card" data-settings-section="beast-mode">
     <summary><span class="settings-category-copy"><strong>Beast Mode</strong><small>${summary.progress}</small></span><span class="status-pill ${summary.unlocked ? 'ok' : ''}">${summary.label}</span></summary>
     <div class="settings-category-body">
       <p class="section-help">Meet these local goals to publish creator programs. No manual approval.</p>
