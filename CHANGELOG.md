@@ -69,6 +69,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Settings no longer drags sideways on a phone. A decorative glow on the Support Workstr
+  card was positioned against the whole app pane instead of against the card, so it hung
+  about 47px past the right edge of the screen and turned the page into something you
+  could pan left and right. The glow is contained by its own card now, and the main pane
+  refuses horizontal scrolling outright so a single stray decoration cannot do this again.
 - Settings categories stay open while the app works in the background. Expanding Data &
   Sync, Account or any other category and then having it collapse on its own was a
   background sync tick, an arriving profile or a catalog refresh redrawing the whole
