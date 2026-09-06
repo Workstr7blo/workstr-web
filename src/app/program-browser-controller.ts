@@ -1,10 +1,13 @@
-import type { ProgramFilterKey } from '../features/sheets/program-browser';
+import type { ProgramBrowser, ProgramFilterKey } from '../features/sheets/program-browser';
 import type { AppState } from './state';
 
 export interface ProgramBrowserContext {
   root: HTMLElement;
   state: AppState;
   render(options?: { toTop?: boolean }): void;
+  // Writes the program list and the open sheet's count, and leaves everything else - the
+  // toolbar, the search field, the cards already on screen - exactly where it is.
+  renderResults(context: ProgramBrowser): void;
 }
 
 const NO_FILTERS = { goal: '', focus: '', format: '', equipment: '' };
@@ -13,11 +16,12 @@ const NO_FILTERS = { goal: '', focus: '', format: '', equipment: '' };
  * Wiring for the Programs and Discover browsing chrome: the filter sheet, its options, the
  * active-filter chips, and Clear.
  *
- * Rebound after every render, like the rest of the shell's bindings. Every handler here
- * redraws, which destroys the element that was clicked, so anything that should still hold
- * focus afterwards is refocused by selector rather than by reference.
+ * Rebound after every render, like the rest of the shell's bindings. Opening and closing
+ * the sheet is a page render, because the sheet itself appears and disappears; everything
+ * inside it writes the list and patches the sheet in place, so the option that was tapped
+ * is still the focused element afterwards and nothing has to be refocused.
  */
-export function bindProgramBrowser({ root, state, render }: ProgramBrowserContext): void {
+export function bindProgramBrowser({ root, state, render, renderResults }: ProgramBrowserContext): void {
   const setFilter = (key: ProgramFilterKey, value: string) => {
     state.programFilters ||= { ...NO_FILTERS };
     state.programFilters[key] = value;
@@ -50,15 +54,12 @@ export function bindProgramBrowser({ root, state, render }: ProgramBrowserContex
     const key = option.dataset.programFilter as ProgramFilterKey;
     const value = option.dataset.programFilterValue || '';
     setFilter(key, value);
-    render();
-    // The sheet stays open, so put focus back on the option that was just chosen.
-    root.querySelector<HTMLElement>(`[data-program-filter="${key}"][data-program-filter-value="${value}"]`)?.focus();
+    if (state.programFilterSheet) renderResults(state.programFilterSheet);
   }));
 
   root.querySelector('#program-filter-reset')?.addEventListener('click', () => {
     state.programFilters = { ...NO_FILTERS };
-    render();
-    root.querySelector<HTMLElement>('#program-filter-reset')?.focus();
+    if (state.programFilterSheet) renderResults(state.programFilterSheet);
   });
 
   root.querySelectorAll<HTMLElement>('[data-program-filter-remove]').forEach((chip) => chip.addEventListener('click', () => {

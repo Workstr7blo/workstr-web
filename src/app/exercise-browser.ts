@@ -158,12 +158,20 @@ export function exerciseActiveFilters(view: ExerciseView, state: AppState): stri
   return `<div class="program-active-filters">${chips}<button class="program-filter-clear" type="button" data-exercise-filter-clear="${view}">Clear</button></div>`;
 }
 
+/**
+ * Exported because the sheet's footer is patched in place when a facet changes rather than
+ * rendered again — the option that was tapped has to stay the focused element — and the
+ * count it shows has to keep agreeing with the grid behind it.
+ */
+export function exerciseMatchLabel(matches: number): string {
+  return `Show ${matches} ${matches === 1 ? 'exercise' : 'exercises'}`;
+}
+
 export function exerciseFilterSheet(state: AppState): string {
   const view = state.exerciseFilterSheet;
   if (!view) return '';
   const facets = exerciseFacets(view, state);
   const matches = exerciseResults(view, state).length;
-  const noun = matches === 1 ? 'exercise' : 'exercises';
   const groups = facetGroups(view, state).map((group) => {
     const option = (value: string, label: string) =>
       `<button class="program-filter-option ${facets[group.facet] === value ? 'active' : ''}" type="button" data-exercise-filter="${group.facet}" data-exercise-filter-value="${html(value)}" aria-pressed="${facets[group.facet] === value}">${html(label)}</button>`;
@@ -181,7 +189,7 @@ export function exerciseFilterSheet(state: AppState): string {
     <div class="program-filter-sheet-body">${groups}</div>
     <div class="program-filter-sheet-footer">
       <button class="button quiet" id="exercise-filter-reset" type="button">Reset filters</button>
-      <button class="button primary" id="exercise-filter-apply" type="button">Show ${matches} ${noun}</button>
+      <button class="button primary" id="exercise-filter-apply" type="button">${exerciseMatchLabel(matches)}</button>
     </div>
   </div>`;
 }

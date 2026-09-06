@@ -5,18 +5,33 @@ import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults
 import { responsiveImageUrl } from '../../core/media';
 
 export function libraryPanel(state: AppState): string {
-  const list = exerciseResults('library', state);
   const sel = state.librarySelect;
-  const hasFilters = Boolean(exerciseQuery('library', state) || activeFacetCount('library', state));
-  const emptyText = state.library.length === 0 && !hasFilters
-    ? '<p>Your library is empty. Add exercises from the Workstr catalog.</p><button class="button primary" data-parent="exercises" data-subtab="discover">Browse Discover</button>'
-    : 'No exercises match.';
   return `<div class="library-panel">
     ${exerciseToolbar('library', state)}
     ${exerciseActiveFilters('library', state)}
-    <div id="ex-grid" class="ex-grid exercise-library-grid${sel.active ? ' selecting' : ''}">${list.map((exercise) => exerciseCardHtml(exercise, sel.active, sel.slugs.has(exercise.slug))).join('')}</div>
-    <div id="ex-empty" class="empty" style="display:${list.length ? 'none' : 'block'}">${emptyText}</div>
+    <div id="ex-grid" class="ex-grid exercise-library-grid${sel.active ? ' selecting' : ''}">${libraryGrid(state)}</div>
+    <div id="ex-empty" class="empty" style="display:${exerciseResults('library', state).length ? 'none' : 'block'}">${libraryEmptyText(state)}</div>
   </div>`;
+}
+
+// Separate from the panel because the cards are written on their own when a filter changes:
+// the toolbar above them, and the search input in it, have not changed and must not be
+// thrown away. Clicks are delegated to `#ex-grid` itself, so replacing what is inside it
+// costs no listeners.
+export function libraryGrid(state: AppState): string {
+  const sel = state.librarySelect;
+  return exerciseResults('library', state)
+    .map((exercise) => exerciseCardHtml(exercise, sel.active, sel.slugs.has(exercise.slug)))
+    .join('');
+}
+
+// An empty library and a filter that matches nothing are different situations and read
+// differently: one offers the way to fill it, the other says the filter is the reason.
+export function libraryEmptyText(state: AppState): string {
+  const hasFilters = Boolean(exerciseQuery('library', state) || activeFacetCount('library', state));
+  return state.library.length === 0 && !hasFilters
+    ? '<p>Your library is empty. Add exercises from the Workstr catalog.</p><button class="button primary" data-parent="exercises" data-subtab="discover">Browse Discover</button>'
+    : 'No exercises match.';
 }
 
 export function exerciseCardHtml(exercise: Exercise, selecting = false, selected = false): string {

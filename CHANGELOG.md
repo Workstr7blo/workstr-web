@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Searching a list redraws the list. Typing a letter into any of the four search fields -
+  your exercises, the Workstr catalog, your programs, relay programs - used to rebuild the
+  whole app for every keystroke, then find the field it had just destroyed and put your
+  cursor back where it was. Now only the results change. The field is never taken away, so
+  the cursor cannot jump, held keys and accented characters behave, and none of the pictures
+  on screen are fetched and drawn again while you type. Filtering from the filter sheet works
+  the same way, and so does picking items in select mode.
+
 - Workstr is built once and stays built. Moving between pages, or anything finishing in the
   background, used to throw away and rewrite the entire app - the header, your avatar, the
   navigation, every photo on screen and any dialog you had open - and draw it again from

@@ -88,8 +88,10 @@ export function createProgramPublishController(ctx: ProgramPublishControllerCont
     }
   }
 
-  function bind(): void {
-    root.querySelectorAll<HTMLElement>('[data-publish-program]').forEach((button) => button.addEventListener('click', (event) => {
+  // Scoped so a program list rewritten by a filter can rebind its own cards without the
+  // page around them being rendered.
+  function bind(scope: ParentNode = root): void {
+    scope.querySelectorAll<HTMLElement>('[data-publish-program]').forEach((button) => button.addEventListener('click', (event) => {
       event.stopPropagation();
       void publishProgram(button.dataset.publishProgram || '');
     }));

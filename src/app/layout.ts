@@ -16,7 +16,7 @@ import { workoutHistory } from '../features/train/history-timeline';
 import { bodyView, trainingStatsView } from '../features/progress/views';
 import { quickWorkoutPanel, recoveryView } from '../features/recovery/views';
 import { programCard, sheetToProgram } from '../features/sheets/views';
-import { programActiveFilters, programFilterSheet, programMatcher, programToolbar } from '../features/sheets/program-browser';
+import { programActiveFilters, programFilterSheet, programMatcher, programToolbar, type ProgramBrowser } from '../features/sheets/program-browser';
 import { exerciseFilterSheet, exerciseSelectionBar } from './exercise-browser';
 import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { moneroMode } from '../features/sheets/monero-tip-view';
@@ -150,11 +150,16 @@ export function programStatusLine(state: AppState): string {
   return state.programStatus || 'program relay cache not loaded yet';
 }
 
-function workoutsView(state: AppState): string {
-  const active = state.subState.workouts;
-  const programMatches = programMatcher(state);
-  const locals = state.sheets.map(sheetToProgram).filter(programMatches);
-  const programs = state.programs.filter(programMatches);
+// The cards of one program list, written on their own when a filter changes. Card clicks
+// are delegated to the list element, so replacing what is inside it costs no listeners.
+export function programListMarkup(context: ProgramBrowser, state: AppState): string {
+  const matches = programMatcher(state);
+  if (context === 'programs') {
+    const locals = state.sheets.map(sheetToProgram).filter(matches);
+    return locals.map((program) => programCard(program, state, { showPayment: false })).join('')
+      || '<div class="empty">No programs match yet. Build one, import from Discover, or clear a filter.</div>';
+  }
+  const programs = state.programs.filter(matches);
   // Lightning popularity is not Monero popularity, so the top-zapped badge is not carried
   // over to the Monero rail. Nothing replaces it: the list is ordered by name either way,
   // and zaps only ever decorated it.
@@ -164,19 +169,25 @@ function workoutsView(state: AppState): string {
     .sort((a, b) => b.sats - a.sats)
     .slice(0, 3)
     .map((entry, index) => [entry.address, index + 1]));
+  return programs.map((program) => programCard(program, state, { showPayment: true, zapRank: topProgramRanks.get(program.address) })).join('')
+    || `<div class="empty">${state.programs.length ? 'No relay programs match. Refresh or clear a filter.' : 'Relay programs published by Workstr and Beast Mode creators appear here. Importing one adds a local copy to your Programs library, which is what you edit and run.'}</div>`;
+}
+
+function workoutsView(state: AppState): string {
+  const active = state.subState.workouts;
   return `<div class="page active" id="page-workouts">
     <div class="page-title">Workouts</div>
     ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
     <div class="sub-panel ${active === 'programs' ? 'active' : ''}" id="sub-workouts-programs">
       ${programToolbar('programs', state)}
       ${programActiveFilters('programs', state)}
-      <div class="program-list">${locals.map((program) => programCard(program, state, { showPayment: false })).join('') || '<div class="empty">No programs match yet. Build one, import from Discover, or clear a filter.</div>'}</div>
+      <div class="program-list" id="programs-list">${programListMarkup('programs', state)}</div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
       ${programToolbar('discover', state)}
       ${programActiveFilters('discover', state)}
       <div id="program-status" class="terminal-mini">${html(programStatusLine(state))}</div>
-      <div class="program-list">${programs.map((program) => programCard(program, state, { showPayment: true, zapRank: topProgramRanks.get(program.address) })).join('') || `<div class="empty">${state.programs.length ? 'No relay programs match. Refresh or clear a filter.' : 'Relay programs published by Workstr and Beast Mode creators appear here. Importing one adds a local copy to your Programs library, which is what you edit and run.'}</div>`}</div>
+      <div class="program-list" id="program-discover-list">${programListMarkup('discover', state)}</div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
       <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Your training month at a glance, then every session below.</p>${historyCalendarPanel(state)}${workoutHistory(state)}</div>

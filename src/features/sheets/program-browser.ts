@@ -143,15 +143,27 @@ function filterGroup(group: { key: ProgramFilterKey; label: string; values: stri
  * stacking context at z-index 1 — a sheet inside it cannot paint over the bottom nav no
  * matter what z-index it is given, and the nav swallowed the footer's clicks.
  */
+/**
+ * Exported because the sheet's footer is patched in place when a filter changes rather than
+ * rendered again — the option that was tapped has to stay the focused element — and the
+ * count it shows has to keep agreeing with the list behind it.
+ */
+export function programFilterMatches(context: ProgramBrowser, state: AppState): number {
+  const match = programMatcher(state);
+  return context === 'discover'
+    ? state.programs.filter(match).length
+    : state.sheets.map(sheetToProgram).filter(match).length;
+}
+
+export function programMatchLabel(matches: number): string {
+  return `Show ${matches} ${matches === 1 ? 'program' : 'programs'}`;
+}
+
 export function programFilterSheet(state: AppState): string {
   const context = state.programFilterSheet;
   if (!context) return '';
   const filter = programFilterValues(state);
-  const match = programMatcher(state);
-  const matches = context === 'discover'
-    ? state.programs.filter(match).length
-    : state.sheets.map(sheetToProgram).filter(match).length;
-  const noun = matches === 1 ? 'program' : 'programs';
+  const matches = programFilterMatches(context, state);
   return `<div class="program-filter-backdrop" data-program-filter-close="1"></div>
   <div class="program-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="program-filter-title">
     <div class="program-filter-sheet-handle" aria-hidden="true"></div>
@@ -161,7 +173,7 @@ export function programFilterSheet(state: AppState): string {
     </div>
     <div class="program-filter-sheet-footer">
       <button class="button quiet" id="program-filter-reset" type="button">Reset filters</button>
-      <button class="button primary" id="program-filter-apply" type="button">Show ${matches} ${noun}</button>
+      <button class="button primary" id="program-filter-apply" type="button">${programMatchLabel(matches)}</button>
     </div>
   </div>`;
 }

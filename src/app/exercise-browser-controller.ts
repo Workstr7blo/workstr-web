@@ -8,6 +8,10 @@ export interface ExerciseBrowserContext {
   root: HTMLElement;
   state: AppState;
   render(options?: RenderOptions): void;
+  // Writes the grid, the empty line, the selection bar and the open sheet's count, and
+  // leaves everything else - the toolbar, the search field, the images already drawn -
+  // exactly where it is.
+  renderResults(view: ExerciseView): void;
   // Opening a card, importing one, favouriting and deleting are the catalog's work; this
   // module owns which card was clicked, not what happens to it.
   catalog: CatalogController;
@@ -22,10 +26,12 @@ const NO_FACETS = { cat: '', muscle: '', diff: '', equip: '' };
  * is acting on before writing. Writing the wrong one would silently filter the view the
  * user is not looking at.
  *
- * Rebound after every render, like the rest of the shell's bindings, and every handler
- * redraws — so anything that should still hold focus is refocused by selector.
+ * Rebound after every render, like the rest of the shell's bindings. Opening and closing
+ * the sheet is a page render, because the sheet itself appears and disappears; everything
+ * inside it writes the results and patches the sheet in place, so the option that was
+ * tapped is still the focused element afterwards and nothing has to be refocused.
  */
-export function bindExerciseBrowser({ root, state, render, catalog }: ExerciseBrowserContext): void {
+export function bindExerciseBrowser({ root, state, render, renderResults, catalog }: ExerciseBrowserContext): void {
   bindLibraryGrid();
   bindDiscoverGrid();
 
@@ -69,16 +75,13 @@ export function bindExerciseBrowser({ root, state, render, catalog }: ExerciseBr
     const facet = option.dataset.exerciseFilter as ExerciseFacet;
     const value = option.dataset.exerciseFilterValue || '';
     setFacet(view, facet, value);
-    render();
-    // The sheet stays open, so put focus back on the option that was just chosen.
-    root.querySelector<HTMLElement>(`[data-exercise-filter="${facet}"][data-exercise-filter-value="${value}"]`)?.focus();
+    renderResults(view);
   }));
 
   root.querySelector('#exercise-filter-reset')?.addEventListener('click', () => {
     if (!state.exerciseFilterSheet) return;
     clearFacets(state.exerciseFilterSheet);
-    render();
-    root.querySelector<HTMLElement>('#exercise-filter-reset')?.focus();
+    renderResults(state.exerciseFilterSheet);
   });
 
   root.querySelectorAll<HTMLElement>('[data-exercise-filter-remove]').forEach((chip) => chip.addEventListener('click', () => {
@@ -102,7 +105,7 @@ export function bindExerciseBrowser({ root, state, render, catalog }: ExerciseBr
         if (!slug) return;
         if (state.librarySelect.slugs.has(slug)) state.librarySelect.slugs.delete(slug);
         else state.librarySelect.slugs.add(slug);
-        render();
+        renderResults('library');
         return;
       }
       const fav = target.closest<HTMLElement>('[data-fav]');
@@ -117,7 +120,7 @@ export function bindExerciseBrowser({ root, state, render, catalog }: ExerciseBr
       const visible = exerciseResults('library', state).map((exercise) => exercise.slug);
       const allSelected = visible.length > 0 && visible.every((slug) => state.librarySelect.slugs.has(slug));
       state.librarySelect.slugs = allSelected ? new Set() : new Set(visible);
-      render();
+      renderResults('library');
     });
     root.querySelector('#lib-delete-selected')?.addEventListener('click', () => { void catalog.deleteSelectedExercises(); });
   }
@@ -134,7 +137,7 @@ export function bindExerciseBrowser({ root, state, render, catalog }: ExerciseBr
         const address = exercise.nostr_address || exercise.slug;
         if (state.discoverSelect.addresses.has(address)) state.discoverSelect.addresses.delete(address);
         else state.discoverSelect.addresses.add(address);
-        render();
+        renderResults('discover');
         return;
       }
       const importButton = target.closest<HTMLButtonElement>('[data-import-address]');
@@ -148,7 +151,7 @@ export function bindExerciseBrowser({ root, state, render, catalog }: ExerciseBr
       const importable = discoverImportable(visible, state.library).map((exercise) => exercise.nostr_address || exercise.slug);
       const allSelected = importable.length > 0 && importable.every((address) => state.discoverSelect.addresses.has(address));
       state.discoverSelect.addresses = allSelected ? new Set() : new Set(importable);
-      render();
+      renderResults('discover');
     });
     root.querySelector('#discover-import-selected')?.addEventListener('click', () => { void catalog.importSelectedDiscovered(); });
   }

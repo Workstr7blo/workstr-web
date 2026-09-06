@@ -43,6 +43,7 @@ or set updates would make full-root rendering inappropriate.
 | Programs and program builder | `src/app/program-builder.ts`, `src/app/program-publish-controller.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-zap-view.ts`, `src/features/sheets/beast-mode.ts` | `src/db/store.ts`, `src/nostr/programImport.ts`, `src/nostr/program-publish.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/beast-mode.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/program-publish-controller.test.ts`, `tests/program-publish.test.ts`, `tests/nwc-ui.test.ts`, browser verification |
 | Programs/Discover browsing chrome: toolbar, filter chips, filter sheet | `src/features/sheets/program-browser.ts`, `src/app/program-browser-controller.ts` | `src/app/layout.ts`, `src/features/sheets/program-labels.ts` | `tests/program-browser.test.ts`, browser verification |
 | Exercise browsing chrome: toolbar, filter chips, filter sheet, selection bar | `src/app/exercise-browser.ts`, `src/app/exercise-browser-controller.ts` | `src/app/format.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts` | `tests/exercise-browser.test.ts`, `tests/equipment-views.test.ts`, browser verification |
+| Writing a result region when a filter changes it, instead of the page | `src/app/browse-surfaces.ts`, `src/app/program-list-controller.ts` | `src/app/catalog-surfaces.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/app/layout.ts` | `tests/shell.test.ts`, browser verification |
 | Live-session orchestration | `src/app/session-runner.ts` | the applicable controller/view below, `src/features/train/repeat-workout.ts` | `tests/session-runner.test.ts`, `tests/session-logic.test.ts` |
 | Repeat a completed workout | `src/features/train/repeat-workout.ts` | `src/app/session-runner.ts`, `src/features/train/views.ts` | `tests/repeat-workout.test.ts`, `tests/session-runner.test.ts` |
 | History release regressions (scale, JSON round trip, neighbouring features) | `tests/history-qa.test.ts` | `docs/RELEASE-QA.md` | `tests/history-qa.test.ts` |
@@ -113,6 +114,16 @@ or set updates would make full-root rendering inappropriate.
   place that can say how many a cold start costs and what asked for each one. The count is
   on the shell handle as `renders`; the reasons reach a dev console and are stripped from a
   production build.
+- `src/app/browse-surfaces.ts` writes the surfaces a filter changes and nothing else: the
+  Library grid and its empty line, the Discover grid, a program list, the selection bar's
+  labels and counts, and the open filter sheet's option states and match count. The sheets
+  and the bar are patched rather than rendered again, so the control that was tapped is
+  still the focused element afterwards - which is why no handler restores focus any more.
+- `src/app/program-list-controller.ts` owns the two program lists: every action a program
+  card offers, and writing a list when a filter changes what belongs in it. Card bindings
+  are scoped rather than delegated, so a freshly written list binds its own cards without
+  doubling a listener on one that was already there; the exercise grids delegate instead,
+  because they carry one action per card and these carry nine.
 - `src/app/settings-disclosure.ts` carries the expanded Settings categories across a
   rebuild. Which `<details data-settings-section>` are open is held in the DOM alone, so a
   rebuild collapsed the card being read; it reopens what the reader had open and never

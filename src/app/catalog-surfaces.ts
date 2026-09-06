@@ -39,10 +39,10 @@ export function updateDiscoverExercises(root: ParentNode, state: AppState): bool
   return true;
 }
 
-// Program cards bind their own handlers - expanding, starting, importing - so the list is
-// not written into the way the exercise grid is. Until the shell stops rebuilding for a
-// page render (#178), the honest choice is to render when this surface is on screen and
-// not to render at all when it is not.
+// Whether any program card is on screen. A catalog answer writes the lists through
+// `src/app/program-list-controller.ts`, which binds the cards it wrote; a reader with no
+// program card in front of them gets nothing written at all, and the next render of that
+// page reads the state that was kept.
 export function programSurfaceMounted(root: ParentNode): boolean {
   return Boolean(root.querySelector('.program-list'));
 }
