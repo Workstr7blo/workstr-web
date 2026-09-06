@@ -142,7 +142,11 @@ body {
 .nav-bottom { margin-top: auto; }
 
 /* Content */
-.content { position: fixed; top: var(--topbar-h); left: var(--sidebar-w); right: 0; bottom: 0; z-index: 1; overflow-y: auto; padding: clamp(18px, 3vw, 32px); padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
+/* `overflow-x: hidden` is a guard, not the fix: a decoration that overhangs its own card
+   must be contained by that card. It is here so one such escape cannot turn the whole app
+   into a horizontal pan area again. Children that scroll sideways on purpose, `.sub-tabs`
+   among them, are their own scroll containers and are unaffected. */
+.content { position: fixed; top: var(--topbar-h); left: var(--sidebar-w); right: 0; bottom: 0; z-index: 1; overflow-y: auto; overflow-x: hidden; padding: clamp(18px, 3vw, 32px); padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
 .page { display: none; max-width: 1080px; margin: 0 auto; }
 .page.active { display: block; }
 .page-title { font-size: clamp(28px, 4vw, 40px); line-height: 1; letter-spacing: -.05em; font-weight: 800; margin: 4px 0 18px; }

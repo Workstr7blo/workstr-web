@@ -173,6 +173,12 @@
 .pairing-video { display: block; width: 100%; max-width: 320px; aspect-ratio: 1; margin: 16px auto 0; border-radius: 12px; background: #000; object-fit: cover; }
 .support-panel {
   padding: 24px;
+  /* The glow below is absolutely positioned and overhangs this panel on purpose. Without a
+     containing block here it resolved against `.content` - which is fixed, so it is the
+     nearest positioned ancestor - and its `right: -12%` became 12% of the whole pane,
+     hanging 47px past the right edge of a phone screen and giving Settings a horizontal
+     pan area. `overflow: hidden` below never applied to it for the same reason. */
+  position: relative;
   overflow: hidden;
   border-color: rgba(var(--accent-rgb), .34);
   background:
