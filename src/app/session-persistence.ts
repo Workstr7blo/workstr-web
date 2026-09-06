@@ -34,6 +34,13 @@ export function createSessionPersistence(state: AppState) {
     if (!state.store) return null;
     const session = (await state.store.listSessions()).find((item) => !item.finished_at);
     if (!session?.id) return null;
+    // Re-reading the store under a running session — an encrypted-sync restore, a namespace
+    // load — must not swap the object out from under it. The runner, the open overlay and
+    // every control bound to them hold the live one, and the shell no longer rebuilds during
+    // a session, so a replacement would leave the screen painted from one object while taps
+    // wrote to another. Same row means keep what is live; a different session, or none,
+    // replaces it exactly as before.
+    if (state.activeSession?.id === Number(session.id)) return state.activeSession;
     return fromStored(session, await state.store.listSessionSets(session.id));
   }
 

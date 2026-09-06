@@ -2,7 +2,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { launchSignerUri, renderShell } from '../src/app/shell';
 import { shellMarkup } from '../src/app/layout';
+import type { ShellHandle } from '../src/app/shell-types';
 import type { AppState } from '../src/app/state';
+import { LOCAL_NAMESPACE } from '../src/db/adopt';
+import { WorkstrStore } from '../src/db/store';
 import { clearLocalSecret, LEGACY_LOCAL_KEY_STORAGE, loadLocalSecret } from '../src/signer/local-key-storage';
 
 // Boot and settings-view rendering kick off background relay fetches unrelated to this file's
@@ -27,11 +30,68 @@ vi.mock('../src/nostr/profile', async (importOriginal) => ({
   fetchProfile: vi.fn(async () => null)
 }));
 
+// `renderShell` boots asynchronously and starts work it does not await. Left running, that
+// chain reaches `render()` after vitest has torn the file's jsdom down, which fails the run
+// at random with `document is not defined` on whichever file was unlucky. Every test that
+// boots a shell drains it before returning: `ready` for the boot chain, one macrotask for
+// the `void`ed continuations hanging off it.
+async function drainBoot(shell: ShellHandle): Promise<void> {
+  await shell.ready;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+// fake-indexeddb resolves on its own timers, and the live session opens across several of
+// them, so the session tests wait on the condition rather than on a fixed sleep.
+async function waitFor(condition: () => boolean, label: string): Promise<void> {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
+    if (condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`timed out waiting for ${label}`);
+}
+
+// Two exercises, one set each, so logging a set starts a rest that auto-advances to the
+// next one. Saved before boot because `renderShell` reads the programs it finds.
+async function startGuardSession(name: string): Promise<{ root: HTMLElement; shell: ShellHandle; cleanup: () => Promise<void> }> {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.getElementById('app') as HTMLElement;
+  const store = await WorkstrStore.open(LOCAL_NAMESPACE);
+  await store.saveSheet({
+    name,
+    exercises: [
+      { position: 0, exercise_slug: 'bench-press', exercise_name: 'Bench Press', sets: 1, reps: '8', rest: 60 },
+      { position: 1, exercise_slug: 'barbell-row', exercise_name: 'Barbell Row', sets: 1, reps: '8', rest: 60 }
+    ]
+  });
+  store.close();
+  const shell = renderShell(root, { skipCatalogRefresh: true });
+  await shell.ready;
+  root.querySelector<HTMLElement>('[data-view="workouts"]')?.click();
+  const sheetId = Number(shell.state.sheets.find((sheet) => sheet.name === name)?.id);
+  const address = `local:${sheetId}`;
+  root.querySelector<HTMLElement>(`[data-toggle-program="${address}"]`)?.click();
+  root.querySelector<HTMLElement>(`[data-start-program="${address}"]`)?.click();
+  await waitFor(() => !!root.querySelector('[data-session-reps="0"]'), 'the live session overlay to open');
+  return { root, shell, cleanup: () => endSession(root, shell, sheetId) };
+}
+
+// fake-indexeddb is global per file, so the fixture is removed rather than left for the
+// tests that follow. Ending the session also stops the elapsed and rest intervals, which
+// would otherwise tick into the next test's jsdom.
+async function endSession(root: HTMLElement, shell: ShellHandle, sheetId: number): Promise<void> {
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  root.querySelector<HTMLElement>('#session-close')?.click();
+  await waitFor(() => !root.querySelector('#session-overlay')?.classList.contains('open'), 'the session overlay to close');
+  confirm.mockRestore();
+  await shell.state.store?.deleteSheet(sheetId);
+  await drainBoot(shell);
+}
+
 describe('shell', () => {
-  it('renders the app chrome and all views without a signer', () => {
+  it('renders the app chrome and all views without a signer', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
-    renderShell(root);
+    const shell = renderShell(root);
     expect(root.querySelector('.sidebar')).toBeTruthy();
     expect(root.querySelector('#page-exercises')).toBeTruthy();
     expect(root.querySelector('#sub-exercises-library')).toBeTruthy();
@@ -69,6 +129,7 @@ describe('shell', () => {
     expect(settings?.textContent).toContain('Manual backup');
     expect(settings?.textContent).toContain('0 selected');
     expect(settings?.querySelector('.beast-mode-card [data-beast-mode-state="locked"]')).toBeTruthy();
+    await drainBoot(shell);
   });
 
   it('swaps the wallet card for the Monero payment address when the rail changes', async () => {
@@ -114,10 +175,89 @@ describe('shell', () => {
     expect(root.querySelector('#open-nwc-zap')).toBeTruthy();
   });
 
-  it('opens a single tabbed account modal from the signed-out chip', () => {
+  // A live session keeps state nothing but the DOM has: the reps and load typed into the
+  // current set, and a running rest countdown. Background work used to rebuild the whole
+  // shell under it - `boot()` awaits a catalog refresh, and the PWA relaunches on a fresh
+  // boot, so reopening the app mid-workout put that rebuild inside the same two seconds as
+  // the user's first tap. These two cover the rebuild staying away and the session surviving.
+  it('keeps reps and load typed into a live set through a background render', async () => {
+    const { root, shell, cleanup } = await startGuardSession('Typed Set Guard');
+    const reps = root.querySelector<HTMLInputElement>('[data-session-reps="0"]')!;
+    const load = root.querySelector<HTMLInputElement>('[data-session-weight="0"]')!;
+    reps.value = '11';
+    load.value = '62.5';
+
+    // Changing the workouts sub-tab refreshes the program catalog, and the status line that
+    // refresh paints sits in a panel that is already mounted behind the overlay.
+    root.querySelector<HTMLElement>('[data-parent="workouts"][data-subtab="discover"]')?.click();
+    await waitFor(() => shell.state.programStatus.startsWith('loaded'), 'the program catalog refresh');
+
+    expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(true);
+    expect(root.querySelector('[data-session-reps="0"]')).toBe(reps);
+    expect(reps.value).toBe('11');
+    expect(load.value).toBe('62.5');
+    expect(root.querySelector('#program-status')?.textContent).toContain('loaded 0 Workstr and creator programs');
+
+    root.querySelector<HTMLElement>('[data-session-log="bench-press"]')?.click();
+    await waitFor(() => (shell.state.activeSession?.sets.length ?? 0) > 0, 'the set to be logged');
+    expect(shell.state.activeSession?.sets[0]).toMatchObject({ exerciseSlug: 'bench-press', reps: 11, weight: 62.5 });
+
+    await cleanup();
+  });
+
+  it('keeps a running rest countdown through a background render', async () => {
+    const { root, shell, cleanup } = await startGuardSession('Rest Guard');
+    const now = vi.spyOn(Date, 'now');
+    const started = Date.now();
+    now.mockReturnValue(started);
+    try {
+      root.querySelector<HTMLElement>('[data-session-log="bench-press"]')?.click();
+      await waitFor(() => !!root.querySelector('#session-rest-overlay')?.classList.contains('show'), 'the rest overlay');
+      expect(root.querySelector('#session-rest-val')?.textContent).toBe('60');
+
+      // Returning to the app reconciles the countdown against the clock, so what follows is
+      // a real position rather than the number the markup ships with.
+      now.mockReturnValue(started + 20_000);
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(root.querySelector('#session-rest-val')?.textContent).toBe('40');
+
+      shell.state.exerciseStatus = '';
+      root.querySelector<HTMLElement>('[data-view="exercises"]')?.click();
+      await waitFor(() => shell.state.exerciseStatus.startsWith('loaded'), 'the exercise catalog refresh');
+
+      expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(true);
+      expect(root.querySelector('#session-rest-val')?.textContent).toBe('40');
+
+      // Still the same timer underneath: the adjust buttons move it, and running it out
+      // still auto-advances to the exercise the rest was resting for.
+      root.querySelector<HTMLElement>('[data-rest-adjust="-15"]')?.click();
+      expect(root.querySelector('#session-rest-val')?.textContent).toBe('25');
+      now.mockReturnValue(started + 46_000);
+      document.dispatchEvent(new Event('visibilitychange'));
+      await waitFor(() => root.querySelector('#session-meta')?.textContent?.includes('Exercise 2/2') === true, 'the auto-advance');
+      expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(false);
+      expect(root.querySelector('#session-body')?.textContent).toContain('Barbell Row');
+
+      root.querySelector<HTMLElement>('[data-session-log="barbell-row"]')?.click();
+      await waitFor(() => !!root.querySelector('#session-rest-overlay')?.classList.contains('show'), 'the second rest overlay');
+      shell.state.exerciseStatus = '';
+      root.querySelector<HTMLElement>('[data-view="workouts"]')?.click();
+      root.querySelector<HTMLElement>('[data-view="exercises"]')?.click();
+      await waitFor(() => shell.state.exerciseStatus.startsWith('loaded'), 'the second exercise catalog refresh');
+      expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(true);
+      root.querySelector<HTMLElement>('#rest-skip')?.click();
+      expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(false);
+    } finally {
+      now.mockRestore();
+    }
+
+    await cleanup();
+  });
+
+  it('opens a single tabbed account modal from the signed-out chip', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
-    renderShell(root);
+    const shell = renderShell(root);
 
     root.querySelector<HTMLElement>('#account-chip')?.click();
     const modal = root.querySelector('#modal.open') as HTMLElement;
@@ -134,6 +274,7 @@ describe('shell', () => {
     expect(createModal.querySelector('#auth-tab-create[aria-selected="true"]')).toBeTruthy();
     expect(createModal.querySelector('#create-local-account')).toBeTruthy();
     expect(createModal.querySelector('#restore-local-account')).toBeNull();
+    await drainBoot(shell);
   });
 
   // The account pill carries two independent states — is this identity connected, and which
@@ -349,10 +490,11 @@ describe('boot migrates a pre-encryption recovery key', () => {
     localStorage.setItem(LEGACY_LOCAL_KEY_STORAGE, secret);
 
     document.body.innerHTML = '<div id="app"></div>';
-    renderShell(document.getElementById('app') as HTMLElement, { skipCatalogRefresh: true });
+    const shell = renderShell(document.getElementById('app') as HTMLElement, { skipCatalogRefresh: true });
 
     await vi.waitFor(() => expect(localStorage.getItem(LEGACY_LOCAL_KEY_STORAGE)).toBeNull());
     expect(await loadLocalSecret()).toBe(secret);
     await clearLocalSecret();
+    await drainBoot(shell);
   });
 });
