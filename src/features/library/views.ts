@@ -2,6 +2,7 @@ import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
 import { difficultyBadgeClass, EX_PLACEHOLDER, exerciseSourceLabel, html } from '../../app/format';
 import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults, exerciseToolbar } from '../../app/exercise-browser';
+import { responsiveImageUrl } from '../../core/media';
 
 export function libraryPanel(state: AppState): string {
   const list = exerciseResults('library', state);
@@ -20,7 +21,7 @@ export function libraryPanel(state: AppState): string {
 
 export function exerciseCardHtml(exercise: Exercise, selecting = false, selected = false): string {
   const src = exercise.image_url || '';
-  const img = `${EX_PLACEHOLDER}${src ? `<img class="card-photo" src="${html(src)}" alt="" loading="lazy" onerror="this.remove()">` : ''}`;
+  const img = `${EX_PLACEHOLDER}${src ? `<img class="card-photo" src="${html(responsiveImageUrl(src, 360))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}`;
   const source = exerciseSourceLabel(exercise);
   const sourceCls = source === 'ai' ? 'badge-ai' : source === 'Workstr' ? 'badge-nostr' : 'badge-manual';
   return `
