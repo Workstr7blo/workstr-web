@@ -50,8 +50,10 @@ export function createMoneroTipController(ctx: MoneroTipControllerContext) {
     });
   }
 
-  function bind(): void {
-    root.querySelectorAll<HTMLElement>('[data-monero-tip]').forEach((button) => button.addEventListener('click', (event) => {
+  // Scoped so a program list rewritten by a filter can rebind its own cards without the
+  // page around them being rendered.
+  function bind(scope: ParentNode = root): void {
+    scope.querySelectorAll<HTMLElement>('[data-monero-tip]').forEach((button) => button.addEventListener('click', (event) => {
       // The card header toggles on click, and the tip action is inside it.
       event.stopPropagation();
       show(button.dataset.moneroTip || '');

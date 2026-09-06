@@ -127,6 +127,9 @@ function harness(overrides: Partial<AppState> = {}, callbacks: { refreshProgramZ
   const render = () => {
     root.innerHTML = shellMarkup(appState);
     controller?.bind();
+    // The shell binds a card's zap action with the rest of that card's actions, and again
+    // on its own when a filter rewrites a program list. The harness stands in for both.
+    controller?.bindProgramCards(root);
   };
   const openModal = (content: string) => {
     const modal = root.querySelector('#modal') as HTMLElement;
