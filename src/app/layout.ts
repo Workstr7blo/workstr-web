@@ -30,7 +30,19 @@ const navItems: Array<{ view: View; label: string; icon: string }> = [
   { view: 'settings', label: 'Settings', icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>' }
 ];
 
+// The whole app as one string: the frame with the current page already written into it.
+// The running app mounts the frame once and writes pages into its host, so this is what the
+// two produce together, and it is what the string-level view tests assert against.
 export function shellMarkup(state: AppState): string {
+  return shellFrame(state, appView(state), pageOverlays(state));
+}
+
+// Everything that outlives a page: the topbar, the navigation, the scroll pane, the live
+// session overlay, the modal host and the toast. Mounted once. A page change writes into
+// `#page-host` and `#page-overlays` and leaves the rest of this standing, which is what
+// stops an avatar, a photo or an open modal being thrown away for a state change that had
+// nothing to do with them.
+export function shellFrame(state: AppState, page = '', overlays = ''): string {
   return `
     <div class="noise"></div>
     <div class="cyber-grid"></div>
@@ -52,16 +64,21 @@ export function shellMarkup(state: AppState): string {
       </div>
     </nav>
     <main class="content">
-      ${appView(state)}
+      <div id="page-host">${page}</div>
     </main>
+    <div id="page-overlays">${overlays}</div>
     ${sessionOverlayMarkup(state)}
-    ${programFilterSheet(state)}
-    ${exerciseFilterSheet(state)}
-    ${exerciseSelectionBar(state)}
     <div id="modal" class="modal"><div class="modal-card"><button id="modal-close" class="modal-close" type="button">×</button><div id="modal-content"></div></div></div>
     <div id="toast"></div>`;
 }
 
+
+// Sheets and the selection bar belong to the browsing pages that open them, so they are
+// written with the page rather than with the frame. They stay outside `.content` because
+// they are fixed-position and the pane they would otherwise sit in scrolls.
+export function pageOverlays(state: AppState): string {
+  return `${programFilterSheet(state)}${exerciseFilterSheet(state)}${exerciseSelectionBar(state)}`;
+}
 
 function sessionOverlayMarkup(state: AppState): string {
   return `<div id="session-overlay" class="session-overlay ${state.activeSession ? 'open' : ''}">
@@ -88,7 +105,18 @@ function sessionOverlayMarkup(state: AppState): string {
   </div>`;
 }
 
-function appView(state: AppState): string {
+// The active item is a class, not a different navigation, so it is patched. Scoped to the
+// sidebar: a page can carry a `[data-view]` button of its own - Statistics offers "Go to
+// Workouts" - and those are links, not navigation state.
+export function updateNavigation(root: ParentNode, state: AppState): void {
+  root.querySelectorAll<HTMLElement>('.sidebar [data-view]').forEach((item) => {
+    item.classList.toggle('active', item.dataset.view === state.view);
+  });
+}
+
+// The current page. Everything on it is rebuilt from state, which is why replacing it
+// wholesale is right where replacing the frame was not.
+export function appView(state: AppState): string {
   if (state.view === 'workouts') return workoutsView(state);
   if (state.view === 'statistics') return statisticsView(state);
   if (state.view === 'settings') return settingsView(state);

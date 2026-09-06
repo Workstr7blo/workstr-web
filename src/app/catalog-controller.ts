@@ -24,6 +24,8 @@ export interface CatalogControllerContext {
   fetchProfile(pubkey: string, relays?: string[]): Promise<RelayProfile | null>;
 }
 
+export type CatalogController = ReturnType<typeof createCatalogController>;
+
 export function createCatalogController(ctx: CatalogControllerContext) {
   const { root, state, render, toast, openModal, closeModal, fetchProfile } = ctx;
 

@@ -36,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Workstr is built once and stays built. Moving between pages, or anything finishing in the
+  background, used to throw away and rewrite the entire app - the header, your avatar, the
+  navigation, every photo on screen and any dialog you had open - and draw it again from
+  scratch. Now only the page itself is replaced, and the frame around it stands still. In
+  practice: the avatar and the navigation stop flickering, photos are not re-fetched and
+  redrawn when something unrelated updates, an open dialog is no longer at risk of being
+  wiped out by a background update, and the first half-minute after opening the app is calm
+  rather than restless.
+
 - The Workstr catalog loading in the background no longer redraws the page you are on. It
   refreshes on every launch and reports twice - once to say it is loading, once with the
   answer - and both used to rebuild the whole app for exercise cards the page in front of

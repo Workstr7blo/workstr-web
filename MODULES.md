@@ -8,7 +8,7 @@ describes the current repository, not future roadmap modules.
 ```text
 src/main.ts
   -> app/shell.ts          boot, state, handlers, persistence coordination
-  -> app/layout.ts         top-level page and session-overlay markup
+  -> app/layout.ts         persistent frame, page markup, session-overlay markup
   -> app/session-runner.ts live-session coordinator
   -> features/*            feature calculations and view markup
   -> db/store.ts           IndexedDB operations
@@ -35,7 +35,7 @@ or set updates would make full-root rendering inappropriate.
 | Stored/live session adaptation | `src/app/session-persistence.ts` | `src/db/store.ts`, `src/app/state.ts` | `tests/session-runner.test.ts`, `tests/store.test.ts` |
 | Catalog surfaces: what a relay answer is written into, and when nothing is | `src/app/catalog-surfaces.ts` | `src/app/catalog-controller.ts`, `src/app/root-rebuild.ts`, `src/features/discover/views.ts` (`discoverGrid`) | `tests/shell.test.ts`, `tests/discover.test.ts`, `tests/root-rebuild.test.ts` |
 | The account chip and the Settings Account identity | `src/app/account-chip.ts` | `src/app/layout.ts`, `src/app/shell.ts` (profile hydration) | `tests/account-chip.test.ts`, `tests/shell.test.ts` |
-| Top-level navigation and page markup | `src/app/layout.ts` | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
+| The persistent frame, top-level navigation and page markup | `src/app/layout.ts` (`shellFrame`, `appView`, `pageOverlays`, `updateNavigation`) | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
 | Redrawing the root: when it is held back, what made it happen, and keeping the reader's place | `src/app/root-rebuild.ts`, `src/app/scroll.ts`, `src/app/settings-disclosure.ts` | `src/app/shell.ts` (`render`), `src/app/session-runner.ts` (`closeSessionOverlay`), the `.content` pane in `src/app/layout.ts` | `tests/root-rebuild.test.ts`, `tests/scroll.test.ts`, `tests/shell.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Responsive image delivery for exercise photos | `src/core/media.ts` | `src/features/train/session-hero.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/features/sheets/builder-views.ts`, `src/app/catalog-controller.ts` | `tests/media.test.ts`, `tests/session-runner.test.ts` |
@@ -94,10 +94,18 @@ or set updates would make full-root rendering inappropriate.
 
 ### App composition
 
-- `src/app/shell.ts` initializes state and namespaces, renders the root, binds global
-  navigation, and composes focused controllers. Feature-specific workflows live behind
-  controller interfaces and the shell is below the 400-line target.
-- `src/app/root-rebuild.ts` owns the one way the shell's root is redrawn: held back
+- `src/app/shell.ts` initializes state and namespaces, mounts the shell, renders pages,
+  binds global navigation, and composes focused controllers. Feature-specific workflows
+  live behind controller interfaces and the shell is below the 400-line target. Boot calls
+  `mount()` once - it writes the frame from `shellFrame` and binds the frame's own
+  listeners in `bindFrame()`, which is why clicking a nav item after twenty renders still
+  fires one handler. Every render after that is a page render: `#page-host` gets
+  `appView(state)`, `#page-overlays` gets the sheets belonging to that page, page controls
+  are rebound, and the navigation and account chip are patched rather than rebuilt. The
+  topbar, avatar, `.content` pane, session overlay, modal host and toast are never touched
+  by a render.
+- `src/app/root-rebuild.ts` owns the one way a page is redrawn - the frame around it is
+  mounted once and is not part of this - held back
   entirely while the live-session overlay is open, because the current set's typed reps and
   load and a running rest countdown live only in the DOM, and scroll-preserving through
   `src/app/scroll.ts` otherwise. The session runner renders once the overlay closes. It also
