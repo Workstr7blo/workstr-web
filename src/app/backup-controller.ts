@@ -1,3 +1,4 @@
+import type { RenderOptions } from './root-rebuild';
 import type { AppState } from './state';
 import type { Signer } from '../signer/types';
 import { backupPanelState, updateBackupStatus } from '../features/backup/views';
@@ -13,7 +14,7 @@ export interface BackupControllerContext {
   // it lives in. The other controllers take the same handle.
   root: ParentNode;
   state: AppState;
-  render(): void;
+  render(options?: RenderOptions): void;
   toast(message: string, kind?: 'ok' | 'bad'): void;
   getSigner(): Promise<Signer | null>;
   // Drops the cached signer so the next pass builds a fresh connection to it.
@@ -63,7 +64,7 @@ export function createBackupController(ctx: BackupControllerContext): BackupCont
     const store = ctx.state.store;
     if (!store) return;
     ctx.state.settings.backup = await store.saveBackupState({ enabled: true });
-    ctx.render();
+    ctx.render({ reason: 'sync-enabled' });
     await engineFor()?.start();
   }
 
@@ -88,14 +89,14 @@ export function createBackupController(ctx: BackupControllerContext): BackupCont
         engine?.stop();
         engine = null;
         if (store) ctx.state.settings.backup = await store.saveBackupState({ enabled: false });
-        ctx.render();
+        ctx.render({ reason: 'sync-disabled' });
         return;
       }
       // The one unavoidable step: records are encrypted to the user's own key and signed
       // by it, so there is nothing to back up to until there is an identity.
       if (!ctx.state.pubkey) {
         localStorage.setItem(INTENT_KEY, '1');
-        ctx.render();
+        ctx.render({ reason: 'sync-needs-sign-in' });
         ctx.toast('Sign in to turn on sync.');
         ctx.requestSignIn();
         return;
