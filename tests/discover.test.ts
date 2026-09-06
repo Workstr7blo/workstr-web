@@ -89,10 +89,13 @@ describe('Discover author payment targets', () => {
       querySelectorAll: () => []
     } as unknown as HTMLElement;
     const render = vi.fn();
+    // Program cards are written into their lists rather than rendered with the page, so
+    // "the answer reached the surface" is this call, not a render.
+    const renderProgramLists = vi.fn();
     const controller = createCatalogController({
-      root, state, render, toast: vi.fn(), openModal: vi.fn(), closeModal: vi.fn(), fetchProfile: vi.fn()
+      root, state, render, toast: vi.fn(), openModal: vi.fn(), closeModal: vi.fn(), fetchProfile: vi.fn(), renderProgramLists
     });
-    return { state, render, controller };
+    return { state, render, renderProgramLists, controller };
   }
 
   it('asks nothing on the Lightning rail, where no card would use the answer', async () => {
@@ -115,7 +118,8 @@ describe('Discover author payment targets', () => {
     expect(fetchAuthorMoneroPaymentTargetsMock).toHaveBeenCalledTimes(1);
     expect(fetchAuthorMoneroPaymentTargetsMock.mock.calls[0][0]).toEqual([AUTHOR, OTHER]);
     expect(app.state.authorPaymentTargets).toEqual({ [AUTHOR]: ADDRESS, [OTHER]: null });
-    expect(app.render).toHaveBeenCalled();
+    expect(app.renderProgramLists).toHaveBeenCalled();
+    expect(app.render).not.toHaveBeenCalled();
 
     // A known absence is an answer, so a rerender or a refresh does not ask again.
     await app.controller.refreshAuthorPaymentTargets();
@@ -133,6 +137,7 @@ describe('Discover author payment targets', () => {
     await app.controller.refreshAuthorPaymentTargets();
 
     expect(app.state.authorPaymentTargets).toEqual({ [AUTHOR]: ADDRESS });
+    expect(app.renderProgramLists).not.toHaveBeenCalled();
     expect(app.render).not.toHaveBeenCalled();
   });
 

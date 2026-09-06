@@ -19,7 +19,9 @@ import { accountIdentity, updateAccountIdentity } from './account-chip';
 import { appView, pageOverlays, shellFrame, updateNavigation } from './layout';
 import { bindProgramBrowser } from './program-browser-controller';
 import { bindExerciseBrowser } from './exercise-browser-controller';
-import { exerciseResults } from './exercise-browser';
+import { renderExerciseResults, updateExerciseFilterSheet } from './browse-surfaces';
+import { createProgramList } from './program-list-controller';
+import { exerciseResults, type ExerciseView } from './exercise-browser';
 import { createSessionRunner } from './session-runner';
 import { paintBodyMapSvg } from './bodymap';
 import { createRenderTrace, rebuildRoot, type RenderOptions } from './root-rebuild';
@@ -183,6 +185,11 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   // Bound once, to elements a page render does not replace. Navigation is delegated from
   // the root because a page can carry a jump of its own - Statistics offers "Go to
   // Workouts", an empty library offers "Browse Discover" - and those buttons come and go.
+  function renderResults(view: ExerciseView): void {
+    renderExerciseResults(root, state, view);
+    updateExerciseFilterSheet(root, state);
+  }
+
   function bindFrame(): void {
     root.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
@@ -235,51 +242,19 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     root.querySelector('#import-file')?.addEventListener('change', (event) => { void preferences.importUserData(event.target as HTMLInputElement); });
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void catalog.refreshExercises(); }));
     root.querySelectorAll('#refresh-programs').forEach((button) => button.addEventListener('click', () => { void catalog.refreshPrograms(); }));
-    root.querySelector('#ex-search')?.addEventListener('input', (event) => { state.filter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#ex-search'); input?.focus(); input?.setSelectionRange(state.filter.length, state.filter.length); });
-    bindExerciseBrowser({ root, state, render, catalog });
+    // Typing redraws the results, not the application. The input is never touched, so there
+    // is no caret to restore afterwards - the hack that used to do it hid bugs in both the
+    // typing and the deleting direction.
+    root.querySelector('#ex-search')?.addEventListener('input', (event) => { state.filter = (event.target as HTMLInputElement).value; renderExerciseResults(root, state, 'library'); });
+    bindExerciseBrowser({ root, state, render, renderResults, catalog });
     root.querySelector('#discover-refresh')?.addEventListener('click', () => { void catalog.refreshExercises(); });
     root.querySelector('#program-discover-refresh')?.addEventListener('click', () => { void catalog.refreshPrograms(); });
-    root.querySelector('#discover-search')?.addEventListener('input', (event) => { state.discoverFilter.q = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#discover-search'); input?.focus(); input?.setSelectionRange(state.discoverFilter.q.length, state.discoverFilter.q.length); });
-    root.querySelector('#program-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#program-filter'); input?.focus(); input?.setSelectionRange(state.programFilter.length, state.programFilter.length); });
-    root.querySelector('#program-discover-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; render(); const input = root.querySelector<HTMLInputElement>('#program-discover-filter'); input?.focus(); input?.setSelectionRange(state.programFilter.length, state.programFilter.length); });
-    bindProgramBrowser({ root, state, render });
-    root.querySelectorAll<HTMLElement>('[data-toggle-program]').forEach((header) => header.addEventListener('click', () => {
-      const address = header.dataset.toggleProgram || null;
-      state.expandedProgramAddress = state.expandedProgramAddress === address ? null : address;
-      render();
-    }));
-    root.querySelectorAll<HTMLElement>('[data-toggle-exitem]').forEach((header) => header.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const key = header.dataset.toggleExitem;
-      const item = key ? root.querySelector<HTMLElement>(`[data-exitem="${CSS.escape(key)}"]`) : null;
-      item?.classList.toggle('open');
-    }));
-    root.querySelectorAll<HTMLElement>('[data-start-program]').forEach((button) => button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const address = button.dataset.startProgram;
-      const program = state.sheets.map(sheetToProgram).find((item) => item.address === address);
-      if (program) void sessionRunner.startTrainingSession(program);
-    }));
-    root.querySelectorAll<HTMLElement>('[data-import-program]').forEach((button) => button.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      const program = state.programs.find((item) => item.address === button.dataset.importProgram);
-      if (program) await catalog.importProgram(program, button as HTMLButtonElement);
-    }));
-    programPublish.bind();
+    root.querySelector('#discover-search')?.addEventListener('input', (event) => { state.discoverFilter.q = (event.target as HTMLInputElement).value; renderExerciseResults(root, state, 'discover'); });
+    root.querySelector('#program-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; programList.renderList('programs'); });
+    root.querySelector('#program-discover-filter')?.addEventListener('input', (event) => { state.programFilter = (event.target as HTMLInputElement).value; programList.renderList('discover'); });
+    bindProgramBrowser({ root, state, render, renderResults: programList.renderList });
+    programList.bindCards(root);
     root.querySelector('#new-program')?.addEventListener('click', () => { void programBuilder.open(); });
-    root.querySelectorAll<HTMLElement>('[data-edit-sheet]').forEach((button) => button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const sheet = state.sheets.find((item) => item.id === Number(button.dataset.editSheet));
-      if (sheet) void programBuilder.open(sheet);
-    }));
-    root.querySelectorAll<HTMLElement>('[data-del-sheet]').forEach((button) => button.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      if (!state.store || !window.confirm('Delete this program?')) return;
-      await state.store.deleteSheet(Number(button.dataset.delSheet) || 0);
-      state.sheets = await state.store.listSheets();
-      render();
-      toast('Program deleted');
-    }));
     root.querySelectorAll<HTMLElement>('[data-delete-session]').forEach((button) => button.addEventListener('click', () => { void preferences.deleteSession(Number(button.dataset.deleteSession)); }));
     root.querySelectorAll<HTMLElement>('[data-repeat-session]').forEach((button) => button.addEventListener('click', () => {
       const source = state.finishedSessions.find((item) => item.id === Number(button.dataset.repeatSession));
@@ -294,7 +269,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       state.expandedSessionId = state.expandedSessionId === id ? null : id;
       render();
     }));
-    bindHistoryCalendar(); nwc.bind(); moneroAddress.bind(); moneroTip.bind();
+    bindHistoryCalendar(); nwc.bind(); moneroAddress.bind();
     preferences.bindRecoveryControls();
     preferences.bindBodyControls();
   }
@@ -338,7 +313,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
 
   createUpdateController({ root, state, toast });
   const programBuilder = createProgramBuilder({ root, state, render, openModal, closeModal, toast });
-  const catalog = createCatalogController({ root, state, render, toast, openModal, closeModal, fetchProfile });
+  const catalog = createCatalogController({ root, state, render, toast, openModal, closeModal, fetchProfile, renderProgramLists: () => programList.renderMounted() });
   const sessionPersistence = createSessionPersistence(state);
   const identity = createIdentityController({ root, state, render, openModal, closeModal, openLocal, openIdentity });
   const programPublish = createProgramPublishController({ root, state, render, toast, openModal, getSigner: options.programPublish?.getSigner || identity.getActiveSigner, publishCreatorProgram: options.programPublish?.publishCreatorProgram, programPublishRelays: options.programPublish?.programPublishRelays });
@@ -351,6 +326,15 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const nwc = createNwcController({ root, state, render, toast, openModal, closeModal, getSigner: identity.getActiveSigner, refreshFunding: preferences.refreshFunding, refreshProgramZapTotals: catalog.refreshProgramZapTotals });
   const moneroAddress = createMoneroAddressController({ root, state, toast, getSigner: identity.getActiveSigner });
   const moneroTip = createMoneroTipController({ root, state, toast, openModal });
+  const programList = createProgramList({
+    root, state, render, toast,
+    startTraining: (program) => { void sessionRunner.startTrainingSession(program); },
+    importProgram: (program, button) => catalog.importProgram(program, button),
+    openBuilder: (sheet) => { void programBuilder.open(sheet); },
+    bindPublish: programPublish.bind,
+    bindTip: moneroTip.bind,
+    bindZap: nwc.bindProgramCards
+  });
   const backup = createBackupController({ root, state, render, toast, getSigner: identity.getActiveSigner, onSignerStalled: identity.dropActiveSigner, onRestored: () => { void refreshFromStore(); }, requestSignIn: () => { identity.startAccountChoice(); } });
 
   function unitLabel(): string { return normalizeWeightUnit(state.settings.unit); }

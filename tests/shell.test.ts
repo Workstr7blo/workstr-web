@@ -100,6 +100,15 @@ function catalogExercise(slug: string): Exercise {
   };
 }
 
+// fake-indexeddb is global per file, so a test that seeds the library clears it again for
+// the tests that follow.
+async function cleanupExercises(shell: ShellHandle): Promise<void> {
+  for (const exercise of await (shell.state.store?.listExercises() ?? [])) {
+    await shell.state.store?.deleteExercise(Number(exercise.id));
+  }
+  await drainBoot(shell);
+}
+
 describe('shell', () => {
   // The baseline for #178. Every increment of that issue removes callers from the render
   // path, and the only way to tell a render that was removed from one that moved somewhere
@@ -240,6 +249,125 @@ describe('shell', () => {
     expect(root.querySelector('#modal')?.classList.contains('open')).toBe(true);
     expect(root.querySelector('#modal-content')?.innerHTML).toBe(content);
     await drainBoot(shell);
+  });
+
+  // #188. Typing used to rebuild the topbar, the navigation, the page, every card and every
+  // image, then find the input it had just destroyed and put the caret back. The caret hack
+  // was the symptom; these assert the cause is gone - the input is the same node, and no
+  // page render happened at all.
+  it('redraws the library grid as the reader types, not the application', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const store = await WorkstrStore.open(LOCAL_NAMESPACE);
+    await store.upsertExercise({ slug: 'bench-press', name: 'Bench Press', muscles: [], equipment: [], tags: [], instructions: [], favourite: false, source_type: 'manual', status: 'active' });
+    await store.upsertExercise({ slug: 'barbell-row', name: 'Barbell Row', muscles: [], equipment: [], tags: [], instructions: [], favourite: false, source_type: 'manual', status: 'active' });
+    store.close();
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    const input = root.querySelector<HTMLInputElement>('#ex-search')!;
+    const grid = root.querySelector('#ex-grid');
+    const toolbar = root.querySelector('.program-toolbar');
+    const rebuiltBefore = shell.renders.rebuilds;
+
+    input.value = 'bench';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(shell.renders.rebuilds).toBe(rebuiltBefore);
+    expect(root.querySelector('#ex-search')).toBe(input);
+    expect(root.querySelector('#ex-grid')).toBe(grid);
+    expect(root.querySelector('.program-toolbar')).toBe(toolbar);
+    expect(grid?.textContent).toContain('Bench Press');
+    expect(grid?.textContent).not.toContain('Barbell Row');
+
+    // The delete path, which the caret hack hid bugs in as readily as the typing path.
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(root.querySelector('#ex-search')).toBe(input);
+    expect(root.querySelector('#ex-grid')?.textContent).toContain('Barbell Row');
+    expect(root.querySelector<HTMLElement>('#ex-empty')?.style.display).toBe('none');
+    await cleanupExercises(shell);
+  });
+
+  it('says nothing matched without rebuilding the page to say it', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const store = await WorkstrStore.open(LOCAL_NAMESPACE);
+    await store.upsertExercise({ slug: 'bench-press', name: 'Bench Press', muscles: [], equipment: [], tags: [], instructions: [], favourite: false, source_type: 'manual', status: 'active' });
+    store.close();
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    const input = root.querySelector<HTMLInputElement>('#ex-search')!;
+    const empty = root.querySelector<HTMLElement>('#ex-empty')!;
+    const rebuiltBefore = shell.renders.rebuilds;
+
+    input.value = 'nothing matches this';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(shell.renders.rebuilds).toBe(rebuiltBefore);
+    expect(root.querySelector('#ex-empty')).toBe(empty);
+    expect(empty.style.display).toBe('block');
+    expect(empty.textContent).toContain('No exercises match');
+    expect(root.querySelector('#ex-grid')?.children.length).toBe(0);
+    await cleanupExercises(shell);
+  });
+
+  // The program lists are written the same way, and their cards carry nine actions bound to
+  // them. Losing those on a patched list is the failure this guards: the card still works.
+  it('redraws a program list as the reader types, and its cards still work', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const store = await WorkstrStore.open(LOCAL_NAMESPACE);
+    await store.saveSheet({ name: 'Push Day', exercises: [{ position: 0, exercise_slug: 'bench-press', exercise_name: 'Bench Press', sets: 3, reps: '8', rest: 60 }] });
+    await store.saveSheet({ name: 'Pull Day', exercises: [{ position: 0, exercise_slug: 'barbell-row', exercise_name: 'Barbell Row', sets: 3, reps: '8', rest: 60 }] });
+    store.close();
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    root.querySelector<HTMLElement>('.sidebar [data-view="workouts"]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const input = root.querySelector<HTMLInputElement>('#program-filter')!;
+    const list = root.querySelector('#programs-list');
+    const rebuiltBefore = shell.renders.rebuilds;
+
+    input.value = 'push';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(shell.renders.rebuilds).toBe(rebuiltBefore);
+    expect(root.querySelector('#program-filter')).toBe(input);
+    expect(root.querySelector('#programs-list')).toBe(list);
+    expect(list?.textContent).toContain('Push Day');
+    expect(list?.textContent).not.toContain('Pull Day');
+
+    // A card written by the patch, not by a page render: its header still expands it.
+    root.querySelector<HTMLElement>('#programs-list [data-toggle-program]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(root.querySelector('#programs-list .workout-card')?.classList.contains('expanded')).toBe(true);
+    for (const sheet of shell.state.sheets) await shell.state.store?.deleteSheet(Number(sheet.id));
+    await drainBoot(shell);
+  });
+
+  // Selection is the other thing that used to redraw everything per tap. The bar is patched
+  // in place, so the button that was tapped keeps its listener and its count is current.
+  it('patches the selection bar instead of rebuilding the page on every tap', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const store = await WorkstrStore.open(LOCAL_NAMESPACE);
+    await store.upsertExercise({ slug: 'bench-press', name: 'Bench Press', muscles: [], equipment: [], tags: [], instructions: [], favourite: false, source_type: 'manual', status: 'active' });
+    store.close();
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    root.querySelector<HTMLElement>('#lib-select-toggle')?.click();
+    const remove = root.querySelector<HTMLButtonElement>('#lib-delete-selected')!;
+    const rebuiltBefore = shell.renders.rebuilds;
+
+    root.querySelector<HTMLElement>('#ex-grid [data-slug="bench-press"]')?.click();
+
+    expect(shell.renders.rebuilds).toBe(rebuiltBefore);
+    expect(root.querySelector('#lib-delete-selected')).toBe(remove);
+    expect(remove.textContent).toBe('Delete (1)');
+    expect(remove.disabled).toBe(false);
+    await cleanupExercises(shell);
   });
 
   // A catalog refresh runs on every launch and reports twice - once to say it is loading,

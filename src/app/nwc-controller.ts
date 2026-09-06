@@ -380,11 +380,17 @@ export function createNwcController(ctx: NwcControllerContext) {
     root.querySelector('#nwc-connect')?.addEventListener('click', () => showConnect());
     root.querySelector('#nwc-disconnect')?.addEventListener('click', () => { void disconnect(); });
     root.querySelector('#open-nwc-zap')?.addEventListener('click', () => showZap());
-    root.querySelectorAll<HTMLElement>('[data-zap-program]').forEach((button) => button.addEventListener('click', (event) => {
+  }
+
+  // The zap action lives on a program card, so it is bound with the rest of a card's
+  // actions - by the shell, and again on its own when a filter rewrites a program list
+  // without the page around it being rendered.
+  function bindProgramCards(scope: ParentNode): void {
+    scope.querySelectorAll<HTMLElement>('[data-zap-program]').forEach((button) => button.addEventListener('click', (event) => {
       event.stopPropagation();
       showProgramZap(button.dataset.zapProgram || '');
     }));
   }
 
-  return { bind, loadConnection, showConnect, showZap, showProgramZap };
+  return { bind, bindProgramCards, loadConnection, showConnect, showZap, showProgramZap };
 }

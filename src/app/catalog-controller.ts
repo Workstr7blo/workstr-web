@@ -22,6 +22,9 @@ export interface CatalogControllerContext {
   openModal(content: string): void;
   closeModal(): void;
   fetchProfile(pubkey: string, relays?: string[]): Promise<RelayProfile | null>;
+  // Writes whichever program lists are mounted and binds the cards it wrote. Program cards
+  // carry their own listeners, so a list cannot simply have its markup replaced.
+  renderProgramLists(): void;
 }
 
 export type CatalogController = ReturnType<typeof createCatalogController>;
@@ -74,13 +77,12 @@ function recoveryVisible(): boolean {
   return state.view === 'workouts' && state.subState.workouts === 'recovery';
 }
 
-// Program cards carry their own listeners, so the list is rendered rather than written
-// into. What this stops is the rebuild that used to happen when the reader was not on
-// Workouts at all - the status line is still patched wherever it is mounted. #178 narrows
-// this to the page once the shell stops being thrown away with it.
-function renderProgramSurface(reason: string): void {
+// The status line is patched wherever it is mounted; the cards are written into the lists
+// that show them, and nothing else on the page is touched. A reader who is not on Workouts
+// at all gets neither - the state is kept and the next render of that page reads it.
+function renderProgramSurface(): void {
   updateProgramCatalogStatus(root, state);
-  if (programSurfaceMounted(root)) render({ reason });
+  if (programSurfaceMounted(root)) ctx.renderProgramLists();
 }
 
 async function refreshPrograms(): Promise<void> {
@@ -103,7 +105,7 @@ async function refreshPrograms(): Promise<void> {
       ? `offline — showing ${cached} Workstr and creator programs from the last sync`
       : `program relay error: ${(error as Error).message}`;
   }
-  renderProgramSurface('program-catalog-loaded');
+  renderProgramSurface();
 }
 
 async function refreshProgramZapTotals(programs = state.programs): Promise<void> {
@@ -118,7 +120,7 @@ async function refreshProgramZapTotals(programs = state.programs): Promise<void>
     } else {
       state.programZapTotals = { ...(state.programZapTotals || {}), ...latest };
     }
-    renderProgramSurface('program-zap-totals');
+    renderProgramSurface();
   } catch {
     // Zap totals are social proof, not core catalog loading. Keep Discover usable
     // when receipt relays are unavailable.
@@ -142,7 +144,7 @@ async function refreshAuthorPaymentTargets(programs = state.programs): Promise<v
     const targets = await fetchAuthorMoneroPaymentTargets(pubkeys, state.settings.publicRelays);
     if (!Object.keys(targets).length) return;
     state.authorPaymentTargets = { ...state.authorPaymentTargets, ...targets };
-    renderProgramSurface('author-payment-targets');
+    renderProgramSurface();
   } catch {
     // A creator's payment address is not part of the catalog. Discover keeps working
     // without it, and the next refresh asks again.
@@ -183,7 +185,7 @@ async function refreshDiscoverProfiles(): Promise<void> {
   }
   if (!changed) return;
   // Author names and pictures are on the Discover exercise cards and on the program cards.
-  if (!updateDiscoverExercises(root, state)) renderProgramSurface('author-profiles');
+  if (!updateDiscoverExercises(root, state)) renderProgramSurface();
 }
 
 // Sign out returns to the anonymous local account; the identity's database
