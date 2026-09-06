@@ -77,7 +77,7 @@ export function supportSummary(state: SupportState = { status: 'idle', receipts:
 export function supportPanel(state: SupportState = { status: 'idle', receipts: [] }, nwc: NwcViewState = { active: false, status: 'idle' }, signedIn = false, moneroMode = false): string {
   const npub = nip19.npubEncode(OPERATOR_PUBKEY);
   const summary = supportSummary(state);
-  return `<details class="settings-category support-panel compact-support">
+  return `<details class="settings-category support-panel compact-support" data-settings-section="support">
     <summary><span class="settings-category-copy"><strong>Support Workstr</strong><small>${html(summary)}</small></span><span class="settings-category-meta">ZAP</span></summary>
     <div class="settings-category-body">
     <div class="settings-row-main support-summary-row">

@@ -20,7 +20,7 @@ import { programActiveFilters, programFilterSheet, programMatcher, programToolba
 import { exerciseFilterSheet, exerciseSelectionBar } from './exercise-browser';
 import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { moneroMode } from '../features/sheets/monero-tip-view';
-import { backupPanel } from '../features/backup/views';
+import { backupPanel, backupPanelState } from '../features/backup/views';
 import { redactNwcSecrets } from '../nostr/nwc';
 
 const navItems: Array<{ view: View; label: string; icon: string }> = [
@@ -251,20 +251,20 @@ function settingsView(state: AppState): string {
   // would be an invitation to pay over a rail this mode has switched off. The stored
   // connection is untouched — picking Lightning again brings the card back as it was.
   const moneroMode = normalizePaymentMode(state.settings.paymentMode) === 'monero';
-  const nwcCard = moneroMode ? '' : `<details class="settings-category nwc-card">
+  const nwcCard = moneroMode ? '' : `<details class="settings-category nwc-card" data-settings-section="zap-wallet">
       <summary><span class="settings-category-copy"><strong>Zap wallet</strong><small>${nwc.active ? html(nwc.walletLabel || 'Wallet connected') : 'Not connected'}</small></span><span class="status-pill ${nwc.active ? 'ok' : ''}">${nwc.active ? 'ACTIVE' : 'OFF'}</span></summary>
       <div class="settings-category-body">${nwcWalletRows({ ...state, nwc })}</div>
     </details>`;
   return `<div class="page active settings-page"><div class="page-title">Settings</div>
-    <details class="settings-category account-card">
+    <details class="settings-category account-card" data-settings-section="account">
       <summary><span class="settings-category-copy"><strong>Account</strong><small>${html(accountSummary)}</small></span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'SIGNED IN' : 'LOCAL'}</span></summary>
       <div class="settings-category-body">${account}</div>
     </details>
     ${beastModeSettingsCard(state)}
-    ${backupPanel({ signedIn: Boolean(state.pubkey), enabled: Boolean(state.settings.backup?.enabled), sync: state.backup, backup: state.settings.backup })}
+    ${backupPanel(backupPanelState(state))}
     ${nwcCard}
     ${paymentModeCard(state)}
-    <details class="settings-category training-preferences-card">
+    <details class="settings-category training-preferences-card" data-settings-section="training-preferences">
       <summary><span class="settings-category-copy"><strong>Training Preferences</strong><small>${unit === 'kg' ? 'Kilograms' : 'Pounds'} · ${ownedEquipmentKeys(state.settings.ownedEquipment).length} equipment</small></span></summary>
       <div class="settings-category-body">
         <div class="settings-row-main"><div><strong>Weight unit</strong><small>Weights are stored in kilograms and converted for display.</small></div><label class="compact-select"><select id="unit-select"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds</option></select></label></div>
@@ -272,7 +272,7 @@ function settingsView(state: AppState): string {
       </div>
     </details>
     ${supportPanel(state.support, nwc, Boolean(state.pubkey), moneroMode)}
-    <details class="settings-category advanced-settings">
+    <details class="settings-category advanced-settings" data-settings-section="advanced">
       <summary><span class="settings-category-copy"><strong>Advanced</strong><small>Diagnostics, relay, signer, and technical state</small></span></summary>
       <div class="settings-category-body"><div class="terminal-mini">version: ${html(APP_VERSION)}\nsecure context: ${secureContext}\ncountdown audio: ${html(countdownAudioState())}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nsigner type: ${html(signerType)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div>
     </details>

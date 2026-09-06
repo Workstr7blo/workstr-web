@@ -69,6 +69,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Settings categories stay open while the app works in the background. Expanding Data &
+  Sync, Account or any other category and then having it collapse on its own was a
+  background sync tick, an arriving profile or a catalog refresh redrawing the whole
+  screen; the categories you opened are now carried across that redraw.
+- Sync status no longer redraws the whole app. The engine reports progress many times
+  during a single pass, and each report rebuilt the topbar, the navigation, every image
+  and whichever page you were on so that one line inside one Settings card could change.
+  Only that card is written now, so the first seconds after launch stop flickering.
 - "How to perform" opens again during a workout. Expanding it worked, but the first
   background catalog refresh after a session starts rebuilds the screen and closed it
   straight away; the session now remembers which exercise's instructions you opened.

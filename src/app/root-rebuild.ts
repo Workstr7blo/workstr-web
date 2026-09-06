@@ -1,5 +1,6 @@
 import { programStatusLine } from './layout';
 import { preservingScroll } from './scroll';
+import { preservingSettingsDisclosures } from './settings-disclosure';
 import type { AppState } from './state';
 
 // The shell redraws by replacing everything inside its root. That is right for every view,
@@ -12,9 +13,12 @@ import type { AppState } from './state';
 // Nothing behind the overlay is on screen, so the rebuild waits: `closeSessionOverlay` in
 // the session runner renders once the session ends, which is also the first moment the
 // wait costs the user nothing.
+// The disclosures are restored inside the scroll pass, not around it: reopening a category
+// changes the height of the page, and the reading position has to be put back against the
+// page the reader will actually see.
 export function rebuildRoot(root: HTMLElement, state: AppState, rebuild: () => void, toTop = false): void {
   if (heldForLiveSession(root, state)) return;
-  preservingScroll(root, rebuild, toTop);
+  preservingScroll(root, () => preservingSettingsDisclosures(root, rebuild), toTop);
 }
 
 // The class rather than `state.activeSession` alone: the overlay is mounted by
