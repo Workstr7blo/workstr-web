@@ -21,7 +21,7 @@ import { bindExerciseBrowser } from './exercise-browser-controller';
 import { exerciseResults } from './exercise-browser';
 import { createSessionRunner } from './session-runner';
 import { paintBodyMapSvg } from './bodymap';
-import { rebuildRoot } from './root-rebuild';
+import { createRenderTrace, rebuildRoot, type RenderOptions } from './root-rebuild';
 import { discoverImportable, discoverImportState } from '../features/discover/views';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
 import { getQuickWorkout } from '../features/recovery/quickWorkout';
@@ -44,13 +44,12 @@ const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
 const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'lightning', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
 
-function profileName(profile: RelayProfile | null): string | null {
-  return profile?.name?.trim() || profile?.nip05?.trim() || null;
-}
+function profileName(profile: RelayProfile | null): string | null { return profile?.name?.trim() || profile?.nip05?.trim() || null; }
 
 export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
   const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' }, monero: { status: 'idle', address: '' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], programZapTotals: {}, programZapAttempts: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
+  const trace = createRenderTrace();
   async function boot(): Promise<void> {
     // Installs from before demo mode was removed may still have the fake
     // demo pubkey persisted; it is not valid hex and would crash npubEncode.
@@ -61,14 +60,14 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     }
     // Paint the shell immediately; data lands on the next render. Nothing above this line
     // may await, or the first paint slips to a microtask and the shell renders empty.
-    render();
+    render({ reason: 'boot-first-paint' });
     // Every boot, not on the first call that wants a signer: someone who only reads their
     // history would otherwise keep the plaintext key on disk forever. Cleanup, so it runs
     // after first paint and a failure is swallowed — the key just stays where it was.
     await migrateLegacyLocalSecret().catch(() => undefined);
     if (state.pubkey) await openIdentity(state.pubkey, false);
     else await openLocal();
-    render();
+    render({ reason: 'boot-account-open' });
     if (!options.skipCatalogRefresh) await catalog.refreshExercises();
   }
 
@@ -86,12 +85,12 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     await loadNamespace(pubkey);
     const cached = readCachedProfile(pubkey);
     state.profileName = profileName(cached); state.profilePicture = cached?.picture || null;
-    render();
+    render({ reason: 'profile-cached' });
     void fetchProfile(pubkey, profileRelays(state.settings.publicRelays)).then((profile) => {
       if (!profile || state.pubkey !== pubkey) return;
       writeCachedProfile(profile);
       state.profileName = profileName(profile); state.profilePicture = profile.picture || null;
-      render();
+      render({ reason: 'profile-relay' });
     });
   }
 
@@ -139,11 +138,12 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     state.programZapAttempts = await state.store.listWorkoutProgramZapAttempts();
     await catalog.reloadLibrary();
     state.activeSession = await sessionPersistence.loadUnfinished();
-    await nwc.loadConnection(); render();
+    await nwc.loadConnection(); render({ reason: 'store-reload' });
   }
 
-  // `toTop`: moving to another view is a new page to the reader, not a redraw.
-  function render(options: { toTop?: boolean } = {}): void {
+  // `toTop`: moving to another view is a new page to the reader, not a redraw. `reason` is
+  // read by a person and never branched on; `root-rebuild.ts` says why it is worth passing.
+  function render(options: RenderOptions = {}): void {
     // Monero Mode is a token swap, and the tokens are declared on `:root`, so the flag has
     // to land there too — an override on `body` cannot win against a `:root` declaration.
     // An attribute rather than a class so it survives `root.innerHTML` resets.
@@ -155,14 +155,14 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       if (state.activeSession) void sessionRunner.openSessionOverlay(state.activeSession);
       identity.renderIfPending();
       programBuilder.renderIfOpen();
-    }, options.toTop);
+    }, { ...options, trace });
   }
 
   function bind(): void {
     root.querySelectorAll<HTMLElement>('[data-view]').forEach((button) => button.addEventListener('click', () => {
       state.view = button.dataset.view as View;
       state.editingId = null;
-      render({ toTop: true });
+      render({ toTop: true, reason: 'navigate-view' });
       if (state.view === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
       if (state.view === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
       if (state.view === 'settings') { void preferences.refreshFunding(); moneroAddress.refreshIfNeeded(); }
@@ -173,12 +173,12 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
         (state.subState[parent] as SubView) = button.dataset.subtab as SubView;
         state.view = parent as View;
         state.editingId = null;
-        render({ toTop: true });
+        render({ toTop: true, reason: 'navigate-subtab' });
         if (parent === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
         if (parent === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
       }
     }));
-    root.querySelector('#account-chip')?.addEventListener('click', () => { if (!state.pubkey) { identity.startAccountChoice(); return; } state.view = 'settings'; render({ toTop: true }); void preferences.refreshFunding(); moneroAddress.refreshIfNeeded(); });
+    root.querySelector('#account-chip')?.addEventListener('click', () => { if (!state.pubkey) { identity.startAccountChoice(); return; } state.view = 'settings'; render({ toTop: true, reason: 'navigate-account-chip' }); void preferences.refreshFunding(); moneroAddress.refreshIfNeeded(); });
     root.querySelectorAll<HTMLElement>('[data-copy]').forEach((button) => button.addEventListener('click', () => {
       void navigator.clipboard.writeText(button.dataset.copy || '')
         .then(() => toast('Copied'), () => toast('Could not copy', 'bad'));
@@ -396,5 +396,5 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   }
 
   const ready = boot();
-  return { state, ready, publishProgram: programPublish.publishProgram };
+  return { state, ready, renders: trace, publishProgram: programPublish.publishProgram };
 }

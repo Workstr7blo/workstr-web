@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { rebuildRoot } from '../src/app/root-rebuild';
+import { createRenderTrace, rebuildRoot } from '../src/app/root-rebuild';
 import type { ActiveSession, AppState } from '../src/app/state';
 
 // The two things that decide whether a rebuild is allowed, plus the status lines and the
@@ -109,7 +109,57 @@ describe('rebuilding the shell root', () => {
   it('goes to the top when the redraw is a different view', () => {
     const { root, state } = shell(null, false);
     (root.querySelector('.content') as HTMLElement).scrollTop = 640;
-    rebuildRoot(root, state, redraw(root), true);
+    rebuildRoot(root, state, redraw(root), { toTop: true });
     expect((root.querySelector('.content') as HTMLElement).scrollTop).toBe(0);
+  });
+});
+
+// The count exists to answer one question across the increments of #178: did a change
+// remove a full rebuild, or move it somewhere else? A counter at a call site could not,
+// because there are over a hundred of them.
+describe('tracing the rebuilds', () => {
+  it('counts a rebuild it allowed, with the reason it was given', () => {
+    const { root, state } = shell(null, false);
+    const trace = createRenderTrace();
+    rebuildRoot(root, state, redraw(root), { reason: 'boot-first-paint', trace });
+    expect(trace.rebuilds).toBe(1);
+    expect(trace.held).toBe(0);
+    expect(trace.recent).toEqual([{ reason: 'boot-first-paint', held: false }]);
+  });
+
+  // A held rebuild is not a rebuild that did not happen: the caller still asked for one,
+  // and an increment that stops it asking is a different result from one that only makes
+  // the hold catch it.
+  it('counts a held rebuild apart from an allowed one', () => {
+    const { root, state } = shell(session(), true);
+    const trace = createRenderTrace();
+    rebuildRoot(root, state, redraw(root), { reason: 'exercise-catalog-loaded', trace });
+    expect(trace.rebuilds).toBe(0);
+    expect(trace.held).toBe(1);
+    expect(trace.recent).toEqual([{ reason: 'exercise-catalog-loaded', held: true }]);
+  });
+
+  it('records a render nobody attributed rather than dropping it', () => {
+    const { root, state } = shell(null, false);
+    const trace = createRenderTrace();
+    rebuildRoot(root, state, redraw(root), { trace });
+    expect(trace.recent[0]).toEqual({ reason: 'unattributed', held: false });
+  });
+
+  // An installed PWA stays open for days. The counts are the measurement; the list is a
+  // window on the end of it and must not grow without limit.
+  it('keeps counting after the recent list has rolled over', () => {
+    const { root, state } = shell(null, false);
+    const trace = createRenderTrace();
+    for (let i = 0; i < 250; i += 1) rebuildRoot(root, state, redraw(root), { reason: `render-${i}`, trace });
+    expect(trace.rebuilds).toBe(250);
+    expect(trace.recent).toHaveLength(200);
+    expect(trace.recent[trace.recent.length - 1]?.reason).toBe('render-249');
+  });
+
+  it('rebuilds with no trace at all', () => {
+    const { root, state } = shell(null, false);
+    rebuildRoot(root, state, redraw(root));
+    expect(root.textContent).toContain('rebuilt');
   });
 });

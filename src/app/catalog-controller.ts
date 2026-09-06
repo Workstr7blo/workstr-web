@@ -9,13 +9,14 @@ import { discoverImportState } from '../features/discover/views';
 import { moneroMode } from '../features/sheets/monero-tip-view';
 import { paintBodyMapSvg } from './bodymap';
 import { EX_PLACEHOLDER, exerciseSourceLabel, html } from './format';
+import type { RenderOptions } from './root-rebuild';
 import type { AppState } from './state';
 import { responsiveImageUrl } from '../core/media';
 
 export interface CatalogControllerContext {
   root: HTMLElement;
   state: AppState;
-  render(): void;
+  render(options?: RenderOptions): void;
   toast(message: string, kind?: 'ok' | 'bad'): void;
   openModal(content: string): void;
   closeModal(): void;
@@ -47,7 +48,7 @@ async function persistCanonCache(): Promise<void> {
 
 async function refreshExercises(): Promise<void> {
   state.exerciseStatus = 'loading Workstr exercises from relays...';
-  render();
+  render({ reason: 'exercise-catalog-loading' });
   try {
     const exercises = await fetchCanonExercises();
     state.discoverExercises = exercises;
@@ -61,12 +62,12 @@ async function refreshExercises(): Promise<void> {
       : `catalog relay error: ${(error as Error).message}`;
   }
   refreshMergedExercises();
-  render();
+  render({ reason: 'exercise-catalog-loaded' });
 }
 
 async function refreshPrograms(): Promise<void> {
   state.programStatus = 'loading Workstr and creator programs from public relays...';
-  render();
+  render({ reason: 'program-catalog-loading' });
   try {
     if (!state.exercises.length) {
       try { state.exercises = await fetchCanonExercises(); } catch { /* Program cards can still infer fallback muscles. */ }
@@ -84,7 +85,7 @@ async function refreshPrograms(): Promise<void> {
       ? `offline — showing ${cached} Workstr and creator programs from the last sync`
       : `program relay error: ${(error as Error).message}`;
   }
-  render();
+  render({ reason: 'program-catalog-loaded' });
 }
 
 async function refreshProgramZapTotals(programs = state.programs): Promise<void> {
@@ -99,7 +100,7 @@ async function refreshProgramZapTotals(programs = state.programs): Promise<void>
     } else {
       state.programZapTotals = { ...(state.programZapTotals || {}), ...latest };
     }
-    render();
+    render({ reason: 'program-zap-totals' });
   } catch {
     // Zap totals are social proof, not core catalog loading. Keep Discover usable
     // when receipt relays are unavailable.
@@ -123,7 +124,7 @@ async function refreshAuthorPaymentTargets(programs = state.programs): Promise<v
     const targets = await fetchAuthorMoneroPaymentTargets(pubkeys, state.settings.publicRelays);
     if (!Object.keys(targets).length) return;
     state.authorPaymentTargets = { ...state.authorPaymentTargets, ...targets };
-    render();
+    render({ reason: 'author-payment-targets' });
   } catch {
     // A creator's payment address is not part of the catalog. Discover keeps working
     // without it, and the next refresh asks again.
@@ -162,7 +163,7 @@ async function refreshDiscoverProfiles(): Promise<void> {
       changed = true;
     }
   }
-  if (changed) render();
+  if (changed) render({ reason: 'author-profiles' });
 }
 
 // Sign out returns to the anonymous local account; the identity's database
