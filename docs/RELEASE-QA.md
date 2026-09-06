@@ -66,6 +66,11 @@ Nothing in CI touches iOS. Do this section on a real iPhone, not a simulator.
       unavailable, the no-sleep video fallback takes over and the screen still stays on.
 - [ ] **Backgrounding.** Leave the app mid-session, take a call or switch apps for a
       minute, come back: the session is intact, the timer reflects real elapsed time.
+- [ ] **Relaunch mid-set.** Force-quit mid-workout and reopen from the home screen. The
+      session comes back; type reps and load into the current set immediately, wait five
+      seconds for the launch catalog refresh to land, then log it — what you typed is what
+      gets stored. Log another set and let the rest countdown run through the same five
+      seconds: it stays on screen and keeps counting.
 - [ ] **Storage survival.** Reopen the next day: data still there. (iOS evicts IndexedDB
       for PWAs it considers unused after ~7 days — worth knowing, not worth blocking on.)
 
