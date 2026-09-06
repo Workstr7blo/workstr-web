@@ -216,8 +216,8 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (state.store) await state.store.finishSession(state.activeSession.id, state.activeSession.finishedAt);
     const finished = state.activeSession;
     state.finishedSessions = state.store ? await ctx.loadFinishedSessions() : [finished, ...state.finishedSessions];
-    // Cleared first: closing the overlay repaints the app behind it, and a session still on
-    // state would be reopened by that render. The summary modal is opened after the repaint.
+    // Cleared before the overlay closes, because everything downstream reads the session off
+    // state to decide what to draw - History, the recap, the overlay's own class.
     state.activeSession = null;
     closeSessionOverlay();
     summary.render(finished);
@@ -243,9 +243,9 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     root.querySelector('#session-rest-overlay')?.classList.remove('show');
     root.querySelector('#session-overlay')?.classList.remove('open');
     root.querySelector('#pr-toast')?.classList.remove('show');
-    // The shell holds back its rebuild while the overlay is open, so everything the session
-    // outlasted — a finished workout in History, a catalog refresh, a restore — is behind by
-    // however long the workout took. This is the first moment repainting costs nothing.
+    // The workout that just ended belongs in History, and the page behind the overlay was
+    // drawn before it existed. An ordinary render, not a catch-up: the page has been kept
+    // current all along, and this adds the one thing finishing changed.
     ctx.render();
   }
 

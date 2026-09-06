@@ -144,8 +144,8 @@ function exercisesView(state: AppState): string {
   </div>`;
 }
 
-// Exported because a background refresh repaints this line in place while a live session
-// holds the shell's rebuild back; the fallback wording must not drift between the two.
+// Exported because a background refresh repaints this line in place rather than through a
+// page render; the fallback wording must not drift between the two.
 export function programStatusLine(state: AppState): string {
   return state.programStatus || 'program relay cache not loaded yet';
 }

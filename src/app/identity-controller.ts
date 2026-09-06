@@ -350,7 +350,6 @@ async function openAndRender(pubkey: string, signerType: AppState['signerType'] 
   return {
     signOut, signOutAndRemoveData, connectNip07, startRemoteSignerRequest, startAccountChoice, startLocalAccount: createLocalAccountFlow, startRestoreLocalAccount: () => showRestoreLocalAccountModal(), getActiveSigner, dropActiveSigner,
     startAddDevice: () => pairing.startScan(), releasePairing: pairing.release, bindSettingsAuth,
-    renderIfPending: () => { if (pendingConnect) renderConnectModal(); },
     clearPending: () => { pendingConnect = null; }
   };
 }
