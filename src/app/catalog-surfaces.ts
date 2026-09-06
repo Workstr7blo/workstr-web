@@ -46,11 +46,3 @@ export function updateDiscoverExercises(root: ParentNode, state: AppState): bool
 export function programSurfaceMounted(root: ParentNode): boolean {
   return Boolean(root.querySelector('.program-list'));
 }
-
-// Used while a live session holds the shell's rebuild back: nothing behind the overlay is
-// on screen, but both status lines are mounted, so they do not have to wait for the
-// session to end. The wording has one owner so the two paths cannot drift.
-export function updateCatalogStatusLines(root: ParentNode, state: AppState): void {
-  updateExerciseCatalogStatus(root, state);
-  updateProgramCatalogStatus(root, state);
-}

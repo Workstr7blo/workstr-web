@@ -15,9 +15,9 @@ src/main.ts
   -> nostr/* / signer/*    network and external signing boundaries
 ```
 
-`renderShell()` owns the long-lived `AppState`. Most ordinary navigation rerenders the
-root. Live-session controllers patch the session overlay directly where frequent timer
-or set updates would make full-root rendering inappropriate.
+`renderShell()` owns the long-lived `AppState`. Ordinary navigation rerenders the current
+page; the frame around it is mounted once. Live-session controllers own the session overlay
+and patch it directly, which is also why a page render can leave it standing.
 
 ## Route by concern
 
@@ -33,10 +33,10 @@ or set updates would make full-root rendering inappropriate.
 | Preferences, recovery, history actions, and backup controls | `src/app/preferences-controller.ts` | `src/db/export.ts`, recovery modules, `src/nostr/zaps.ts` | feature tests, `tests/export.test.ts` |
 | NWC wallet connection and in-app support zaps | `src/app/nwc-controller.ts`, `src/nostr/support-zap.ts` | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts`, `src/features/support/views.ts` | `tests/nwc-ui.test.ts`, `tests/support-zap.test.ts`, NWC tests |
 | Stored/live session adaptation | `src/app/session-persistence.ts` | `src/db/store.ts`, `src/app/state.ts` | `tests/session-runner.test.ts`, `tests/store.test.ts` |
-| Catalog surfaces: what a relay answer is written into, and when nothing is | `src/app/catalog-surfaces.ts` | `src/app/catalog-controller.ts`, `src/app/root-rebuild.ts`, `src/features/discover/views.ts` (`discoverGrid`) | `tests/shell.test.ts`, `tests/discover.test.ts`, `tests/root-rebuild.test.ts` |
+| Catalog surfaces: what a relay answer is written into, and when nothing is | `src/app/catalog-surfaces.ts` | `src/app/catalog-controller.ts`, `src/features/discover/views.ts` (`discoverGrid`) | `tests/shell.test.ts`, `tests/discover.test.ts` |
 | The account chip and the Settings Account identity | `src/app/account-chip.ts` | `src/app/layout.ts`, `src/app/shell.ts` (profile hydration) | `tests/account-chip.test.ts`, `tests/shell.test.ts` |
 | The persistent frame, top-level navigation and page markup | `src/app/layout.ts` (`shellFrame`, `appView`, `pageOverlays`, `updateNavigation`) | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
-| Redrawing the root: when it is held back, what made it happen, and keeping the reader's place | `src/app/root-rebuild.ts`, `src/app/scroll.ts`, `src/app/settings-disclosure.ts` | `src/app/shell.ts` (`render`), `src/app/session-runner.ts` (`closeSessionOverlay`), the `.content` pane in `src/app/layout.ts` | `tests/root-rebuild.test.ts`, `tests/scroll.test.ts`, `tests/shell.test.ts` |
+| Redrawing the page: what made it happen, and keeping the reader's place | `src/app/root-rebuild.ts`, `src/app/scroll.ts`, `src/app/settings-disclosure.ts` | `src/app/shell.ts` (`render`), the `.content` pane in `src/app/layout.ts` | `tests/root-rebuild.test.ts`, `tests/scroll.test.ts`, `tests/shell.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Responsive image delivery for exercise photos | `src/core/media.ts` | `src/features/train/session-hero.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/features/sheets/builder-views.ts`, `src/app/catalog-controller.ts` | `tests/media.test.ts`, `tests/session-runner.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
@@ -106,14 +106,14 @@ or set updates would make full-root rendering inappropriate.
   topbar, avatar, `.content` pane, session overlay, modal host and toast are never touched
   by a render.
 - `src/app/root-rebuild.ts` owns the one way a page is redrawn - the frame around it is
-  mounted once and is not part of this - held back
-  entirely while the live-session overlay is open, because the current set's typed reps and
-  load and a running rest countdown live only in the DOM, and scroll-preserving through
-  `src/app/scroll.ts` otherwise. The session runner renders once the overlay closes. It also
-  counts them: every full rebuild passes through here, so `createRenderTrace` is the only
-  place that can say how many a cold start costs and what asked for each one. The count is
-  on the shell handle as `renders`; the reasons reach a dev console and are stripped from a
-  production build.
+  mounted once and is not part of this - scroll-preserving through `src/app/scroll.ts`. It
+  used to refuse to run at all while a workout was live, because a rebuild of the whole root
+  took away the reps and load typed into the current set and reset a running rest countdown.
+  A render writes the page host now and the overlay is not in it, so the hold is gone and
+  the session is safe by construction rather than by waiting. It also counts renders: every
+  one passes through here, so `createRenderTrace` is the only place that can say how many a
+  cold start costs and what asked for each one. The count is on the shell handle as
+  `renders`; the reasons reach a dev console and are stripped from a production build.
 - `src/app/browse-surfaces.ts` writes the surfaces a filter changes and nothing else: the
   Library grid and its empty line, the Discover grid, a program list, the selection bar's
   labels and counts, and the open filter sheet's option states and match count. The sheets

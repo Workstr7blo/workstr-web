@@ -55,7 +55,6 @@ export interface ProgramBuilderContext {
 
 export interface ProgramBuilderController {
   open(sheet?: SheetWithExercises | null): Promise<void>;
-  renderIfOpen(): void;
   clear(): void;
 }
 
@@ -365,5 +364,5 @@ function renderRows(): void {
   refreshAutoLabels(current);
 }
 
-  return { open, renderIfOpen: renderModal, clear: () => { builder = null; } };
+  return { open, clear: () => { builder = null; } };
 }

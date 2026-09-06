@@ -132,7 +132,6 @@ describe('shell', () => {
       'boot-account-open'
     ]);
     expect(shell.renders.rebuilds).toBe(3);
-    expect(shell.renders.held).toBe(0);
     // Nothing on the boot path may render without saying why, or the baseline stops being
     // readable the moment it changes.
     expect(shell.renders.recent.filter((record) => record.reason === 'unattributed')).toEqual([]);
@@ -614,6 +613,100 @@ describe('shell', () => {
     }
 
     await cleanup();
+  });
+
+  // #187. The two tests above passed while the render was being refused outright: the
+  // session survived because nothing was drawn at all. This one is the difference. The
+  // render is allowed to happen - the count goes up - and the overlay comes through it as
+  // the same nodes, because a render writes the page host and the overlay is not in it.
+  it('renders the page under a live session without touching the overlay', async () => {
+    const { root, shell, cleanup } = await startGuardSession('Overlay Identity Guard');
+    const overlay = root.querySelector('#session-overlay');
+    const body = root.querySelector('#session-body');
+    const footer = root.querySelector('#session-footer');
+    const reps = root.querySelector<HTMLInputElement>('[data-session-reps="0"]')!;
+    const renderedBefore = shell.renders.rebuilds;
+
+    root.querySelector<HTMLElement>('[data-parent="workouts"][data-subtab="discover"]')?.click();
+    await waitFor(() => shell.state.programStatus.startsWith('loaded'), 'the program catalog refresh');
+
+    expect(shell.renders.rebuilds).toBeGreaterThan(renderedBefore);
+    expect(root.querySelector('#session-overlay')).toBe(overlay);
+    expect(root.querySelector('#session-body')).toBe(body);
+    expect(root.querySelector('#session-footer')).toBe(footer);
+    expect(root.querySelector('[data-session-reps="0"]')).toBe(reps);
+    // The page behind it was genuinely redrawn rather than skipped, which is what the old
+    // hold used to prevent - the session outlasted a stale screen it then had to catch up.
+    expect(root.querySelector('#program-status')?.textContent).toContain('loaded');
+
+    // And the runner still owns it: logging a set works on the DOM the render left alone.
+    root.querySelector<HTMLElement>('[data-session-log="bench-press"]')?.click();
+    await waitFor(() => (shell.state.activeSession?.sets.length ?? 0) > 0, 'the set to be logged');
+
+    await cleanup();
+  });
+
+  // The builder holds a name and a description in the DOM until it is saved, so a render
+  // that redrew the modal threw away whatever had been typed but not committed. The modal
+  // host is part of the frame and nothing re-renders its content behind the reader now.
+  it('keeps the program builder and its typed edits through a background render', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    root.querySelector<HTMLElement>('.sidebar [data-view="workouts"]')?.click();
+    root.querySelector<HTMLElement>('#new-program')?.click();
+    await waitFor(() => !!root.querySelector('#sheet-name'), 'the program builder');
+    const name = root.querySelector<HTMLInputElement>('#sheet-name')!;
+    const desc = root.querySelector<HTMLInputElement>('#sheet-desc')!;
+    name.value = 'Pull Day';
+    name.dispatchEvent(new Event('input'));
+    desc.value = 'not saved yet';
+    desc.dispatchEvent(new Event('input'));
+    const renderedBefore = shell.renders.rebuilds;
+
+    root.querySelector<HTMLElement>('[data-parent="workouts"][data-subtab="discover"]')?.click();
+    await waitFor(() => shell.state.programStatus.startsWith('loaded'), 'the program catalog refresh');
+
+    expect(shell.renders.rebuilds).toBeGreaterThan(renderedBefore);
+    expect(root.querySelector('#modal')?.classList.contains('open')).toBe(true);
+    // Node identity, not the value: the builder mirrors what is typed into its own state,
+    // so a modal that was redrawn would come back reading 'Pull Day' out of a different
+    // input - with the caret, the selection and any half-finished row gone with the old one.
+    expect(root.querySelector('#sheet-name')).toBe(name);
+    expect(root.querySelector('#sheet-desc')).toBe(desc);
+    expect(name.value).toBe('Pull Day');
+    expect(desc.value).toBe('not saved yet');
+
+    root.querySelector<HTMLElement>('#modal-close')?.click();
+    await drainBoot(shell);
+  });
+
+  // Content and listeners both: a modal that came through looking right but had lost its
+  // handlers would fail as a dead button, which is the shape of bug this increment is
+  // about. The close button is bound with the frame, the tabs inside it are not.
+  it('keeps an open modal working through a background render', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    root.querySelector<HTMLElement>('#account-chip')?.click();
+    await waitFor(() => root.querySelector('#modal')?.classList.contains('open') === true, 'the account modal');
+    const content = root.querySelector('#modal-content')!;
+    const markup = content.innerHTML;
+    const renderedBefore = shell.renders.rebuilds;
+
+    shell.state.exerciseStatus = '';
+    root.querySelector<HTMLElement>('.sidebar [data-view="exercises"]')?.click();
+    await drainBoot(shell);
+
+    expect(shell.renders.rebuilds).toBeGreaterThan(renderedBefore);
+    expect(root.querySelector('#modal-content')).toBe(content);
+    expect(root.querySelector('#modal-content')?.innerHTML).toBe(markup);
+
+    root.querySelector<HTMLElement>('#modal-close')?.click();
+    expect(root.querySelector('#modal')?.classList.contains('open')).toBe(false);
+    await drainBoot(shell);
   });
 
   it('opens a single tabbed account modal from the signed-out chip', async () => {
