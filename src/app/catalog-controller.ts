@@ -10,6 +10,7 @@ import { moneroMode } from '../features/sheets/monero-tip-view';
 import { paintBodyMapSvg } from './bodymap';
 import { EX_PLACEHOLDER, exerciseSourceLabel, html } from './format';
 import type { AppState } from './state';
+import { responsiveImageUrl } from '../core/media';
 
 export interface CatalogControllerContext {
   root: HTMLElement;
@@ -187,7 +188,7 @@ function openExerciseDetail(exercise: Exercise, source: 'library' | 'discover'):
     ? `<button class="button quiet danger" id="ex-detail-delete">Delete</button>`
     : `<button class="button ${importCls}" id="ex-import"${importState === 'in-library' ? ' disabled' : ''}>${importLabel}</button>`;
   openModal(`
-    <div class="detail-img${src ? '' : ' placeholder'}">${src ? `<img src="${html(src)}" alt="" loading="lazy" onerror="this.parentElement.classList.add('placeholder');this.remove()">` : EX_PLACEHOLDER}</div>
+    <div class="detail-img${src ? '' : ' placeholder'}">${src ? `<img src="${html(responsiveImageUrl(src, 720))}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('placeholder');this.remove()">` : EX_PLACEHOLDER}</div>
     <h3 class="detail-title">${html(exercise.name)}</h3>
     <div class="detail-badges">
       ${exercise.difficulty ? `<span class="badge diff">${html(exercise.difficulty)}</span>` : ''}

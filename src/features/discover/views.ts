@@ -2,6 +2,7 @@ import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, EX_PLACEHOLDER, html } from '../../app/format';
 import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults, exerciseToolbar } from '../../app/exercise-browser';
+import { responsiveImageUrl } from '../../core/media';
 
 export type DiscoverImportState = 'new' | 'in-library' | 'update';
 
@@ -28,7 +29,7 @@ function importButton(exercise: Exercise, importState: DiscoverImportState): str
 
 export function discoverCardHtml(exercise: Exercise, state: AppState): string {
   const src = exercise.image_url || '';
-  const img = `${EX_PLACEHOLDER}${src ? `<img class="card-photo" src="${html(src)}" alt="" loading="lazy" onerror="this.remove()">` : ''}`;
+  const img = `${EX_PLACEHOLDER}${src ? `<img class="card-photo" src="${html(responsiveImageUrl(src, 360))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}`;
   const importState = discoverImportState(exercise, state.library);
   const sel = state.discoverSelect;
   // Only importable cards (new/update) take part in select mode.

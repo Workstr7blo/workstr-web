@@ -247,6 +247,39 @@ describe('session runner', () => {
     expect(root.querySelector('.session-set-columns')?.textContent).toContain('Load kg');
   });
 
+  // The hero is the one image on the screen and the reason the user opened the session, so
+  // it stays eager. What changes is the size of the file, not when it starts loading.
+  it('serves the session hero at a rendition width and lets the browser pick one', async () => {
+    state.activeSession = {
+      id: 12, sheetName: 'Pull', startedAt: '2026-08-14T12:00:00.000Z',
+      exercises: [{ exerciseSlug: 'row', exerciseName: 'Row', sets: 2, reps: '8', restSec: 60, imageUrl: 'https://i.nostr.build/kalIzVhq0xYFPZSA.png' }],
+      sets: []
+    };
+    await runner.openSessionOverlay(state.activeSession);
+    const hero = root.querySelector<HTMLImageElement>('.session-ex-image.wide');
+    expect(hero).toBeTruthy();
+    expect(hero!.getAttribute('loading')).toBe('eager');
+    expect(hero!.getAttribute('src')).toContain('w=720');
+    // Descriptors are the widths the host serves, not the ones asked for.
+    expect(hero!.getAttribute('srcset')).toBe(
+      'https://i.nostr.build/kalIzVhq0xYFPZSA.png?w=480 640w, https://i.nostr.build/kalIzVhq0xYFPZSA.png?w=720 854w, https://i.nostr.build/kalIzVhq0xYFPZSA.png?w=1080 1200w'
+    );
+    // The rendition is a rendering detail; what the session holds stays canonical.
+    expect(state.activeSession.exercises[0].imageUrl).toBe('https://i.nostr.build/kalIzVhq0xYFPZSA.png');
+  });
+
+  it('leaves a hero on a host that does not resize exactly as it was', async () => {
+    state.activeSession = {
+      id: 13, sheetName: 'Pull', startedAt: '2026-08-14T12:00:00.000Z',
+      exercises: [{ exerciseSlug: 'row', exerciseName: 'Row', sets: 2, reps: '8', restSec: 60, imageUrl: 'https://blossom.example/abc.jpg' }],
+      sets: []
+    };
+    await runner.openSessionOverlay(state.activeSession);
+    const hero = root.querySelector<HTMLImageElement>('.session-ex-image.wide');
+    expect(hero!.getAttribute('src')).toBe('https://blossom.example/abc.jpg');
+    expect(hero!.hasAttribute('srcset')).toBe(false);
+  });
+
   it('reconciles and dismisses an active rest timer after its deadline', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));

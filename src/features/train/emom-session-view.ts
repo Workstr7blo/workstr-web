@@ -3,6 +3,7 @@ import type { ActiveSession, SessionExercise, SessionSetLog } from '../../app/st
 import type { EmomBlock, TrainingStep } from '../../core/types';
 import { emomDurationSec, type EmomPosition, type EmomSlot } from './emom';
 import { sessionProgressPercent, strengthProgressUnits, type EmomTimerPhase } from './session-logic';
+import { sessionHeroMedia } from './session-hero';
 
 export interface EmomSessionViewInput {
   root: HTMLElement;
@@ -57,9 +58,7 @@ function stepTarget(step: TrainingStep): string {
 // The same frame the standard runner uses, so switching training mode changes the middle of
 // the screen and nothing around it. A missing image costs a strip rather than a screenful.
 function heroMedia(exercise: SessionExercise | undefined, name: string): string {
-  return exercise?.imageUrl
-    ? `<img class="session-ex-image wide" src="${html(exercise.imageUrl)}" alt="${html(name)}" loading="eager" onerror="this.classList.add('placeholder');this.removeAttribute('src');this.textContent='No image'">`
-    : '<div class="session-ex-image wide placeholder">No image</div>';
+  return sessionHeroMedia(exercise, name);
 }
 
 // Phase, clock and interval metadata as one band under the hero: the timer belongs to the

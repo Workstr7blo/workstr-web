@@ -1,6 +1,7 @@
 import { html } from '../../app/format';
 import type { ActiveSession, SessionExercise, SessionSetLog } from '../../app/state';
 import type { SupersetTransition } from './session-logic';
+import { sessionHeroMedia } from './session-hero';
 
 export interface StandardSessionViewInput {
   root: HTMLElement;
@@ -187,9 +188,7 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   meta.textContent = input.superset
     ? `${sectionPrefix}${session.sheetName || 'Workout'} · Round ${input.superset.roundIndex + 1} of ${input.superset.rounds} · Move ${input.superset.stepIndex + 1} of ${input.superset.stepCount}${sectionSuffix}`
     : `${session.sheetName || 'Workout'} · Exercise ${exerciseIndex + 1}/${exercises.length}${sectionSuffix}`;
-  const media = exercise.imageUrl
-    ? `<img class="session-ex-image wide" src="${html(exercise.imageUrl)}" alt="${html(name)}" loading="eager" onerror="this.classList.add('placeholder');this.removeAttribute('src');this.textContent='No image'">`
-    : '<div class="session-ex-image wide placeholder">No image</div>';
+  const media = sessionHeroMedia(exercise, name);
   body.innerHTML = `<h2 class="sr-only">${html(name)}</h2>
     ${media}
     <div class="session-target-row">
