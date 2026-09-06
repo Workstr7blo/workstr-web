@@ -67,7 +67,7 @@ describe('where renditions are allowed to exist', () => {
     for (const dir of boundaries) {
       for (const entry of readdirSync(resolve(root, dir), { withFileTypes: true, recursive: true })) {
         if (!entry.isFile() || !entry.name.endsWith('.ts')) continue;
-        const path = join(entry.parentPath ?? entry.path, entry.name);
+        const path = join(entry.parentPath, entry.name);
         const source = readFileSync(path, 'utf8');
         if (/from ['"][^'"]*core\/media['"]/.test(source)) offenders.push(path.replace(`${root}/`, ''));
       }
