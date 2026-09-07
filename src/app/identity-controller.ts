@@ -3,6 +3,7 @@ import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData }
 import { hasNip07, createNip07Signer } from '../signer/nip07';
 import { clearNip46State, createBunkerSigner, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
 import { clearLocalKey, createCachedLocalKeySigner, createLocalAccount, exportLocalNsec, importLocalAccount } from '../signer/local-key';
+import { accountChoiceMarkup } from './account-choice-view';
 import { createDevicePairingController } from './device-pairing-controller';
 import { WORKSTR_RELAY_URL } from '../sync/engine';
 import { forgetAutoApprove } from '../signer/auto-approve';
@@ -190,48 +191,16 @@ function bindSettingsAuth(): void {
   root.querySelector('#add-device-settings')?.addEventListener('click', () => pairing.startScan());
 }
 
-function startAccountChoice(tab: 'login' | 'create' = 'login'): void {
-  const isLogin = tab === 'login';
-  openModal(`<div class="page-title">Workstr account</div>
-    <p class="section-help">Use Workstr locally, or connect a private encrypted sync account when you want training on every device.</p>
-    <div class="auth-tabs" role="tablist" aria-label="Account flow">
-      <button id="auth-tab-login" class="auth-tab ${isLogin ? 'active' : ''}" type="button" role="tab" aria-selected="${isLogin}">Log in</button>
-      <button id="auth-tab-create" class="auth-tab ${!isLogin ? 'active' : ''}" type="button" role="tab" aria-selected="${!isLogin}">Create account</button>
-    </div>
-    ${isLogin ? loginTabMarkup() : createTabMarkup()}`);
-  root.querySelector('#auth-tab-login')?.addEventListener('click', () => startAccountChoice('login'));
-  root.querySelector('#auth-tab-create')?.addEventListener('click', () => startAccountChoice('create'));
+// One flow, not two tabs. The markup is in `account-choice-view.ts`; what stays here is
+// which action each row runs, and every one of them is the action it ran before.
+function startAccountChoice(): void {
+  openModal(accountChoiceMarkup());
   root.querySelector('#create-local-account')?.addEventListener('click', () => void createLocalAccountFlow());
-  root.querySelector('#restore-local-account')?.addEventListener('click', () => showRestoreLocalAccountModal());
   root.querySelector('#pair-new-device')?.addEventListener('click', () => pairing.startNewDevice());
+  root.querySelector('#restore-local-account')?.addEventListener('click', () => showRestoreLocalAccountModal());
   root.querySelector('#connect-remote-signer')?.addEventListener('click', () => { closeModal(); void startRemoteSignerRequest(); });
   root.querySelector('#connect-extension-signer')?.addEventListener('click', () => { closeModal(); void connectNip07(); });
   root.querySelector('#continue-local')?.addEventListener('click', closeModal);
-}
-
-function loginTabMarkup(): string {
-  return `<div class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-login">
-    <p class="section-help">Restore an existing Workstr account with your recovery key, or connect a mobile signer.</p>
-    <div class="settings-auth-options single-column">
-      <button id="pair-new-device" class="button primary" type="button">Scan code from another device</button>
-      <button id="restore-local-account" class="button" type="button">Restore with recovery key</button>
-      <button id="connect-remote-signer" class="button" type="button">Use mobile signer</button>
-      ${hasNip07() ? '<button id="connect-extension-signer" class="button" type="button">Use browser extension</button>' : ''}
-    </div>
-    <button id="continue-local" class="auth-link-button" type="button">Continue locally on this device</button>
-  </div>`;
-}
-
-function createTabMarkup(): string {
-  return `<div class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-create">
-    <p class="section-help">Create a device-managed account for fast encrypted sync. Workstr will show a recovery key next — save it in your password manager.</p>
-    <div class="settings-auth-options single-column">
-      <button id="create-local-account" class="button primary" type="button">Create encrypted sync account</button>
-      <button id="connect-remote-signer" class="button" type="button">Use mobile signer instead</button>
-      ${hasNip07() ? '<button id="connect-extension-signer" class="button" type="button">Use browser extension instead</button>' : ''}
-    </div>
-    <button id="continue-local" class="auth-link-button" type="button">Continue locally for now</button>
-  </div>`;
 }
 
 async function createLocalAccountFlow(): Promise<void> {
@@ -262,7 +231,10 @@ function showRecoveryKeyModal(pubkey: string, nsec: string): void {
 }
 
 function showRestoreLocalAccountModal(input = '', error: string | null = null): void {
-  openModal(`<div class="page-title">Restore with recovery key</div>
+  // Reached from the account choice screen, so it offers the way back to it. Closing the
+  // modal and reopening it to change your mind is not a way back.
+  openModal(`<button id="account-back" class="auth-back-button" type="button">← Back</button>
+    <div class="page-title">Restore with recovery key</div>
     <p class="section-help">Paste an nsec recovery key. It stays in this browser profile on this device so sync can run without signer prompts.</p>
     <textarea id="local-key-input" class="auth-key-input" rows="4" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="nsec1...">${html(input)}</textarea>
     ${error ? `<p class="auth-error" role="alert">Recovery key error: ${html(error)}</p>` : ''}
@@ -290,6 +262,7 @@ function showRestoreLocalAccountModal(input = '', error: string | null = null): 
     }
   })());
   root.querySelector('#restore-use-signer')?.addEventListener('click', () => { closeModal(); void startRemoteSignerRequest(); });
+  root.querySelector('#account-back')?.addEventListener('click', () => startAccountChoice());
 }
 
 function showSignerConnectModal(uri: string, mobile: boolean): void {

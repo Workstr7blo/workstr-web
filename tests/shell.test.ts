@@ -686,7 +686,10 @@ describe('shell', () => {
     await drainBoot(shell);
   });
 
-  it('opens a single tabbed account modal from the signed-out chip', async () => {
+  // One flow, not two tabs: creating an account and reaching one you already have are not
+  // symmetrical choices, and the tabs presented them as if they were - which is also how
+  // "use a signer" ended up filed under Create, where it never belonged.
+  it('opens one account flow from the signed-out chip', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
     const shell = renderShell(root);
@@ -695,17 +698,16 @@ describe('shell', () => {
     const modal = root.querySelector('#modal.open') as HTMLElement;
     expect(modal).toBeTruthy();
     expect(modal.textContent).toContain('Workstr account');
-    expect(modal.querySelector('#auth-tab-login[aria-selected="true"]')).toBeTruthy();
-    expect(modal.querySelector('#auth-tab-create[aria-selected="false"]')).toBeTruthy();
+    expect(modal.querySelector('.auth-tabs')).toBeNull();
+    expect(modal.querySelector('#auth-tab-login')).toBeNull();
+    expect(modal.querySelector('#auth-tab-create')).toBeNull();
+
+    // Everything on one page, in the order it should be considered in.
+    expect(modal.querySelector('#create-local-account')).toBeTruthy();
+    expect(modal.querySelector('#pair-new-device')).toBeTruthy();
     expect(modal.querySelector('#restore-local-account')).toBeTruthy();
     expect(modal.querySelector('#connect-remote-signer')).toBeTruthy();
-    expect(modal.querySelector('#create-local-account')).toBeNull();
-
-    modal.querySelector<HTMLElement>('#auth-tab-create')?.click();
-    const createModal = root.querySelector('#modal.open') as HTMLElement;
-    expect(createModal.querySelector('#auth-tab-create[aria-selected="true"]')).toBeTruthy();
-    expect(createModal.querySelector('#create-local-account')).toBeTruthy();
-    expect(createModal.querySelector('#restore-local-account')).toBeNull();
+    expect(modal.querySelector('#continue-local')).toBeTruthy();
     await drainBoot(shell);
   });
 

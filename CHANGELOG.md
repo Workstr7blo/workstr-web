@@ -36,6 +36,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Setting up an account is one screen instead of two tabs. Creating an account and connecting
+  one you already have were presented side by side as if they were the same kind of choice,
+  which they are not: there is one way to create a Workstr account, and four ways to reach one
+  you already have. Now the create option sits at the top, the ways in - scan from another
+  device, restore with a recovery key, mobile signer, browser extension - are listed under it
+  in the order most people should try them, and using Workstr without an account is still there
+  at the bottom. Scanning from a device you are already signed in on is marked as the one to
+  pick first.
+
+- The mobile signer and browser extension options no longer appear under "create an account".
+  They connect an account you already have; they cannot make a new one, and listing them there
+  suggested otherwise.
+
 - Settings is organised into five groups you can scan: Account, Training, Payments, Support,
   then System & Data. Every card that was there is still there and still does the same thing -
   what changed is that they are now sorted by what you would go looking for rather than by
