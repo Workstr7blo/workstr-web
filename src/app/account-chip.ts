@@ -131,8 +131,17 @@ function patchChipExtras(chip: HTMLElement, identity: AccountIdentity): void {
 function patchSettingsAccount(root: ParentNode, identity: AccountIdentity): void {
   const card = root.querySelector('.account-card');
   if (!card) return;
-  const summary = card.querySelector(':scope > summary .settings-category-copy small');
-  if (summary) summary.textContent = identity.signedIn ? `Signed in · ${identity.label}` : 'Local only';
+  // What a profile changes is the name and the picture. The lines around them - the signer
+  // it is held in, the npub - are fixed for as long as the account is signed in, so they
+  // are the view's to write and not this function's to overwrite.
+  if (identity.signedIn) {
+    const summary = card.querySelector(':scope > summary .settings-account-summary');
+    if (summary) {
+      patchAvatar(summary, 'settings-account-summary-avatar', identity);
+      const summaryName = summary.querySelector('.settings-category-copy strong');
+      if (summaryName) summaryName.textContent = identity.label;
+    }
+  }
   const row = card.querySelector('.settings-account-identity');
   if (!row || !identity.signedIn) return;
   patchAvatar(row, 'settings-account-avatar', identity);

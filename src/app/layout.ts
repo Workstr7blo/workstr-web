@@ -1,14 +1,7 @@
 import type { AppState, View } from './state';
-import { accountChip, accountIdentity, avatarFace } from './account-chip';
-import { displayIdentity, exerciseFilterValues, html } from './format';
-import { APP_VERSION } from './version';
-import { countdownAudioState } from '../features/train/countdown-audio';
-import { supportPanel } from '../features/support/views';
-import { paymentModeCard } from '../features/support/payment-mode-views';
-import { isFreeEquipment, ownedEquipmentKeys } from '../core/equipment';
-import { normalizePaymentMode } from '../core/types';
-import { normalizeWeightUnit } from '../core/units';
-import { hasNip07 } from '../signer/nip07';
+import { settingsView } from './settings-view';
+import { accountChip, accountIdentity } from './account-chip';
+import { html } from './format';
 import { libraryPanel } from '../features/library/views';
 import { discoverPanel } from '../features/discover/views';
 import { historyCalendarPanel } from '../features/train/history-calendar';
@@ -18,10 +11,7 @@ import { quickWorkoutPanel, recoveryView } from '../features/recovery/views';
 import { programCard, sheetToProgram } from '../features/sheets/views';
 import { programActiveFilters, programFilterSheet, programMatcher, programToolbar, type ProgramBrowser } from '../features/sheets/program-browser';
 import { exerciseFilterSheet, exerciseSelectionBar } from './exercise-browser';
-import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { moneroMode } from '../features/sheets/monero-tip-view';
-import { backupPanel, backupPanelState } from '../features/backup/views';
-import { redactNwcSecrets } from '../nostr/nwc';
 
 const navItems: Array<{ view: View; label: string; icon: string }> = [
   { view: 'exercises', label: 'Exercises', icon: '<path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/>' },
@@ -210,79 +200,5 @@ function statisticsView(state: AppState): string {
     <div class="sub-panel ${active === 'body' ? 'active' : ''}" id="sub-statistics-body">
       ${bodyView(state)}
     </div>
-  </div>`;
-}
-
-// Kit options come from the library plus the Workstr catalog, so equipment can
-// be ticked before any exercise using it has been imported.
-function equipmentRows(state: AppState): string {
-  const options = exerciseFilterValues([...state.library, ...state.discoverExercises]).equipment
-    .filter((item) => !isFreeEquipment(item.key));
-  const owned = new Set(ownedEquipmentKeys(state.settings.ownedEquipment));
-  if (!options.length) {
-    return `<div class="settings-row-main"><div><strong>Equipment</strong><small>No equipment listed yet. Import exercises from Discover and equipment appears here.</small></div><span class="status-pill">0 selected</span></div>`;
-  }
-  const boxes = options.map((item) => `<label class="equip-option"><input type="checkbox" class="equip-toggle" value="${html(item.key)}" ${owned.has(item.key) ? 'checked' : ''} />${html(item.label)}</label>`).join('');
-  return `<div class="settings-inline-section equipment-details">
-    <div class="settings-inline-heading"><span><strong>Equipment</strong><small>Used for Quick Workout suggestions.</small></span><span class="status-pill">${owned.size} selected</span></div>
-    <div class="equip-options">${boxes}</div>
-  </div>`;
-}
-
-function nwcWalletRows(state: AppState): string {
-  const detail = state.nwc.message || (state.nwc.active
-    ? `${state.nwc.walletLabel || 'Wallet connected'}${state.nwc.relayLabel ? ` · ${state.nwc.relayLabel}` : ''}`
-    : 'Paste the NWC string from your wallet. Workstr validates it before saving.');
-  return `<div class="settings-row-main nwc-wallet-row">
-    <div><strong>Zap wallet (NWC)</strong><small>${html(redactNwcSecrets(detail))}</small></div>
-    <div class="settings-row-actions">
-      <button id="nwc-connect" class="button ${state.nwc.active ? '' : 'payment'}">${state.nwc.active ? 'Replace wallet' : 'Connect wallet'}</button>
-      ${state.nwc.active ? '<button id="nwc-disconnect" class="button quiet">Disconnect</button>' : ''}
-    </div>
-  </div>`;
-}
-
-function settingsView(state: AppState): string {
-  const nwc = state.nwc ?? { active: false, status: 'idle' as const };
-  const unit = normalizeWeightUnit(state.settings.unit);
-  const keyLine = state.signerType === 'local' ? 'Device-managed key for faster sync.' : 'Keys stay in your signer.';
-  const accountSummary = state.pubkey ? `Signed in · ${displayIdentity(state)}` : 'Local only';
-  const accountAvatar = avatarFace('settings-account-avatar', accountIdentity(state));
-  const account = state.pubkey
-    ? `<div class="settings-row-main account-row"><div class="settings-account-identity">${accountAvatar}<span><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></span></div><div class="settings-row-actions"><button id="add-device-settings" class="button small">Add device</button><button id="sign-out-settings" class="button small">Sign out</button><button id="remove-account-data" class="button quiet danger small">Remove data</button></div></div>`
-    : `<div class="settings-row-main account-row"><div><strong>Local only</strong><small>Use Workstr now, add encrypted sync when ready.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Account</button></div></div>`;
-  const relay = state.settings.workstrRelay || 'default Workstr relay';
-  const signerType = state.signerType || (state.pubkey ? 'unknown' : 'none');
-  const secureContext = typeof window !== 'undefined' && window.isSecureContext;
-  // Monero Mode replaces the wallet layer rather than adding to it: an NWC connection is a
-  // Lightning instrument, and offering to connect one while creator support is on Monero
-  // would be an invitation to pay over a rail this mode has switched off. The stored
-  // connection is untouched — picking Lightning again brings the card back as it was.
-  const moneroMode = normalizePaymentMode(state.settings.paymentMode) === 'monero';
-  const nwcCard = moneroMode ? '' : `<details class="settings-category nwc-card" data-settings-section="zap-wallet">
-      <summary><span class="settings-category-copy"><strong>Zap wallet</strong><small>${nwc.active ? html(nwc.walletLabel || 'Wallet connected') : 'Not connected'}</small></span><span class="status-pill ${nwc.active ? 'ok' : ''}">${nwc.active ? 'ACTIVE' : 'OFF'}</span></summary>
-      <div class="settings-category-body">${nwcWalletRows({ ...state, nwc })}</div>
-    </details>`;
-  return `<div class="page active settings-page"><div class="page-title">Settings</div>
-    <details class="settings-category account-card" data-settings-section="account">
-      <summary><span class="settings-category-copy"><strong>Account</strong><small>${html(accountSummary)}</small></span><span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'SIGNED IN' : 'LOCAL'}</span></summary>
-      <div class="settings-category-body">${account}</div>
-    </details>
-    ${beastModeSettingsCard(state)}
-    ${backupPanel(backupPanelState(state))}
-    ${nwcCard}
-    ${paymentModeCard(state)}
-    <details class="settings-category training-preferences-card" data-settings-section="training-preferences">
-      <summary><span class="settings-category-copy"><strong>Training Preferences</strong><small>${unit === 'kg' ? 'Kilograms' : 'Pounds'} · ${ownedEquipmentKeys(state.settings.ownedEquipment).length} equipment</small></span></summary>
-      <div class="settings-category-body">
-        <div class="settings-row-main"><div><strong>Weight unit</strong><small>Weights are stored in kilograms and converted for display.</small></div><label class="compact-select"><select id="unit-select"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds</option></select></label></div>
-        ${equipmentRows(state)}
-      </div>
-    </details>
-    ${supportPanel(state.support, nwc, Boolean(state.pubkey), moneroMode)}
-    <details class="settings-category advanced-settings" data-settings-section="advanced">
-      <summary><span class="settings-category-copy"><strong>Advanced</strong><small>Diagnostics, relay, signer, and technical state</small></span></summary>
-      <div class="settings-category-body"><div class="terminal-mini">version: ${html(APP_VERSION)}\nsecure context: ${secureContext}\ncountdown audio: ${html(countdownAudioState())}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nsigner type: ${html(signerType)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div>
-    </details>
   </div>`;
 }

@@ -36,6 +36,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Settings is organised into five groups you can scan: Account, Training, Payments, Support,
+  then System & Data. Every card that was there is still there and still does the same thing -
+  what changed is that they are now sorted by what you would go looking for rather than by
+  which part of the app owns them, with the everyday things near the top and backups, sync and
+  diagnostics gathered at the bottom. Cards in a group sit together in one panel, so a group
+  reads as one thing.
+
+- The card that chooses between Lightning and Monero is now called Payment Mode. It was called
+  Monero Mode, which read as a switch for one of the two answers rather than the question.
+
+- The Account row shows who you are signed in as - your picture, your name and your npub -
+  instead of the word "Account".
+
+- Data & Sync says what it is for rather than repeating its own status badge back at you.
+
 - Photos you are already looking at stay put. When the exercise catalog answered, every
   card in the grid was thrown away and built again, so each picture was fetched and drawn a
   second time even when nothing about it had changed - a visible flicker on a phone, and
