@@ -544,7 +544,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .settings-category > summary:focus-visible { outline: 2px solid var(--purple-2); outline-offset: -3px; }
 .settings-category-copy { min-width: 0; display: grid; gap: 4px; }
 .settings-account-summary { min-width: 0; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; align-items: center; }
-.settings-account-summary .avatar-face { width: 34px; height: 34px; }
+/* Both the picture and the letter that stands in for it, because `avatarFace` renders one
+   or the other under the same class. An unsized <img> here takes its natural dimensions -
+   a 400px profile picture - and overruns the 34px column with the name and npub on top
+   of it. `flex`/`width`/`height` together, so it cannot be stretched by its container. */
+.settings-account-summary-avatar { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; min-width: 34px; overflow: hidden; border: 1px solid var(--border-hot); border-radius: 50%; object-fit: cover; background: rgba(var(--accent-rgb), .18); color: var(--purple-2); font: 900 13px/1 Inter, ui-sans-serif, sans-serif; }
+.settings-account-summary-avatar[hidden] { display: none !important; }
 .settings-account-npub { color: var(--muted); font: 11px/1.2 ui-monospace, monospace; opacity: .8; }
 .settings-category-copy strong { color: var(--text); font: 850 15px/1.15 Inter, ui-sans-serif, sans-serif; }
 .settings-category-copy small { overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
