@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pairing events a pubkey and the relay accept per hour. Pairing never consumes the backup
   quota, and encrypted sync behaves exactly as before.
 
+### Fixed
+
+- The Account row in Settings no longer shows a huge profile picture with your name and npub
+  printed on top of it. The picture had no size set, so it rendered at whatever size the file
+  happened to be - a 400 pixel image took over the whole row. It is a small round avatar again.
+
 ### Changed
 
 - Setting up an account is one screen instead of two tabs. Creating an account and connecting
