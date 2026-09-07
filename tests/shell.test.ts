@@ -450,7 +450,7 @@ describe('shell', () => {
     expect(settings?.textContent).toContain('Data & Sync');
     expect(settings?.textContent).toContain('Training Preferences');
     expect(settings?.textContent).toContain('Support Workstr');
-    expect(settings?.textContent).toContain('Monero Mode');
+    expect(settings?.textContent).toContain('Payment Mode');
     expect(settings?.textContent).toContain('Lightning zaps');
     expect(settings?.querySelector('.advanced-settings:not([open])')).toBeTruthy();
     expect(settings?.querySelectorAll('.settings-category:not([open])')).toHaveLength(8);

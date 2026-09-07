@@ -105,7 +105,7 @@ export function paymentModeCard(state: AppState): string {
     </label>`;
   };
   return `<details class="settings-category payment-mode-card" data-settings-section="payment-mode"${monero ? ' open' : ''}>
-    <summary><span class="settings-category-copy"><strong>Monero Mode</strong><small>${monero ? 'Monero tips' : 'Lightning zaps'}</small></span><span class="status-pill ${monero ? 'ok' : ''}">${monero ? 'MONERO' : 'LIGHTNING'}</span></summary>
+    <summary><span class="settings-category-copy"><strong>Payment Mode</strong><small>${monero ? 'Monero tips' : 'Lightning zaps'}</small></span><span class="status-pill ${monero ? 'ok' : ''}">${monero ? 'MONERO' : 'LIGHTNING'}</span></summary>
     <div class="settings-category-body">
       <p class="section-help">Switch creator support from Lightning zaps to public Monero payment targets. Workouts and programs stay the same.</p>
       <div class="payment-rail" role="radiogroup" aria-label="Creator support">

@@ -66,6 +66,10 @@ describe('Monero payment address settings', () => {
     expect(monero).toContain('It is not stored in Workstr sync.');
     // Opened by default so the address is reachable straight after picking the rail.
     expect(monero).toContain('<details class="settings-category payment-mode-card" data-settings-section="payment-mode" open>');
+    // The card chooses a rail, so it is named for the choice rather than for one of the
+    // answers - calling it Monero Mode read as a Monero feature toggle.
+    expect(monero).toContain('<strong>Payment Mode</strong>');
+    expect(monero).not.toContain('<strong>Monero Mode</strong>');
   });
 
   it('never calls it a wallet and offers no NWC action', () => {
