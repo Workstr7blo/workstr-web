@@ -43,9 +43,14 @@ export function statusPill(state: BackupPanelState): { label: string; ok: boolea
   return { label: state.sync.pending > 0 ? `${state.sync.pending} pending` : 'up to date', ok: true };
 }
 
+// The pill beside it already carries the state - this returned `statusPill().label`
+// verbatim for every signed-in case, so the row said "off / OFF" and "3 pending / 3
+// PENDING". The line says what the card is for instead, and the pill stays the one place
+// the state is read from.
 export function backupSummary(state: BackupPanelState): string {
-  if (!state.signedIn) return 'Local only';
-  return statusPill(state).label;
+  return state.signedIn
+    ? 'Back up, sync, and move your training data'
+    : 'Sign in to back up and sync this device';
 }
 
 const PHASE_LABEL: Record<SyncProgress['phase'], string> = {

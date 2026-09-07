@@ -42,8 +42,11 @@ describe('last sync label', () => {
 
 describe('status pill', () => {
   it('keeps the collapsed data summary meaningful before account setup', () => {
-    expect(backupSummary(panelState({ signedIn: false, enabled: false }))).toBe('Local only');
-    expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).toBe('3 pending');
+    // Not the pill's words. It used to return `statusPill().label` unchanged, so the card
+    // printed the same state twice on one line and told the reader nothing about the card.
+    expect(backupSummary(panelState({ signedIn: false, enabled: false }))).toBe('Sign in to back up and sync this device');
+    expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).toBe('Back up, sync, and move your training data');
+    expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).not.toBe(statusPill(panelState({ sync: { state: 'idle', pending: 3 } })).label);
   });
 
   it('says off before it says anything else', () => {
@@ -154,7 +157,7 @@ describe('patching the status into a mounted card', () => {
     expect(root.querySelector('.data-sync-card .status-pill')?.textContent).toBe('up to date');
     updateBackupStatus(root, panelState({ sync: { state: 'syncing', pending: 3 } }));
     expect(root.querySelector('.data-sync-card .status-pill')?.textContent).toBe('syncing');
-    expect(root.querySelector('.data-sync-card summary .settings-category-copy small')?.textContent).toBe('syncing');
+    expect(root.querySelector('.data-sync-card summary .status-pill')?.textContent).toBe('syncing');
     expect(root.querySelector('#backup-status')?.textContent).toContain('Syncing now…');
   });
 

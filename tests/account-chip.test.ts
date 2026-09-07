@@ -1,27 +1,40 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
+import { settingsView } from '../src/app/settings-view';
 import { accountChip, accountIdentity, avatarFace, updateAccountIdentity, type AccountIdentity } from '../src/app/account-chip';
 import type { AppState } from '../src/app/state';
 
+// Enough state to render the whole Settings page, because that is what the patch runs
+// against. The identity fields are what these tests actually vary.
 const state = (over: Partial<AppState> = {}): AppState => ({
   pubkey: 'ab'.repeat(32),
+  npub: 'npub1trainer',
   profileName: 'Trainer',
   profilePicture: 'https://example.invalid/a.png',
+  profileNames: {},
+  signerType: 'local',
+  store: null,
   settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [] },
+  support: { status: 'idle', receipts: [] },
+  nwc: { active: false, status: 'idle' },
+  monero: { status: 'idle', address: '' },
+  library: [],
+  discoverExercises: [],
+  finishedSessions: [],
+  sheets: [],
+  backup: { state: 'off', pending: 0 },
+  signInStatus: null,
   ...over
-} as AppState);
+} as unknown as AppState);
 
-// The chip and the Settings card as the shell mounts them, so the patch is exercised
-// against the markup it will actually meet.
-function mount(identity: AccountIdentity): HTMLElement {
+// The chip beside the real Settings page, not a hand-written imitation of it. A fixture
+// that only looked like the card let the card be restructured underneath this patch without
+// a single test failing - the page rendered correctly and then had its summary overwritten
+// at runtime. `settingsView` is the markup the patch will actually meet.
+function mount(identity: AccountIdentity, appState = state()): HTMLElement {
   document.body.innerHTML = `<div id="app">
     <div class="topbar-actions">${accountChip(identity)}</div>
-    <details class="settings-category account-card" data-settings-section="account">
-      <summary><span class="settings-category-copy"><strong>Account</strong><small>Signed in · ${identity.label}</small></span></summary>
-      <div class="settings-row-main account-row">
-        <div class="settings-account-identity">${avatarFace('settings-account-avatar', identity)}<span><strong>${identity.label}</strong><small>Keys stay in your signer.</small></span></div>
-      </div>
-    </details>
+    ${settingsView(appState)}
   </div>`;
   return document.getElementById('app') as HTMLElement;
 }
@@ -45,7 +58,11 @@ describe('the account chip', () => {
     expect(root.querySelector('img.connection-avatar')).toBe(image);
     expect(root.querySelector('.connection-chip-label')?.textContent).toBe('Coach');
     expect(root.querySelector('.settings-account-identity strong')?.textContent).toBe('Coach');
-    expect(root.querySelector('.account-card summary small')?.textContent).toBe('Signed in · Coach');
+    // The name is patched where the name lives. The line under it says which signer holds
+    // the key, which a profile does not change - overwriting it with the name was the bug
+    // this assertion replaces.
+    expect(root.querySelector('.account-card summary .settings-category-copy strong')?.textContent).toBe('Coach');
+    expect(root.querySelector('.account-card summary .settings-category-copy small')?.textContent).toBe('Signed in with a device key');
   });
 
   it('moves the same element to a new picture rather than making another', () => {
@@ -65,7 +82,7 @@ describe('the account chip', () => {
     expect(root.querySelector('img.connection-avatar')?.getAttribute('src')).toBe('https://example.invalid/a.png');
     expect(root.querySelector('img.settings-account-avatar')).toBeTruthy();
     expect(root.querySelector('.settings-account-identity strong')?.textContent).toBe('Trainer');
-    expect(root.querySelector('.settings-account-identity small')?.textContent).toBe('Keys stay in your signer.');
+    expect(root.querySelector('.settings-account-identity small')?.textContent).toBe('Device-managed key for faster sync.');
   });
 
   it('puts a failed picture back on screen when a working one replaces it', () => {
