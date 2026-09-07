@@ -36,6 +36,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Photos you are already looking at stay put. When the exercise catalog answered, every
+  card in the grid was thrown away and built again, so each picture was fetched and drawn a
+  second time even when nothing about it had changed - a visible flicker on a phone, and
+  wasted data. Cards are now compared one by one and only the ones that actually changed are
+  rewritten.
+
+- Settings stops shifting under you. Opening Settings starts a read of the public zap
+  receipts, which answers twice, and each answer used to redraw the page and close whatever
+  category you had expanded. So did turning sync on or off - inside the very card holding
+  the switch. Both now update just the part that changed, and the section you are reading
+  stays open because nothing takes it away.
+
 - A live workout no longer freezes the rest of the app. Because a background refresh used to
   redraw everything, and redrawing everything mid-workout would have taken away the reps you
   had typed and reset a running rest timer, Workstr simply refused to redraw at all while a

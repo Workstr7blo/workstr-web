@@ -1,4 +1,5 @@
-import { discoverGrid } from '../features/discover/views';
+import { discoverCards, discoverEmptyText } from '../features/discover/views';
+import { writeCards } from './card-grid';
 import { programStatusLine } from './layout';
 import type { AppState } from './state';
 
@@ -33,7 +34,7 @@ export function updateProgramCatalogStatus(root: ParentNode, state: AppState): b
 export function updateDiscoverExercises(root: ParentNode, state: AppState): boolean {
   const grid = root.querySelector('#discover-grid');
   if (!grid) return false;
-  grid.innerHTML = discoverGrid(state);
+  writeCards(grid, discoverCards(state), discoverEmptyText(state), 'data-address');
   grid.classList.toggle('selecting', state.discoverSelect.active);
   updateExerciseCatalogStatus(root, state);
   return true;

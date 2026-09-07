@@ -276,8 +276,16 @@ Not a milestone and not scheduled. Built only if the funding trigger in `instruc
 
 ## Known debt
 
-- `render()` rebuilds the whole root on every state change (54 call sites). Fine at
-  current DOM size; the session runner's in-place patching is the pattern to copy if
-  lists get janky.
+- `render()` writes the current page, not the application (#178). The frame - topbar,
+  avatar, navigation, session overlay, modal host, toast - is mounted once at boot and is
+  never rewritten; a render replaces `#page-host` and the sheets belonging to that page.
+  Background work does not render at all: the account chip, the catalog grids and status
+  lines, the sync status and card, and the support funding meter are each written into the
+  surface that shows them, and report `false` when that surface is not on screen so the
+  caller simply keeps the state. Grids reconcile by key, so a card that has not changed
+  keeps its node and its photo. A cold start costs three renders; `tests/render-budget.test.ts`
+  holds that number and the node-identity guarantees that go with it. The remaining debt is
+  narrower: a page render still rebuilds its whole page, which is right at current DOM size
+  and is the thing to revisit if a single page gets janky.
 - The app shell and live runner are divided into focused coordinators, controllers,
   views, timing, persistence, and summary modules; neither remains oversized.

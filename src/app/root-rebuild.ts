@@ -1,5 +1,4 @@
 import { preservingScroll } from './scroll';
-import { preservingSettingsDisclosures } from './settings-disclosure';
 
 // Rendering scope is the open question this file exists to narrow, so the count of
 // rebuilds is kept here rather than at any of the hundred-odd `render()` call sites: a
@@ -65,10 +64,12 @@ export function createRenderTrace(): RenderTrace {
 // guard but the absence of the hazard: background work during a session repaints the page
 // behind the overlay, where the user cannot see it and the session does not live.
 //
-// The disclosures are restored inside the scroll pass, not around it: reopening a category
-// changes the height of the page, and the reading position has to be put back against the
-// page the reader will actually see.
+// It also used to capture which Settings categories were open and reopen them afterwards,
+// because background work redrew the page a reader was sitting on. Nothing background
+// redraws Settings any more - the account chip, the catalog, the sync status, the funding
+// meter and the sync switch are all written into the surfaces that show them - so a render
+// here is a page the reader asked for, and a fresh page opens as a fresh page.
 export function rebuildRoot(root: HTMLElement, rebuild: () => void, options: RebuildOptions = {}): void {
   options.trace?.record({ reason: options.reason || UNATTRIBUTED });
-  preservingScroll(root, () => preservingSettingsDisclosures(root, rebuild), options.toTop);
+  preservingScroll(root, rebuild, options.toTop);
 }

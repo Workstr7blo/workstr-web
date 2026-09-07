@@ -1,4 +1,5 @@
-import { libraryEmptyText, libraryGrid } from '../features/library/views';
+import { libraryCards, libraryEmptyText } from '../features/library/views';
+import { writeCards } from './card-grid';
 import { programFilterMatches, programMatchLabel, programFilterValues, type ProgramBrowser, type ProgramFilterKey } from '../features/sheets/program-browser';
 import { updateDiscoverExercises } from './catalog-surfaces';
 import { exerciseFacets, exerciseMatchLabel, exerciseResults, type ExerciseFacet, type ExerciseView } from './exercise-browser';
@@ -24,7 +25,8 @@ export function renderExerciseResults(root: ParentNode, state: AppState, view: E
 export function updateLibraryExercises(root: ParentNode, state: AppState): void {
   const grid = root.querySelector('#ex-grid');
   if (!grid) return;
-  grid.innerHTML = libraryGrid(state);
+  // The empty line for the library is its own node below the grid, not a card inside it.
+  writeCards(grid, libraryCards(state), '', 'data-slug');
   grid.classList.toggle('selecting', state.librarySelect.active);
   const empty = root.querySelector<HTMLElement>('#ex-empty');
   if (!empty) return;
