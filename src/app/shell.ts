@@ -186,6 +186,19 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     void sessionRunner.openSessionOverlay(state.activeSession);
   }
 
+  // Every control inside the Data & Sync card, in one place because the card has two ways
+  // of arriving: written with the page by a render, or written into the standing card when
+  // sync is switched on or off. Both bind through here, so neither can drift from the other
+  // and a patched card is never left with dead controls.
+  function bindBackupCard(): void {
+    root.querySelector('#auto-backup')?.addEventListener('change', (event) => { void backup.setEnabled((event.target as HTMLInputElement).checked); });
+    root.querySelector('#enable-sync')?.addEventListener('click', () => { void backup.setEnabled(true); });
+    root.querySelector('#sync-now')?.addEventListener('click', () => { void backup.syncNow(); });
+    root.querySelector('#export-data')?.addEventListener('click', () => { void preferences.exportUserData(); });
+    root.querySelector('#import-data')?.addEventListener('click', () => root.querySelector<HTMLInputElement>('#import-file')?.click());
+    root.querySelector('#import-file')?.addEventListener('change', (event) => { void preferences.importUserData(event.target as HTMLInputElement); });
+  }
+
   // Bound once, to elements a page render does not replace. Navigation is delegated from
   // the root because a page can carry a jump of its own - Statistics offers "Go to
   // Workouts", an empty library offers "Browse Discover" - and those buttons come and go.
@@ -239,11 +252,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       if (rail.checked) void preferences.savePaymentMode(rail.value).then(() => { moneroAddress.refreshIfNeeded(); void catalog.refreshAuthorPaymentTargets(); });
     }));
     root.querySelectorAll('.equip-toggle').forEach((box) => box.addEventListener('change', () => { void preferences.saveOwnedEquipment(); }));
-    root.querySelector('#auto-backup')?.addEventListener('change', (event) => { void backup.setEnabled((event.target as HTMLInputElement).checked); }); root.querySelector('#enable-sync')?.addEventListener('click', () => { void backup.setEnabled(true); });
-    root.querySelector('#sync-now')?.addEventListener('click', () => { void backup.syncNow(); });
-    root.querySelector('#export-data')?.addEventListener('click', () => { void preferences.exportUserData(); });
-    root.querySelector('#import-data')?.addEventListener('click', () => root.querySelector<HTMLInputElement>('#import-file')?.click());
-    root.querySelector('#import-file')?.addEventListener('change', (event) => { void preferences.importUserData(event.target as HTMLInputElement); });
+    bindBackupCard();
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void catalog.refreshExercises(); }));
     root.querySelectorAll('#refresh-programs').forEach((button) => button.addEventListener('click', () => { void catalog.refreshPrograms(); }));
     // Typing redraws the results, not the application. The input is never touched, so there
@@ -339,7 +348,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     bindTip: moneroTip.bind,
     bindZap: nwc.bindProgramCards
   });
-  const backup = createBackupController({ root, state, render, toast, getSigner: identity.getActiveSigner, onSignerStalled: identity.dropActiveSigner, onRestored: () => { void refreshFromStore(); }, requestSignIn: () => { identity.startAccountChoice(); } });
+  const backup = createBackupController({ root, state, render, toast, getSigner: identity.getActiveSigner, onSignerStalled: identity.dropActiveSigner, onRestored: () => { void refreshFromStore(); }, requestSignIn: () => { identity.startAccountChoice(); }, bindCard: bindBackupCard });
 
   function unitLabel(): string { return normalizeWeightUnit(state.settings.unit); }
 

@@ -57,33 +57,6 @@ describe('rebuilding the shell root', () => {
     expect((root.querySelector('.content') as HTMLElement).scrollTop).toBe(640);
   });
 
-  // Which Settings categories are expanded lives in the DOM alone, so a rebuild for a sync
-  // tick or an arriving profile used to collapse the card being read.
-  it('reopens the Settings categories the reader had expanded', () => {
-    const root = shell(false);
-    root.querySelector('#page-host')!.innerHTML = `
-      <details data-settings-section="account" open></details>
-      <details data-settings-section="sync"></details>`;
-    rebuildRoot(root, () => {
-      root.querySelector('#page-host')!.innerHTML = `
-        <details data-settings-section="account"></details>
-        <details data-settings-section="sync"></details>`;
-    });
-    expect(root.querySelector<HTMLDetailsElement>('[data-settings-section="account"]')?.open).toBe(true);
-    expect(root.querySelector<HTMLDetailsElement>('[data-settings-section="sync"]')?.open).toBe(false);
-  });
-
-  // Monero Mode ships its card open so switching rails reveals the address section. Writing
-  // the captured closed state back over that would undo the reveal.
-  it('leaves a category the fresh markup opens on its own alone', () => {
-    const root = shell(false);
-    root.querySelector('#page-host')!.innerHTML = '<details data-settings-section="payment-mode"></details>';
-    rebuildRoot(root, () => {
-      root.querySelector('#page-host')!.innerHTML = '<details data-settings-section="payment-mode" open></details>';
-    });
-    expect(root.querySelector<HTMLDetailsElement>('[data-settings-section="payment-mode"]')?.open).toBe(true);
-  });
-
   it('goes to the top when the redraw is a different view', () => {
     const root = shell(false);
     (root.querySelector('.content') as HTMLElement).scrollTop = 640;

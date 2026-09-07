@@ -1,5 +1,6 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
+import type { GridCard } from '../../app/card-grid';
 import { difficultyBadgeClass, EX_PLACEHOLDER, exerciseSourceLabel, html } from '../../app/format';
 import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults, exerciseToolbar } from '../../app/exercise-browser';
 import { responsiveImageUrl } from '../../core/media';
@@ -19,10 +20,17 @@ export function libraryPanel(state: AppState): string {
 // thrown away. Clicks are delegated to `#ex-grid` itself, so replacing what is inside it
 // costs no listeners.
 export function libraryGrid(state: AppState): string {
+  return libraryCards(state).map((card) => card.html).join('');
+}
+
+// The same cards, keyed the way the markup keys them, so a caller can write the ones that
+// changed instead of all of them.
+export function libraryCards(state: AppState): GridCard[] {
   const sel = state.librarySelect;
-  return exerciseResults('library', state)
-    .map((exercise) => exerciseCardHtml(exercise, sel.active, sel.slugs.has(exercise.slug)))
-    .join('');
+  return exerciseResults('library', state).map((exercise) => ({
+    key: exercise.slug,
+    html: exerciseCardHtml(exercise, sel.active, sel.slugs.has(exercise.slug))
+  }));
 }
 
 // An empty library and a filter that matches nothing are different situations and read

@@ -36,7 +36,10 @@ and patch it directly, which is also why a page render can leave it standing.
 | Catalog surfaces: what a relay answer is written into, and when nothing is | `src/app/catalog-surfaces.ts` | `src/app/catalog-controller.ts`, `src/features/discover/views.ts` (`discoverGrid`) | `tests/shell.test.ts`, `tests/discover.test.ts` |
 | The account chip and the Settings Account identity | `src/app/account-chip.ts` | `src/app/layout.ts`, `src/app/shell.ts` (profile hydration) | `tests/account-chip.test.ts`, `tests/shell.test.ts` |
 | The persistent frame, top-level navigation and page markup | `src/app/layout.ts` (`shellFrame`, `appView`, `pageOverlays`, `updateNavigation`) | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
-| Redrawing the page: what made it happen, and keeping the reader's place | `src/app/root-rebuild.ts`, `src/app/scroll.ts`, `src/app/settings-disclosure.ts` | `src/app/shell.ts` (`render`), the `.content` pane in `src/app/layout.ts` | `tests/root-rebuild.test.ts`, `tests/scroll.test.ts`, `tests/shell.test.ts` |
+| Redrawing the page: what made it happen, and keeping the reader's place | `src/app/root-rebuild.ts`, `src/app/scroll.ts` | `src/app/shell.ts` (`render`), the `.content` pane in `src/app/layout.ts` | `tests/root-rebuild.test.ts`, `tests/scroll.test.ts`, `tests/render-budget.test.ts` |
+| How much the app redraws, and what a background answer may never replace | `tests/render-budget.test.ts` | every surface writer below | `tests/render-budget.test.ts` |
+| Writing a grid of cards without rebuilding the ones that did not change | `src/app/card-grid.ts` | `src/app/catalog-surfaces.ts`, `src/app/browse-surfaces.ts`, `src/features/discover/views.ts` (`discoverCards`), `src/features/library/views.ts` (`libraryCards`) | `tests/card-grid.test.ts`, `tests/render-budget.test.ts` |
+| Settings surfaces a background answer writes in place | `src/features/support/views.ts` (`updateSupportFunding`), `src/features/backup/views.ts` (`updateBackupStatus`, `updateBackupCard`) | `src/app/preferences-controller.ts`, `src/app/backup-controller.ts`, `src/app/shell.ts` (`bindBackupCard`) | `tests/backup-views.test.ts`, `tests/render-budget.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Responsive image delivery for exercise photos | `src/core/media.ts` | `src/features/train/session-hero.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/features/sheets/builder-views.ts`, `src/app/catalog-controller.ts` | `tests/media.test.ts`, `tests/session-runner.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
@@ -114,6 +117,14 @@ and patch it directly, which is also why a page render can leave it standing.
   one passes through here, so `createRenderTrace` is the only place that can say how many a
   cold start costs and what asked for each one. The count is on the shell handle as
   `renders`; the reasons reach a dev console and are stripped from a production build.
+  `tests/render-budget.test.ts` asserts that count and the identities a background answer
+  must not replace - it is the regression floor for #178, not a performance benchmark.
+- `src/app/card-grid.ts` writes a keyed grid: a card whose markup has not changed keeps its
+  node, and with it the exercise photo already painted. Scoping a catalog answer to the grid
+  stopped the page being rebuilt, but writing the grid with one `innerHTML` still destroyed
+  every card in it. Note it parses every card before comparing - a node the parser has
+  serialised and the template it came from are not the same string, and comparing them raw
+  finds every card changed and preserves nothing.
 - `src/app/browse-surfaces.ts` writes the surfaces a filter changes and nothing else: the
   Library grid and its empty line, the Discover grid, a program list, the selection bar's
   labels and counts, and the open filter sheet's option states and match count. The sheets
@@ -124,11 +135,6 @@ and patch it directly, which is also why a page render can leave it standing.
   are scoped rather than delegated, so a freshly written list binds its own cards without
   doubling a listener on one that was already there; the exercise grids delegate instead,
   because they carry one action per card and these carry nine.
-- `src/app/settings-disclosure.ts` carries the expanded Settings categories across a
-  rebuild. Which `<details data-settings-section>` are open is held in the DOM alone, so a
-  rebuild collapsed the card being read; it reopens what the reader had open and never
-  closes what the fresh markup opened itself. A mitigation for rebuilding Settings for
-  background state at all.
 - `src/app/program-builder.ts` owns program-builder modal state, exercise selection,
   normal/superset and EMOM prescriptions, row ordering, validation, and persistence.
 - `src/app/program-publish-controller.ts` owns Beast Mode local program publish

@@ -218,7 +218,7 @@ describe('what a sync status redraws', () => {
       backup: { state: 'off', pending: 0 }
     } as unknown as AppState;
     const controller = createBackupController({
-      root, state, render, toast: vi.fn(), getSigner: async () => null, requestSignIn: vi.fn()
+      root, state, render, toast: vi.fn(), getSigner: async () => null, requestSignIn: vi.fn(), bindCard: vi.fn()
     });
     await controller.resume();
 

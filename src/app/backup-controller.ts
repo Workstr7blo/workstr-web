@@ -1,7 +1,7 @@
 import type { RenderOptions } from './root-rebuild';
 import type { AppState } from './state';
 import type { Signer } from '../signer/types';
-import { backupPanelState, updateBackupStatus } from '../features/backup/views';
+import { backupPanelState, updateBackupCard, updateBackupStatus } from '../features/backup/views';
 import { createSyncEngine, type SyncEngine, type SyncStatus } from '../sync/engine';
 
 // Survives the sign-in round trip, including a NIP-46 hop out to a signer app and back.
@@ -24,6 +24,10 @@ export interface BackupControllerContext {
   // device and invisible.
   onRestored?(): void;
   requestSignIn(): void;
+  // Rebinds the controls inside the Data & Sync card after its body has been rewritten.
+  // Turning sync on or off replaces the controls themselves, so patching the card without
+  // this would leave a switch that does nothing.
+  bindCard(): void;
   relayUrl?: string;
 }
 
@@ -60,11 +64,21 @@ export function createBackupController(ctx: BackupControllerContext): BackupCont
     ctx.state.backup = { state: 'off', pending: 0 };
   };
 
+  // Turning sync on or off changes which controls the card has, so the status patch above
+  // cannot carry it. A render could - but the reader is inside this card when they press
+  // the switch, and a rebuilt page would close it under them. The card is written in place
+  // instead, and a
+  // reader who is not on Settings gets nothing written and keeps the state.
+  function writeCard(reason: string): void {
+    if (updateBackupCard(ctx.root, backupPanelState(ctx.state))) ctx.bindCard();
+    else ctx.render({ reason });
+  }
+
   async function enable(): Promise<void> {
     const store = ctx.state.store;
     if (!store) return;
     ctx.state.settings.backup = await store.saveBackupState({ enabled: true });
-    ctx.render({ reason: 'sync-enabled' });
+    writeCard('sync-enabled');
     await engineFor()?.start();
   }
 
@@ -89,14 +103,14 @@ export function createBackupController(ctx: BackupControllerContext): BackupCont
         engine?.stop();
         engine = null;
         if (store) ctx.state.settings.backup = await store.saveBackupState({ enabled: false });
-        ctx.render({ reason: 'sync-disabled' });
+        writeCard('sync-disabled');
         return;
       }
       // The one unavoidable step: records are encrypted to the user's own key and signed
       // by it, so there is nothing to back up to until there is an identity.
       if (!ctx.state.pubkey) {
         localStorage.setItem(INTENT_KEY, '1');
-        ctx.render({ reason: 'sync-needs-sign-in' });
+        writeCard('sync-needs-sign-in');
         ctx.toast('Sign in to turn on sync.');
         ctx.requestSignIn();
         return;

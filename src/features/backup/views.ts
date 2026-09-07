@@ -109,6 +109,16 @@ export function backupPanelState(state: AppState): BackupPanelState {
 export function backupPanel(state: BackupPanelState): string {
   const pill = statusPill(state);
   const summary = backupSummary(state);
+  return `<details class="settings-category data-sync-card" data-settings-section="sync">
+    <summary><span class="settings-category-copy"><strong>Data &amp; Sync</strong><small>${html(summary)}</small></span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></summary>
+    <div class="settings-category-body">${backupCardBody(state)}</div>
+  </details>`;
+}
+
+// The body alone, so turning sync on or off can be written into the card that is already
+// standing. Everything above it - the `<details>` element itself, and with it whether the
+// reader had the card expanded - is not part of this.
+export function backupCardBody(state: BackupPanelState): string {
   const localOnly = state.backup?.localOnlyHistoryCount ?? 0;
   const eraLine = state.signedIn && state.enabled && localOnly > 0
     ? `<div class="settings-subtle-row"><span>Local-only older workouts</span><strong>${localOnly}</strong></div>`
@@ -129,9 +139,7 @@ export function backupPanel(state: BackupPanelState): string {
   const olderNote = state.signedIn && state.enabled && localOnly > 0
     ? `<p class="section-help">Those older workouts stay on this device and are included when you export JSON.</p>`
     : '';
-  return `<details class="settings-category data-sync-card" data-settings-section="sync">
-    <summary><span class="settings-category-copy"><strong>Data &amp; Sync</strong><small>${html(summary)}</small></span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></summary>
-    <div class="settings-category-body">
+  return `
       <section class="settings-control-group sync-control-group" aria-label="Sync">
         <div class="settings-control-heading"><span><strong>Sync</strong><small>${html(syncCopy)}</small></span></div>
         <div class="settings-row-main sync-control-row"><div><strong>Auto-sync</strong><small>${state.enabled ? 'Keep this device current automatically.' : 'Turn on encrypted backup.'}</small></div><div class="settings-row-actions">${syncAction}</div></div>
@@ -144,9 +152,30 @@ export function backupPanel(state: BackupPanelState): string {
           <div><strong>Export or import</strong><small>JSON includes all local training data.</small></div>
           <div class="settings-row-actions"><button id="export-data" class="button">Export JSON</button><button id="import-data" class="button">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
         </div>
-      </section>
-    </div>
-  </details>`;
+      </section>`;
+}
+
+// Turning sync on or off changes which controls the card has, not only what they say, so
+// the status patch above cannot carry it - but a render cannot either, because the reader
+// is inside this card when they press the switch and a rebuilt page would close it under
+// them. The body is written into the standing `<details>`, and the caller rebinds the
+// controls it just replaced.
+//
+// False when the card is not mounted, which is every view except Settings.
+export function updateBackupCard(root: ParentNode, state: BackupPanelState): boolean {
+  const card = root.querySelector('.data-sync-card');
+  const body = card?.querySelector(':scope > .settings-category-body');
+  if (!card || !body) return false;
+  const pill = statusPill(state);
+  const pillEl = card.querySelector(':scope > summary .status-pill');
+  if (pillEl) {
+    pillEl.textContent = pill.label;
+    pillEl.classList.toggle('ok', pill.ok);
+  }
+  const summary = card.querySelector(':scope > summary .settings-category-copy small');
+  if (summary) summary.textContent = backupSummary(state);
+  body.innerHTML = backupCardBody(state);
+  return true;
 }
 
 // The sync engine reports a status for every phase and every step within it, so a single
