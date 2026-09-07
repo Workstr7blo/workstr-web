@@ -6,6 +6,7 @@ import { normalizeStatsRange } from '../features/progress/stats';
 import { LOCAL_NAMESPACE } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
 import { fetchMonthlyZapReceipts } from '../nostr/zaps';
+import { updateSupportFunding } from '../features/support/views';
 import type { RelayProgram } from '../nostr/canon';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
 import { getQuickWorkout } from '../features/recovery/quickWorkout';
@@ -61,13 +62,17 @@ function bindBodyControls(): void {
 async function refreshFunding(): Promise<void> {
   if (state.support.status === 'loading' || state.support.status === 'ready') return;
   state.support = { ...state.support, status: 'loading' };
-  render({ reason: 'support-funding-loading' });
+  // Written into the card rather than through a render: the reader is on Settings when this
+  // runs - that is what starts it - and rebuilding the page would close the category they
+  // are reading, twice, seconds apart. A reader who has navigated away gets nothing written
+  // and keeps the state, which the next render of Settings reads.
+  if (!updateSupportFunding(root, state.support)) render({ reason: 'support-funding-loading' });
   try {
     state.support = { status: 'ready', receipts: await fetchMonthlyZapReceipts(), fetchedAt: Date.now() };
   } catch {
     state.support = { ...state.support, status: 'offline' };
   }
-  render({ reason: 'support-funding-loaded' });
+  if (!updateSupportFunding(root, state.support)) render({ reason: 'support-funding-loaded' });
 }
 
 function bindRecoveryControls(): void {

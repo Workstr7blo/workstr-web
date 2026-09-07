@@ -111,8 +111,29 @@ export function supportPanel(state: SupportState = { status: 'idle', receipts: [
           <strong>NIP-57</strong>
         </div>
       </div>
-      ${fundingPanel(state)}
+      <div id="support-funding">${fundingPanel(state)}</div>
     </div>
     </div>
   </details>`;
+}
+
+// Reading the zap receipts is the one background answer that lands on Settings while the
+// reader is sitting in it, and it arrives twice - once to say it is reading, once with the
+// month. Rendering the page for either closed whichever category was open, which is the
+// last thing `src/app/settings-disclosure.ts` existed to paper over. Only the two summary
+// lines and the meter depend on the funding state, and none of them carries a control, so
+// this needs no rebinding.
+//
+// False when the card is not mounted, which is every view except Settings.
+export function updateSupportFunding(root: ParentNode, state: SupportState): boolean {
+  const card = root.querySelector('.support-panel');
+  if (!card) return false;
+  const summary = supportSummary(state);
+  const head = card.querySelector(':scope > summary .settings-category-copy small');
+  if (head) head.textContent = summary;
+  const row = card.querySelector('.support-summary-row small');
+  if (row) row.textContent = summary;
+  const meter = card.querySelector('#support-funding');
+  if (meter) meter.innerHTML = fundingPanel(state);
+  return true;
 }

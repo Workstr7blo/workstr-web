@@ -110,33 +110,10 @@ async function cleanupExercises(shell: ShellHandle): Promise<void> {
 }
 
 describe('shell', () => {
-  // The baseline for #178. Every increment of that issue removes callers from the render
-  // path, and the only way to tell a render that was removed from one that moved somewhere
-  // else is to count them all at the one place they pass through. These numbers are what
-  // the app does today, not what it should do: when an increment lands, they go down and
-  // this test is updated to the new count. It rising is the regression.
+  // The signed-out cold-start count lives in `tests/render-budget.test.ts`, which owns the
+  // budget for #178. This one stays here because it is about what the chip does, not only
+  // how many renders it costs.
   //
-  // A signed-out cold start, catalog relays stubbed: 3 renders. Since the shell is mounted
-  // once, each of these replaces the page and leaves the frame standing - the count did not
-  // move for the persistent-shell split, what a count costs did. The frame is written once,
-  // and the tests below assert that by node identity rather than by counting.
-  it('renders the page three times during a local cold start', async () => {
-    document.body.innerHTML = '<div id="app"></div>';
-    const root = document.getElementById('app') as HTMLElement;
-    const shell = renderShell(root);
-    await drainBoot(shell);
-
-    expect(shell.renders.recent.map((record) => record.reason)).toEqual([
-      'boot-first-paint',
-      'store-reload',
-      'boot-account-open'
-    ]);
-    expect(shell.renders.rebuilds).toBe(3);
-    // Nothing on the boot path may render without saying why, or the baseline stops being
-    // readable the moment it changes.
-    expect(shell.renders.recent.filter((record) => record.reason === 'unattributed')).toEqual([]);
-  });
-
   // Signing in adds one, for the cached profile. The relay's answer used to add a second -
   // the flash a moment after launch that rebuilt the topbar, the navigation, every image
   // and the current page to change a name and a picture. It patches the chip now (#184).

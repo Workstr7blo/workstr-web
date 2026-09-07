@@ -1,5 +1,6 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
+import type { GridCard } from '../../app/card-grid';
 import { authorPill, difficultyBadgeClass, EX_PLACEHOLDER, html } from '../../app/format';
 import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults, exerciseToolbar } from '../../app/exercise-browser';
 import { responsiveImageUrl } from '../../core/media';
@@ -82,4 +83,20 @@ export function discoverGrid(state: AppState): string {
     ? 'The official Workstr catalog loads here. Importing an exercise copies it into your local library, which is what you edit and add to programs; updates appear when catalog versions are newer.'
     : 'No exercises match.';
   return list.map((exercise) => discoverCardHtml(exercise, state)).join('') || `<div class="empty">${empty}</div>`;
+}
+
+// The same cards the grid is made of, keyed the way the markup keys them, so a caller can
+// write the ones that changed instead of all of them.
+export function discoverCards(state: AppState): GridCard[] {
+  return exerciseResults('discover', state).map((exercise) => ({
+    key: exercise.nostr_address || exercise.slug,
+    html: discoverCardHtml(exercise, state)
+  }));
+}
+
+export function discoverEmptyText(state: AppState): string {
+  const hasFilters = Boolean(exerciseQuery('discover', state) || activeFacetCount('discover', state));
+  return state.discoverExercises.length === 0 && !hasFilters
+    ? '<div class="empty">The official Workstr catalog loads here. Importing an exercise copies it into your local library, which is what you edit and add to programs; updates appear when catalog versions are newer.</div>'
+    : '<div class="empty">No exercises match.</div>';
 }
