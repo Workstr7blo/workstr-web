@@ -145,12 +145,35 @@
   box-shadow: 0 0 20px rgba(var(--payment-rgb), .17);
 }
 .web-empty-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-.settings-auth-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
-.settings-auth-options.single-column { grid-template-columns: 1fr; }
-.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 18px 0 14px; padding: 4px; border: 1px solid var(--border); border-radius: 15px; background: rgba(0,0,0,.22); }
-.auth-tab { min-height: 42px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); font: 850 12px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; cursor: pointer; }
-.auth-tab.active { color: var(--on-accent); background: linear-gradient(135deg, var(--sovereign-purple), var(--accent-deep)); box-shadow: 0 0 24px rgba(var(--accent-rgb), .28); }
-.auth-panel { margin-top: 8px; }
+/* Three levels of emphasis, because the three kinds of choice here are not equal: create an
+   account, connect one you already have, or carry on without one. */
+.account-create { display: grid; grid-template-columns: 48px minmax(0, 1fr) max-content; gap: 14px; align-items: center; margin: 18px 0 0; padding: 18px; border: 1px solid rgba(var(--accent-rgb), .42); border-radius: 18px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .18), rgba(var(--accent-rgb), .06)); }
+.account-create-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; color: var(--purple-2); background: rgba(var(--accent-rgb), .22); }
+.account-create-icon svg { width: 24px; height: 24px; }
+.account-create-copy { min-width: 0; display: grid; gap: 5px; }
+.account-create-copy strong { color: var(--text); font: 850 16px/1.2 Inter, ui-sans-serif, sans-serif; }
+.account-create-copy small { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.account-create-cta { white-space: nowrap; }
+.account-divider { display: grid; grid-template-columns: 1fr max-content 1fr; gap: 12px; align-items: center; margin: 20px 0 12px; }
+.account-divider::before, .account-divider::after { content: ''; height: 1px; background: var(--border); }
+.account-divider span { color: var(--text); font: 800 13px/1 Inter, ui-sans-serif, sans-serif; }
+.account-paths { display: grid; gap: 8px; }
+/* A menu of routes, not a wall of equal buttons - each row says what it is and where it
+   goes, and the one worth picking first is lifted rather than shouted. */
+.account-path { display: grid; grid-template-columns: 40px minmax(0, 1fr) 16px; gap: 12px; align-items: center; width: 100%; min-height: 64px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,.025); text-align: left; cursor: pointer; }
+.account-path:hover { border-color: rgba(var(--accent-line-rgb), .38); background: rgba(255,255,255,.045); }
+.account-path:focus-visible { outline: 2px solid var(--purple-2); outline-offset: 2px; }
+.account-path.recommended { border-color: rgba(var(--accent-rgb), .42); background: linear-gradient(135deg, rgba(var(--accent-rgb), .14), rgba(var(--accent-rgb), .04)); }
+.account-path-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: var(--purple-2); background: rgba(var(--accent-rgb), .14); }
+.account-path-icon svg { width: 20px; height: 20px; }
+.account-path-copy { min-width: 0; display: grid; gap: 3px; }
+.account-path-copy strong { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--text); font: 850 14.5px/1.2 Inter, ui-sans-serif, sans-serif; }
+.account-path-copy small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.account-path-badge { padding: 3px 7px; border-radius: 999px; color: var(--success-green); background: rgba(0,208,132,.12); border: 1px solid rgba(0,208,132,.34); font: 850 9.5px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.account-path-chevron { color: var(--purple-2); font: 900 17px/1 ui-monospace, monospace; text-align: right; }
+.account-local-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.auth-back-button { display: inline-flex; align-items: center; min-height: 32px; margin-bottom: 6px; padding: 0; border: 0; background: transparent; color: var(--purple-2); font: 800 13px/1.2 inherit; cursor: pointer; }
+.auth-back-button:hover { color: var(--text); }
 .auth-link-button { display: block; margin: 16px auto 0; border: 0; background: transparent; color: var(--purple-2); font: 800 13px/1.2 inherit; cursor: pointer; }
 .auth-link-button:hover { color: var(--text); }
 .auth-key-input { margin-top: 14px; min-height: 96px; font: 700 13px/1.5 ui-monospace, monospace; resize: vertical; }
@@ -700,7 +723,9 @@
 
 @media (max-width: 700px) {
   input, textarea, select, button { font-size: 16px; }
-  .settings-auth-options { grid-template-columns: 1fr; }
+  /* The CTA drops under the copy rather than being squeezed beside it. */
+  .account-create { grid-template-columns: 48px minmax(0, 1fr); row-gap: 12px; }
+  .account-create-cta { grid-column: 1 / -1; width: 100%; }
   .support-panel { padding: 20px; }
   .support-hero-row { grid-template-columns: 42px minmax(0,1fr); gap: 12px; }
   .support-bolt { width: 40px; height: 40px; border-radius: 13px; font-size: 21px; }
