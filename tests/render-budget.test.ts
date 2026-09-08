@@ -5,6 +5,7 @@ import type { ShellHandle } from '../src/app/shell-types';
 import type { Exercise } from '../src/core/types';
 import { fetchCanonExercises } from '../src/nostr/canon';
 import { LOCAL_NAMESPACE } from '../src/db/adopt';
+import { MY_EQUIPMENT } from '../src/core/equipment';
 import { WorkstrStore } from '../src/db/store';
 
 // This file is the floor #178 leaves behind. Every increment of that issue took a caller
@@ -145,6 +146,87 @@ describe('the render budget', () => {
     expect(root.querySelector('#auto-backup')).toBeTruthy();
     localStorage.removeItem('workstr.currentPubkey');
     await drainBoot(shell);
+  });
+
+  // #204. Every case above is a background answer arriving behind the reader. These two are
+  // the foreground version of the same failure: the reader's own click on a preference used
+  // to rebuild the Settings page and take the card they clicked in with it.
+  //
+  // The equipment options come from the library, so a kit needs an exercise carrying one -
+  // the starter seed is body weight, which is free and never offered.
+  // Settings live in the shared local namespace and outlive a case, so the baseline is
+  // written rather than assumed - otherwise these two read each other's leftovers.
+  async function settingsWithKit(): Promise<{ root: HTMLElement; shell: ShellHandle }> {
+    document.body.innerHTML = '<div id="app"></div>';
+    const store = await WorkstrStore.open(LOCAL_NAMESPACE);
+    await store.upsertExercise({ slug: 'db-row', name: 'Dumbbell Row', muscles: ['back'], equipment: ['Dumbbells'], tags: [], instructions: [], favourite: false, source_type: 'manual', status: 'active' });
+    await store.saveSettings({ unit: 'kg', paymentMode: 'lightning', publicRelays: [], ownedEquipment: [] });
+    store.close();
+    const { root, shell } = await boot();
+    root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
+    return { root, shell };
+  }
+
+  it('writes the unit preference without rendering the page', async () => {
+    const { root, shell } = await settingsWithKit();
+    const card = root.querySelector<HTMLDetailsElement>('.training-preferences-card')!;
+    card.open = true;
+    const before = shell.renders.rebuilds;
+
+    const select = root.querySelector<HTMLSelectElement>('#unit-select')!;
+    select.value = 'lbs';
+    select.dispatchEvent(new Event('change'));
+    // The saver assigns state before awaiting the write, so waiting on state would race the
+    // patcher. The rendered text is the thing under test and is the honest thing to wait for.
+    await waitFor(() => card.querySelector('summary .settings-category-copy small')?.textContent?.startsWith('Pounds') === true, 'the summary to say Pounds');
+
+    expect(shell.renders.rebuilds).toBe(before);
+    // The same node, not a new one that happens to be open: a patcher that rebuilt the card
+    // and reopened it would pass on `open` alone and still be the bug.
+    expect(root.querySelector('.training-preferences-card')).toBe(card);
+    expect(card.open).toBe(true);
+    expect(card.querySelector('summary .settings-category-copy small')?.textContent).toBe('Pounds \u00b7 0 equipment');
+    await cleanup(shell);
+  });
+
+  it('writes the equipment kit without rendering the page', async () => {
+    const { root, shell } = await settingsWithKit();
+    const card = root.querySelector<HTMLDetailsElement>('.training-preferences-card')!;
+    card.open = true;
+    const chips = card.querySelector('.equip-options')!;
+    const box = root.querySelector<HTMLInputElement>('.equip-toggle')!;
+    const before = shell.renders.rebuilds;
+
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    await waitFor(() => card.querySelector('.training-preference-block .status-pill')?.textContent === '1 selected', 'the pill to say 1 selected');
+
+    expect(shell.renders.rebuilds).toBe(before);
+    expect(root.querySelector('.training-preferences-card')).toBe(card);
+    expect(card.open).toBe(true);
+    // The chips are not rebuilt either, so the box the reader ticked is the box they see.
+    expect(card.querySelector('.equip-options')).toBe(chips);
+    expect(root.querySelector('.equip-toggle')).toBe(box);
+    expect(box.checked).toBe(true);
+    expect(card.querySelector('.training-preference-block .status-pill')?.textContent).toBe('1 selected');
+    expect(card.querySelector('summary .settings-category-copy small')?.textContent).toBe('Kilograms \u00b7 1 equipment');
+
+    // Emptying the kit still clears a filter pointing at it. That filter belongs to
+    // Exercises, which is not mounted here - the state change is the whole job, and dropping
+    // the render must not drop it. Untested before #204, and the failure would be a filter
+    // silently matching nothing.
+    shell.state.exFilter.equip = MY_EQUIPMENT;
+    shell.state.discoverFilter.equip = MY_EQUIPMENT;
+    box.checked = false;
+    box.dispatchEvent(new Event('change'));
+    await waitFor(() => card.querySelector('.training-preference-block .status-pill')?.textContent === '0 selected', 'the pill to say 0 selected');
+
+    expect(shell.state.exFilter.equip).toBe('');
+    expect(shell.state.discoverFilter.equip).toBe('');
+    expect(shell.renders.rebuilds).toBe(before);
+    expect(root.querySelector('.training-preferences-card')).toBe(card);
+    expect(card.open).toBe(true);
+    await cleanup(shell);
   });
 });
 
