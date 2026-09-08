@@ -849,16 +849,28 @@
 .glyph { background: #0b0616; border: 1px solid var(--border-hot); }
 .glyph img { width: 19px; height: 19px; object-fit: contain; display: block; }
 
-/* My equipment: a plain checkbox list rather than a chip row, so it stays
-   readable as the catalog adds equipment types. 44px rows keep it tappable. */
-.equip-options { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+/* My equipment: compact selectable chips that wrap to the width they are given, so a
+   growing catalog stays scannable instead of turning into a long column. The native
+   checkbox stays visible and is still the source of truth -- it carries the checked state
+   for assistive technology, and its tick means the selection is never colour alone. */
+.equip-options { display: flex; flex-wrap: wrap; gap: 8px; }
 .equip-option {
-  display: flex; align-items: center; gap: 11px;
-  min-height: 44px; padding: 4px 2px;
-  font-size: 14px; font-weight: 700; color: var(--text);
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 40px; padding: 8px 13px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: rgba(255,255,255,.025);
+  font-size: 13px; font-weight: 800; color: var(--muted);
   cursor: pointer;
+  transition: border-color .14s ease, background .14s ease, color .14s ease;
 }
-.equip-option input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--sovereign-purple); }
+.equip-option input { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--sovereign-purple); }
+.equip-option:hover { border-color: var(--border-hot); color: var(--text); }
+.equip-option:has(input:checked) {
+  border-color: rgba(var(--accent-alt-rgb), .55);
+  background: rgba(var(--accent-alt-rgb), .14);
+  color: var(--purple-2);
+}
+.equip-option:has(input:focus-visible) { outline: 2px solid var(--purple-2); outline-offset: 2px; }
 .wex-superset-toggle {
   margin-top: 9px;
   padding: 6px 9px;
