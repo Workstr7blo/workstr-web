@@ -61,6 +61,34 @@ function settingsGroup(group: SettingsGroup): string {
 // One preference block inside Training Preferences, shaped like the weight unit above it:
 // title, description, status on the right. The chips are the control, so they sit under both
 // columns rather than in a bordered section of their own.
+
+// The two strings the card derives from settings, read by the view below and by
+// `updateTrainingPreferences`. They are written once because a patcher that computes its own
+// copy is a patcher that drifts from the view the day someone edits one of them - which is
+// exactly how the Account summary broke in #201.
+function trainingSummary(state: AppState): string {
+  return `${normalizeWeightUnit(state.settings.unit) === 'kg' ? 'Kilograms' : 'Pounds'} · ${ownedEquipmentKeys(state.settings.ownedEquipment).length} equipment`;
+}
+
+function equipmentSelected(state: AppState): string {
+  return `${ownedEquipmentKeys(state.settings.ownedEquipment).length} selected`;
+}
+
+// Writes what a preference change moves and nothing else. The select holds the value the
+// reader just picked and the checkboxes hold the boxes they just ticked, so the card is
+// already correct apart from these two strings - and rebuilding it to write them would throw
+// away the disclosure the reader is working inside. False when the card is not on screen, so
+// the caller can fall back to a render.
+export function updateTrainingPreferences(root: ParentNode, state: AppState): boolean {
+  const card = root.querySelector('.training-preferences-card');
+  if (!card) return false;
+  const summary = card.querySelector(':scope > summary .settings-category-copy small');
+  if (summary) summary.textContent = trainingSummary(state);
+  const pill = card.querySelector('.training-preference-block .status-pill');
+  if (pill) pill.textContent = equipmentSelected(state);
+  return true;
+}
+
 function equipmentPreference(state: AppState): string {
   const options = exerciseFilterValues([...state.library, ...state.discoverExercises]).equipment
     .filter((item) => !isFreeEquipment(item.key));
@@ -71,7 +99,7 @@ function equipmentPreference(state: AppState): string {
   const chips = options.map((item) => `<label class="equip-option"><input type="checkbox" class="equip-toggle" value="${html(item.key)}" ${owned.has(item.key) ? 'checked' : ''} /><span>${html(item.label)}</span></label>`).join('');
   return `<div class="training-preference training-preference-block">
     <div class="training-preference-copy"><strong>Equipment</strong><small>${blurb}</small></div>
-    <span class="status-pill">${owned.size} selected</span>
+    <span class="status-pill">${equipmentSelected(state)}</span>
     ${options.length ? `<div class="equip-options">${chips}</div>` : ''}
   </div>`;
 }
@@ -121,7 +149,7 @@ function accountCard(state: AppState): string {
 function trainingPreferencesCard(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   return `<details class="settings-category training-preferences-card" data-settings-section="training-preferences">
-    <summary><span class="settings-category-copy"><strong>Training Preferences</strong><small>${unit === 'kg' ? 'Kilograms' : 'Pounds'} · ${ownedEquipmentKeys(state.settings.ownedEquipment).length} equipment</small></span></summary>
+    <summary><span class="settings-category-copy"><strong>Training Preferences</strong><small>${trainingSummary(state)}</small></span></summary>
     <div class="settings-category-body training-preferences-body">
       <div class="training-preference training-preference-row">
         <div class="training-preference-copy"><strong>Weight unit</strong><small>Choose how weights are displayed.</small></div>
