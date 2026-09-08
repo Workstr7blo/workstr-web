@@ -57,17 +57,22 @@ function settingsGroup(group: SettingsGroup): string {
 
 // Kit options come from the library plus the Workstr catalog, so equipment can
 // be ticked before any exercise using it has been imported.
-function equipmentRows(state: AppState): string {
+//
+// One preference block inside Training Preferences, shaped like the weight unit above it:
+// title, description, status on the right. The chips are the control, so they sit under both
+// columns rather than in a bordered section of their own.
+function equipmentPreference(state: AppState): string {
   const options = exerciseFilterValues([...state.library, ...state.discoverExercises]).equipment
     .filter((item) => !isFreeEquipment(item.key));
   const owned = new Set(ownedEquipmentKeys(state.settings.ownedEquipment));
-  if (!options.length) {
-    return `<div class="settings-row-main"><div><strong>Equipment</strong><small>No equipment listed yet. Import exercises from Discover and equipment appears here.</small></div><span class="status-pill">0 selected</span></div>`;
-  }
-  const boxes = options.map((item) => `<label class="equip-option"><input type="checkbox" class="equip-toggle" value="${html(item.key)}" ${owned.has(item.key) ? 'checked' : ''} />${html(item.label)}</label>`).join('');
-  return `<div class="settings-inline-section equipment-details">
-    <div class="settings-inline-heading"><span><strong>Equipment</strong><small>Used for Quick Workout suggestions.</small></span><span class="status-pill">${owned.size} selected</span></div>
-    <div class="equip-options">${boxes}</div>
+  const blurb = options.length
+    ? 'Used for Quick Workout suggestions.'
+    : 'No equipment listed yet. Import exercises from Discover and equipment appears here.';
+  const chips = options.map((item) => `<label class="equip-option"><input type="checkbox" class="equip-toggle" value="${html(item.key)}" ${owned.has(item.key) ? 'checked' : ''} /><span>${html(item.label)}</span></label>`).join('');
+  return `<div class="training-preference training-preference-block">
+    <div class="training-preference-copy"><strong>Equipment</strong><small>${blurb}</small></div>
+    <span class="status-pill">${owned.size} selected</span>
+    ${options.length ? `<div class="equip-options">${chips}</div>` : ''}
   </div>`;
 }
 
@@ -117,9 +122,13 @@ function trainingPreferencesCard(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   return `<details class="settings-category training-preferences-card" data-settings-section="training-preferences">
     <summary><span class="settings-category-copy"><strong>Training Preferences</strong><small>${unit === 'kg' ? 'Kilograms' : 'Pounds'} · ${ownedEquipmentKeys(state.settings.ownedEquipment).length} equipment</small></span></summary>
-    <div class="settings-category-body">
-      <div class="settings-row-main"><div><strong>Weight unit</strong><small>Weights are stored in kilograms and converted for display.</small></div><label class="compact-select"><select id="unit-select"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds</option></select></label></div>
-      ${equipmentRows(state)}
+    <div class="settings-category-body training-preferences-body">
+      <div class="training-preference training-preference-row">
+        <div class="training-preference-copy"><strong>Weight unit</strong><small>Choose how weights are displayed.</small></div>
+        <label class="compact-select"><select id="unit-select" aria-label="Weight unit"><option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kilograms</option><option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Pounds</option></select></label>
+      </div>
+      <div class="training-preference-divider"></div>
+      ${equipmentPreference(state)}
     </div>
   </details>`;
 }

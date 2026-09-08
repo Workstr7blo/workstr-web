@@ -116,6 +116,59 @@ describe('the Settings page', () => {
     expect(cardTitles(monero)).not.toContain('Zap Wallet');
   });
 
+  // The card holds two preferences, and #202 asked for them to read as one surface: plain
+  // blocks divided by a line, with nothing inside carrying the bordered `.settings-row-main`
+  // treatment that would make it look like a card within a card.
+  describe('Training Preferences', () => {
+    const withKit = (): HTMLElement => render({
+      library: [{ id: 'a', name: 'Row', equipment: ['Dumbbells'] }, { id: 'b', name: 'Push-up', equipment: ['Body Weight'] }],
+      discoverExercises: [{ id: 'c', name: 'Press', equipment: ['Bench'] }],
+      settings: { unit: 'lbs', paymentMode: 'lightning', publicRelays: [], ownedEquipment: ['Dumbbells'] }
+    } as unknown as Partial<AppState>);
+
+    it('reads as one surface with a divider instead of nested cards', () => {
+      const card = withKit().querySelector('.training-preferences-card') as HTMLElement;
+      expect(card.querySelectorAll('.settings-row-main')).toHaveLength(0);
+      expect(card.querySelectorAll('.settings-inline-section')).toHaveLength(0);
+      expect(card.querySelectorAll('.training-preference')).toHaveLength(2);
+      expect(card.querySelectorAll('.training-preference-divider')).toHaveLength(1);
+      // Weight unit, then the line, then Equipment.
+      const order = [...card.querySelectorAll('.settings-category-body > *')].map((el) => el.className);
+      expect(order).toEqual(['training-preference training-preference-row', 'training-preference-divider', 'training-preference training-preference-block']);
+    });
+
+    it('keeps the weight unit select and drops the storage detail from its copy', () => {
+      const card = withKit().querySelector('.training-preferences-card') as HTMLElement;
+      const select = card.querySelector('#unit-select') as HTMLSelectElement;
+      expect([...select.options].map((option) => option.value)).toEqual(['kg', 'lbs']);
+      expect(select.value).toBe('lbs');
+      expect(select.getAttribute('aria-label')).toBe('Weight unit');
+      expect(card.querySelector('.training-preference-row small')?.textContent).toBe('Choose how weights are displayed.');
+      expect(card.textContent).not.toContain('stored in kilograms');
+    });
+
+    it('offers owned equipment as real checkboxes, free equipment excluded', () => {
+      const card = withKit().querySelector('.training-preferences-card') as HTMLElement;
+      const boxes = [...card.querySelectorAll<HTMLInputElement>('.equip-options .equip-toggle')];
+      expect(boxes.map((box) => box.value)).toEqual(['bench', 'dumbbells']);
+      expect(boxes.every((box) => box.type === 'checkbox')).toBe(true);
+      expect(boxes.filter((box) => box.checked).map((box) => box.value)).toEqual(['dumbbells']);
+      expect(card.querySelector('.training-preference-block .status-pill')?.textContent).toBe('1 selected');
+    });
+
+    it('explains an empty kit without adding another card', () => {
+      const card = render().querySelector('.training-preferences-card') as HTMLElement;
+      expect(card.querySelector('.equip-options')).toBeNull();
+      expect(card.querySelectorAll('.settings-row-main')).toHaveLength(0);
+      expect(card.querySelector('.training-preference-block small')?.textContent).toContain('Import exercises from Discover');
+      expect(card.querySelector('.training-preference-block .status-pill')?.textContent).toBe('0 selected');
+    });
+
+    it('still summarises unit and kit size while collapsed', () => {
+      expect(withKit().querySelector('.training-preferences-card > summary .settings-category-copy small')?.textContent).toBe('Pounds · 1 equipment');
+    });
+  });
+
   it('shows the signed-in identity in the Account summary', () => {
     const signedIn = render({ pubkey: 'ab'.repeat(32), signerType: 'local', profileName: 'Trainer' });
     const summary = signedIn.querySelector('.account-card > summary');
