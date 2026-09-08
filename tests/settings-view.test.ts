@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { settingsView } from '../src/app/settings-view';
+import { settingsView, updateTrainingPreferences } from '../src/app/settings-view';
 import { updateSupportFunding } from '../src/features/support/views';
 import { updateBackupCard, updateBackupStatus, backupPanelState } from '../src/features/backup/views';
 import { accountIdentity, updateAccountIdentity } from '../src/app/account-chip';
@@ -162,6 +162,38 @@ describe('the Settings page', () => {
       expect(card.querySelectorAll('.settings-row-main')).toHaveLength(0);
       expect(card.querySelector('.training-preference-block small')?.textContent).toContain('Import exercises from Discover');
       expect(card.querySelector('.training-preference-block .status-pill')?.textContent).toBe('0 selected');
+    });
+
+    // #204: the two savers write these strings in place rather than rebuilding the page,
+    // which is what keeps the card the reader is inside from closing under them. Running the
+    // patcher over the real view is the only way to see that it still finds its targets - the
+    // failure it guards is silent, because the page renders correctly and is overwritten a
+    // moment later.
+    it('writes the changed strings in place without rebuilding the card', () => {
+      const root = withKit();
+      const card = root.querySelector('.training-preferences-card') as HTMLDetailsElement;
+      card.open = true;
+      const pill = card.querySelector('.training-preference-block .status-pill');
+      const chips = card.querySelector('.equip-options');
+
+      const changed = state({
+        library: [{ id: 'a', name: 'Row', equipment: ['Dumbbells'] }, { id: 'b', name: 'Push-up', equipment: ['Body Weight'] }],
+        discoverExercises: [{ id: 'c', name: 'Press', equipment: ['Bench'] }],
+        settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [], ownedEquipment: ['Dumbbells', 'Bench'] }
+      } as unknown as Partial<AppState>);
+      expect(updateTrainingPreferences(root, changed)).toBe(true);
+
+      expect(root.querySelector('.training-preferences-card')).toBe(card);
+      expect(card.open).toBe(true);
+      expect(card.querySelector('.equip-options')).toBe(chips);
+      expect(card.querySelector('.training-preference-block .status-pill')).toBe(pill);
+      expect(pill?.textContent).toBe('2 selected');
+      expect(card.querySelector('summary .settings-category-copy small')?.textContent).toBe('Kilograms \u00b7 2 equipment');
+    });
+
+    it('reports a miss when the card is not on the page', () => {
+      document.body.innerHTML = '<div id="app"></div>';
+      expect(updateTrainingPreferences(document.getElementById('app') as HTMLElement, state())).toBe(false);
     });
 
     it('still summarises unit and kit size while collapsed', () => {

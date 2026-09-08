@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Changing your weight unit or ticking a piece of equipment no longer closes the Training
+  Preferences card you changed it in. Saving either preference redrew the whole Settings
+  page, which threw away every card you had open - so building up a kit meant reopening the
+  card between each tick. The two lines that actually change, the summary and the selected
+  count, are now written in place and nothing else is disturbed.
+
 - The Account row in Settings no longer shows a huge profile picture with your name and npub
   printed on top of it. The picture had no size set, so it rendered at whatever size the file
   happened to be - a 400 pixel image took over the whole row. It is a small round avatar again.

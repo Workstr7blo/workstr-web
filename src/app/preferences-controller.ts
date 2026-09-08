@@ -7,6 +7,7 @@ import { LOCAL_NAMESPACE } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
 import { fetchMonthlyZapReceipts } from '../nostr/zaps';
 import { updateSupportFunding } from '../features/support/views';
+import { updateTrainingPreferences } from './settings-view';
 import type { RelayProgram } from '../nostr/canon';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
 import { getQuickWorkout } from '../features/recovery/quickWorkout';
@@ -167,11 +168,16 @@ async function deleteSession(id: number): Promise<void> {
   render();
 }
 
+// Both preference writes happen while the reader is inside the Training Preferences card,
+// so neither may rebuild the page: a render replaces the Settings view wholesale and the
+// open disclosure goes with it. Only the summary line and the equipment count move, and the
+// patcher writes those in place. The render is the fallback for a caller that is not looking
+// at Settings, not the normal path.
 async function saveUnitPreference(value: string): Promise<void> {
   if (!state.store) return;
   state.settings = { ...state.settings, unit: normalizeWeightUnit(value) };
   await state.store.saveSettings(state.settings);
-  render();
+  if (!updateTrainingPreferences(root, state)) render({ reason: 'unit-preference-offscreen' });
 }
 
 // Only flips the stored rail and the theme/attribute layer it drives; NWC, zap, and
@@ -199,7 +205,9 @@ async function saveOwnedEquipment(): Promise<void> {
     if (state.exFilter.equip === MY_EQUIPMENT) state.exFilter.equip = '';
     if (state.discoverFilter.equip === MY_EQUIPMENT) state.discoverFilter.equip = '';
   }
-  render();
+  // The cleared filter belongs to Exercises, which is not mounted while Settings is showing
+  // and is built from state when it is navigated to, so it needs no render of its own.
+  if (!updateTrainingPreferences(root, state)) render({ reason: 'equipment-preference-offscreen' });
 }
 
 async function exportUserData(): Promise<void> {
