@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Training Preferences reads as one panel. Weight unit sat in a bordered row while Equipment
+  hung underneath it as a bare list, so the two settings looked like separate components
+  inside the same card. They are now two blocks on one surface with a thin line between
+  them, and the equipment choices are compact chips that wrap to the width of the screen
+  instead of a checkbox column you had to scroll past. The weight unit help text no longer
+  mentions how weights are stored internally. Nothing about units, your saved kit, or Quick
+  Workout changed.
+
 - Setting up an account is one screen instead of two tabs. Creating an account and connecting
   one you already have were presented side by side as if they were the same kind of choice,
   which they are not: there is one way to create a Workstr account, and four ways to reach one
