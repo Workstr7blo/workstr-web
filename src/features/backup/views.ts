@@ -35,6 +35,7 @@ export function startedOnLabel(iso: string | undefined): string {
 }
 
 export function statusPill(state: BackupPanelState): { label: string; ok: boolean } {
+  if (!state.signedIn) return { label: 'local', ok: false };
   if (!state.enabled) return { label: 'off', ok: false };
   if (state.sync.state === 'error') return state.sync.reconnecting
     ? { label: 'reconnecting', ok: true }
@@ -50,7 +51,7 @@ export function statusPill(state: BackupPanelState): { label: string; ok: boolea
 export function backupSummary(state: BackupPanelState): string {
   return state.signedIn
     ? 'Back up, sync, and move your training data'
-    : 'Sign in to back up and sync this device';
+    : 'Manual backup for this device';
 }
 
 const PHASE_LABEL: Record<SyncProgress['phase'], string> = {
@@ -125,23 +126,28 @@ export function backupPanel(state: BackupPanelState): string {
 // reader had the card expanded - is not part of this.
 export function backupCardBody(state: BackupPanelState): string {
   const localOnly = state.backup?.localOnlyHistoryCount ?? 0;
-  const eraLine = state.signedIn && state.enabled && localOnly > 0
+  const manualBackup = `
+      <section class="settings-control-group manual-backup-group" aria-label="Manual backup">
+        <div class="settings-control-heading"><span><strong>Manual backup</strong><small>A portable archive for this device.</small></span></div>
+        <div class="settings-row-main manual-backup-row">
+          <div><strong>Export or import</strong><small>JSON includes all local training data.</small></div>
+          <div class="settings-row-actions"><button id="export-data" class="button">Export JSON</button><button id="import-data" class="button">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
+        </div>
+      </section>`;
+  if (!state.signedIn) return manualBackup;
+  const eraLine = state.enabled && localOnly > 0
     ? `<div class="settings-subtle-row"><span>Local-only older workouts</span><strong>${localOnly}</strong></div>`
     : '';
-  const syncCopy = !state.signedIn
-    ? 'Sign in to protect new training across devices.'
-    : state.enabled
-      ? 'Encrypted backup for new training.'
-      : 'Protect new training across devices.';
-  const syncAction = !state.signedIn
-    ? '<span class="settings-muted-action">Use Account above</span>'
-    : state.enabled
-      ? `<label class="settings-switch"><input type="checkbox" id="auto-backup" checked />Auto-sync</label><button id="sync-now" class="button" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button>`
-      : '<button id="enable-sync" class="button primary">Turn on sync</button>';
+  const syncCopy = state.enabled
+    ? 'Encrypted backup for new training.'
+    : 'Protect new training across devices.';
+  const syncAction = state.enabled
+    ? `<label class="settings-switch"><input type="checkbox" id="auto-backup" checked />Auto-sync</label><button id="sync-now" class="button" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button>`
+    : '<button id="enable-sync" class="button primary">Turn on sync</button>';
   const live = state.enabled
     ? `<div class="backup-live" id="backup-status"><span class="settings-live-label">${html(statusLine(state))}</span>${progressMarkup(state.sync.progress)}</div>${eraLine}`
     : '';
-  const olderNote = state.signedIn && state.enabled && localOnly > 0
+  const olderNote = state.enabled && localOnly > 0
     ? `<p class="section-help">Those older workouts stay on this device and are included when you export JSON.</p>`
     : '';
   return `
@@ -151,13 +157,7 @@ export function backupCardBody(state: BackupPanelState): string {
         ${live}
         ${olderNote}
       </section>
-      <section class="settings-control-group manual-backup-group" aria-label="Manual backup">
-        <div class="settings-control-heading"><span><strong>Manual backup</strong><small>A portable archive for this device.</small></span></div>
-        <div class="settings-row-main manual-backup-row">
-          <div><strong>Export or import</strong><small>JSON includes all local training data.</small></div>
-          <div class="settings-row-actions"><button id="export-data" class="button">Export JSON</button><button id="import-data" class="button">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
-        </div>
-      </section>`;
+      ${manualBackup}`;
 }
 
 // Turning sync on or off changes which controls the card has, not only what they say, so

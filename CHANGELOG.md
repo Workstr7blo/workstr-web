@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Local-only Settings now shows only what works without an account: Account, Training
+  Preferences, manual JSON backup, and Advanced. Beast Mode, Payments, Zap Wallet,
+  Support Workstr, and Auto-sync controls appear only after signing in, so local training
+  reads as an intentional mode instead of a disabled version of the connected app.
+
 - Changing your weight unit or ticking a piece of equipment no longer closes the Training
   Preferences card you changed it in. Saving either preference redrew the whole Settings
   page, which threw away every card you had open - so building up a kit meant reopening the

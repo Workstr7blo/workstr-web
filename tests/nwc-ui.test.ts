@@ -56,6 +56,8 @@ function state(overrides: Partial<AppState> = {}): AppState {
 describe('NWC support UI', () => {
   it('renders a Settings wallet connection row without exposing secrets', () => {
     const markup = shellMarkup(state({
+      pubkey: 'a'.repeat(64),
+      signerType: 'local',
       nwc: {
         active: true,
         status: 'idle',
@@ -85,7 +87,7 @@ describe('NWC support UI', () => {
 
   it('replaces the Settings wallet card with the Monero address layout in Monero Mode', () => {
     const wallet = { active: true, status: 'idle' as const, walletLabel: 'Alby', relayLabel: 'relay.example.com' };
-    const lightning = shellMarkup(state({ nwc: wallet, settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [] } }));
+    const lightning = shellMarkup(state({ pubkey: 'a'.repeat(64), signerType: 'local', nwc: wallet, settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [] } }));
     expect(lightning).toContain('nwc-card');
     expect(lightning).toContain('Zap wallet (NWC)');
     expect(lightning).not.toContain('Monero payment address');
@@ -96,8 +98,8 @@ describe('NWC support UI', () => {
     expect(monero).not.toContain('id="nwc-connect"');
     expect(monero).not.toContain('id="nwc-disconnect"');
     expect(monero).not.toContain('Replace wallet');
-    expect(monero).toContain('Monero payment address');
-    expect(monero).toContain('Sign in with your Nostr signer');
+    expect(monero).not.toContain('Monero payment address');
+    expect(monero).not.toContain('Sign in with your Nostr signer');
 
     const signedIn = shellMarkup(state({ pubkey: 'a'.repeat(64), nwc: wallet, settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } }));
     expect(signedIn).toContain('id="monero-address"');
