@@ -76,6 +76,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | NIP-A3 Monero payment targets (`kind:10133`) | `src/nostr/payment-targets.ts` | `src/nostr/pool.ts`, `src/signer/types.ts` | `tests/payment-targets.test.ts` |
 | Monero Tip on Discover program cards | `src/features/sheets/monero-tip-view.ts`, `src/app/monero-tip-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/catalog-controller.ts`, `src/features/sheets/views.ts` | `tests/monero-tip-controller.test.ts`, `tests/discover.test.ts` |
 | Monero Mode Settings card and the user's public Monero address | `src/features/support/payment-mode-views.ts`, `src/app/monero-address-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/layout.ts`, `src/features/support/views.ts` | `tests/monero-address-controller.test.ts`, `tests/nwc-ui.test.ts`, `tests/shell.test.ts` |
+| Support Workstr on the active payment rail | `src/features/support/views.ts` | `src/core/funding.ts`, `src/app/monero-mark.ts`, `src/nostr/payment-targets.ts`, `src/app/settings-view.ts`, `src/app/preferences-controller.ts` | `tests/support-views.test.ts`, `tests/nwc-ui.test.ts`, `tests/settings-view.test.ts` |
 | IndexedDB schema | `src/db/schema.ts` | `src/core/types.ts`, `src/db/store.ts` | `tests/store.test.ts`, `tests/export.test.ts`, `tests/adopt.test.ts` |
 | IndexedDB repository operations | `src/db/store.ts` | schema and domain types | `tests/store.test.ts` |
 | Anonymous/signed-in namespace adoption | `src/db/adopt.ts` | schema, shell sign-in flow | `tests/adopt.test.ts`, `tests/shell.test.ts` |
@@ -167,17 +168,29 @@ and patch it directly, which is also why a page render can leave it standing.
   address: the `kind:10133` lookup, validation, publish and clear, and the in-place repaint
   of that Settings section. It never writes the address to the database, so the relays stay
   the only source of truth and nothing about it enters encrypted sync.
+- `src/app/monero-mark.ts` owns the vendored Monero mark and badge. It lives in `app/`
+  because the creator tip sheet and the Monero support card both draw it and features do
+  not import each other. Monochrome and `currentColor` only: it identifies the payment
+  mechanism, never Workstr itself.
 - `src/features/sheets/monero-tip-view.ts` owns the Monero rail's program-card surfaces:
-  the vendored Monero mark, whether an author can be tipped at all, the card action, and
-  the tip sheet's markup. `moneroMode(state)` is the single answer to "which creator-support
-  rail is this" for the sheets feature. It renders no total and no status, because a Monero
-  transfer leaves nothing Workstr can read.
+  whether an author can be tipped at all, the card action, and the tip sheet's markup.
+  `moneroMode(state)` is the single answer to "which creator-support rail is this" for the
+  sheets feature. It renders no total and no status, because a Monero transfer leaves
+  nothing Workstr can read.
 - `src/app/monero-tip-controller.ts` owns opening that sheet, copying the address, and the
   `monero:` wallet hand-off. It never touches Idenstr, NWC, or the program-zap path.
 - `src/features/support/payment-mode-views.ts` renders the Monero Mode Settings card: the
   creator-support rail picker and, in Monero Mode, the public payment-address section.
   While that mode is on, `src/app/layout.ts` renders no NWC wallet card and
-  `src/features/support/views.ts` drops its in-app zap controls.
+  `src/features/support/views.ts` renders its Monero rail instead of its Lightning one.
+- `src/features/support/views.ts` owns the Support Workstr card on both rails.
+  `supportPanel` only picks between `lightningSupportPanel` (zap action, the month, and a
+  transparency disclosure holding the counts, the zap target and the npub) and
+  `moneroSupportPanel` (the canonical `OPERATOR_MONERO_ADDRESS` as an amount-free
+  `monero:` QR, a shortened display, and a copy action). Support follows the payment mode
+  rather than explaining why it differs from it, and the Monero card invents no funding
+  meter: `updateSupportFunding` finds no `#support-funding` there and reports success
+  without writing, so the reader's open categories survive the background receipt read.
 - `src/features/sheets/program-browser.ts` owns the search/filter/action toolbar above
   Programs and Discover, the active-filter chips, and the filter sheet. Both browsers share
   `state.programFilter` and `state.programFilters`; `state.programFilterSheet` only records

@@ -80,7 +80,7 @@ describe('NWC support UI', () => {
     expect(inactive).toContain('Connect a zap wallet in Settings');
 
     const active = supportPanel({ status: 'idle', receipts: [] }, { active: true, status: 'idle', walletLabel: 'Alby', relayLabel: 'relay.example.com' }, true);
-    expect(active).toContain('id="open-nwc-zap" class="button payment" >Zap with wallet</button>');
+    expect(active).toContain('id="open-nwc-zap" class="button payment" >Zap Workstr</button>');
     expect(active).toContain('NWC wallet ready');
     expect(active).toContain('Alby · relay.example.com');
   });
@@ -108,16 +108,17 @@ describe('NWC support UI', () => {
     expect(signedIn).not.toContain('nwc-card');
   });
 
-  it('withdraws the in-app zap controls from Support in Monero Mode without hiding the funding facts', () => {
-    const panel = supportPanel({ status: 'idle', receipts: [] }, { active: true, status: 'idle', walletLabel: 'Alby' }, true, true);
+  it('swaps Support itself to the Monero rail rather than explaining the mismatch', () => {
+    const panel = supportPanel({ status: 'ready', receipts: [] }, { active: true, status: 'idle', walletLabel: 'Alby' }, true, true);
 
     expect(panel).not.toContain('open-nwc-zap');
-    expect(panel).not.toContain('Zap with wallet');
+    expect(panel).not.toContain('Zap Workstr');
     expect(panel).not.toContain('Connect a zap wallet');
-    expect(panel).toContain('Creator support is on Monero.');
-    // The operator's own zap target is a published NIP-57 fact, not an NWC control.
-    expect(panel).toContain('External zap');
-    expect(panel).toContain('Copy npub');
+    expect(panel).not.toContain('Creator support is on Monero.');
+    expect(panel).not.toContain('External zap');
+    expect(panel).not.toContain('Copy npub');
+    expect(panel).toContain('Private support with Monero');
+    expect(panel).toContain('Copy address');
   });
 });
 

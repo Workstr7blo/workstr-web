@@ -1,5 +1,5 @@
 import { normalizePaymentMode } from '../core/types';
-import { moneroMark } from '../features/sheets/monero-tip-view';
+import { moneroMark } from './monero-mark';
 import { displayIdentity, html } from './format';
 import type { AppState } from './state';
 

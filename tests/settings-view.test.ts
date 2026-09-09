@@ -121,6 +121,7 @@ describe('the Settings page', () => {
     expect(root.querySelector('.payment-mode-card')).toBeNull();
     expect(root.querySelector('.nwc-card')).toBeNull();
     expect(root.querySelector('.support-panel')).toBeNull();
+    expect(render({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>).querySelector('.support-panel')).toBeNull();
     expect(root.textContent).not.toContain('Payments');
     expect(root.textContent).not.toContain('Support Workstr');
     expect(root.textContent).not.toContain('Payment Mode');
@@ -289,6 +290,21 @@ describe('the background patchers still find their cards', () => {
     expect(card.open).toBe(true);
     expect(root.querySelector('.support-panel #support-funding')).toBeTruthy();
     expect(root.querySelector('.support-panel > summary .settings-category-copy small')?.textContent).toContain('sats this month');
+  });
+
+  it('leaves the Monero support card alone instead of rerendering the page for it', () => {
+    const root = render(signedIn({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>));
+    const card = root.querySelector('.support-panel') as HTMLDetailsElement;
+    card.open = true;
+    const before = card.innerHTML;
+
+    // True without touching anything: a rerender here would close whatever the reader has open.
+    expect(updateSupportFunding(root, { status: 'ready', receipts: [] })).toBe(true);
+
+    expect(root.querySelector('.support-panel')).toBe(card);
+    expect(card.open).toBe(true);
+    expect(card.innerHTML).toBe(before);
+    expect(root.querySelector('#support-funding')).toBeNull();
   });
 
   it('writes the sync card inside the grouped page', () => {
