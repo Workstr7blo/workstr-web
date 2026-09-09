@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The support meter now follows the Workstr operator's live Nostr profile when deciding
+  which zap receipts count. It reads the current kind:0 `lud16`/`lud06`, fetches that LNURL
+  metadata, and trusts that endpoint's `nostrPubkey` instead of a stale hardcoded wallet
+  signer.
+
 - The Account card now shows Add device only for Workstr-managed device-key accounts.
   Browser-extension and mobile-signer accounts keep Sign out and Remove data, but no longer
   see a pairing action that cannot transfer an external signer's key.

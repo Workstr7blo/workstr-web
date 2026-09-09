@@ -1,9 +1,10 @@
 import type { Event } from 'nostr-tools';
 import { SimplePool, verifyEvent } from 'nostr-tools';
 import { getSatoshisAmountFromBolt11 } from 'nostr-tools/nip57';
-import { ZAP_RECEIPT_SIGNER_PUBKEY, ZAP_RELAYS } from '../core/funding';
+import { ZAP_RELAYS } from '../core/funding';
 import { OPERATOR_PUBKEY, type RelayProgram } from './canon';
 import { encodeLnurl, lud16ToLnurlPayEndpoint } from './lnurl';
+import { fetchOperatorZapTarget } from './operator-zap-target';
 import { DEFAULT_PUBLIC_RELAYS } from './pool';
 
 const QUERY_TIMEOUT_MS = 7000;
@@ -192,9 +193,9 @@ export interface ReceiptTrust {
 // check the funding panel would be a number strangers control.
 export function parseZapReceipt(event: Event, trust: ReceiptTrust = {}): ZapReceipt | null {
   const recipient = trust.recipient ?? OPERATOR_PUBKEY;
-  const signer = trust.signer ?? ZAP_RECEIPT_SIGNER_PUBKEY;
+  const signer = trust.signer;
   if (event.kind !== 9735) return null;
-  if (event.pubkey !== signer) return null;
+  if (!signer || event.pubkey !== signer) return null;
   if (tagValue(event.tags as string[][], 'p') !== recipient) return null;
   if (!verifyEvent(event)) return null;
 
@@ -327,6 +328,7 @@ export async function fetchProgramZapTotals(programs: RelayProgram[]): Promise<R
 // offline client reports "0 sats received", which is precisely the false
 // statement this function exists to avoid.
 export async function fetchMonthlyZapReceipts(since = monthStartUnix()): Promise<ZapReceipt[]> {
+  const target = await fetchOperatorZapTarget();
   const pool = new SimplePool();
   try {
     const filter = { kinds: [9735], '#p': [OPERATOR_PUBKEY], since, limit: RECEIPT_LIMIT };
@@ -336,7 +338,7 @@ export async function fetchMonthlyZapReceipts(since = monthStartUnix()): Promise
     }));
     if (results.every((result) => result.status === 'rejected')) throw new Error('no relay reachable');
     const merged = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
-    return collectZapReceipts(merged);
+    return collectZapReceipts(merged, { recipient: OPERATOR_PUBKEY, signer: target.receiptSignerPubkey });
   } finally {
     pool.close(ZAP_RELAYS);
   }

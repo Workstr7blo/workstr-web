@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
-import { OPERATOR_LUD16, ZAP_RECEIPT_SIGNER_PUBKEY } from '../src/core/funding';
+import { OPERATOR_LUD16 } from '../src/core/funding';
 import { OPERATOR_PUBKEY } from '../src/nostr/canon';
 import { parseNwcConnectionString } from '../src/nostr/nwc';
 import { executeSupportZap } from '../src/nostr/support-zap';
@@ -29,11 +29,21 @@ function response(body: unknown, ok = true): Response {
   return new Response(JSON.stringify(body), { status: ok ? 200 : 500, headers: { 'content-type': 'application/json' } });
 }
 
+const RECEIPT_SIGNER_PUBKEY = 'c'.repeat(64);
+const ZAP_TARGET = {
+  lud16: OPERATOR_LUD16,
+  endpoint: 'https://coinos.io/.well-known/lnurlp/workstr',
+  callback: 'https://coinos.io/lnurl/callback',
+  receiptSignerPubkey: RECEIPT_SIGNER_PUBKEY,
+  minSendable: 1000,
+  maxSendable: 1_000_000_000
+};
+
 function fakeFetch(invoiceValue = BOLT11_1000_SATS) {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes('/.well-known/lnurlp/workstr')) {
-      return response({ callback: 'https://coinos.io/lnurl/callback', allowsNostr: true, nostrPubkey: ZAP_RECEIPT_SIGNER_PUBKEY, minSendable: 1000, maxSendable: 1_000_000_000 });
+      return response({ callback: ZAP_TARGET.callback, allowsNostr: true, nostrPubkey: RECEIPT_SIGNER_PUBKEY, minSendable: ZAP_TARGET.minSendable, maxSendable: ZAP_TARGET.maxSendable });
     }
     return response({ pr: invoiceValue });
   });
@@ -58,7 +68,7 @@ describe('executeSupportZap', () => {
       signer: testSigner,
       nwcConnection: parseNwcConnectionString(NWC),
       createdAt: 1_800_000_123
-    }, { fetch: fetchImpl as typeof fetch, nwc: { transport } });
+    }, { fetch: fetchImpl as typeof fetch, nwc: { transport }, zapTarget: ZAP_TARGET });
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.error.message);
@@ -82,7 +92,7 @@ describe('executeSupportZap', () => {
       amountSats: 1000,
       signer: signer(),
       nwcConnection: parseNwcConnectionString(NWC)
-    }, { fetch: fakeFetch(BOLT11_21_SATS) as typeof fetch, nwc: { transport } });
+    }, { fetch: fakeFetch(BOLT11_21_SATS) as typeof fetch, nwc: { transport }, zapTarget: ZAP_TARGET });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'invalid-invoice' } });
     expect(transport.request).not.toHaveBeenCalled();
@@ -94,7 +104,7 @@ describe('executeSupportZap', () => {
       amountSats: 1000,
       signer: signer(),
       nwcConnection: parseNwcConnectionString(NWC)
-    }, { fetch: fakeFetch() as typeof fetch, nwc: { transport } });
+    }, { fetch: fakeFetch() as typeof fetch, nwc: { transport }, zapTarget: ZAP_TARGET });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'payment-failed', nwcKind: 'rejected_unauthorized' } });
     expect(JSON.stringify(result)).not.toContain(SECRET);
