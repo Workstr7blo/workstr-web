@@ -244,6 +244,34 @@ describe('the Settings page', () => {
     expect(summary?.querySelector('.status-pill')?.textContent).toBe('SIGNED IN');
     expect(render().querySelector('.account-card > summary .status-pill')?.textContent).toBe('LOCAL');
   });
+
+  it('shows Add device only for device-managed accounts', () => {
+    const local = render(signedIn({ signerType: 'local', profileName: 'Trainer' }));
+    expect(local.querySelector('#add-device-settings')).toBeTruthy();
+    expect(local.querySelector('#sign-out-settings')).toBeTruthy();
+    expect(local.querySelector('#remove-account-data')).toBeTruthy();
+    expect(local.querySelector('.account-card .settings-account-identity small')?.textContent).toBe('Device-managed key for faster sync.');
+    expect(local.querySelector('.account-card > summary')?.textContent).toContain('Signed in with a device key');
+
+    const nip07 = render(signedIn({ signerType: 'nip07', profileName: 'Trainer' }));
+    expect(nip07.querySelector('#add-device-settings')).toBeNull();
+    expect(nip07.querySelector('#sign-out-settings')).toBeTruthy();
+    expect(nip07.querySelector('#remove-account-data')).toBeTruthy();
+    expect(nip07.querySelector('.account-card .settings-account-identity small')?.textContent).toBe('Keys stay in your signer.');
+    expect(nip07.querySelector('.account-card > summary')?.textContent).toContain('Signed in with your signer');
+
+    const nip46 = render(signedIn({ signerType: 'nip46', profileName: 'Trainer' }));
+    expect(nip46.querySelector('#add-device-settings')).toBeNull();
+    expect(nip46.querySelector('#sign-out-settings')).toBeTruthy();
+    expect(nip46.querySelector('#remove-account-data')).toBeTruthy();
+    expect(nip46.querySelector('.account-card .settings-account-identity small')?.textContent).toBe('Keys stay in your signer.');
+
+    const localOnly = render();
+    expect(localOnly.querySelector('#add-device-settings')).toBeNull();
+    expect(localOnly.querySelector('#sign-out-settings')).toBeNull();
+    expect(localOnly.querySelector('#remove-account-data')).toBeNull();
+    expect(localOnly.querySelector('#sign-in-settings')).toBeTruthy();
+  });
 });
 
 // Regrouping is a markup change, and the patchers from #189 find their targets by selector.
