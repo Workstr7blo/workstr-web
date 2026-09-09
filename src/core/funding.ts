@@ -4,25 +4,13 @@
 // plan (docs/instruction.md section 11). The support screen therefore has to
 // be honest about two numbers: what came in, and what it costs to run.
 
-// Zap target identity. The Lightning address is published in the operator's
-// kind:0 as `lud16`, but v1 support copy treats it as LNURL-pay plumbing behind
-// zaps rather than as a separate donation rail: every counted donation should
-// leave a NIP-57 receipt.
-export const OPERATOR_LUD16 = 'workstr@coinos.io';
+// Zap target identity. The Nostr handle is the human-facing target; the active Lightning
+// address is read from the operator's live kind:0 `lud16`/`lud06` metadata before
+// requesting invoices or trusting receipts. This fallback is only used if every profile
+// relay is unavailable.
+export const OPERATOR_LUD16 = 'workstr@rizful.com';
 export const OPERATOR_NOSTR_HANDLE = 'workstr@workstr.fit';
 export const OPERATOR_NOSTR_URL = `https://njump.me/${OPERATOR_NOSTR_HANDLE}`;
-
-// The wallet provider's nostr key, taken from the LNURL-pay metadata for
-// OPERATOR_LUD16 (`nostrPubkey`). Zap receipts are signed by the provider, not
-// by the donor, so this is the only key that can legitimately say a payment
-// happened.
-//
-// Pinned rather than fetched: it needs no HTTP call, works offline, and is
-// deterministic in tests — the same reasoning as the pinned catalog operator
-// key. Changing wallet provider means changing this constant and shipping a
-// release; historical receipts signed by the old key stop counting, which is
-// correct, since the old wallet is no longer the operator's.
-export const ZAP_RECEIPT_SIGNER_PUBKEY = '72bdbc57bdd6dfc4e62685051de8041d148c3c68fe42bf301f71aa6cf53e52fb';
 
 // Published monthly operating cost. Section 3.4: asking for money without
 // showing the bill is not an option. Denominated in sats deliberately —

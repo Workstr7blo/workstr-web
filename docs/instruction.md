@@ -344,10 +344,11 @@ other client can read it. Curation is a quality decision, not a lock (Section 11
    `MONTHLY_COST_SATS`. Both sides are sats, so the percentage is exact and needs no price
    feed. Entirely client-side — zap receipts are public events, so transparency costs no
    backend.
-3. **Only receipts signed by the wallet provider's key count** (`ZAP_RECEIPT_SIGNER_PUBKEY`,
-   pinned in `core/funding.ts` from the LNURL-pay metadata). Anyone can publish a
-   `kind:9735` tagged to any pubkey; without the signer check the published total would be
-   a number strangers control, and the transparency claim in 3.4 would be worthless.
+3. **Only receipts signed by the wallet provider's key count.** Derive that key from the
+   operator's live kind:0 `lud16`/`lud06` metadata, then from that LNURL-pay endpoint's
+   `nostrPubkey`. Anyone can publish a `kind:9735` tagged to any pubkey; without the signer
+   check the published total would be a number strangers control, and pinning the signer in
+   code would drift when the operator changes zap providers.
 4. **A failed fetch reports "unknown", never zero.** "Nobody donated" and "we could not
    check" are different claims and only one is true. Note `querySync` *resolves empty* on
    an unreachable relay rather than rejecting — the same trap `share.ts` documents for

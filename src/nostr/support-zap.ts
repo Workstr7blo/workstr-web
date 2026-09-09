@@ -1,9 +1,10 @@
 import { getSatoshisAmountFromBolt11 } from 'nostr-tools/nip57';
-import { OPERATOR_LUD16, ZAP_RECEIPT_SIGNER_PUBKEY, ZAP_RELAYS } from '../core/funding';
+import { ZAP_RELAYS } from '../core/funding';
 import type { Signer, SignedNostrEvent } from '../signer/types';
 import { OPERATOR_PUBKEY } from './canon';
 import { NwcError, toNwcError, type NwcConnection, type NwcErrorCode, type NwcFailureKind } from './nwc';
 import { payInvoice, type NwcClientOptions, type NwcPaymentResult } from './nwc-client';
+import { fetchOperatorZapTarget, type OperatorZapTarget } from './operator-zap-target';
 
 export type SupportZapFailureCode =
   | 'missing-signer'
@@ -41,6 +42,7 @@ export interface SupportZapInput {
 export interface SupportZapOptions {
   fetch?: typeof fetch;
   nwc?: NwcClientOptions;
+  zapTarget?: OperatorZapTarget;
 }
 
 const MAX_SUPPORT_ZAP_SATS = 1_000_000;
@@ -117,20 +119,19 @@ function checkedComment(comment: string | undefined): string | SupportZapFailure
 }
 
 async function requestOperatorInvoice(
+  target: OperatorZapTarget,
   zapRequest: SignedNostrEvent,
   amountMsat: number,
   comment: string,
   fetchImpl: typeof fetch
 ): Promise<string> {
-  const endpoint = lnurlpEndpoint(OPERATOR_LUD16);
-  if (!endpoint) throw new Error('Operator zap target is not configured.');
-  const metadataResponse = await fetchImpl(endpoint);
+  const metadataResponse = await fetchImpl(target.endpoint);
   if (!metadataResponse.ok) throw new Error('Zap target was unreachable.');
   const metadata = await metadataResponse.json() as { callback?: string; allowsNostr?: boolean; nostrPubkey?: string; minSendable?: number; maxSendable?: number };
   if (!metadata.callback || metadata.allowsNostr !== true || !metadata.nostrPubkey) {
     throw new Error('Zap target does not support Nostr zaps.');
   }
-  if (metadata.nostrPubkey !== ZAP_RECEIPT_SIGNER_PUBKEY) {
+  if (metadata.nostrPubkey.toLowerCase() !== target.receiptSignerPubkey) {
     throw new Error('Zap target signer did not match Workstr receipts.');
   }
   if (typeof metadata.minSendable === 'number' && amountMsat < metadata.minSendable) throw new Error('Zap amount is below the target minimum.');
@@ -171,11 +172,16 @@ export async function executeSupportZap(input: SupportZapInput, options: Support
   const comment = checkedComment(input.comment);
   if (typeof comment !== 'string') return { ok: false, error: comment };
 
+  let target: OperatorZapTarget;
+  try {
+    target = options.zapTarget ?? await fetchOperatorZapTarget({ fetch: options.fetch });
+  } catch {
+    return fail('invoice-request-failed', 'Could not resolve the current Workstr zap target. Check the zap target and try again.');
+  }
+
   let zapRequest: SignedNostrEvent;
   try {
     const pubkey = await input.signer.getPublicKey();
-    const endpoint = lnurlpEndpoint(OPERATOR_LUD16);
-    if (!endpoint) return fail('invoice-request-failed', 'Operator zap target is not configured.');
     zapRequest = await input.signer.signEvent({
       kind: 9734,
       created_at: input.createdAt ?? Math.floor(Date.now() / 1000),
@@ -184,7 +190,7 @@ export async function executeSupportZap(input: SupportZapInput, options: Support
         ['relays', ...ZAP_RELAYS],
         ['amount', String(amount * 1000)],
         ['p', OPERATOR_PUBKEY],
-        ['lnurl', lnurlTag(endpoint)],
+        ['lnurl', lnurlTag(target.endpoint)],
         ['client', 'workstr']
       ],
       content: comment
@@ -196,7 +202,7 @@ export async function executeSupportZap(input: SupportZapInput, options: Support
 
   let invoice: string;
   try {
-    invoice = await requestOperatorInvoice(zapRequest, amount * 1000, comment, options.fetch ?? fetch);
+    invoice = await requestOperatorInvoice(target, zapRequest, amount * 1000, comment, options.fetch ?? fetch);
   } catch {
     return fail('invoice-request-failed', 'Could not request a zap invoice. Check the zap target and try again.');
   }

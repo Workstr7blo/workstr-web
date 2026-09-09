@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
 import { collectProgramZapTotals, collectZapReceipts, fundingTotals, monthStartUnix, parseZapReceipt, resolveWorkoutProgramZapRecipient, type WorkoutProgramZapSource } from '../src/nostr/zaps';
+import { operatorZapAddressFromProfile, operatorZapTargetFromMetadata } from '../src/nostr/operator-zap-target';
 import { buildNwcZapPaymentPayload, buildWorkoutProgramZapRequestPayload } from '../src/nostr/zap-request';
 import { OPERATOR_PUBKEY } from '../src/nostr/canon';
 import { decodeLnurl } from '../src/nostr/lnurl';
@@ -66,6 +67,25 @@ function validRecipient() {
 }
 
 describe('resolveWorkoutProgramZapRecipient', () => {
+  it('derives the operator zap receipt signer from kind:0 LNURL metadata', () => {
+    const address = operatorZapAddressFromProfile(JSON.stringify({ lud16: 'workstr@rizful.com' }));
+    expect(address).toEqual({ lud16: 'workstr@rizful.com', endpoint: 'https://rizful.com/.well-known/lnurlp/workstr' });
+    expect(operatorZapTargetFromMetadata(address!, {
+      callback: 'https://rizful.com/lnurl_two/workstr/get_invoice',
+      allowsNostr: true,
+      nostrPubkey: providerPubkey,
+      minSendable: 1000,
+      maxSendable: 25_000_000
+    })).toMatchObject({ lud16: 'workstr@rizful.com', receiptSignerPubkey: providerPubkey, minSendable: 1000 });
+  });
+
+  it('rejects operator zap metadata without a Nostr receipt signer', () => {
+    const address = { lud16: 'workstr@example.com', endpoint: 'https://example.com/.well-known/lnurlp/workstr' };
+    expect(operatorZapTargetFromMetadata(address, { callback: 'https://example.com/callback', allowsNostr: true })).toBeNull();
+    expect(operatorZapTargetFromMetadata(address, { callback: 'https://example.com/callback', allowsNostr: false, nostrPubkey: providerPubkey })).toBeNull();
+    expect(operatorZapTargetFromMetadata(address, { callback: 'https://example.com/callback', allowsNostr: true, nostrPubkey: 'not-a-pubkey' })).toBeNull();
+  });
+
   it('returns a validated descriptor for a zappable workout program', () => {
     const result = resolveWorkoutProgramZapRecipient(program({ zapRecipient: { relays: ['wss://relay.example'] } }));
     expect(result.ok).toBe(true);
@@ -182,6 +202,10 @@ describe('parseZapReceipt', () => {
     expect(parsed).not.toBeNull();
     expect(parsed!.sats).toBe(21);
     expect(parsed!.senderPubkey).toBe('f'.repeat(64));
+  });
+
+  it('requires the receipt signer derived from the operator LNURL metadata', () => {
+    expect(parseZapReceipt(receipt())).toBeNull();
   });
 
   it('rejects a receipt signed by anyone else', () => {
