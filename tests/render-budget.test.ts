@@ -110,6 +110,7 @@ describe('the render budget', () => {
   // Reading the zap receipts starts when Settings opens and answers twice - once to say it
   // is reading, once with the month. Both used to redraw the page the reader was on.
   it('draws the funding answer without rendering the page', async () => {
+    localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     const { root, shell } = await boot();
     root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
     const before = shell.renders.rebuilds;
@@ -117,6 +118,7 @@ describe('the render budget', () => {
 
     expect(shell.renders.rebuilds).toBe(before);
     expect(root.querySelector('.support-panel #support-funding')).toBeTruthy();
+    localStorage.removeItem('workstr.currentPubkey');
     await drainBoot(shell);
   });
 
@@ -265,6 +267,7 @@ describe('what a background answer must not replace', () => {
   // What `settings-disclosure.ts` used to capture and put back. The category stays open
   // because nothing threw it away, not because something reopened it.
   it('leaves an open Settings category open while the funding answer lands', async () => {
+    localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     const { root, shell } = await boot();
     root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
     const account = root.querySelector<HTMLDetailsElement>('.account-card')!;
@@ -276,6 +279,7 @@ describe('what a background answer must not replace', () => {
     expect(root.querySelector('.account-card')).toBe(account);
     expect(account.open).toBe(true);
     expect(root.querySelector('.support-panel')).toBe(support);
+    localStorage.removeItem('workstr.currentPubkey');
     await drainBoot(shell);
   });
 

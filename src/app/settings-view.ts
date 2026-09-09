@@ -172,23 +172,30 @@ function advancedCard(state: AppState): string {
 }
 
 export function settingsView(state: AppState): string {
+  const signedIn = Boolean(state.pubkey);
   const nwc = state.nwc ?? { active: false, status: 'idle' as const };
   // Monero Mode replaces the wallet layer rather than adding to it: an NWC connection is a
   // Lightning instrument, and offering to connect one while creator support is on Monero
   // would be an invitation to pay over a rail this mode has switched off. The stored
   // connection is untouched — picking Lightning again brings the card back as it was.
   const moneroMode = normalizePaymentMode(state.settings.paymentMode) === 'monero';
-  const nwcCard = moneroMode ? '' : `<details class="settings-category nwc-card" data-settings-section="zap-wallet">
+  const nwcCard = !signedIn || moneroMode ? '' : `<details class="settings-category nwc-card" data-settings-section="zap-wallet">
       <summary><span class="settings-category-copy"><strong>Zap Wallet</strong><small>${nwc.active ? html(nwc.walletLabel || 'Wallet connected') : 'Not connected'}</small></span><span class="status-pill ${nwc.active ? 'ok' : ''}">${nwc.active ? 'ACTIVE' : 'OFF'}</span></summary>
       <div class="settings-category-body">${nwcWalletRows({ ...state, nwc })}</div>
     </details>`;
+  const trainingCards = [
+    trainingPreferencesCard(state),
+    signedIn ? beastModeSettingsCard(state) : ''
+  ];
+  const paymentCards = signedIn ? [paymentModeCard(state), nwcCard] : [];
+  const supportCards = signedIn ? [supportPanel(state.support, nwc, true, moneroMode)] : [];
   return `<div class="page active settings-page">
     <div class="page-title">Settings</div>
     <p class="page-blurb">Customize your experience, keep your data safe, and support a stronger, more sovereign future.</p>
     ${settingsGroup({ id: 'account', label: 'Account', blurb: 'Your identity and device connection', icon: GROUP_ICONS.account, cards: [accountCard(state)] })}
-    ${settingsGroup({ id: 'training', label: 'Training', blurb: 'Configure your training experience', icon: GROUP_ICONS.training, cards: [trainingPreferencesCard(state), beastModeSettingsCard(state)] })}
-    ${settingsGroup({ id: 'payments', label: 'Payments', blurb: 'Choose your creator support method', icon: GROUP_ICONS.payments, cards: [paymentModeCard(state), nwcCard] })}
-    ${settingsGroup({ id: 'support', label: 'Support', blurb: 'Help keep Workstr independent', icon: GROUP_ICONS.support, cards: [supportPanel(state.support, nwc, Boolean(state.pubkey), moneroMode)], variant: 'support' })}
+    ${settingsGroup({ id: 'training', label: 'Training', blurb: 'Configure your training experience', icon: GROUP_ICONS.training, cards: trainingCards })}
+    ${settingsGroup({ id: 'payments', label: 'Payments', blurb: 'Choose your creator support method', icon: GROUP_ICONS.payments, cards: paymentCards })}
+    ${settingsGroup({ id: 'support', label: 'Support', blurb: 'Help keep Workstr independent', icon: GROUP_ICONS.support, cards: supportCards, variant: 'support' })}
     ${settingsGroup({ id: 'system', label: 'System & Data', blurb: 'Manage your data and advanced settings', icon: GROUP_ICONS.system, cards: [backupPanel(backupPanelState(state)), advancedCard(state)] })}
   </div>`;
 }

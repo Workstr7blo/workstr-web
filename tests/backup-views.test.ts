@@ -44,14 +44,19 @@ describe('status pill', () => {
   it('keeps the collapsed data summary meaningful before account setup', () => {
     // Not the pill's words. It used to return `statusPill().label` unchanged, so the card
     // printed the same state twice on one line and told the reader nothing about the card.
-    expect(backupSummary(panelState({ signedIn: false, enabled: false }))).toBe('Sign in to back up and sync this device');
+    expect(backupSummary(panelState({ signedIn: false, enabled: false }))).toBe('Manual backup for this device');
     expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).toBe('Back up, sync, and move your training data');
     expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).not.toBe(statusPill(panelState({ sync: { state: 'idle', pending: 3 } })).label);
   });
 
-  it('says off before it says anything else', () => {
+  it('says off before it says anything else for signed-in users', () => {
     expect(statusPill(panelState({ enabled: false, sync: { state: 'error', pending: 4, lastError: 'boom' } })))
       .toEqual({ label: 'off', ok: false });
+  });
+
+  it('uses a neutral local pill before account setup', () => {
+    expect(statusPill(panelState({ signedIn: false, enabled: false, sync: { state: 'error', pending: 4, lastError: 'boom' } })))
+      .toEqual({ label: 'local', ok: false });
   });
 
   it('distinguishes up to date, pending work, syncing and trouble', () => {
@@ -110,9 +115,17 @@ describe('the panel', () => {
     expect(html).toContain('Manual backup');
   });
 
-  it('tells a signed-out user that sign-in comes first', () => {
+  it('keeps signed-out Data & Sync to manual backup only', () => {
     const html = backupPanel(panelState({ signedIn: false, enabled: false }));
-    expect(html).toContain('Sign in to protect new training');
+    expect(html).toContain('Manual backup for this device');
+    expect(html).toContain('Manual backup');
+    expect(html).toContain('id="export-data"');
+    expect(html).toContain('id="import-data"');
+    expect(html).not.toContain('Sign in to protect new training');
+    expect(html).not.toContain('Use Account above');
+    expect(html).not.toContain('Auto-sync');
+    expect(html).not.toContain('Sync now');
+    expect(html).not.toContain('id="enable-sync"');
     expect(html).not.toContain('id="auto-backup"');
   });
 
