@@ -62,6 +62,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Support Workstr now matches the payment mode you are on. On Lightning it opens with the
+  zap action and this month's total against the target, and the accounting - received,
+  supporters, receipt count, gap, the zap address and the npub - sits behind "View
+  transparency details" for anyone who wants to check it. On Monero it shows a Monero QR
+  code for Workstr's own address, the address itself, and a copy button. The card no longer
+  shows a Lightning target in Monero mode and then explains why, and the fundraising
+  paragraph has moved out of the first thing you read. Support is voluntary either way and
+  the receipt figures are unchanged.
+
 - Training Preferences reads as one panel. Weight unit sat in a bordered row while Equipment
   hung underneath it as a bare list, so the two settings looked like separate components
   inside the same card. They are now two blocks on one surface with a thin line between

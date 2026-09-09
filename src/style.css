@@ -64,12 +64,17 @@
    Workstr cannot see a Monero payment, so it has nothing true to say about one. */
 .monero-tip { display: grid; justify-items: center; gap: 12px; text-align: center; }
 .monero-tip .page-title { margin: 0; }
-.monero-tip-mark { color: var(--payment-accent); line-height: 0; filter: drop-shadow(0 0 18px rgba(var(--payment-rgb), .32)); }
+.monero-tip-mark,
+.support-monero-mark { color: var(--payment-accent); line-height: 0; filter: drop-shadow(0 0 18px rgba(var(--payment-rgb), .32)); }
 .monero-tip-creator { margin: -6px 0 0; color: var(--text); font-weight: 700; }
-.monero-tip-qr { width: 210px; max-width: 100%; padding: 12px; border: 1px solid rgba(var(--payment-rgb), .45); border-radius: 12px; background: #fff; box-shadow: 0 0 26px rgba(var(--payment-rgb), .18); }
-.monero-tip-qr svg { display: block; width: 100%; height: auto; }
-.monero-tip-address { display: block; width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid rgba(var(--payment-rgb), .3); border-radius: 10px; background: rgba(var(--payment-rgb), .07); color: var(--text); font: 500 12px/1.5 ui-monospace, monospace; word-break: break-all; user-select: all; }
-.monero-tip-actions { width: 100%; justify-content: center; }
+.monero-tip-qr,
+.support-monero-qr { width: 210px; max-width: 100%; padding: 12px; border: 1px solid rgba(var(--payment-rgb), .45); border-radius: 12px; background: #fff; box-shadow: 0 0 26px rgba(var(--payment-rgb), .18); }
+.monero-tip-qr svg,
+.support-monero-qr svg { display: block; width: 100%; height: auto; }
+.monero-tip-address,
+.support-monero-address { display: block; width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid rgba(var(--payment-rgb), .3); border-radius: 10px; background: rgba(var(--payment-rgb), .07); color: var(--text); font: 500 12px/1.5 ui-monospace, monospace; word-break: break-all; user-select: all; }
+.monero-tip-actions,
+.support-monero-actions { width: 100%; justify-content: center; }
 
 @media (max-width: 760px) {
   .payment-rail { grid-template-columns: 1fr; }
@@ -354,6 +359,28 @@
 .support-stats span { display: block; color: var(--dim); font: 800 10px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .09em; }
 .support-stats strong { display: block; margin-top: 6px; color: var(--text); font-size: 13px; line-height: 1.25; overflow-wrap: anywhere; }
 .support-meter-note { margin: 12px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+/* Support: the transparency disclosure. The month stays on the card and the counts, the zap
+   target and the npub sit one level deeper, so the reader who wants the arithmetic can open
+   it and nobody else has to read past it on the way to the button. */
+.support-transparency { margin-top: 14px; border: 1px solid rgba(var(--accent-line-rgb), .2); border-radius: 16px; background: rgba(0,0,0,.2); }
+.support-transparency > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 15px; list-style: none; cursor: pointer; color: var(--purple-2); font: 850 11px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.support-transparency > summary::-webkit-details-marker { display: none; }
+.support-transparency > summary::after { content: '›'; font-size: 18px; line-height: .8; transition: transform .15s ease; }
+.support-transparency[open] > summary::after { transform: rotate(90deg); }
+.support-transparency-body { padding: 0 15px 15px; }
+.support-transparency-body .support-stats { margin-top: 2px; }
+.support-transparency-body .settings-row-actions { margin-top: 12px; }
+.support-transparency-body .section-help { margin: 12px 0 0; }
+.support-transparency-body .support-zap-card { margin-bottom: 0; }
+.support-transparency-body .support-meter-note { margin-top: 10px; }
+
+/* Support: the Monero rail. Same card and the same title, a payment code where the funding
+   meter is - there is no Monero accounting to show, and faking one would be inventing it. */
+.support-panel-monero .settings-category-meta { color: var(--payment-accent); }
+.support-monero { display: grid; justify-items: center; gap: 12px; text-align: center; }
+.support-monero-address { text-align: center; }
+.support-monero .section-help { margin: 0; }
 .metric-grid.mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .workout-card:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(0,0,0,.22); }
 .workout-card.top-zapped { position: relative; border-color: rgba(var(--accent-line-rgb), .55); box-shadow: 0 0 26px rgba(var(--accent-rgb), .18), inset 0 1px 0 rgba(255,255,255,.06); }
@@ -846,7 +873,8 @@
   .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 104px minmax(0,1fr) 22px; gap: 10px; }
   .workout-card-media .program-zap-cta { min-height: 36px; padding: 8px 7px; font-size: 14px; }
   .workout-card-media .monero-tip-cta { min-height: 36px; padding: 8px 7px; font-size: 14px; }
-  .monero-tip-qr { width: 180px; }
+  .monero-tip-qr,
+  .support-monero-qr { width: 180px; }
   /* Source and difficulty are one line, as in the approved rendering. They wrapped because
      the info column is ~230px at this width and the two pills together just missed it. */
   .program-badge-row { flex-wrap: nowrap; gap: 5px; margin-top: 7px; }

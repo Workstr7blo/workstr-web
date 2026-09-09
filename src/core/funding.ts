@@ -19,6 +19,14 @@ export const OPERATOR_NOSTR_URL = `https://njump.me/${OPERATOR_NOSTR_HANDLE}`;
 // public support page at workstr.fit/support/.
 export const MONTHLY_COST_SATS = 85_000;
 
+// Where Workstr itself is supported on the Monero rail. Unlike the Lightning target this
+// cannot be resolved from a profile: a Monero address is not Nostr metadata, and the
+// operator's own `kind:10133` target belongs to creator support rather than to Workstr. So
+// it is a constant, written down once, and validated before anything renders a payment code
+// from it.
+export const OPERATOR_MONERO_ADDRESS =
+  '86KJi8uZfTSb3G87MmUmks8QFoMT8pQYpdWkRxJAJgWCVPZG4tUm5v29pKFPorCiA5NkCXps8taFagdWt1xUqtNP63cZtss';
+
 // Relays queried for zap receipts. Receipts are published by the wallet
 // provider to widely-read relays, so this is the broad read set rather than
 // the narrow catalog set.
