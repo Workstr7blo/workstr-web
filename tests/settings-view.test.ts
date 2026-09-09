@@ -27,6 +27,10 @@ function render(overrides: Partial<AppState> = {}): HTMLElement {
   return document.getElementById('app') as HTMLElement;
 }
 
+function signedIn(overrides: Partial<AppState> = {}): Partial<AppState> {
+  return { pubkey: 'ab'.repeat(32), signerType: 'local', ...overrides } as Partial<AppState>;
+}
+
 const groupLabels = (root: HTMLElement): string[] =>
   Array.from(root.querySelectorAll('.settings-group-label')).map((el) => el.textContent?.trim() || '');
 
@@ -36,18 +40,18 @@ const cardTitles = (root: HTMLElement): string[] =>
 
 describe('the Settings page', () => {
   it('reads as five groups in the order a person thinks in', () => {
-    expect(groupLabels(render())).toEqual(['Account', 'Training', 'Payments', 'Support', 'System & Data']);
+    expect(groupLabels(render(signedIn()))).toEqual(['Account', 'Training', 'Payments', 'Support', 'System & Data']);
   });
 
   it('orders the cards within each group', () => {
-    const titles = cardTitles(render());
+    const titles = cardTitles(render(signedIn()));
     expect(titles.indexOf('Training Preferences')).toBeLessThan(titles.indexOf('Beast Mode'));
     expect(titles.indexOf('Payment Mode')).toBeLessThan(titles.indexOf('Zap Wallet'));
     expect(titles.indexOf('Data & Sync')).toBeLessThan(titles.indexOf('Advanced'));
   });
 
   it('puts each card in its group', () => {
-    const root = render();
+    const root = render(signedIn());
     const groupOf = (selector: string): string | undefined => root.querySelector(selector)
       ?.closest('.settings-group')?.querySelector('.settings-group-label')?.textContent?.trim();
     expect(groupOf('.account-card')).toBe('Account');
@@ -63,7 +67,7 @@ describe('the Settings page', () => {
   // Grouping is a claim about meaning, so it is made in markup a screen reader can follow
   // rather than in styling alone.
   it('names each group semantically', () => {
-    const root = render();
+    const root = render(signedIn());
     for (const section of Array.from(root.querySelectorAll('.settings-group'))) {
       const labelledBy = section.getAttribute('aria-labelledby');
       expect(labelledBy).toBeTruthy();
@@ -78,7 +82,7 @@ describe('the Settings page', () => {
   });
 
   it('gives every group a one-line blurb', () => {
-    const root = render();
+    const root = render(signedIn());
     const blurbs = Array.from(root.querySelectorAll('.settings-group-copy small')).map((el) => el.textContent?.trim());
     expect(blurbs).toHaveLength(5);
     expect(blurbs.every((line) => Boolean(line))).toBe(true);
@@ -88,7 +92,7 @@ describe('the Settings page', () => {
   // Cards in a group share one container and are divided by a line, so a group reads as one
   // object. A group holding a single card is just a card.
   it('collects a group into one container', () => {
-    const root = render();
+    const root = render(signedIn());
     const training = root.querySelector('.training-preferences-card')?.closest('.settings-group');
     expect(training?.querySelectorAll('.settings-group-cards')).toHaveLength(1);
     expect(training?.querySelectorAll('.settings-group-cards > .settings-category')).toHaveLength(2);
@@ -97,7 +101,7 @@ describe('the Settings page', () => {
   });
 
   it('keeps Support visually its own thing', () => {
-    const root = render();
+    const root = render(signedIn());
     const support = root.querySelector('.support-panel')?.closest('.settings-group-cards');
     expect(support?.classList.contains('settings-group-cards--support')).toBe(true);
   });
@@ -109,8 +113,39 @@ describe('the Settings page', () => {
     expect(card?.querySelector('#import-file')).toBeTruthy();
   });
 
+  it('renders local-only Settings as account, training, and local data only', () => {
+    const root = render();
+    expect(groupLabels(root)).toEqual(['Account', 'Training', 'System & Data']);
+    expect(cardTitles(root)).toEqual(['Local only', 'Training Preferences', 'Data & Sync', 'Advanced']);
+    expect(root.querySelector('.beast-mode-card')).toBeNull();
+    expect(root.querySelector('.payment-mode-card')).toBeNull();
+    expect(root.querySelector('.nwc-card')).toBeNull();
+    expect(root.querySelector('.support-panel')).toBeNull();
+    expect(root.textContent).not.toContain('Payments');
+    expect(root.textContent).not.toContain('Support Workstr');
+    expect(root.textContent).not.toContain('Payment Mode');
+    expect(root.textContent).not.toContain('Zap Wallet');
+  });
+
+  it('keeps local-only Data & Sync focused on manual backup', () => {
+    const card = render().querySelector('.data-sync-card') as HTMLElement;
+    expect(card.querySelector('summary .settings-category-copy small')?.textContent).toBe('Manual backup for this device');
+    expect(card.querySelector('summary .status-pill')?.textContent).toBe('local');
+    expect(card.querySelector('.manual-backup-group')).toBeTruthy();
+    expect(card.querySelector('#export-data')).toBeTruthy();
+    expect(card.querySelector('#import-data')).toBeTruthy();
+    expect(card.querySelector('#import-file')).toBeTruthy();
+    expect(card.querySelector('.sync-control-group')).toBeNull();
+    expect(card.querySelector('#auto-backup')).toBeNull();
+    expect(card.querySelector('#sync-now')).toBeNull();
+    expect(card.querySelector('#enable-sync')).toBeNull();
+    expect(card.textContent).not.toContain('Use Account above');
+    expect(card.textContent).not.toContain('Auto-sync');
+    expect(card.textContent).not.toContain('Sync now');
+  });
+
   it('drops the Zap Wallet card on the Monero rail and leaves the payment card standing', () => {
-    const monero = render({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>);
+    const monero = render(signedIn({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>));
     expect(monero.querySelector('.nwc-card')).toBeNull();
     expect(monero.querySelector('.payment-mode-card')).toBeTruthy();
     expect(cardTitles(monero)).not.toContain('Zap Wallet');
@@ -216,7 +251,7 @@ describe('the Settings page', () => {
 // bug comes back. These assert against the real page markup rather than a fixture.
 describe('the background patchers still find their cards', () => {
   it('writes the funding surface inside the grouped page', () => {
-    const root = render();
+    const root = render(signedIn());
     const card = root.querySelector('.support-panel') as HTMLDetailsElement;
     card.open = true;
 

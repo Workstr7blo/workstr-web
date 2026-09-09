@@ -442,20 +442,22 @@ describe('shell', () => {
     root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
     const settings = root.querySelector('.settings-page') as HTMLElement;
     expect(settings?.textContent).toContain('Account');
-    expect(settings?.textContent).toContain('Beast Mode');
-    expect(settings?.textContent).toContain('Create 1 local program');
-    expect(settings?.textContent).toContain('Complete 5 workouts');
-    expect(settings?.textContent).toContain('Train on 3 distinct local days');
-    expect(settings?.textContent).toContain('Signed-in Nostr profile has a picture');
+    expect(settings?.textContent).not.toContain('Beast Mode');
+    expect(settings?.textContent).not.toContain('Create 1 local program');
+    expect(settings?.textContent).not.toContain('Complete 5 workouts');
+    expect(settings?.textContent).not.toContain('Train on 3 distinct local days');
+    expect(settings?.textContent).not.toContain('Signed-in Nostr profile has a picture');
     expect(settings?.textContent).toContain('Data & Sync');
     expect(settings?.textContent).toContain('Training Preferences');
-    expect(settings?.textContent).toContain('Support Workstr');
-    expect(settings?.textContent).toContain('Payment Mode');
-    expect(settings?.textContent).toContain('Lightning zaps');
+    expect(settings?.textContent).not.toContain('Support Workstr');
+    expect(settings?.textContent).not.toContain('Payment Mode');
+    expect(settings?.textContent).not.toContain('Lightning zaps');
     expect(settings?.querySelector('.advanced-settings:not([open])')).toBeTruthy();
-    expect(settings?.querySelectorAll('.settings-category:not([open])')).toHaveLength(8);
+    expect(settings?.querySelectorAll('.settings-category:not([open])')).toHaveLength(4);
     expect(settings?.querySelector('.account-card summary')?.textContent).toContain('Local only');
-    expect(settings?.querySelector('.beast-mode-card summary')?.textContent).toContain('0/4 objectives');
+    expect(settings?.querySelector('.beast-mode-card')).toBeNull();
+    expect(settings?.querySelector('.payment-mode-card')).toBeNull();
+    expect(settings?.querySelector('.support-panel')).toBeNull();
     expect(settings?.querySelector('.account-card .terminal-mini')).toBeNull();
     expect(settings?.querySelector('#sign-in-settings')).toBeTruthy();
     expect(settings?.querySelector('#create-account-settings')).toBeNull();
@@ -463,14 +465,14 @@ describe('shell', () => {
     expect(settings?.querySelector('#enable-sync')).toBeNull();
     expect(settings?.querySelector('#auto-backup')).toBeNull();
     expect(settings?.textContent).not.toContain('Create sync account');
-    expect(settings?.textContent).toContain('Use Account above');
+    expect(settings?.textContent).not.toContain('Use Account above');
     expect(settings?.textContent).toContain('Manual backup');
     expect(settings?.textContent).toContain('0 selected');
-    expect(settings?.querySelector('.beast-mode-card [data-beast-mode-state="locked"]')).toBeTruthy();
     await drainBoot(shell);
   });
 
   it('swaps the wallet card for the Monero payment address when the rail changes', async () => {
+    localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
     const shell = renderShell(root, { skipCatalogRefresh: true });
@@ -511,6 +513,7 @@ describe('shell', () => {
     expect(root.querySelector('#nwc-connect')).toBeTruthy();
     expect(root.querySelector('#monero-address-section')).toBeNull();
     expect(root.querySelector('#open-nwc-zap')).toBeTruthy();
+    localStorage.removeItem('workstr.currentPubkey');
   });
 
   // A live session keeps state nothing but the DOM has: the reps and load typed into the
