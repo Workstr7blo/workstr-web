@@ -41,7 +41,7 @@ The first version gated the relay behind a 50-pubkey allowlist reached through a
 | Reads | Open |
 | Default quota | 50 MB/pubkey |
 | Encryption | NIP-44 to the user's own pubkey |
-| Relay URL | `wss://relay.workstr.fit:43736` |
+| Relay URL | `wss://relay.workstr.fit:58956` |
 | Source of truth | IndexedDB |
 
 Admin tooling exists for blocking, debugging, status checks, and emergency fixes. There is no onboarding path for it to be an exception to.

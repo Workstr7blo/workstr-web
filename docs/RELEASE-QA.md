@@ -386,7 +386,7 @@ Record the event id and cleanup result. A local policy unit test is not evidence
 deployed relay is running the same policy.
 
 **The client loop** — `tests/sync-relay.integration.test.ts` run with
-`WORKSTR_TEST_RELAY=wss://relay.workstr.fit:43736`: all six must be green. The suite covers
+`WORKSTR_TEST_RELAY=wss://relay.workstr.fit:58956`: all six must be green. The suite covers
 an encrypted V2 event on the wire, account isolation, a full phone → relay → laptop
 restore, policy rejection, queue drain, and offline logging uploading after reconnect.
 Section 6b adds the real-device and signer surface around that sync logic.
@@ -414,7 +414,7 @@ before it is filed as a bug: the last event written is never reaped until someth
 written.
 
 **The client loop** — `tests/pairing-relay.integration.test.ts` run with
-`WORKSTR_TEST_RELAY=wss://relay.workstr.fit:43736`: all four must be green. The suite
+`WORKSTR_TEST_RELAY=wss://relay.workstr.fit:58956`: all four must be green. The suite
 carries a recovery key across a real relay, collects the response on a connection that was
 not listening when it was sent, has the relay refuse an envelope that breaks the policy,
 and returns rather than hanging when nothing answers. It is skipped when the variable is

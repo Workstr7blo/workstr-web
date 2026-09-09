@@ -63,7 +63,7 @@ describe('record collection', () => {
   it('keeps device-local settings out of the synced record', async () => {
     const picked = syncedSettings({
       unit: 'kg', publicRelays: ['wss://a'], ownedEquipment: ['barbell'],
-      workstrRelay: 'wss://relay.workstr.fit:43736', signerType: 'nip46',
+      workstrRelay: 'wss://relay.workstr.fit:58956', signerType: 'nip46',
       canonCache: { fetchedAt: 1, events: [] }, syncCursor: 5,
       backup: { enabled: true, lastSyncAt: 'now' }
     });

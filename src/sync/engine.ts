@@ -16,7 +16,7 @@ import { repairCachedKeyIfOlderBackupWasSeen } from './key-repair';
 // accepts only this client's encrypted records, so putting it in the user's kind:10002
 // would invite every other Nostr client to publish their notes at a relay that will
 // refuse them. It is also never mixed into the catalog or public write relay sets.
-export const WORKSTR_RELAY_URL = 'wss://relay.workstr.fit:43736';
+export const WORKSTR_RELAY_URL = 'wss://relay.workstr.fit:58956';
 
 export const CHANGE_DEBOUNCE_MS = 4000;
 
