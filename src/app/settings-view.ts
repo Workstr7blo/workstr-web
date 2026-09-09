@@ -127,9 +127,12 @@ function npubLine(state: AppState): string {
 
 function accountCard(state: AppState): string {
   const keyLine = state.signerType === 'local' ? 'Device-managed key for faster sync.' : 'Keys stay in your signer.';
+  const addDeviceAction = state.signerType === 'local'
+    ? '<button id="add-device-settings" class="button small">Add device</button>'
+    : '';
   const accountAvatar = avatarFace('settings-account-avatar', accountIdentity(state));
   const account = state.pubkey
-    ? `<div class="settings-row-main account-row"><div class="settings-account-identity">${accountAvatar}<span><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></span></div><div class="settings-row-actions"><button id="add-device-settings" class="button small">Add device</button><button id="sign-out-settings" class="button small">Sign out</button><button id="remove-account-data" class="button quiet danger small">Remove data</button></div></div>`
+    ? `<div class="settings-row-main account-row"><div class="settings-account-identity">${accountAvatar}<span><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></span></div><div class="settings-row-actions">${addDeviceAction}<button id="sign-out-settings" class="button small">Sign out</button><button id="remove-account-data" class="button quiet danger small">Remove data</button></div></div>`
     : `<div class="settings-row-main account-row"><div><strong>Local only</strong><small>Use Workstr now, add encrypted sync when ready.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Account</button></div></div>`;
   // The identity is the summary here rather than a word: the avatar, the name and the npub
   // are what someone checks when they open Settings to see who they are signed in as.
