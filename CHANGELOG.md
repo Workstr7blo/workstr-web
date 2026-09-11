@@ -64,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Workstr's own Monero donation address has changed. The Support screen, its QR code and
+  the Open wallet link all point at the new address, which is the one published on
+  workstr.fit. Anyone who saved the old address should use the new one.
 - Support Workstr now matches the payment mode you are on. On Lightning it opens with the
   zap action and this month's total against the target, and the accounting - received,
   supporters, receipt count, gap, the zap address and the npub - sits behind "View
