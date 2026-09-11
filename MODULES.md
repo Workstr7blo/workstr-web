@@ -168,10 +168,12 @@ and patch it directly, which is also why a page render can leave it standing.
   address: the `kind:10133` lookup, validation, publish and clear, and the in-place repaint
   of that Settings section. It never writes the address to the database, so the relays stay
   the only source of truth and nothing about it enters encrypted sync.
-- `src/app/monero-mark.ts` owns the vendored Monero mark and badge. It lives in `app/`
-  because the creator tip sheet and the Monero support card both draw it and features do
-  not import each other. Monochrome and `currentColor` only: it identifies the payment
-  mechanism, never Workstr itself.
+- `src/app/monero-mark.ts` owns the vendored Monero mark, the badge, and `moneroQr`, the
+  payment code with the mark knocked into its middle. It lives in `app/` because the
+  creator tip sheet and the Monero support card both draw it and features do not import
+  each other. Monochrome: it identifies the payment mechanism, never Workstr itself. The
+  mark and badge take `currentColor`; only the one inside a code names a token, because it
+  sits on white where the surrounding text colour would vanish.
 - `src/features/sheets/monero-tip-view.ts` owns the Monero rail's program-card surfaces:
   whether an author can be tipped at all, the card action, and the tip sheet's markup.
   `moneroMode(state)` is the single answer to "which creator-support rail is this" for the
