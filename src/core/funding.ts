@@ -25,7 +25,7 @@ export const MONTHLY_COST_SATS = 85_000;
 // it is a constant, written down once, and validated before anything renders a payment code
 // from it.
 export const OPERATOR_MONERO_ADDRESS =
-  '86KJi8uZfTSb3G87MmUmks8QFoMT8pQYpdWkRxJAJgWCVPZG4tUm5v29pKFPorCiA5NkCXps8taFagdWt1xUqtNP63cZtss';
+  '43SH87nCju4L58vNbzrM88aSQ1yughBNvBzNauUkT71jNzv7rvdPcqpKRY94VUdEGJXbJs5dshSaNi4jAb9x96ecLid3rQq';
 
 // Relays queried for zap receipts. Receipts are published by the wallet
 // provider to widely-read relays, so this is the broad read set rather than
