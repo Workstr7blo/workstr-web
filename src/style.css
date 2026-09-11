@@ -64,8 +64,7 @@
    Workstr cannot see a Monero payment, so it has nothing true to say about one. */
 .monero-tip { display: grid; justify-items: center; gap: 12px; text-align: center; }
 .monero-tip .page-title { margin: 0; }
-.monero-tip-mark,
-.support-monero-mark { color: var(--payment-accent); line-height: 0; filter: drop-shadow(0 0 18px rgba(var(--payment-rgb), .32)); }
+.monero-tip-mark { color: var(--payment-accent); line-height: 0; filter: drop-shadow(0 0 18px rgba(var(--payment-rgb), .32)); }
 .monero-tip-creator { margin: -6px 0 0; color: var(--text); font-weight: 700; }
 .monero-tip-qr,
 .support-monero-qr { width: 210px; max-width: 100%; padding: 12px; border: 1px solid rgba(var(--payment-rgb), .45); border-radius: 12px; background: #fff; box-shadow: 0 0 26px rgba(var(--payment-rgb), .18); }

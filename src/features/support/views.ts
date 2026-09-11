@@ -1,11 +1,10 @@
-import { renderSVG } from 'uqr';
 import { nip19 } from 'nostr-tools';
 import { MONTHLY_COST_SATS, OPERATOR_MONERO_ADDRESS, OPERATOR_NOSTR_HANDLE, OPERATOR_NOSTR_URL } from '../../core/funding';
 import { OPERATOR_PUBKEY } from '../../nostr/canon';
 import { fundingTotals, type ZapReceipt } from '../../nostr/zaps';
 import { looksLikeMoneroAddress } from '../../nostr/payment-targets';
 import { redactNwcSecrets } from '../../nostr/nwc';
-import { moneroBadge } from '../../app/monero-mark';
+import { moneroQr } from '../../app/monero-mark';
 import { html } from '../../app/format';
 import type { NwcViewState } from '../../app/state';
 
@@ -162,8 +161,7 @@ export function moneroSupportPanel(address: string = OPERATOR_MONERO_ADDRESS): s
   const uri = `monero:${target}`;
   return supportCard('monero', 'XMR', 'Private support with Monero', `
     <div class="support-monero">
-      <div class="support-monero-mark">${moneroBadge(46)}</div>
-      <div class="support-monero-qr" role="img" aria-label="QR code for the Workstr Monero address ${html(target)}">${renderSVG(uri, { border: 2 })}</div>
+      <div class="support-monero-qr" role="img" aria-label="QR code for the Workstr Monero address ${html(target)}">${moneroQr(uri)}</div>
       <code class="support-monero-address" aria-hidden="true">${html(shortMoneroAddress(target))}</code>
       <span class="sr-only">Workstr Monero address: ${html(target)}</span>
       <div class="web-empty-actions support-monero-actions">

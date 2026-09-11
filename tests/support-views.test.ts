@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { renderSVG } from 'uqr';
+import { encode } from 'uqr';
 import { nip19 } from 'nostr-tools';
 import { lightningSupportPanel, moneroSupportPanel, shortMoneroAddress, supportPanel, supportSummary } from '../src/features/support/views';
 import { MONTHLY_COST_SATS, OPERATOR_MONERO_ADDRESS, OPERATOR_NOSTR_HANDLE, OPERATOR_NOSTR_URL } from '../src/core/funding';
 import { OPERATOR_PUBKEY } from '../src/nostr/canon';
 import { looksLikeMoneroAddress } from '../src/nostr/payment-targets';
+import { moneroQr } from '../src/app/monero-mark';
 
 const receipts = [
   { id: 'one', sats: 1_000, createdAt: 1, senderPubkey: 'a'.repeat(64) },
@@ -80,9 +81,36 @@ describe('the Monero support card', () => {
 
   it('encodes the canonical address as an amount-free monero: URI', () => {
     expect(looksLikeMoneroAddress(OPERATOR_MONERO_ADDRESS)).toBe(true);
-    expect(markup).toContain(renderSVG(`monero:${OPERATOR_MONERO_ADDRESS}`, { border: 2 }));
+    expect(markup).toContain(moneroQr(`monero:${OPERATOR_MONERO_ADDRESS}`));
     expect(markup).toContain(`href="monero:${OPERATOR_MONERO_ADDRESS}"`);
     expect(markup).not.toContain('tx_amount');
+  });
+
+  it('draws the mark inside the code, on a plate small enough for level H to survive', () => {
+    const uri = `monero:${OPERATOR_MONERO_ADDRESS}`;
+    const code = moneroQr(uri);
+
+    // Level H, because the centre is covered. A lower level here would still render and
+    // would still look right, and would fail in a camera after the money.
+    const size = encode(uri, { ecc: 'H', border: 2 }).size;
+    expect(code).toContain(`viewBox="0 0 ${size * 10} ${size * 10}"`);
+
+    const plate = code.match(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)" rx="\d+" fill="white"\/>/);
+    expect(plate).not.toBeNull();
+    const [, x, y, width, height] = plate!.map(Number);
+    const codeSize = size * 10;
+    expect(width).toBe(height);
+    expect(width / codeSize).toBeLessThanOrEqual(0.22);
+    // centred, so the knockout stays away from the three finder patterns
+    expect(x).toBe(Math.round((codeSize - width) / 2));
+    expect(y).toBe(x);
+    // painted from the payment token: `currentColor` would inherit the page text colour
+    // and disappear against the white plate
+    expect(code).toContain('fill="var(--payment-accent)"');
+  });
+
+  it('no longer repeats the mark above the code', () => {
+    expect(markup).not.toContain('support-monero-mark');
   });
 
   it('shortens the address on screen but copies and announces all of it', () => {

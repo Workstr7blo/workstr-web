@@ -64,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The Monero code on Support Workstr now carries the Monero mark in its middle, matching
+  the donate code on workstr.fit. The code is drawn with stronger error correction so it
+  still scans with the centre covered.
 - Workstr's own Monero donation address has changed. The Support screen, its QR code and
   the Open wallet link all point at the new address, which is the one published on
   workstr.fit. Anyone who saved the old address should use the new one.
