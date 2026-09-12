@@ -30,8 +30,8 @@ and patch it directly, which is also why a page render can leave it standing.
 | QR device pairing crypto and relay transport | `src/signer/pairing.ts` | `src/nostr/device-pairing.ts`, `relay/write-policy.mjs`, `docs/device-pairing-architecture.md` | `tests/pairing.test.ts`, `tests/pairing-relay.integration.test.ts` |
 | QR device pairing screens and camera | `src/app/device-pairing-controller.ts` | `src/features/identity/pairing-view.ts`, `src/app/qr-scanner.ts`, `src/app/identity-controller.ts` | `tests/device-pairing-controller.test.ts` |
 | Catalog/library actions and cache | `src/app/catalog-controller.ts` | `src/nostr/canon.ts`, `src/nostr/programImport.ts`, `src/db/store.ts` | `tests/discover.test.ts`, `tests/programImport.test.ts`, browser verification |
-| Preferences, recovery, history actions, and backup controls | `src/app/preferences-controller.ts` | `src/db/export.ts`, recovery modules, `src/nostr/zaps.ts` | feature tests, `tests/export.test.ts` |
-| NWC wallet connection and in-app support zaps | `src/app/nwc-controller.ts`, `src/nostr/support-zap.ts` | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts`, `src/features/support/views.ts` | `tests/nwc-ui.test.ts`, `tests/support-zap.test.ts`, NWC tests |
+| Preferences, recovery, history actions, and backup controls | `src/app/preferences-controller.ts` | `src/db/export.ts`, recovery modules | feature tests, `tests/export.test.ts` |
+| Deleting what a Lightning build left on a device | `src/db/retire-lightning.ts`, `src/db/store.ts` (`retireLightningSettings`) | `src/app/shell.ts` (boot, `loadNamespace`) | `tests/retire-lightning.test.ts`, `tests/store.test.ts` |
 | Stored/live session adaptation | `src/app/session-persistence.ts` | `src/db/store.ts`, `src/app/state.ts` | `tests/session-runner.test.ts`, `tests/store.test.ts` |
 | Catalog surfaces: what a relay answer is written into, and when nothing is | `src/app/catalog-surfaces.ts` | `src/app/catalog-controller.ts`, `src/features/discover/views.ts` (`discoverGrid`) | `tests/shell.test.ts`, `tests/discover.test.ts` |
 | The account chip and the Settings Account identity | `src/app/account-chip.ts` | `src/app/layout.ts`, `src/app/shell.ts` (profile hydration) | `tests/account-chip.test.ts`, `tests/shell.test.ts` |
@@ -41,11 +41,11 @@ and patch it directly, which is also why a page render can leave it standing.
 | Writing a grid of cards without rebuilding the ones that did not change | `src/app/card-grid.ts` | `src/app/catalog-surfaces.ts`, `src/app/browse-surfaces.ts`, `src/features/discover/views.ts` (`discoverCards`), `src/features/library/views.ts` (`libraryCards`) | `tests/card-grid.test.ts`, `tests/render-budget.test.ts` |
 | The account choice screen: create vs. connect, and the order the routes are offered in | `src/app/account-choice-view.ts` | `src/app/identity-controller.ts` (`startAccountChoice` binds every row), `src/signer/nip07.ts` (`hasNip07`) | `tests/account-choice-view.test.ts`, `tests/shell.test.ts` |
 | The Settings page: which cards exist, the groups they sit in, and their order | `src/app/settings-view.ts` | every settings card below, `src/app/layout.ts` (`appView`) | `tests/settings-view.test.ts`, `tests/shell.test.ts` |
-| Settings surfaces written in place rather than rerendered - a background answer, or the reader's own preference change | `src/features/support/views.ts` (`updateSupportFunding`), `src/features/backup/views.ts` (`updateBackupStatus`, `updateBackupCard`), `src/app/settings-view.ts` (`updateTrainingPreferences`) | `src/app/preferences-controller.ts`, `src/app/backup-controller.ts`, `src/app/shell.ts` (`bindBackupCard`) | `tests/backup-views.test.ts`, `tests/settings-view.test.ts`, `tests/render-budget.test.ts` |
+| Settings surfaces written in place rather than rerendered - a background answer, or the reader's own preference change | `src/app/monero-address-controller.ts` (`repaint`), `src/features/backup/views.ts` (`updateBackupStatus`, `updateBackupCard`), `src/app/settings-view.ts` (`updateTrainingPreferences`) | `src/app/preferences-controller.ts`, `src/app/backup-controller.ts`, `src/app/shell.ts` (`bindBackupCard`, the Monero tips switch handler) | `tests/backup-views.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts`, `tests/render-budget.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Responsive image delivery for exercise photos | `src/core/media.ts` | `src/features/train/session-hero.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/features/sheets/builder-views.ts`, `src/app/catalog-controller.ts` | `tests/media.test.ts`, `tests/session-runner.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
-| Programs and program builder | `src/app/program-builder.ts`, `src/app/program-publish-controller.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-zap-view.ts`, `src/features/sheets/beast-mode.ts` | `src/db/store.ts`, `src/nostr/programImport.ts`, `src/nostr/program-publish.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/beast-mode.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/program-publish-controller.test.ts`, `tests/program-publish.test.ts`, `tests/nwc-ui.test.ts`, browser verification |
+| Programs and program builder | `src/app/program-builder.ts`, `src/app/program-publish-controller.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-actions.ts`, `src/features/sheets/beast-mode.ts` | `src/db/store.ts`, `src/nostr/programImport.ts`, `src/nostr/program-publish.ts` | `tests/sheets.test.ts`, `tests/sheets-views.test.ts`, `tests/beast-mode.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/program-publish-controller.test.ts`, `tests/program-publish.test.ts`, browser verification |
 | Programs/Discover browsing chrome: toolbar, filter chips, filter sheet | `src/features/sheets/program-browser.ts`, `src/app/program-browser-controller.ts` | `src/app/layout.ts`, `src/features/sheets/program-labels.ts` | `tests/program-browser.test.ts`, browser verification |
 | Exercise browsing chrome: toolbar, filter chips, filter sheet, selection bar | `src/app/exercise-browser.ts`, `src/app/exercise-browser-controller.ts` | `src/app/format.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts` | `tests/exercise-browser.test.ts`, `tests/equipment-views.test.ts`, browser verification |
 | Writing a result region when a filter changes it, instead of the page | `src/app/browse-surfaces.ts`, `src/app/program-list-controller.ts` | `src/app/catalog-surfaces.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/app/layout.ts` | `tests/shell.test.ts`, browser verification |
@@ -69,14 +69,11 @@ and patch it directly, which is also why a page render can leave it standing.
 | Isolated browser smoke verification | `src/app/isolated-browser-smoke.ts`, `src/browser-smoke.ts`, `scripts/browser-smoke.mjs` | `vite.smoke.config.ts`, `smoke.html`, `src/app/program-publish-controller.ts` | `tests/isolated-browser-smoke.test.ts`, `tests/program-publish-controller.test.ts` |
 | NIP-07 signing and device-local keys | `src/signer/nip07.ts`, `src/signer/local-key.ts` | `src/signer/types.ts` | `tests/local-key-signer.test.ts`, shell/share tests use fakes |
 | NIP-46 remote signing | `src/signer/nip46.ts` | `src/signer/types.ts`, shell sign-in flow | `tests/shell.test.ts` plus browser validation |
-| Workout-summary and creator-program event publishing | `src/nostr/share.ts`, `src/nostr/program-publish.ts` | `src/features/train/session-summary.ts`, signer contract | `tests/share.test.ts`, `tests/program-publish.test.ts` |
-| Zap receipts, support accounting, and operator zap target metadata | `src/nostr/zaps.ts`, `src/nostr/operator-zap-target.ts` | `src/core/funding.ts`, `src/features/support/views.ts`, `src/nostr/support-zap.ts` | `tests/zaps.test.ts`, `tests/support-views.test.ts`, `tests/support-zap.test.ts` |
-| Nostr Wallet Connect parsing, client, and secure wallet link | `src/nostr/nwc.ts`, `src/nostr/nwc-client.ts`, `src/nostr/nwc-storage.ts` | `src/db/export.ts`, payment/support UI | `tests/nwc.test.ts`, `tests/nwc-client.test.ts`, `tests/nwc-storage.test.ts` |
-| Workout program zaps | `src/nostr/program-zap.ts`, `src/nostr/program-zap-status.ts` | `src/nostr/zaps.ts`, `src/nostr/zap-request.ts`, `src/nostr/lnurl.ts`, `src/nostr/nwc-client.ts`, `src/db/store.ts`, `src/signer/types.ts` | `tests/program-zap.test.ts`, `tests/program-zap-status.test.ts`, `tests/zaps.test.ts`, `tests/nwc-client.test.ts` |
+| Workout-summary and creator-program event publishing | `src/nostr/share.ts`, `src/nostr/program-publish.ts` | `src/features/train/session-summary.ts`, `src/nostr/secret-redaction.ts`, signer contract | `tests/share.test.ts`, `tests/program-publish.test.ts`, `tests/secret-redaction.test.ts` |
 | NIP-A3 Monero payment targets (`kind:10133`) | `src/nostr/payment-targets.ts` | `src/nostr/pool.ts`, `src/signer/types.ts` | `tests/payment-targets.test.ts` |
 | Monero Tip on Discover program cards | `src/features/sheets/monero-tip-view.ts`, `src/app/monero-tip-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/catalog-controller.ts`, `src/features/sheets/views.ts` | `tests/monero-tip-controller.test.ts`, `tests/discover.test.ts` |
-| Monero Mode Settings card and the user's public Monero address | `src/features/support/payment-mode-views.ts`, `src/app/monero-address-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/layout.ts`, `src/features/support/views.ts` | `tests/monero-address-controller.test.ts`, `tests/nwc-ui.test.ts`, `tests/shell.test.ts` |
-| Support Workstr on the active payment rail | `src/features/support/views.ts` | `src/core/funding.ts`, `src/app/monero-mark.ts`, `src/nostr/payment-targets.ts`, `src/app/settings-view.ts`, `src/app/preferences-controller.ts` | `tests/support-views.test.ts`, `tests/nwc-ui.test.ts`, `tests/settings-view.test.ts` |
+| The Monero tips switch and the user's public Monero address | `src/features/support/payment-mode-views.ts`, `src/app/monero-address-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/settings-view.ts`, `src/app/shell.ts` (the switch handler) | `tests/monero-address-controller.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts` |
+| Support Workstr | `src/features/support/views.ts` | `src/core/funding.ts`, `src/app/monero-mark.ts`, `src/nostr/payment-targets.ts`, `src/app/settings-view.ts` | `tests/support-views.test.ts`, `tests/settings-view.test.ts` |
 | IndexedDB schema | `src/db/schema.ts` | `src/core/types.ts`, `src/db/store.ts` | `tests/store.test.ts`, `tests/export.test.ts`, `tests/adopt.test.ts` |
 | IndexedDB repository operations | `src/db/store.ts` | schema and domain types | `tests/store.test.ts` |
 | Anonymous/signed-in namespace adoption | `src/db/adopt.ts` | schema, shell sign-in flow | `tests/adopt.test.ts`, `tests/shell.test.ts` |
@@ -151,8 +148,9 @@ and patch it directly, which is also why a page render can leave it standing.
 - `src/features/sheets/builder-views.ts` renders the builder's row and EMOM-section
   markup from `BuilderState`. It is pure markup; all builder state lives in the
   controller above.
-- `src/features/sheets/program-zap-view.ts` renders program-card zap actions and
-  latest local zap status; wallet execution stays in `src/app/nwc-controller.ts`.
+- `src/features/sheets/program-actions.ts` renders a program card's Start/Publish/Edit/
+  Delete or Import/Update actions. The card's only payment action, the Monero Tip, comes
+  from `src/features/sheets/monero-tip-view.ts`.
 - `src/features/sheets/beast-mode.ts` owns the objective local Beast Mode eligibility
   helper, compact Settings category summary, and reusable Settings and locked-Publish
   checklist markup.
@@ -161,38 +159,37 @@ and patch it directly, which is also why a page render can leave it standing.
 - `src/app/identity-controller.ts` owns signer connection, adoption choices, sign-out,
   and the NIP-46 connection modal lifecycle.
 - `src/app/preferences-controller.ts` owns settings persistence, body/history actions,
-  backup controls, support funding refresh, and Quick Workout/recovery handlers.
-- `src/app/nwc-controller.ts` owns zap-wallet connection modals, active NWC restore,
-  disconnect, and in-app support zap UI execution.
+  backup controls, and Quick Workout/recovery handlers.
 - `src/app/monero-address-controller.ts` owns the current user's public NIP-A3 Monero
   address: the `kind:10133` lookup, validation, publish and clear, and the in-place repaint
   of that Settings section. It never writes the address to the database, so the relays stay
-  the only source of truth and nothing about it enters encrypted sync.
+  the only source of truth and nothing about it enters encrypted sync. It reads the address on
+  the first Settings visit whether or not Monero tips are on, because an address left
+  published after tips are switched off must stay removable; `repaint` shows or hides the
+  section and rewrites the line under the switch.
 - `src/app/monero-mark.ts` owns the vendored Monero mark, the badge, and `moneroQr`, the
   payment code with the mark knocked into its middle. It lives in `app/` because the
   creator tip sheet and the Monero support card both draw it and features do not import
   each other. Monochrome: it identifies the payment mechanism, never Workstr itself. The
   mark and badge take `currentColor`; only the one inside a code names a token, because it
   sits on white where the surrounding text colour would vanish.
-- `src/features/sheets/monero-tip-view.ts` owns the Monero rail's program-card surfaces:
-  whether an author can be tipped at all, the card action, and the tip sheet's markup.
-  `moneroMode(state)` is the single answer to "which creator-support rail is this" for the
-  sheets feature. It renders no total and no status, because a Monero transfer leaves
+- `src/features/sheets/monero-tip-view.ts` owns the program-card Tip: whether an author can
+  be tipped at all, the card action, and the tip sheet's markup. `moneroMode(state)` is the
+  single answer to "are Monero tips on" for the sheets feature. It renders no total and no status, because a Monero transfer leaves
   nothing Workstr can read.
 - `src/app/monero-tip-controller.ts` owns opening that sheet, copying the address, and the
-  `monero:` wallet hand-off. It never touches Idenstr, NWC, or the program-zap path.
-- `src/features/support/payment-mode-views.ts` renders the Monero Mode Settings card: the
-  creator-support rail picker and, in Monero Mode, the public payment-address section.
-  While that mode is on, `src/app/layout.ts` renders no NWC wallet card and
-  `src/features/support/views.ts` renders its Monero rail instead of its Lightning one.
-- `src/features/support/views.ts` owns the Support Workstr card on both rails.
-  `supportPanel` only picks between `lightningSupportPanel` (zap action, the month, and a
-  transparency disclosure holding the counts, the zap target and the npub) and
-  `moneroSupportPanel` (the canonical `OPERATOR_MONERO_ADDRESS` as an amount-free
-  `monero:` QR, a shortened display, and a copy action). Support follows the payment mode
-  rather than explaining why it differs from it, and the Monero card invents no funding
-  meter: `updateSupportFunding` finds no `#support-funding` there and reports success
-  without writing, so the reader's open categories survive the background receipt read.
+  `monero:` wallet hand-off. It signs and publishes nothing.
+- `src/features/support/payment-mode-views.ts` renders the Monero tips card: a
+  `role="switch"` checkbox and, under it, the public payment-address section. The section
+  shows while tips are on and, while they are off, only for an address still published on
+  relays (`moneroAddressVisible`), with the line under the switch saying so
+  (`moneroTipsCopy`). The card is a `<section>`, not a `<details>`: one control, nothing to
+  collapse. The stored setting keeps its `paymentMode` name, now `'off' | 'monero'`.
+- `src/features/support/views.ts` owns the Support Workstr card: `supportPanel` renders the
+  canonical `OPERATOR_MONERO_ADDRESS` as an amount-free `monero:` QR, a shortened display,
+  and a copy action. It does not follow the Monero tips switch, because supporting Workstr
+  is not creator tipping, and it shows no funding meter, because a Monero transfer leaves
+  nothing Workstr can count.
 - `src/features/sheets/program-browser.ts` owns the search/filter/action toolbar above
   Programs and Discover, the active-filter chips, and the filter sheet. Both browsers share
   `state.programFilter` and `state.programFilters`; `state.programFilterSheet` only records
@@ -201,11 +198,10 @@ and patch it directly, which is also why a page render can leave it standing.
   The sheet is rendered next to the modal in `shellMarkup`, not inside the page: `.content`
   is a fixed stacking context at z-index 1, so a sheet inside it cannot paint over the
   mobile bottom nav. `src/app/program-browser-controller.ts` owns its event bindings.
-- The account pill in `src/app/layout.ts` reports the active rail on every view: a `₿` or
-  Monero-mark medallion plus a payment-tinted perimeter, both painted from the payment
-  tokens. It reads the mode and never sets it — the rail is chosen in the Settings card
-  above. The green connection badge on the avatar is a separate state and does not follow
-  the payment mode.
+- The account pill in `src/app/layout.ts` carries a Monero-mark medallion and an orange
+  perimeter on every view while Monero tips are on, and neither while they are off. It reads
+  the setting and never sets it. The green connection badge on the avatar is a separate
+  state and does not follow the switch.
 - `src/app/exercise-browser.ts` owns the Library and Discover toolbar, chips, filter sheet
   and selection bar. It lives in `app/` rather than either feature because both features use
   it and a feature-to-feature import is not allowed. Unlike the program browser, the two
@@ -218,7 +214,7 @@ and patch it directly, which is also why a page render can leave it standing.
   still be undone. `src/app/exercise-browser-controller.ts` owns its event bindings.
 - `src/app/session-persistence.ts` adapts stored session rows into live/history state.
 - `src/app/layout.ts` composes top-level pages from feature view functions. It owns the
-  Settings category order and disclosure shell; backup, wallet, support, and Beast Mode
+  Settings category order and disclosure shell; backup, payment, support, and Beast Mode
   views render their category bodies and summaries. It does not persist data.
 - `src/app/state.ts` defines render/session state and cross-feature session helpers.
 - `src/app/session-runner.ts` creates a live session, selects standard versus EMOM
@@ -304,15 +300,15 @@ targets, or muscle metadata solely from the current exercise library.
   relay acknowledgement/verification before reporting success.
 - `src/nostr/profile.ts` fetches kind-0 identity metadata across configured/default
   relays, retries transient failures, and maintains the per-browser public profile cache.
-- `src/nostr/support-zap.ts` builds the operator NIP-57 zap request, obtains the LNURL
-  invoice, verifies the invoice amount, and sends `pay_invoice` through NWC.
+- `src/nostr/secret-redaction.ts` redacts wallet connection strings, secret parameters,
+  nsecs and bare 64-hex keys. `src/nostr/program-publish.ts` refuses to publish a program
+  carrying any of them, and the publish controller redacts relay errors through it.
 - `src/nostr/payment-targets.ts` reads and writes NIP-A3 `kind:10133` payment targets. It is
-  Monero-only on purpose: a `kind:10133` may also carry Lightning targets, but Lightning zap
-  recipients keep resolving from `kind:0` `lud16`/`lud06`, and honouring a NIP-A3 Lightning
-  target would silently redirect payments away from where NIP-57 says they go. It writes the
-  canonical `monero` method and accepts the `xmr` alias when reading. The signed event is the
-  only source of truth — the address is never written to encrypted sync, workout records, or
-  the NWC credential store, and `tests/payment-targets.test.ts` enforces that boundary.
+  Monero-only on purpose: Workstr pays on no other rail, so other `payto` targets are
+  neither read nor dropped when the event is rewritten. It writes the canonical `monero`
+  method and accepts the `xmr` alias when reading. The signed event is the only source of
+  truth — the address is never written to encrypted sync or workout records, and
+  `tests/payment-targets.test.ts` enforces that boundary.
   Reading tolerates relay failure (returns null, so cards still render); publishing does not,
   because writing a replaceable event without first reading it would drop the user's other
   `payto` targets.
@@ -333,7 +329,7 @@ targets, or muscle metadata solely from the current exercise library.
 ## Styling and static assets
 
 - `src/style.css` contains Workstr Web-specific and live-runner overrides. Its last block is
-  the Monero Mode override.
+  the Monero tips override.
 - `src/workstr-reference.css` is imported design/reference CSS used by the app. Its `:root`
   block owns the theme tokens. Colour is expressed as channel tokens (`--accent-rgb` and
   friends, bare `R, G, B` triplets) so rules pick their own alpha via
@@ -345,7 +341,9 @@ targets, or muscle metadata solely from the current exercise library.
   `--payment-accent`, `--payment-accent-strong` and `--on-payment` are the creator-support
   layer, and are the only tokens a payment mode may override. Purple means "this is Workstr";
   orange means "this is Monero payment" — never "this is selected". A creator-payment control
-  reaches for `--payment-*`; everything else reaches for `--accent-*`.
+  reaches for `--payment-*`; everything else reaches for `--accent-*`. While Monero tips are
+  off the payment tokens resolve to the Workstr accent, so a payment surface still on screen
+  (Support Workstr, an address left published) is not orange.
 - `public/workstr-reference.css` is a static public copy; confirm which copy a proposed
   change targets before editing both.
 - `public/sw.js` is copied as-is into the production build.
@@ -390,8 +388,7 @@ every new relay call.
 
 A test that needs relay data mocks the module it calls, or injects a fake pool through the
 `poolFactory` option `src/nostr/payment-targets.ts` and `src/nostr/program-publish.ts`
-accept. Loopback is allowed so a test can stand up its own server, as the NWC mock wallet
-does. `tests/no-network.test.ts` asserts the guard itself.
+accept. Loopback is allowed so a test can stand up its own server. `tests/no-network.test.ts` asserts the guard itself.
 
 ## Automated drift check
 

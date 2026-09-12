@@ -4,14 +4,14 @@ import { slugify } from '../core/ids';
 import type { SheetWithExercises } from '../db/store';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../signer/types';
 import { CREATOR_PROGRAM_D_PREFIX, CREATOR_PROGRAM_KIND } from './creator-programs';
-import { redactNwcSecrets } from './nwc';
+import { containsSecretMaterial } from './secret-redaction';
 import { DEFAULT_PUBLIC_RELAYS } from './pool';
 
 const SIGN_TIMEOUT_MS = 120000;
 const PUBLISH_TIMEOUT_MS = 8000;
 const CONFIRM_TIMEOUT_MS = 3500;
 const WORKSTR_SYNC_RELAY_HOST = 'relay.workstr.fit';
-const NWC_PUBLIC_SECRET_ERROR = 'Creator program publish blocked: remove NWC wallet connection or secret material before publishing.';
+const PUBLIC_SECRET_ERROR = 'Creator program publish blocked: remove wallet connection strings or secret keys before publishing.';
 
 export interface PublishCreatorProgramResult {
   event: SignedNostrEvent;
@@ -87,26 +87,22 @@ function exerciseAddress(row: SheetExercise): string {
   return `workstr:exercise:${slug}`;
 }
 
-function containsNwcSecretMaterial(value: string): boolean {
-  return /walletconnect/i.test(value) || redactNwcSecrets(value) !== value;
-}
-
-function assertNoNwcSecretMaterial(value: unknown): void {
+function assertNoSecretMaterial(value: unknown): void {
   if (typeof value === 'string') {
-    if (containsNwcSecretMaterial(value)) throw new Error(NWC_PUBLIC_SECRET_ERROR);
+    if (containsSecretMaterial(value)) throw new Error(PUBLIC_SECRET_ERROR);
     return;
   }
   if (Array.isArray(value)) {
-    for (const item of value) assertNoNwcSecretMaterial(item);
+    for (const item of value) assertNoSecretMaterial(item);
     return;
   }
   if (value && typeof value === 'object') {
-    for (const item of Object.values(value)) assertNoNwcSecretMaterial(item);
+    for (const item of Object.values(value)) assertNoSecretMaterial(item);
   }
 }
 
 function assertCreatorProgramPublicFieldsSafe(sheet: SheetWithExercises): void {
-  assertNoNwcSecretMaterial({
+  assertNoSecretMaterial({
     slug: sheet.slug,
     name: sheet.name,
     notes: sheet.notes,

@@ -1,51 +1,40 @@
 @import './workstr-reference.css';
 
-/* Creator-support rail picker. Both options are styled from --payment-* rather than the app
-   accent, so the selected rail carries Lightning gold or Monero orange and the rest of
-   Settings stays Workstr purple. */
-.payment-rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-.payment-rail-option {
-  position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 11px 12px;
-  border: 1px solid var(--border); border-radius: 14px; background: rgba(255, 255, 255, .03);
-  cursor: pointer; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+/* Monero tips. A row with a switch rather than a disclosure: one control, nothing to collapse.
+   The switch and the card edge read --payment-*, which stays Workstr purple until tips are
+   on, so turning them on is the thing that brings Monero orange in. */
+.monero-tips-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 66px; padding: 14px 16px; }
+.monero-tips-row .settings-category-copy small { white-space: normal; }
+.monero-tips-body { border-top: 1px solid rgba(var(--accent-line-rgb), .16); }
+.monero-tips-body[hidden] { display: none; }
+/* The body already draws the line under the switch; the address section's own divider would
+   stack a second one right below it. */
+.monero-tips-body > .monero-address-section { margin-top: 0; padding-top: 0; border-top: 0; }
+.settings-toggle {
+  appearance: none; -webkit-appearance: none; position: relative; flex: none; width: 46px; height: 28px; margin: 0;
+  border: 1px solid var(--border); border-radius: 999px; background: rgba(255, 255, 255, .06);
+  cursor: pointer; transition: background-color .16s ease, border-color .16s ease;
 }
-.payment-rail-option:hover { border-color: var(--border-hot); }
-.payment-rail-option input { position: absolute; opacity: 0; pointer-events: none; }
-.payment-rail-mark {
-  width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border-radius: 9px;
-  border: 1px solid var(--border); background: rgba(0, 0, 0, .24);
-  color: var(--muted); font: 800 15px/1 ui-monospace, monospace;
+.settings-toggle::before {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--muted); transition: transform .16s ease, background-color .16s ease;
 }
-.payment-rail-copy { min-width: 0; }
-.payment-rail-copy strong { display: block; color: var(--text); font-weight: 850; font-size: 13px; }
-.payment-rail-copy small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.35; }
-.payment-rail-option.selected {
-  border-color: rgba(var(--payment-rgb), .55);
-  background: rgba(var(--payment-rgb), .08);
-  box-shadow: 0 0 22px rgba(var(--payment-rgb), .14);
+.settings-toggle:hover { border-color: var(--border-hot); }
+.settings-toggle:checked { border-color: rgba(var(--payment-rgb), .6); background: rgba(var(--payment-rgb), .24); }
+.settings-toggle:checked::before { transform: translateX(18px); background: var(--payment-accent); box-shadow: 0 0 10px var(--payment-glow); }
+.settings-toggle:focus-visible { outline: 2px solid var(--purple-2); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .settings-toggle, .settings-toggle::before { transition: none; }
 }
-.payment-rail-option.selected .payment-rail-mark {
-  border-color: transparent; color: var(--on-payment);
-  background: linear-gradient(135deg, var(--payment-accent), var(--payment-accent-strong));
-}
-.payment-rail-option:focus-within { outline: 2px solid rgba(var(--payment-rgb), .6); outline-offset: 2px; }
 
-/* The mode badge is the one place the payment accent is named outright. Only reachable
-   while Monero Mode is on, so the default Lightning card is untouched. */
-.payment-mode-card .status-pill.ok { color: var(--payment-accent); border-color: rgba(var(--payment-rgb), .38); background: rgba(var(--payment-rgb), .08); }
-
-/* Monero Mode gives its own Settings card an orange identity — a descendant rule, not a
-   token override, so it cannot leak into any other surface. This is what finally consumes
-   --payment-glow. */
-:root[data-payment-mode="monero"] .payment-mode-card {
+/* With tips on the card takes an orange identity - a descendant rule, not a token override,
+   so it cannot leak into any other surface. */
+:root[data-payment-mode="monero"] .monero-tips-card {
   border-color: rgba(var(--payment-rgb), .35);
   background: rgba(var(--payment-rgb), .06);
   box-shadow: 0 0 24px var(--payment-glow);
 }
-:root[data-payment-mode="monero"] .payment-mode-card[open] > summary {
-  border-bottom-color: rgba(var(--payment-rgb), .28);
-  background: rgba(var(--payment-rgb), .09);
-}
+:root[data-payment-mode="monero"] .monero-tips-body { border-top-color: rgba(var(--payment-rgb), .28); }
 
 /* The public Monero payment address. Field, focus ring and publish action are Monero
    surfaces and take --payment-*; the card around them stays Workstr purple. Monospace
@@ -76,7 +65,7 @@
 .support-monero-actions { width: 100%; justify-content: center; }
 
 @media (max-width: 760px) {
-  .payment-rail { grid-template-columns: 1fr; }
+  .monero-tips-row { min-height: 64px; padding: 13px 14px; }
   .monero-address-section .settings-row-actions .button { flex: 1; }
 }
 
@@ -222,9 +211,8 @@
 .connection-chip.warn .connection-dot { background: var(--bitcoin-gold); box-shadow: 0 0 0 3px rgba(247, 147, 26, 0.16); }
 .connection-chip.error .connection-dot { background: var(--danger-red); box-shadow: 0 0 0 3px rgba(255, 56, 100, 0.16); }
 .connection-chip.error { border-color: rgba(255, 56, 100, 0.32); }
-/* The active rail, one medallion for both modes: the fill and its foreground come from the
-   payment tokens, so Monero Mode swaps the colour without a second component. Bitcoin has a
-   typographic mark, Monero has none in a system font, so it uses the vendored path. */
+/* Monero tips on: the fill and its foreground come from the payment tokens, and the mark is
+   the vendored path because Monero has no glyph in a system font. */
 .connection-payment-mark {
   width: 19px; height: 19px; flex: 0 0 19px;
   display: grid; place-items: center; border-radius: 999px;
@@ -244,9 +232,8 @@
   background: rgba(var(--payment-rgb), .06);
   box-shadow: 0 0 18px rgba(var(--payment-rgb), .10);
 }
-/* Lightning gold and Monero orange are close enough in hue that an identical perimeter reads
-   the same in both modes. Monero gets a firmer edge so the two are distinguishable without
-   reading the medallion — the difference is weight, not a second palette. */
+/* With Monero tips on, the perimeter turns orange and gets a firmer edge as well, so the chip
+   reads as changed before anyone finds the medallion. */
 :root[data-payment-mode="monero"] .connection-chip.ok {
   border-color: rgba(var(--payment-rgb), .5);
   box-shadow: 0 0 0 1px rgba(var(--payment-rgb), .07), 0 0 16px rgba(var(--payment-rgb), .13);
@@ -317,76 +304,27 @@
   border-color: rgba(var(--accent-rgb), .34);
   background:
     radial-gradient(circle at 14% 10%, rgba(var(--accent-rgb), .30), transparent 34%),
-    radial-gradient(circle at 92% 0%, rgba(247,147,26,.10), transparent 30%),
+    radial-gradient(circle at 92% 0%, rgba(var(--payment-rgb), .10), transparent 30%),
     linear-gradient(180deg, rgba(var(--surface-raised-rgb), .94), rgba(8,4,15,.92));
 }
 .support-panel::after { content: ''; position: absolute; inset: auto -12% -42% 22%; height: 180px; background: radial-gradient(ellipse, rgba(var(--accent-rgb), .22), transparent 70%); pointer-events: none; }
 .support-hero-row { display: grid; grid-template-columns: 52px minmax(0,1fr); gap: 14px; align-items: start; }
-.support-bolt { width: 50px; height: 50px; display: grid; place-items: center; border-radius: 16px; color: var(--bitcoin-gold); background: linear-gradient(135deg, rgba(var(--accent-rgb), .28), rgba(247,147,26,.12)); border: 1px solid rgba(247,147,26,.3); box-shadow: 0 0 34px rgba(var(--accent-rgb), .34); }
-.support-bolt svg { width: 25px; height: 25px; filter: drop-shadow(0 0 12px rgba(247,147,26,.35)); }
 .support-panel h3 { margin: 8px 0 8px; font-size: clamp(26px, 6vw, 42px); line-height: .98; letter-spacing: -.06em; }
 .support-panel .section-help { margin-bottom: 14px; }
-.support-zap-card { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 14px; align-items: center; margin: 18px 0 4px; padding: 16px; border-radius: 18px; border: 1px solid rgba(var(--accent-line-rgb), .22); background: linear-gradient(135deg, rgba(255,255,255,.055), rgba(0,0,0,.22)); }
-.support-zap-copy { min-width: 0; }
-.support-zap-copy strong { display: block; margin-top: 8px; font-size: 20px; letter-spacing: -.03em; }
-.support-zap-copy small { display: block; margin-top: 6px; color: var(--muted); font: 700 12px/1.45 ui-monospace, monospace; overflow-wrap: anywhere; }
-.nwc-support-status { margin-top: 10px; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(var(--accent-line-rgb), .16); background: rgba(0,0,0,.2); }
-.nwc-support-status.ok { border-color: rgba(0,208,132,.32); background: rgba(0,208,132,.08); }
-.nwc-support-status strong { display: block; font-size: 13px; }
-.nwc-support-status small { display: block; margin-top: 4px; color: var(--muted); overflow-wrap: anywhere; }
-.nwc-form { display: grid; gap: 14px; }
-.nwc-form label { display: grid; gap: 7px; color: var(--purple-2); font: 900 11px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
-.nwc-form input, .nwc-form textarea { min-width: 0; }
-.support-receipt-badge { flex: none; display: grid; place-items: center; min-width: 84px; min-height: 70px; padding: 10px; border-radius: 16px; border: 1px solid rgba(0,208,132,.36); background: rgba(0,208,132,.08); color: var(--success-green); text-align: center; text-transform: uppercase; }
-.support-receipt-badge span { font: 800 10px/1 ui-monospace, monospace; letter-spacing: .12em; color: var(--muted); }
-.support-receipt-badge strong { margin-top: 6px; font: 900 14px/1 ui-monospace, monospace; letter-spacing: .06em; }
+.support-status { margin-top: 10px; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(var(--accent-line-rgb), .16); background: rgba(0,0,0,.2); }
+.support-status strong { display: block; font-size: 13px; }
+.support-status small { display: block; margin-top: 4px; color: var(--muted); overflow-wrap: anywhere; }
 .support-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
 .support-actions .button.primary { box-shadow: 0 0 28px rgba(var(--accent-rgb), .32); }
 .support-note { font-size: 14px; }
-.support-meter { margin-top: 16px; padding: 16px; border-radius: 18px; border: 1px solid rgba(var(--accent-line-rgb), .22); background: rgba(0,0,0,.28); }
-.support-meter.loading,
-.support-meter.offline { color: var(--accent-pale); font: 13px/1.55 ui-monospace, monospace; }
-.support-meter-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; color: var(--muted); font: 800 12px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
-.support-meter-head strong { color: var(--text); font-size: 20px; letter-spacing: -.03em; }
-.support-track { height: 10px; margin: 13px 0 14px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.075); }
-.support-track span { display: block; height: 100%; min-width: 4px; border-radius: inherit; background: linear-gradient(90deg, var(--sovereign-purple), var(--success-green)); box-shadow: 0 0 18px rgba(var(--accent-rgb), .55); }
-.support-meter.under { border-color: rgba(255,72,112,.34); }
-.support-meter.under .support-track span { background: linear-gradient(90deg, #ff4870, var(--sovereign-purple)); }
-.support-meter.covered { border-color: rgba(0,208,132,.34); }
-.support-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
-.support-stats div { min-width: 0; padding: 10px; border-radius: 13px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.055); }
-.support-stats span { display: block; color: var(--dim); font: 800 10px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .09em; }
-.support-stats strong { display: block; margin-top: 6px; color: var(--text); font-size: 13px; line-height: 1.25; overflow-wrap: anywhere; }
-.support-meter-note { margin: 12px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
-
-/* Support: the transparency disclosure. The month stays on the card and the counts, the zap
-   target and the npub sit one level deeper, so the reader who wants the arithmetic can open
-   it and nobody else has to read past it on the way to the button. */
-.support-transparency { margin-top: 14px; border: 1px solid rgba(var(--accent-line-rgb), .2); border-radius: 16px; background: rgba(0,0,0,.2); }
-.support-transparency > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 15px; list-style: none; cursor: pointer; color: var(--purple-2); font: 850 11px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
-.support-transparency > summary::-webkit-details-marker { display: none; }
-.support-transparency > summary::after { content: '›'; font-size: 18px; line-height: .8; transition: transform .15s ease; }
-.support-transparency[open] > summary::after { transform: rotate(90deg); }
-.support-transparency-body { padding: 0 15px 15px; }
-.support-transparency-body .support-stats { margin-top: 2px; }
-.support-transparency-body .settings-row-actions { margin-top: 12px; }
-.support-transparency-body .section-help { margin: 12px 0 0; }
-.support-transparency-body .support-zap-card { margin-bottom: 0; }
-.support-transparency-body .support-meter-note { margin-top: 10px; }
-
-/* Support: the Monero rail. Same card and the same title, a payment code where the funding
-   meter is - there is no Monero accounting to show, and faking one would be inventing it. */
+/* Support Workstr: a payment code and nothing counted beside it - there is no Monero
+   accounting to show, and faking one would be inventing it. */
 .support-panel-monero .settings-category-meta { color: var(--payment-accent); }
 .support-monero { display: grid; justify-items: center; gap: 12px; text-align: center; }
 .support-monero-address { text-align: center; }
 .support-monero .section-help { margin: 0; }
 .metric-grid.mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .workout-card:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(0,0,0,.22); }
-.workout-card.top-zapped { position: relative; border-color: rgba(var(--accent-line-rgb), .55); box-shadow: 0 0 26px rgba(var(--accent-rgb), .18), inset 0 1px 0 rgba(255,255,255,.06); }
-.workout-card.top-zapped.rank-1 { border-color: rgba(var(--payment-rgb), .82); box-shadow: 0 0 34px rgba(var(--payment-rgb), .26), inset 0 1px 0 rgba(255,255,255,.08); }
-.workout-card.top-zapped.rank-2 { border-color: rgba(var(--accent-line-rgb), .72); box-shadow: 0 0 30px rgba(var(--accent-rgb), .24), inset 0 1px 0 rgba(255,255,255,.07); }
-.workout-card.top-zapped.rank-3 { border-color: rgba(var(--payment-rgb), .5); box-shadow: 0 0 24px rgba(var(--accent-rgb), .18), 0 0 14px rgba(var(--payment-rgb), .1), inset 0 1px 0 rgba(255,255,255,.06); }
-.program-zap-rank { display: inline-flex; min-height: 22px; align-items: center; justify-content: center; padding: 4px 7px; border: 1px solid rgba(var(--payment-rgb), .46); border-radius: 999px; background: rgba(6,3,12,.86); color: var(--payment-accent); font: 900 9px/1 ui-monospace, monospace; letter-spacing: .08em; text-align: center; text-transform: uppercase; box-shadow: 0 0 16px rgba(var(--payment-rgb), .16); }
 .workout-card-map.has-map {
   width: 148px;
   height: 148px;
@@ -400,23 +338,16 @@
 .workout-card-map.has-map polygon { vector-effect: non-scaling-stroke; }
 .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 148px minmax(0,1fr) 22px; align-items: start; }
 .workout-card-media { display: grid; gap: 9px; align-content: start; justify-items: stretch; }
-/* The card's payment action. This control is where the glass recipe started, and it is now
-   just `.button.payment` at card width — both rails emit the same element and differ only
-   in the hue `--payment-*` resolves to and in the glyph. Colour stops here: the card, its
-   title, its creator and its border stay Workstr on either rail. */
-.workout-card-media .program-zap-cta,
+/* The card's payment action: `.button.payment` at card width. Colour stops here - the card,
+   its title, its creator and its border stay Workstr. */
 .workout-card-media .monero-tip-cta { width: 100%; min-height: 38px; padding-inline: 0; gap: 8px; }
-.program-zap-cta .program-zap-icon,
 .monero-tip-cta .monero-mark,
 .monero-tip-cta .monero-badge { display: block; flex: none; filter: drop-shadow(0 0 7px rgba(var(--payment-rgb), .45)); }
-.program-zap-cta .program-zap-label,
 .monero-tip-cta .monero-tip-label { display: inline-block; line-height: 1; letter-spacing: .01em; }
 .diff-badge.inline { position: static; display: inline-flex; align-items: center; padding: 4px 7px; }
 .program-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .program-tag-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; max-width: 230px; }
 .program-tag-grid .tag-pill { min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.program-zap-stats .program-zap-icon { flex: none; }
-.program-zap-stats { display: inline-flex; width: fit-content; align-items: center; justify-content: center; gap: 4px; margin-left: auto; padding: 6px 9px; border: 1px solid rgba(var(--payment-rgb), .26); border-radius: 999px; background: rgba(var(--payment-rgb), .08); color: var(--payment-accent); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .07em; text-transform: uppercase; }
 .workout-card-author { margin-top: 8px; display: flex; align-items: center; gap: 8px; max-width: 230px; }
 .workout-card-author .author-pill { min-width: 0; }
 .program-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
@@ -861,16 +792,10 @@
   .account-create-cta { grid-column: 1 / -1; width: 100%; }
   .support-panel { padding: 20px; }
   .support-hero-row { grid-template-columns: 42px minmax(0,1fr); gap: 12px; }
-  .support-bolt { width: 40px; height: 40px; border-radius: 13px; font-size: 21px; }
   .support-panel h3 { font-size: 26px; }
-  .support-zap-card { grid-template-columns: 1fr; padding: 14px; }
-  .support-receipt-badge { grid-template-columns: auto auto; justify-content: center; gap: 8px; min-height: 0; min-width: 0; }
-  .support-receipt-badge strong { margin-top: 0; }
   .support-actions .button { justify-content: center; }
-  .support-stats { grid-template-columns: 1fr; }
   .workout-card-map.has-map { width: 104px; height: 104px; padding: 4px; }
   .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 104px minmax(0,1fr) 22px; gap: 10px; }
-  .workout-card-media .program-zap-cta { min-height: 36px; padding: 8px 7px; font-size: 14px; }
   .workout-card-media .monero-tip-cta { min-height: 36px; padding: 8px 7px; font-size: 14px; }
   .monero-tip-qr,
   .support-monero-qr { width: 180px; }
@@ -1148,14 +1073,14 @@
 .session-danger > .button { margin-top: 7px; }
 
 /* ---------------------------------------------------------------------------
-   Monero Mode.
+   Monero tips.
 
    Two separate identities, and this block only owns the second one:
 
      purple  = Workstr / Nostr   (shell, navigation, cards, recovery, identity)
      orange  = Monero            (creator-support and payment surfaces)
 
-   So the override is deliberately tiny. Monero Mode swaps the creator-support
+   So the override is deliberately tiny. Monero tips swap the creator-support
    layer and leaves the app theme alone — Workstr stays visually Workstr, and
    orange means "this is Monero payment" rather than "this is selected".
 

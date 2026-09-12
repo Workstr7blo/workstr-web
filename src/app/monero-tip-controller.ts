@@ -13,9 +13,8 @@ export interface MoneroTipControllerContext {
  * Tipping a program's creator in Monero.
  *
  * Everything this controller does is local: it shows an address the relays already
- * published, copies it, or hands it to a wallet. It never reaches Idenstr, NWC, or the
- * program-zap path — a Monero transfer is not a NIP-57 zap and must not borrow its
- * plumbing.
+ * published, copies it, or hands it to a wallet. It signs nothing and publishes nothing: a
+ * Monero transfer leaves no event behind, and nothing here pretends otherwise.
  */
 export function createMoneroTipController(ctx: MoneroTipControllerContext) {
   const { root, state, toast, openModal } = ctx;

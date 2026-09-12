@@ -36,12 +36,6 @@ loopback origin. Its mock signer, mock publisher, and empty relay list prevent f
 actions from reaching public Nostr transport; the command also verifies that the normal
 production build does not emit the smoke entrypoint.
 
-## Maintainer docs
-
-- [NWC workout-program zaps](docs/nwc-workout-zaps.md) — setup, secure wallet
-  configuration, mock-wallet testing, payload flow, failure handling, and manual QA for
-  creator zaps through Nostr Wallet Connect.
-
 ## Phase 0 target
 
 - PWA shell

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMoneroAddressController } from '../src/app/monero-address-controller';
-import { EMPTY_ADDRESS_COPY, moneroAddressSection, paymentModeCard } from '../src/features/support/payment-mode-views';
+import { EMPTY_ADDRESS_COPY, moneroAddressSection, moneroTipsCard } from '../src/features/support/payment-mode-views';
 import type { AppState } from '../src/app/state';
 import type { SignedNostrEvent, Signer } from '../src/signer/types';
 
@@ -54,26 +54,26 @@ describe('Monero payment address settings', () => {
     publishMoneroPaymentTargetMock.mockReset();
   });
 
-  it('renders the Monero address section only in Monero Mode', () => {
-    const lightning = paymentModeCard(state({ settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [] } }));
-    expect(lightning).not.toContain('Monero payment address');
-    expect(lightning).not.toContain('id="monero-address"');
+  it('shows the address section while Monero tips are on', () => {
+    const off = moneroTipsCard(state({ settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] } }));
+    expect(off).toContain('id="monero-tips-body" hidden');
+    expect(off).not.toContain(' checked');
 
-    const monero = paymentModeCard(state());
-    expect(monero).toContain('Monero payment address');
-    expect(monero).toContain('NIP-A3 kind:10133');
-    expect(monero).toContain('Use a fresh Monero subaddress.');
-    expect(monero).toContain('It is not stored in Workstr sync.');
-    // Opened by default so the address is reachable straight after picking the rail.
-    expect(monero).toContain('<details class="settings-category payment-mode-card" data-settings-section="payment-mode" open>');
-    // The card chooses a rail, so it is named for the choice rather than for one of the
-    // answers - calling it Monero Mode read as a Monero feature toggle.
-    expect(monero).toContain('<strong>Payment Mode</strong>');
-    expect(monero).not.toContain('<strong>Monero Mode</strong>');
+    const on = moneroTipsCard(state());
+    expect(on).not.toContain('id="monero-tips-body" hidden');
+    expect(on).toContain('role="switch" id="monero-tips-toggle"');
+    expect(on).toContain('Monero payment address');
+    expect(on).toContain('NIP-A3 kind:10133');
+    expect(on).toContain('Use a fresh Monero subaddress.');
+    expect(on).toContain('It is not stored in Workstr sync.');
+    // A switch, not a disclosure: one control and nothing to collapse.
+    expect(on).toContain('<section class="settings-category monero-tips-card" data-settings-section="monero-tips">');
+    expect(on).not.toContain('<details');
+    expect(on).toContain('<strong id="monero-tips-label">Monero tips</strong>');
   });
 
   it('never calls it a wallet and offers no NWC action', () => {
-    const monero = paymentModeCard(state());
+    const monero = moneroTipsCard(state());
     expect(monero.toLowerCase()).not.toContain('wallet');
     expect(monero).not.toContain('nwc');
   });
@@ -237,11 +237,31 @@ describe('Monero payment address settings', () => {
     expect(app.toast).toHaveBeenCalledWith('Sign in to publish a Monero address', 'bad');
   });
 
-  it('stays off the network in Lightning mode', () => {
-    const app = harness({ settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [] } });
+  // Turning tips off unpublishes nothing, so the address is still read: it is the only way the
+  // card can offer to remove one left behind.
+  it('reads the published address with tips off and keeps it removable', async () => {
+    fetchPaymentTargetsEventMock.mockResolvedValueOnce(targetsEvent([['payto', 'monero', ADDRESS]]));
+    const app = harness({ settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] } });
+    app.root.innerHTML = moneroTipsCard(app.state);
+    app.controller.bind();
+    const body = () => app.root.querySelector<HTMLElement>('#monero-tips-body');
+    const copy = () => app.root.querySelector('#monero-tips-copy')?.textContent;
 
+    expect(body()?.hidden).toBe(true);
     app.controller.refreshIfNeeded();
+    await vi.waitFor(() => expect(app.state.monero.status).toBe('ready'));
 
-    expect(fetchPaymentTargetsEventMock).not.toHaveBeenCalled();
+    expect(fetchPaymentTargetsEventMock).toHaveBeenCalledTimes(1);
+    expect(body()?.hidden).toBe(false);
+    expect(copy()).toBe('Off. Your Monero address is still published.');
+    expect(app.field()?.value).toBe(ADDRESS);
+
+    publishMoneroPaymentTargetMock.mockResolvedValueOnce({ event: targetsEvent([]), okRelays: ['wss://relay.example'], failedRelays: [] });
+    app.field()!.value = '';
+    await app.controller.save();
+
+    expect(publishMoneroPaymentTargetMock.mock.calls[0][1]).toBe('');
+    expect(body()?.hidden).toBe(true);
+    expect(copy()).toBe("Show a Tip button on creators' programs");
   });
 });

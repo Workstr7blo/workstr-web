@@ -6,10 +6,9 @@ import { DEFAULT_PUBLIC_RELAYS } from './pool';
 // advertise where an author can be paid, so it is read for other people's programs and
 // written for the current user.
 //
-// This module is deliberately Monero-only. A `kind:10133` event may also carry Lightning
-// targets, but Workstr resolves Lightning zap recipients from `kind:0` `lud16`/`lud06` and
-// must keep doing so — treating a NIP-A3 Lightning target as a zap recipient would silently
-// redirect payments away from where NIP-57 says they go.
+// This module is deliberately Monero-only. A `kind:10133` event may also carry other payment
+// targets, such as Lightning; Workstr pays nobody on those rails, so it reads none of them and
+// preserves every one of them untouched when it rewrites the event.
 export const PAYMENT_TARGETS_KIND = 10133;
 export const PAYTO_TAG = 'payto';
 
@@ -137,7 +136,7 @@ async function queryPaymentTargetsEvent(relays: string[], pubkey: string, timeou
   }
 }
 
-// One relay query for many authors, so opening Discover in Monero Mode costs a single
+// One relay query for many authors, so opening Discover with Monero tips on costs a single
 // round trip rather than one per card. `kind:10133` is replaceable, so relays may still
 // answer with more than one event per author when they disagree about which is current;
 // the newest `created_at` wins, the same rule a relay applies itself.

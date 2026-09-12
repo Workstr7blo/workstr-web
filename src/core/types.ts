@@ -214,48 +214,12 @@ export interface BackupSettings {
   lastError?: string;
 }
 
-// Which payment surface Settings, Discover, and program cards show for creator support.
-// 'lightning' is the compatibility default: NIP-57 zaps and NWC stay exactly as they are
-// today. 'monero' is consumed by later NIP-A3 phases; this flag alone changes no payment
-// behavior.
-export type PaymentMode = 'lightning' | 'monero';
+// Whether Monero tips are on. 'off' is the default and the only other state: Lightning zaps
+// were removed (#218), so a settings row or a sync record still saying 'lightning' reads as off.
+export type PaymentMode = 'off' | 'monero';
 
 export function normalizePaymentMode(value: unknown): PaymentMode {
-  return value === 'monero' ? 'monero' : 'lightning';
-}
-
-export type WorkoutProgramZapStatus = 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown';
-
-// Device-local payment attempt history for workout program zaps. It gives the UI/calling
-// layer a durable status handle without syncing wallet activity or NWC credentials.
-export interface WorkoutProgramZapAttempt {
-  id: string;
-  status: WorkoutProgramZapStatus;
-  programAddress: string;
-  programName: string;
-  programEventId?: string;
-  programPubkey?: string;
-  amountSats: number;
-  comment?: string;
-  recipientPubkey?: string;
-  recipientLnurl?: string;
-  invoice?: string;
-  paymentHash?: string;
-  feesPaidMsat?: number;
-  errorCode?: string;
-  errorMessage?: string;
-  nwcCode?: string;
-  nwcKind?: string;
-  createdAt: ISODateTime;
-  updatedAt: ISODateTime;
-  completedAt?: ISODateTime;
-}
-
-// Device-local NWC wallet state. The connection string itself is a spending credential
-// stored only by src/nostr/nwc-storage.ts; settings may keep non-secret local zap status
-// and are still excluded from syncedSettings/manual exports as defense in depth.
-export interface NwcSettings {
-  programZapAttempts?: WorkoutProgramZapAttempt[];
+  return value === 'monero' ? 'monero' : 'off';
 }
 
 export interface WorkstrSettings {
@@ -274,5 +238,4 @@ export interface WorkstrSettings {
   ownedEquipment?: string[];
   canonCache?: CanonCache;
   backup?: BackupSettings;
-  nwc?: NwcSettings;
 }

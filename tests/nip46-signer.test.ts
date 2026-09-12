@@ -162,9 +162,8 @@ describe('what the app asks a signer for', () => {
     expect(SIGNER_PERMS).toContain('sign_event:30078');
     // The workout summary a user chooses to share is the only other thing it signs.
     expect(SIGNER_PERMS).toContain('sign_event:1');
-    // A program zap is a user-approved NIP-57 request that must be signed before the
-    // recipient can issue a Nostr zap invoice.
-    expect(SIGNER_PERMS).toContain('sign_event:9734');
+    // Zap requests went with Lightning (#218), and a kind the app no longer signs is not asked for.
+    expect(SIGNER_PERMS).not.toContain('sign_event:9734');
     // Blanket signing would let Workstr sign anything at all in the user's name.
     expect(SIGNER_PERMS).not.toContain('sign_event');
   });

@@ -37,6 +37,14 @@ const rules = all.replace(MONERO_BLOCK, '').replace(/:root\s*\{[^}]*\}/, '');
 const outsideOverride = all.replace(MONERO_BLOCK, '');
 
 describe('theme tokens', () => {
+  // Monero orange arrives with the switch. Until then every payment token resolves to the
+  // Workstr accent, so a payment surface still on screen with tips off is not orange.
+  it('keeps payment tokens on the Workstr accent while Monero tips are off', () => {
+    const rootBlock = reference.match(/:root\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(rootBlock).toMatch(/--payment-rgb:\s*var\(--accent-rgb\)/);
+    expect(rootBlock).not.toMatch(/--payment-rgb:\s*\d/);
+  });
+
   it('routes every purple theme colour through a channel token', () => {
     const literals = rules.match(
       /rgba?\(\s*(124\s*,\s*60\s*,\s*255|188\s*,\s*151\s*,\s*255|181\s*,\s*140\s*,\s*255|168\s*,\s*85\s*,\s*247)/g

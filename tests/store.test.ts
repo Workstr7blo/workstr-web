@@ -65,10 +65,10 @@ describe('WorkstrStore', () => {
     expect((await store.getSettings()).unit).toBe('lbs');
   });
 
-  it('defaults paymentMode to lightning and persists monero', async () => {
+  it('defaults paymentMode to off and persists monero', async () => {
     const store = await WorkstrStore.open('payment-mode-test-pubkey');
     const defaults = await store.getSettings();
-    expect(defaults.paymentMode).toBe('lightning');
+    expect(defaults.paymentMode).toBe('off');
 
     await store.saveSettings({ ...defaults, paymentMode: 'monero' });
     expect((await store.getSettings()).paymentMode).toBe('monero');
@@ -98,6 +98,34 @@ describe('WorkstrStore', () => {
     await store.saveSettings({ ...defaults, paymentMode: 'monero' });
     await vi.waitFor(async () => expect(await store.listSyncQueue()).toHaveLength(1));
     expect(await store.listSyncQueue()).toEqual([{ address: 'workstr:v2:settings', updated_at: expect.any(String) }]);
+  });
+
+  // #218. A row from a Lightning build keeps this device's zap history under `nwc` and a stored
+  // 'lightning' rail until something removes them, and removing them is not a user's change.
+  it('retires Lightning settings in place without queueing a sync write', async () => {
+    const raw = await openWorkstrDB('retire-lightning-settings-test');
+    await raw.put('settings', { unit: 'kg', publicRelays: [], paymentMode: 'lightning', nwc: { programZapAttempts: [{ id: 'zap-1' }] } } as never, 'settings');
+    raw.close();
+    const store = await WorkstrStore.open('retire-lightning-settings-test');
+    store.setChangeListener((address, updatedAt) => { void store.enqueueSync(address, updatedAt); });
+
+    expect((await store.getSettings()).paymentMode).toBe('off');
+    await store.retireLightningSettings();
+
+    const check = await openWorkstrDB('retire-lightning-settings-test');
+    const row = await check.get('settings', 'settings') as unknown as Record<string, unknown>;
+    check.close();
+    expect(row).not.toHaveProperty('nwc');
+    expect(row.paymentMode).toBe('off');
+    expect(row.unit).toBe('kg');
+    expect(await store.listSyncQueue()).toHaveLength(0);
+  });
+
+  it('leaves a settings row with nothing to retire as it was', async () => {
+    const store = await WorkstrStore.open('retire-lightning-noop-test');
+    await store.saveSettings({ ...(await store.getSettings()), paymentMode: 'monero' });
+    await store.retireLightningSettings();
+    expect((await store.getSettings()).paymentMode).toBe('monero');
   });
 
   it('migrates retired relay and catalog source vocabulary on open', async () => {

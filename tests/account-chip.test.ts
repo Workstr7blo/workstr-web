@@ -14,9 +14,7 @@ const state = (over: Partial<AppState> = {}): AppState => ({
   profileNames: {},
   signerType: 'local',
   store: null,
-  settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [] },
-  support: { status: 'idle', receipts: [] },
-  nwc: { active: false, status: 'idle' },
+  settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] },
   monero: { status: 'idle', address: '' },
   library: [],
   discoverExercises: [],
@@ -104,12 +102,15 @@ describe('the account chip', () => {
     expect(root.querySelector('.connection-avatar.fallback')?.textContent).toBe('W');
   });
 
-  it('swaps the payment medallion with the rail', () => {
+  // Off has nothing to mark, so the medallion is added and removed rather than swapped.
+  it('adds and removes the Monero medallion with the switch', () => {
     const root = mount(accountIdentity(state()));
-    expect(root.querySelector('.connection-payment-mark')?.textContent).toBe('₿');
+    expect(root.querySelector('.connection-payment-mark')).toBeNull();
     updateAccountIdentity(root, accountIdentity(state({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>)));
     expect(root.querySelector('.connection-payment-mark')?.querySelector('.monero-mark')).toBeTruthy();
-    expect(root.querySelector('.connection-payment-mark')?.getAttribute('aria-label')).toBe('Monero payments');
+    expect(root.querySelector('.connection-payment-mark')?.getAttribute('aria-label')).toBe('Monero tips on');
+    updateAccountIdentity(root, accountIdentity(state()));
+    expect(root.querySelector('.connection-payment-mark')).toBeNull();
   });
 
   // Every view except Settings has no Account card, and the chip itself is gone while the

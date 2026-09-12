@@ -56,12 +56,14 @@ deployed to the domain and released as v2.4.0 (2026-09-04).
 - **Workout history** — a monthly calendar with consistency cards, a timeline grouped by
   local day and driven by calendar selection, and Repeat workout rebuilding a past session
   from its own snapshot.
-- **Release and support** — starter seed of three beginner programs, the zap-only support
-  and funding panel, and the tag-triggered release pipeline. v0.9.0, v1.0.0 and v1.1.0 are
+- **Release and support** — starter seed of three beginner programs, the Support Workstr
+  card, and the tag-triggered release pipeline. v0.9.0, v1.0.0 and v1.1.0 are
   tagged, released with build artifacts, and live on the domain.
-- **Creator support rails** — Settings picks Lightning zaps or Monero tips. Monero Mode
-  swaps the NWC wallet card for a public `kind:10133` address and Discover's zap surfaces
-  for a tip action, and touches nothing else. Released in v2.3.0.
+- **Creator support** — one rail, Monero, behind a Monero tips switch in Settings that is
+  off by default. On, it shows the user's public `kind:10133` address and a Tip action on
+  Discover cards whose author publishes one. Monero shipped as Monero Mode in v2.3.0;
+  Lightning zaps, the NWC wallet and the zap-receipt funding meter were removed after it
+  (#218, unreleased).
 - **Mobile-first browsing** — Programs, Discover and the exercise library each put search,
   a filter sheet and their own actions in one toolbar row, cutting the distance from the
   sub-tabs to the first card from 322px and 214px to 76px on a phone. Statistics scopes to
@@ -87,11 +89,11 @@ here was new architecture.
    from the operator's signed catalog events by `scripts/generate-seed.mjs` and parsed
    through the same codecs as a Discover import. Backfill-only, once per account; seeded
    rows do not count as user data for adoption, and editing a starter program forks it.
-2. ~~**Support surface**~~ — done. App and landing tell the same zap-only transparency
-   story: zaps are the canonical donation route because they produce public `kind:9735`
-   receipts; plain Lightning and on-chain BTC are not normal v1 donation paths. The
-   funding panel reads verified zap receipts against the published 85,000 sats monthly
-   operating target; unreachable relays report unknown, never zero.
+2. ~~**Support surface**~~ — done. App and landing told the same zap-only transparency
+   story: zaps were the canonical donation route because they produce public `kind:9735`
+   receipts, and the funding panel read verified receipts against the published 85,000 sats
+   monthly operating target. Both have since been retired - the landing support page, then
+   Lightning itself (#218) - and Support Workstr is now a Monero address and QR code.
 3. ~~**Release plumbing**~~ — done. `CHANGELOG.md`, the tag-triggered release workflow,
    and GitHub Releases carrying the built site as an artifact. Cutting a release is now
    one pass: promote `[Unreleased]`, bump the package version, tag, push.
@@ -251,6 +253,10 @@ across seven views confirms rather than a screenshot hash.
 
 Workstr never holds Monero keys, custody, balances or transaction status, and Monero
 direct payments are never presented as NIP-57 zaps.
+
+After this release Lightning was removed entirely (#218). The two-option rail became a
+single Monero tips switch, off by default, and Support Workstr became Monero on every
+setting of it.
 
 ## Fallback — paid relay access
 

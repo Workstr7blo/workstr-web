@@ -21,9 +21,8 @@ browser. User data lives either in the browser (IndexedDB) in an initial phase, 
 **NIP-44-encrypted Nostr events on an authenticated relay** on a second phase.
 
 The operator hosts **no application backend**. The only server-side component is the
-relay (strfry) with a write-policy plugin, in Phase 2a. Donations need no backend
-in v1 because the canonical funding rail is Nostr zaps: LNURL-pay creates the invoice,
-public zap receipts create the accounting trail (Section 11).
+relay (strfry) with a write-policy plugin, in Phase 2a. Donations need no backend:
+supporting Workstr is a Monero address and a QR code (Section 11).
 
 ## 2. Vision
 
@@ -44,7 +43,7 @@ Long-term vision: the client is a complete free product and stays free. The **se
 around it** — encrypted sync/backup, retention guarantees, a curated exercise library,
 media hosting, and eventually a platform where coaches publish programs — costs money to
 run, and the plan is to fund that cost with **donations rather than subscriptions**:
-recurring zaps, targeted fundraisers, and supporter recognition. A paid tier is the
+direct Monero donations, targeted fundraisers, and supporter recognition. A paid tier is the
 documented fallback, not the goal. Section 11 states what it would cost, what donations
 must cover, and the exact condition under which the fallback activates.
 
@@ -61,8 +60,11 @@ must cover, and the exact condition under which the fallback activates.
    are services the operator genuinely pays for. The intent is that users who find the
    product valuable fund development and infrastructure directly, and that gating never
    has to be turned on.
-4. **Transparent by default**: running costs and donations received are published, in the
-   app and in the repo. Asking for money without showing the bill is not an option.
+4. **Transparent by default**: running costs are published in the repo (Section 11.1).
+   Donations received are published only when they can be counted honestly; a Monero
+   donation leaves nothing the app can count, so the app shows no income figure rather than
+   an invented one. Whether the in-app Support card should also show the bill is open
+   (Section 11.1).
 5. **Marketing loop**: free users publish workout summaries and shared programs to
    *public* relays, which advertises the product inside the Nostr social graph.
 
@@ -126,8 +128,8 @@ Rules that govern every technical decision:
     verified (Section 6.1).
   - Share a session summary as a `kind:1` note, text plus the program's muscle map when
     one exists.
-  - Support the project: zap the operator npub, with the app and landing page aligned
-    around public zap receipts as the funding/accounting trail (Section 11).
+  - Support the project: Workstr's Monero address and QR code in Settings (Section 11).
+    Creators can be tipped in Monero from Discover once Monero tips are on (Section 6.4).
 - **Workstr relay (Phase 2a)**: encrypted multi-device sync of eligible private data;
   retention guarantee. Available to anyone who turns on Auto-sync.
 
@@ -201,13 +203,8 @@ rules out open exercise publishing does not apply the same way.
 | **NIP-42** | Relay AUTH. **Not used** — decision record. It was specified to enforce a pubkey allowlist, and to scope reads so a pubkey saw only its own records. Both jobs were dropped: backup is open to everyone, and open reads are acceptable because every payload is NIP-44 ciphertext. Event signatures already bind authorship, so the write policy can identify an author without AUTH. Reintroduce it only if reads must be scoped or admission returns (Phase 2b). |
 | **NIP-98** | HTTP Auth events (kind 27235). **Rejected for media upload** — built and removed: unreliable against the media host, and it inserted a second signer prompt mid-publish for no user-visible gain. Kept in this table as a decision record; if media hosting returns it is via Blossom on the operator's own host (Phase 3), re-evaluated from scratch. Still the right tool for authenticating a request to the operator's *own* endpoint (relay-access requests, Phase 2a). |
 | **NIP-19** | bech32 encoding (`npub`, `naddr`, `nevent`) for display and share links. |
-| **LNURL-pay / lud16** | The operator's Lightning address in `kind:0`, used as the LNURL-pay target behind zaps. It is payment plumbing, not a separate primary donation rail: v1 support copy steers users to Nostr zaps because zaps produce public receipts. |
-| **NIP-57** | Zaps and zap receipts (`kind:9735`). The canonical donation path for Workstr, because every counted donation must leave a verifiable public receipt. Donation prompts, supporter recognition, and the funding transparency panel are computed from these receipts client-side. Phase 1, core, not optional. |
-| **NIP-A3 (kind 10133)** | Public payment targets. A replaceable event whose `payto` tags say where an author can be paid. Read for a program author to offer a Monero tip, written for the signed-in user from Settings. Monero only in Workstr: a Lightning target here is deliberately ignored, because NIP-57 says a zap recipient comes from `kind:0`, and quietly preferring a NIP-A3 Lightning target would redirect payments away from where every other client sends them. Optional, and only visible on the Monero rail. |
-| **NIP-47 (NWC)** | V2 support follow-up. Nostr Wallet Connect enables custom in-app zap amounts without leaving Workstr: build/sign the NIP-57 zap request, fetch the LNURL invoice, pay through the user's wallet, then verify the `kind:9735` receipt before claiming success. |
-
-**Important distinction**: NIP-46 = remote *signing* (identity). NIP-47/NWC = remote
-*wallet* (payments). They are separate connections with separate permissions.
+| **NIP-A3 (kind 10133)** | Public payment targets. A replaceable event whose `payto` tags say where an author can be paid. Read for a program author to offer a Monero tip, written for the signed-in user from Settings. Monero only in Workstr: other `payto` targets in the event are neither read nor dropped when Workstr rewrites it. Optional, and only visible while Monero tips are on (Section 6.4). |
+| **NIP-57 / NIP-47 (zaps, NWC)** | **Removed** — decision record (#218). Workstr shipped Lightning zaps, in-app payment through Nostr Wallet Connect, and a funding meter computed from `kind:9735` receipts, then retired the rail in favour of Monero tips. A device that had connected a wallet has its stored connection deleted on upgrade. Reintroducing Lightning means specifying receipts, wallet storage and the funding panel again from scratch. |
 
 **Terminology (used consistently from here on)**: a **supporter** is someone who has
 donated. A **sync user** is someone who has turned Auto-sync on. These are deliberately
@@ -311,8 +308,9 @@ distinction is deliberate and load-bearing:
    indexing tags including `t=workstr`, `t=beastmode`, `t=workstr-program`, and
    `client=Workstr`.
 4. Publishing uses the configured public relay set, filters out `relay.workstr.fit`, and
-   requires at least one relay acknowledgement before reporting success. NWC wallet
-   connection strings or secret material must never be included in public program events.
+   requires at least one relay acknowledgement before reporting success. Wallet connection
+   strings and secret keys must never be included in public program events;
+   `src/nostr/secret-redaction.ts` is what refuses them.
 
 **Why exercises are operator-signed, permanently**: an open exercise vocabulary degrades.
 Real relay data fills with entries that ignore the tag standard and with a dozen
@@ -334,28 +332,17 @@ other client can read it. Curation is a quality decision, not a lock (Section 11
    somebody's work.
 
 **Support the project (free, Phase 1)**
-1. The app support panel and the Workstr landing/support page must stay in sync: both
-   present **Nostr zaps as the canonical donation route** because zaps create public
-   `kind:9735` receipts. The support surface may show the operator npub, zap links, and
-   explanatory Lightning/LNURL context, but it must not advertise plain Lightning or
-   on-chain BTC as normal v1 donation paths that bypass receipt accounting.
-2. Funding panel: REQ `{kinds:[9735], "#p":[operatorPubkey], since:<monthStart>}` from the
-   broad read set, sum the bolt11 amounts, display month-to-date against
-   `MONTHLY_COST_SATS`. Both sides are sats, so the percentage is exact and needs no price
-   feed. Entirely client-side — zap receipts are public events, so transparency costs no
-   backend.
-3. **Only receipts signed by the wallet provider's key count.** Derive that key from the
-   operator's live kind:0 `lud16`/`lud06` metadata, then from that LNURL-pay endpoint's
-   `nostrPubkey`. Anyone can publish a `kind:9735` tagged to any pubkey; without the signer
-   check the published total would be a number strangers control, and pinning the signer in
-   code would drift when the operator changes zap providers.
-4. **A failed fetch reports "unknown", never zero.** "Nobody donated" and "we could not
-   check" are different claims and only one is true. Note `querySync` *resolves empty* on
-   an unreachable relay rather than rejecting — the same trap `share.ts` documents for
-   publish — so the connection is established explicitly before the query.
-5. **No custom in-app amount buttons in v1.** They require NWC/NIP-47 plus the full NIP-57
-   zap flow. In v2, Workstr can add custom in-app zaps: sign zap request, fetch invoice,
-   pay via NWC, then verify the receipt before claiming success.
+1. Settings → Support shows Workstr's Monero address as an amount-free `monero:` QR code, a
+   shortened address and a copy action. It does not depend on the Monero tips switch:
+   supporting Workstr is not creator tipping.
+2. The address is `OPERATOR_MONERO_ADDRESS` in `src/core/funding.ts`, validated before any
+   code is drawn from it. The donate section on workstr.fit shows the same address and has
+   to change with it; the landing site no longer has a support page of its own.
+3. **No funding meter.** A Monero transfer leaves nothing Workstr can read, so the app shows
+   no total, no supporter count and no progress against a target. Showing none is honest;
+   inventing one is not.
+4. Lightning zaps, the NWC wallet and the zap-receipt funding meter were removed in #218
+   (Section 6, the NIP-57 / NIP-47 decision record).
 
 **Turn on encrypted sync (Phase 2a)**
 1. A signed-in user turns on **Auto-sync** in Settings → Data & Sync. That is the entire
@@ -405,40 +392,40 @@ Consequences to design around:
 - Compromise means an attacker can publish catalog entries users will trust. Detection is
   manual. This is the price of the curation model and it is worth stating plainly.
 
-### 6.4 Creator support: two rails, one app theme
+### 6.4 Creator support: Monero tips, one app theme
 
-Workstr supports creators on exactly one rail at a time, chosen in Settings. **Lightning
-is the default and the unchanged product**; Monero Mode is an opt-in that swaps the
-payment layer and nothing else.
+Workstr supports creators on one rail, Monero, behind a single switch in Settings →
+Payments. **Off is the default.** Lightning zaps were the default rail until #218 removed
+them; a stored or synced `'lightning'` setting now reads as off.
 
-| | Lightning (default) | Monero Mode |
-|---|---|---|
-| Recipient of record | `kind:0` `lud16`/`lud06`, per NIP-57 | `kind:10133` `payto` tag, per NIP-A3 |
-| Mechanism | Zap request (`kind:9734`) → LNURL invoice → NWC payment → receipt (`kind:9735`) | An address, a QR and a `monero:` link. The user pays from their own wallet. |
-| Proof | Public zap receipts. Totals and the top-zapped ranking are computed from them. | **None, and none is invented.** |
-| Settings | NWC wallet card | Public Monero address card (`kind:10133`) |
-| Discover | Zap CTA, sats totals, top-zapped ranking | Tip action, and only for an author who publishes a Monero address |
+| | Monero tips on |
+|---|---|
+| Recipient of record | `kind:10133` `payto` tag, per NIP-A3 |
+| Mechanism | An address, a QR and a `monero:` link. The user pays from their own wallet. |
+| Proof | **None, and none is invented.** |
+| Settings | Public Monero address section under the switch (`kind:10133`) |
+| Discover | Tip action, and only for an author who publishes a Monero address |
+
+With tips off, no program card carries a payment action and nothing on screen is orange.
 
 Rules that follow from this, and that later work must not erode:
 
-- **`kind:10133` is canonical for Monero. `kind:0` `lud16`/`lud06` stays canonical for
-  Lightning.** Neither is read as a substitute for the other.
+- **`kind:10133` is canonical for Monero.** Other `payto` targets in the event are neither
+  read nor dropped.
 - **Monero has no receipt layer here.** Workstr cannot see a Monero transfer, so it never
-  shows a Monero total, ranking, badge, count, or "creator earnings". Lightning social
-  proof is not reused as Monero social proof: on the Monero rail the sats totals and the
-  top-zapped badge are removed, not recoloured. The list itself is ordered by name in both
-  rails — zaps only ever decorated it — so nothing has to be invented to replace them.
+  shows a Monero total, ranking, badge, count, or "creator earnings". Program lists are
+  ordered by name, and nothing decorates them.
 - **No CTA without an address.** An author who publishes no Monero target gets no payment
   control at all — not a disabled button, not "no address". It is somebody else's payment
   setup, not a Workstr error.
 - **The public Monero address is Nostr metadata, not a Workstr credential.** It lives in
-  the user's `kind:10133` on public relays, is never written to IndexedDB, never enters
-  encrypted sync, and is never stored beside NWC wallet credentials. The relays are its
-  only source of truth.
-- **Auto-sync is unchanged in Monero Mode.** The rail decides who gets paid and how; it
-  has nothing to do with backup, and no sync behaviour may be made to depend on it.
-- **Monero Mode hides NWC, it never deletes it.** A saved wallet survives the switch and
-  returns with the Lightning rail.
+  the user's `kind:10133` on public relays, is never written to IndexedDB and never enters
+  encrypted sync. The relays are its only source of truth.
+- **Turning tips off unpublishes nothing.** The address is read on the first Settings visit
+  either way, and while tips are off an address still published keeps its section, and the
+  line under the switch says so, so it can be removed.
+- **Auto-sync does not depend on the switch.** It decides who gets paid and how; it has
+  nothing to do with backup, and no sync behaviour may be made to depend on it.
 
 **The theme has two layers, and only the second one is a payment mode's business:**
 
@@ -448,9 +435,9 @@ Rules that follow from this, and that later work must not erode:
               ┌─────────────┴─────────────┐
        WORKSTR APP THEME           CREATOR SUPPORT
        black + purple                    │
-       Nostr identity          ┌─────────┴─────────┐
-              │            Lightning            Monero
-       navigation, cards,      gold              orange
+       Nostr identity              Monero tips
+              │                off: purple
+       navigation, cards,      on:  orange
        exercises, programs,
        workouts, statistics,
        recovery, identity
@@ -463,10 +450,10 @@ in every payment mode; `--payment-rgb`, `--payment-accent`, `--payment-accent-st
 fails the build otherwise.
 
 The mental model is not "if Monero, turn Workstr orange". It is: render Workstr normally,
-then render the payment UI for whichever rail is selected. This has eroded twice — once as
-tokens that changed nothing, once as an app repainted graphite and orange — which is why
-the rule is written here and enforced by a test. A view with no payment control on screen
-must look the same in both modes.
+then render the payment UI if Monero tips are on. This has eroded twice — once as tokens
+that changed nothing, once as an app repainted graphite and orange — which is why the rule
+is written here and enforced by a test. A view with no payment control on screen must look
+the same with tips on and off.
 
 ---
 
@@ -589,7 +576,7 @@ src/
     muscles.ts         # canonical muscle map — copied verbatim from public/muscles.js
     equipment.ts       # equipment key normalization, owned-equipment matching,
                        #   bodyweight-always-available rule
-    funding.ts         # lud16, pinned zap-receipt signer key, published monthly cost
+    funding.ts         # Workstr's Monero donation address
   signer/
     types.ts           # interface Signer { getPublicKey; signEvent; nip44Encrypt; nip44Decrypt }
     nip07.ts           # window.nostr adapter
@@ -604,7 +591,6 @@ src/
     export.ts          # JSON export/import of the entire local DB
   nostr/
     pool.ts            # relay sets (catalog / write) and shared profile types
-    zaps.ts            # zap-receipt validation, sats totals, month boundary, fetch
     canon.ts           # the Workstr catalog: operator-filtered queries, signature
                        #   verification, 33401/33402 → local row mapping, dedupe,
                        #   offline cache
@@ -622,9 +608,8 @@ src/
     recovery/          # recovery-state computation + suggestions + Quick Workout
                        #   (recovery.ts and quickWorkout.ts are pure)
     discover/          # catalog browse/import UI
-    support/           # zap-first support UI, funding panel (reads kind:9735 receipts),
-                       #   and later NWC custom-zap flow. Paid relay invoicing lands here
-                       #   only if the Section 11 fallback fires.
+    support/           # Support Workstr (Monero QR) and the Monero tips card. Paid relay
+                       #   invoicing lands here only if the Section 11 fallback fires.
     backup/            # encrypted-sync controls, progress, and status, composed into
                        #   Settings → Data & Sync beside manual JSON backup
   app/
@@ -786,20 +771,17 @@ nothing.
       against empty slots only.
     - Seed content mirrors catalog entries where they exist, so importing the catalog
       later recognizes them by address instead of duplicating them.
-11. **Support block:** a zap-first support screen aligned with the landing/support page:
-    operator npub/zap target, clear receipt-based funding copy, and a live funding panel
-    that REQs `kind:9735` zap receipts for the operator pubkey from public relays and
-    shows month-to-date against the published monthly infrastructure cost. No on-chain BTC
-    or plain-Lightning donation route in v1; every advertised donation path should produce
-    a public receipt. Zero backend; zap receipts are public events. Ships in Phase 1
-    because it is *cheaper to build than the paywall*, and because a funding model that
-    starts asking in Phase 3 has no data by Phase 2a.
+11. **Support block:** a support screen in Settings. It shipped as a zap-first screen with a
+    funding panel read from `kind:9735` receipts; since #218 it is Workstr's Monero address
+    and QR code, with no meter. Zero backend. Ships in Phase 1 because it is *cheaper to
+    build than the paywall*, and because a funding model that starts asking in Phase 3 has
+    no supporters by Phase 2a.
 12. **Release pass:** run `docs/RELEASE-QA.md` against the deployed site and clear its
     blocking sections before tagging 1.0.
 
 **Exit criteria:** a stranger installs the app, trains for a month, and shares summaries
 **without ever creating an identity**; a Nostr user additionally signs in, adopts their
-local history, imports catalog programs, and supports the project with a zap — with the
+local history, imports catalog programs, and supports the project — with the
 operator hosting zero infrastructure.
 
 ### Phase 2a — The Workstr relay (donation-funded)
@@ -824,8 +806,8 @@ Server side:
    `relay.workstr.example` DNS record; DDNS updater if home-hosted.
 5. **Backups:** nightly snapshot of strfry's LMDB directory off-machine
    (users' encrypted backups are the one thing that must never be lost).
-6. **Cost publication:** the monthly running cost goes in the repo and into the Phase 1
-   funding panel. Rule 3.4 is not optional.
+6. **Cost publication:** the monthly running cost goes in the repo (Section 11.1). Rule 3.4
+   is not optional.
 
 Client side:
 7. **Toggle block:** `features/backup/` — Auto-sync, progress, and status in Settings →
@@ -847,8 +829,8 @@ Client side:
 
 **Exit criteria:** turn Auto-sync on from a phone → no operator action of any kind →
 open laptop, sign in, entire history appears after decryption. A `kind:1` publish attempt
-against the Workstr relay is rejected by the write policy. Funding panel shows real
-donations against a published real cost.
+against the Workstr relay is rejected by the write policy. The real monthly cost is
+published in Section 11.1.
 
 ### Phase 2b — Paid access (fallback only, build nothing until triggered)
 
@@ -877,12 +859,12 @@ is the point of rule 4.2.
 
 ### Phase 3 — Growth (optional, in rough order of value)
 
-1. **Milestone zap prompts:** contextual donation moments at PRs, streaks, and after a
+1. **Milestone support prompts:** contextual donation moments at PRs, streaks, and after a
    restore-from-relay actually saves someone's history. Builds on the Phase 1 support
    block; this is the highest-value growth item under donation funding, not the third.
-2. **Supporter badge** on shared kind:1 summaries + supporters page, resolved from public
-   zap receipts. Honor system, no enforcement — it converts well in zap culture and costs
-   nothing to run.
+2. **Supporter badge** on shared kind:1 summaries. Honor system, no enforcement: a Monero
+   donation leaves nothing to verify, so the badge is self-declared, and it costs nothing to
+   run.
 3. **User-published programs (`kind:33402`).** The one authoring capability that does open
    up. A program is composed work — a named, ordered, deliberate arrangement — so it does
    not produce the duplicate-and-garbage failure that rules out open exercise authoring
@@ -899,11 +881,11 @@ is the point of rule 4.2.
    own answer to "who may upload", since Phase 2a's write policy gates content rather than
    identity and a media endpoint cannot be gated the same way. Re-open the media-upload question here, from scratch — NIP-98 against a third
    party failed (Section 6), a self-hosted Blossom endpoint is a different problem.
-5. **NIP-47 (NWC)** wallet connect: one-tap in-app zaps.
+5. ~~**NIP-47 (NWC)** wallet connect~~ — shipped in v2.2, removed with Lightning in #218.
 6. **Push notifications** for scheduled workouts (requires a small always-on push
    service, which has a genuine per-user cost and so needs its own gating answer).
 7. **Coach platform:** third-party trainers publish programs on the relay, keeping their
-   own zap/payment relationship with their followers (program-follow with updates;
+   own payment relationship with their followers (program-follow with updates;
    imports elsewhere remain snapshots). Builds directly on item 3. The operator's cut, if
    any, is a later decision — this is a content engine first.
 8. **Idenstr signer backend (optional)** (`signer/idenstr.ts`): the web codebase becomes usable
@@ -918,11 +900,10 @@ trigger, not a roadmap item.
 
 ### 11.1 What costs money
 
-**Published monthly target: 85,000 sats.** That single figure is what the app shows, and it
-is the denominator for everything below. It lives in `src/core/funding.ts` as
-`MONTHLY_COST_SATS`; changing the real cost means changing that constant and shipping.
-The target mirrors the public support page: about 55k sats for AI credits and development,
-22k for growth tests, 2k for Nostr.build media hosting, 5k for the domain, and 1k buffer.
+**Monthly operating cost: about 85,000 sats.** It is published here rather than in the app:
+the funding meter that showed it against zap receipts was removed with Lightning (#218),
+and a Monero donation leaves nothing to set against it. The figure breaks down as about 55k sats for AI credits and development, 22k for growth
+tests, 2k for Nostr.build media hosting, 5k for the domain, and 1k buffer.
 
 | Line item | When | Monthly equivalent |
 |---|---|---|
@@ -934,33 +915,24 @@ The target mirrors the public support page: about 55k sats for AI credits and de
 | GitHub Pages hosting | Phase 0 | 0 |
 | Relay host / encrypted sync | later | separate targeted asks when incurred |
 
-**Denominated in sats on purpose.** Donations arrive in sats, so a sats budget compares
-directly and the funding panel never needs a price feed to tell the truth. A fiat budget
-would drift against the same donations every time the exchange rate moved, and the app
-would have to fetch a rate from a third party to say anything at all.
+**Denominated in sats** because it was set when donations arrived as zaps. Nothing in the
+app converts it or compares it with Monero donations.
 
-Rule 3.4: asking for money without showing the bill is not an option. Phase 1 is close to
-zero in real spend; the figure is published from the start anyway, because the support
-screen ships in Phase 1 and a screen that asks without showing is exactly what 3.4
-forbids.
+Rule 3.4 is met by publishing the cost here. The in-app Support card shows an address and no
+figures; whether it should show this bill beside the address is an open question, not a
+settled one.
 
 ### 11.2 Funding ladder, in priority order
 
-1. **Recurring and one-off zaps** from users — app support screen, landing support page,
-   and later milestone prompts at PRs and streaks. Zaps are the canonical funding rail
-   because they create public receipts.
-2. **Targeted zap fundraisers** for specific line items: a year of VPS, the curated library
-   photo shoot, a specific feature. Concrete asks outperform open-ended ones, but the
-   accounting still resolves from NIP-57 receipts.
-3. **Supporter recognition** — badge on shared summaries, supporters page. Honor system,
-   resolved from public zap receipts, no enforcement anywhere.
+1. **Direct Monero donations** — the Support Workstr card in Settings and the donate
+   section on workstr.fit, and later milestone prompts at PRs and streaks. There is no
+   receipt layer: Workstr neither counts nor displays what arrives.
+2. **Targeted fundraisers** for specific line items: a year of VPS, the curated library
+   photo shoot, a specific feature. Concrete asks outperform open-ended ones; any accounting
+   for them is published by the operator, not computed by the app.
+3. **Supporter recognition** — badge on shared summaries. Honor system, no enforcement
+   anywhere.
 4. *Fallback only:* **paid relay access** (Phase 2b), under the trigger in 11.4.
-
-Plain Lightning payments and on-chain BTC are deliberately not normal donation routes in
-v1 because they do not reliably produce the public Nostr receipts the funding meter uses.
-If an exceptional out-of-band donation ever happens, do not silently add it to the live
-zap total; publish a separate signed accounting note or leave it out of the automated
-meter.
 
 ### 11.3 Never gated, under any funding outcome
 
@@ -991,7 +963,7 @@ credible instead of a rug-pull.
 `[X]` is deliberately unset. It cannot be chosen honestly yet: Phase 1 has no
 infrastructure bill, so the denominator does not exist. **Fill it in once Phase 2a has
 run**, alongside the real cost figures in 11.1 — at that point the monthly bill is known,
-the funding panel has a season of zap data behind it, and the number is an observation
+a season of donations has come in, and the number is an observation
 rather than a guess. Until then the trigger reads as "there is a threshold, and it will be
 published with the costs it refers to", which is the commitment that matters.
 
@@ -1128,8 +1100,8 @@ kind cannot be satisfied before a release exists.
   blocking sections; the seeded beginner programs are trainable on a fresh install with
   no network; export/import verified on real hardware; a real summary is visible in a
   mainstream Nostr client; catalog import and update detection verified against a real
-  republish and edit-fork; support screen live with a real zap appearing in the funding
-  panel against a published cost.
+  republish and edit-fork; support screen live (at v1.0, a real zap in the funding panel
+  against a published cost; since #218, Workstr's Monero QR code).
 - **Phase 1 — proven** (field evidence gathered *after* the tag; gates nothing, informs
   what comes next): 30 days of real training logged by real users with zero operator
   infrastructure, including at least one who never signed in.

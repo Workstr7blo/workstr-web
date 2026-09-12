@@ -34,21 +34,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pairing events a pubkey and the relay accept per hour. Pairing never consumes the backup
   quota, and encrypted sync behaves exactly as before.
 
+### Removed
+
+- Lightning zaps are gone, and Monero is now the only way Workstr handles payments. That
+  removes the Zap Wallet card and its Nostr Wallet Connect setup, the Zap button, sats
+  totals and "top zapped" ranking on Discover programs, and the zap-receipt funding meter on
+  Support Workstr. A wallet connection saved on this device is deleted the first time the
+  new version opens, along with the local record of zaps it sent. Nothing changes on your
+  wallet's side, so revoke the connection there as well if you no longer want it. Workstr
+  also stops asking a remote signer for permission to sign zap requests.
+
 ### Fixed
 
 - Encrypted sync now points at the Workstr relay's current AirVPN forwarded port `58956`.
-
-- The support meter now follows the Workstr operator's live Nostr profile when deciding
-  which zap receipts count. It reads the current kind:0 `lud16`/`lud06`, fetches that LNURL
-  metadata, and trusts that endpoint's `nostrPubkey` instead of a stale hardcoded wallet
-  signer.
 
 - The Account card now shows Add device only for Workstr-managed device-key accounts.
   Browser-extension and mobile-signer accounts keep Sign out and Remove data, but no longer
   see a pairing action that cannot transfer an external signer's key.
 
 - Local-only Settings now shows only what works without an account: Account, Training
-  Preferences, manual JSON backup, and Advanced. Beast Mode, Payments, Zap Wallet,
+  Preferences, manual JSON backup, and Advanced. Beast Mode, Payments,
   Support Workstr, and Auto-sync controls appear only after signing in, so local training
   reads as an intentional mode instead of a disabled version of the connected app.
 
@@ -64,21 +69,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Creator tipping is one Monero tips switch in Settings → Payments, off by default, in place
+  of the choice between Lightning and Monero. On, Discover program cards show a Tip button
+  for creators who publish a Monero address, and your own public address is set under the
+  switch. Anyone who had picked Monero stays on; everyone else starts off. Turning tips off
+  does not unpublish your address: if one is still published, the card says so and keeps the
+  field to remove it. Flipping the switch no longer redraws Settings or closes the cards you
+  have open.
+- Support Workstr shows the same Monero QR code and address whichever way the switch is
+  set, and no monthly total or target: a Monero donation leaves nothing the app can count.
 - The Monero code on Support Workstr now carries the Monero mark in its middle, matching
   the donate code on workstr.fit. The code is drawn with stronger error correction so it
   still scans with the centre covered.
 - Workstr's own Monero donation address has changed. The Support screen, its QR code and
   the Open wallet link all point at the new address, which is the one published on
   workstr.fit. Anyone who saved the old address should use the new one.
-- Support Workstr now matches the payment mode you are on. On Lightning it opens with the
-  zap action and this month's total against the target, and the accounting - received,
-  supporters, receipt count, gap, the zap address and the npub - sits behind "View
-  transparency details" for anyone who wants to check it. On Monero it shows a Monero QR
-  code for Workstr's own address, the address itself, and a copy button. The card no longer
-  shows a Lightning target in Monero mode and then explains why, and the fundraising
-  paragraph has moved out of the first thing you read. Support is voluntary either way and
-  the receipt figures are unchanged.
-
 - Training Preferences reads as one panel. Weight unit sat in a bordered row while Equipment
   hung underneath it as a bare list, so the two settings looked like separate components
   inside the same card. They are now two blocks on one surface with a thin line between
@@ -107,9 +112,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostics gathered at the bottom. Cards in a group sit together in one panel, so a group
   reads as one thing.
 
-- The card that chooses between Lightning and Monero is now called Payment Mode. It was called
-  Monero Mode, which read as a switch for one of the two answers rather than the question.
-
 - The Account row shows who you are signed in as - your picture, your name and your npub -
   instead of the word "Account".
 
@@ -121,9 +123,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wasted data. Cards are now compared one by one and only the ones that actually changed are
   rewritten.
 
-- Settings stops shifting under you. Opening Settings starts a read of the public zap
-  receipts, which answers twice, and each answer used to redraw the page and close whatever
-  category you had expanded. So did turning sync on or off - inside the very card holding
+- Settings stops shifting under you. Opening Settings starts a relay read that answers a
+  moment later, and answers like that used to redraw the page and close whatever category
+  you had expanded. So did turning sync on or off - inside the very card holding
   the switch. Both now update just the part that changed, and the section you are reading
   stays open because nothing takes it away.
 
@@ -161,8 +163,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answer - and both used to rebuild the whole app for exercise cards the page in front of
   you does not show. Reading Settings or Statistics while it runs is now quiet, and a
   refresh from Discover itself writes the new cards into the grid without redrawing the
-  photos and controls around them. The same goes for creator profiles, zap totals and
-  Monero payment addresses arriving behind the catalog.
+  photos and controls around them. The same goes for creator profiles and Monero
+  payment addresses arriving behind the catalog.
 
 - Your profile arriving from a relay no longer redraws the app. A second or two after
   Workstr opens, the name and picture come back from the network; the whole screen used to

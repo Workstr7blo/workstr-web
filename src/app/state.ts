@@ -1,20 +1,9 @@
 import type { WorkstrStore, SheetWithExercises } from '../db/store';
-import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings, WorkoutProgramZapAttempt } from '../core/types';
+import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings } from '../core/types';
 import type { RelayProgram } from '../nostr/canon';
-import type { ProgramZapTotals } from '../nostr/zaps';
 import type { RelayProfile } from '../nostr/pool';
-import type { SupportState } from '../features/support/views';
 import type { MoneroAddressState } from '../features/support/payment-mode-views';
 import type { SyncStatus } from '../sync/engine';
-
-export interface NwcViewState {
-  active: boolean;
-  walletLabel?: string;
-  relayLabel?: string;
-  savedAt?: number;
-  status: 'idle' | 'connecting' | 'paying' | 'success' | 'error';
-  message?: string;
-}
 
 export type View = 'exercises' | 'workouts' | 'statistics' | 'settings';
 export type SubView = 'library' | 'discover' | 'programs' | 'history' | 'recovery' | 'training' | 'body';
@@ -78,9 +67,7 @@ export interface AppState {
   authorPaymentTargets?: Record<string, string | null>;
   store: WorkstrStore | null;
   settings: WorkstrSettings;
-  support: SupportState;
-  nwc: NwcViewState;
-  // The public Monero payment target shown in Settings while Monero Mode is on. Session
+  // The user's public Monero payment target, shown under Monero tips in Settings. Session
   // state, not a setting: the relays own the address.
   monero: MoneroAddressState;
   signerType: 'nip07' | 'nip46' | 'local' | null;
@@ -88,8 +75,6 @@ export interface AppState {
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
   exercises: Exercise[];
   programs: RelayProgram[];
-  programZapTotals?: Record<string, ProgramZapTotals>;
-  programZapAttempts: WorkoutProgramZapAttempt[];
   expandedSessionId: number | null;
   // Calendar navigation is transient on purpose: month and day selection reset with the
   // session rather than persisting as a setting. Null month means "the current month".

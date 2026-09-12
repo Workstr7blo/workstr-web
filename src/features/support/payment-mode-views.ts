@@ -5,8 +5,7 @@ import type { SignedNostrEvent } from '../../signer/types';
 
 // The current user's public NIP-A3 Monero target, as Settings knows it. It is deliberately
 // not a stored setting: the address lives in the user's `kind:10133` on public relays, so
-// the relays stay the source of truth and nothing about it enters encrypted sync or the
-// NWC credential store.
+// the relays stay the source of truth and nothing about it enters encrypted sync.
 export interface MoneroAddressState {
   status: 'idle' | 'loading' | 'ready' | 'saving' | 'error';
   /** The address currently advertised on relays. Empty string means "publishes none". */
@@ -85,34 +84,34 @@ export function moneroAddressSection(monero: MoneroAddressState = IDLE, signedIn
   return `<div class="settings-inline-section monero-address-section" id="monero-address-section">${moneroAddressBody(monero, signedIn)}</div>`;
 }
 
-// Which rail carries creator support. Presented as a choice rather than an on/off switch,
-// because that is what it is — the app is on Lightning or on Monero, never on "neither".
-// Marks are `₿` (U+20BF) and `ɱ` (U+0271), the Bitcoin and Monero symbols. Real typographic
-// characters rather than icon assets, so the pair stays symmetric and needs nothing vendored;
-// #132 brings official Monero artwork in for the Tip CTA, where it carries more weight.
+// Monero tips is a switch rather than a choice between rails: it is the only rail, and off is
+// a real state. On shows a Tip button on creators' programs and the user's own public address.
 //
-// Picking Monero also swaps what the rest of Settings offers: the NWC wallet card is
-// replaced by the public payment address below, since a Monero target is published to
-// relays rather than connected to a wallet.
-export function paymentModeCard(state: AppState): string {
-  const monero = normalizePaymentMode(state.settings.paymentMode) === 'monero';
-  const rail = (value: 'lightning' | 'monero', mark: string, label: string, hint: string) => {
-    const on = (value === 'monero') === monero;
-    return `<label class="payment-rail-option${on ? ' selected' : ''}">
-      <input type="radio" name="payment-mode" value="${value}" ${on ? 'checked' : ''} />
-      <span class="payment-rail-mark" aria-hidden="true">${mark}</span>
-      <span class="payment-rail-copy"><strong>${label}</strong><small>${hint}</small></span>
-    </label>`;
-  };
-  return `<details class="settings-category payment-mode-card" data-settings-section="payment-mode"${monero ? ' open' : ''}>
-    <summary><span class="settings-category-copy"><strong>Payment Mode</strong><small>${monero ? 'Monero tips' : 'Lightning zaps'}</small></span><span class="status-pill ${monero ? 'ok' : ''}">${monero ? 'MONERO' : 'LIGHTNING'}</span></summary>
-    <div class="settings-category-body">
-      <p class="section-help">Switch creator support from Lightning zaps to public Monero payment targets. Workouts and programs stay the same.</p>
-      <div class="payment-rail" role="radiogroup" aria-label="Creator support">
-        ${rail('lightning', '₿', 'Lightning zaps', 'Default. Zap creators over NWC.')}
-        ${rail('monero', 'ɱ', 'Monero tips', 'Tip creators at their public Monero address.')}
-      </div>
-      ${monero ? moneroAddressSection(state.monero, Boolean(state.pubkey)) : ''}
+// The address outlives the switch. It is published on relays, so turning tips off does not
+// unpublish it - and hiding the only control that can remove it would leave it public with no
+// way back. Off with an address still published, the card says so and keeps the section.
+const TIPS_HELP = "Show a Tip button on creators' programs";
+const STILL_PUBLISHED = 'Off. Your Monero address is still published.';
+
+export function moneroTipsOn(state: AppState): boolean {
+  return normalizePaymentMode(state.settings.paymentMode) === 'monero';
+}
+
+export function moneroTipsCopy(state: AppState): string {
+  return !moneroTipsOn(state) && state.monero.address ? STILL_PUBLISHED : TIPS_HELP;
+}
+
+export function moneroAddressVisible(state: AppState): boolean {
+  return moneroTipsOn(state) || Boolean(state.monero.address);
+}
+
+export function moneroTipsCard(state: AppState): string {
+  const on = moneroTipsOn(state);
+  return `<section class="settings-category monero-tips-card" data-settings-section="monero-tips">
+    <div class="monero-tips-row">
+      <span class="settings-category-copy"><strong id="monero-tips-label">Monero tips</strong><small id="monero-tips-copy">${html(moneroTipsCopy(state))}</small></span>
+      <input type="checkbox" role="switch" id="monero-tips-toggle" class="settings-toggle" aria-labelledby="monero-tips-label" aria-describedby="monero-tips-copy"${on ? ' checked' : ''} />
     </div>
-  </details>`;
+    <div class="settings-category-body monero-tips-body" id="monero-tips-body"${moneroAddressVisible(state) ? '' : ' hidden'}>${moneroAddressSection(state.monero, Boolean(state.pubkey))}</div>
+  </section>`;
 }

@@ -5,8 +5,6 @@ import { sessionDayKey } from '../core/dates';
 import { normalizeStatsRange } from '../features/progress/stats';
 import { LOCAL_NAMESPACE } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
-import { fetchMonthlyZapReceipts } from '../nostr/zaps';
-import { updateSupportFunding } from '../features/support/views';
 import { updateTrainingPreferences } from './settings-view';
 import type { RelayProgram } from '../nostr/canon';
 import { getRecovery, type RecoveryGroup } from '../features/recovery/recovery';
@@ -56,28 +54,6 @@ function bindBodyControls(): void {
     render();
     toast('Profile saved');
   });
-}
-
-// Zap receipts are public, so this needs no identity and runs whether or not
-// the user is signed in. Refetched at most once per settings visit.
-//
-// Monero Mode has no Lightning funding surface to write into, so it does not read the
-// receipts either; switching back to Lightning starts the read from `savePaymentMode`.
-async function refreshFunding(): Promise<void> {
-  if (normalizePaymentMode(state.settings.paymentMode) === 'monero') return;
-  if (state.support.status === 'loading' || state.support.status === 'ready') return;
-  state.support = { ...state.support, status: 'loading' };
-  // Written into the card rather than through a render: the reader is on Settings when this
-  // runs - that is what starts it - and rebuilding the page would close the category they
-  // are reading, twice, seconds apart. A reader who has navigated away gets nothing written
-  // and keeps the state, which the next render of Settings reads.
-  if (!updateSupportFunding(root, state.support)) render({ reason: 'support-funding-loading' });
-  try {
-    state.support = { status: 'ready', receipts: await fetchMonthlyZapReceipts(), fetchedAt: Date.now() };
-  } catch {
-    state.support = { ...state.support, status: 'offline' };
-  }
-  if (!updateSupportFunding(root, state.support)) render({ reason: 'support-funding-loaded' });
 }
 
 function bindRecoveryControls(): void {
@@ -184,16 +160,12 @@ async function saveUnitPreference(value: string): Promise<void> {
   if (!updateTrainingPreferences(root, state)) render({ reason: 'unit-preference-offscreen' });
 }
 
-// The stored rail decides which wallet layer, which Discover actions, and which Support
-// card Settings shows, so this rerenders rather than patching a row.
+// Saves and nothing else. The switch lives on Settings, and the shell writes the few things
+// it moves there in place; see its `#monero-tips-toggle` handler.
 async function savePaymentMode(value: string): Promise<void> {
   if (!state.store) return;
   state.settings = { ...state.settings, paymentMode: normalizePaymentMode(value) };
   await state.store.saveSettings(state.settings);
-  render();
-  // Coming back to Lightning mounts a funding surface the reader is already looking at, and
-  // the visit that would have filled it in has already happened.
-  void refreshFunding();
 }
 
 async function saveOwnedEquipment(): Promise<void> {
@@ -243,7 +215,7 @@ async function importUserData(input: HTMLInputElement): Promise<void> {
 }
 
   return {
-    bindBodyControls, refreshFunding, bindRecoveryControls, deleteSession,
+    bindBodyControls, bindRecoveryControls, deleteSession,
     saveUnitPreference, savePaymentMode, saveOwnedEquipment, exportUserData, importUserData
   };
 }

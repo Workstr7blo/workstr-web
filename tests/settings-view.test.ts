@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { settingsView, updateTrainingPreferences } from '../src/app/settings-view';
-import { updateSupportFunding } from '../src/features/support/views';
+import { supportPanel } from '../src/features/support/views';
 import { updateBackupCard, updateBackupStatus, backupPanelState } from '../src/features/backup/views';
 import { accountIdentity, updateAccountIdentity } from '../src/app/account-chip';
 import { displayNpub } from '../src/app/format';
@@ -11,9 +11,7 @@ function state(overrides: Partial<AppState> = {}): AppState {
   return {
     pubkey: null, npub: null, profileName: null, profilePicture: null, profileNames: {},
     signerType: null, store: null,
-    settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [] },
-    support: { status: 'idle', receipts: [] },
-    nwc: { active: false, status: 'idle' },
+    settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] },
     monero: { status: 'idle', address: '' },
     library: [], discoverExercises: [], finishedSessions: [], sheets: [],
     backup: { state: 'off', pending: 0 },
@@ -46,7 +44,6 @@ describe('the Settings page', () => {
   it('orders the cards within each group', () => {
     const titles = cardTitles(render(signedIn()));
     expect(titles.indexOf('Training Preferences')).toBeLessThan(titles.indexOf('Beast Mode'));
-    expect(titles.indexOf('Payment Mode')).toBeLessThan(titles.indexOf('Zap Wallet'));
     expect(titles.indexOf('Data & Sync')).toBeLessThan(titles.indexOf('Advanced'));
   });
 
@@ -57,8 +54,7 @@ describe('the Settings page', () => {
     expect(groupOf('.account-card')).toBe('Account');
     expect(groupOf('.training-preferences-card')).toBe('Training');
     expect(groupOf('.beast-mode-card')).toBe('Training');
-    expect(groupOf('.payment-mode-card')).toBe('Payments');
-    expect(groupOf('.nwc-card')).toBe('Payments');
+    expect(groupOf('.monero-tips-card')).toBe('Payments');
     expect(groupOf('.support-panel')).toBe('Support');
     expect(groupOf('.data-sync-card')).toBe('System & Data');
     expect(groupOf('.advanced-settings')).toBe('System & Data');
@@ -118,13 +114,12 @@ describe('the Settings page', () => {
     expect(groupLabels(root)).toEqual(['Account', 'Training', 'System & Data']);
     expect(cardTitles(root)).toEqual(['Local only', 'Training Preferences', 'Data & Sync', 'Advanced']);
     expect(root.querySelector('.beast-mode-card')).toBeNull();
-    expect(root.querySelector('.payment-mode-card')).toBeNull();
-    expect(root.querySelector('.nwc-card')).toBeNull();
+    expect(root.querySelector('.monero-tips-card')).toBeNull();
     expect(root.querySelector('.support-panel')).toBeNull();
     expect(render({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>).querySelector('.support-panel')).toBeNull();
     expect(root.textContent).not.toContain('Payments');
     expect(root.textContent).not.toContain('Support Workstr');
-    expect(root.textContent).not.toContain('Payment Mode');
+    expect(root.textContent).not.toContain('Monero tips');
     expect(root.textContent).not.toContain('Zap Wallet');
   });
 
@@ -145,11 +140,58 @@ describe('the Settings page', () => {
     expect(card.textContent).not.toContain('Sync now');
   });
 
-  it('drops the Zap Wallet card on the Monero rail and leaves the payment card standing', () => {
-    const monero = render(signedIn({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>));
-    expect(monero.querySelector('.nwc-card')).toBeNull();
-    expect(monero.querySelector('.payment-mode-card')).toBeTruthy();
-    expect(cardTitles(monero)).not.toContain('Zap Wallet');
+  describe('Monero tips', () => {
+    const off = (overrides: Partial<AppState> = {}): HTMLElement => render(signedIn(overrides));
+    const on = (overrides: Partial<AppState> = {}): HTMLElement =>
+      render(signedIn({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] }, ...overrides } as Partial<AppState>));
+    const body = (root: HTMLElement): HTMLElement => root.querySelector('#monero-tips-body') as HTMLElement;
+
+    it('is one switch in Payments, off by default', () => {
+      const root = off();
+      const card = root.querySelector('.monero-tips-card') as HTMLElement;
+      const toggle = card.querySelector<HTMLInputElement>('#monero-tips-toggle')!;
+      expect(card.tagName).toBe('SECTION');
+      expect(toggle.type).toBe('checkbox');
+      expect(toggle.getAttribute('role')).toBe('switch');
+      expect(toggle.checked).toBe(false);
+      expect(card.querySelector('#monero-tips-label')?.textContent).toBe('Monero tips');
+      expect(card.querySelector('#monero-tips-copy')?.textContent).toBe("Show a Tip button on creators' programs");
+      expect(body(root).hidden).toBe(true);
+      expect(card.closest('.settings-group')?.querySelector('.settings-group-copy small')?.textContent).toBe('Tip program creators with Monero');
+    });
+
+    it('shows the address section when on', () => {
+      const root = on();
+      expect(root.querySelector<HTMLInputElement>('#monero-tips-toggle')?.checked).toBe(true);
+      expect(body(root).hidden).toBe(false);
+      expect(root.querySelector('.monero-tips-card #monero-address')).toBeTruthy();
+    });
+
+    // Turning tips off unpublishes nothing, so an address still on the relays keeps the
+    // section that can remove it, and the line under the switch says why it is there.
+    it('keeps a published address reachable with tips off', () => {
+      const root = off({ monero: { status: 'ready', address: `8${'B'.repeat(94)}` } } as Partial<AppState>);
+      expect(root.querySelector<HTMLInputElement>('#monero-tips-toggle')?.checked).toBe(false);
+      expect(root.querySelector('#monero-tips-copy')?.textContent).toBe('Off. Your Monero address is still published.');
+      expect(body(root).hidden).toBe(false);
+      expect(root.querySelector('#monero-address-save')).toBeTruthy();
+    });
+
+    it('shows the same Support Workstr card whichever way it is set', () => {
+      const offCard = off().querySelector('.support-panel')?.outerHTML;
+      const onCard = on().querySelector('.support-panel')?.outerHTML;
+      expect(offCard).toBeTruthy();
+      expect(offCard).toBe(onCard);
+      expect(supportPanel()).toContain('Private support with Monero');
+    });
+
+    it('leaves no Lightning surface anywhere in Settings', () => {
+      for (const root of [off(), on()]) {
+        const text = root.textContent || '';
+        for (const gone of ['Zap', 'Lightning', 'NWC', 'sats', 'Payment Mode']) expect(text).not.toContain(gone);
+        expect(root.querySelector('.nwc-card, .payment-rail, .payment-mode-card, #open-nwc-zap, #support-funding')).toBeNull();
+      }
+    });
   });
 
   // The card holds two preferences, and #202 asked for them to read as one surface: plain
@@ -159,7 +201,7 @@ describe('the Settings page', () => {
     const withKit = (): HTMLElement => render({
       library: [{ id: 'a', name: 'Row', equipment: ['Dumbbells'] }, { id: 'b', name: 'Push-up', equipment: ['Body Weight'] }],
       discoverExercises: [{ id: 'c', name: 'Press', equipment: ['Bench'] }],
-      settings: { unit: 'lbs', paymentMode: 'lightning', publicRelays: [], ownedEquipment: ['Dumbbells'] }
+      settings: { unit: 'lbs', paymentMode: 'off', publicRelays: [], ownedEquipment: ['Dumbbells'] }
     } as unknown as Partial<AppState>);
 
     it('reads as one surface with a divider instead of nested cards', () => {
@@ -215,7 +257,7 @@ describe('the Settings page', () => {
       const changed = state({
         library: [{ id: 'a', name: 'Row', equipment: ['Dumbbells'] }, { id: 'b', name: 'Push-up', equipment: ['Body Weight'] }],
         discoverExercises: [{ id: 'c', name: 'Press', equipment: ['Bench'] }],
-        settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [], ownedEquipment: ['Dumbbells', 'Bench'] }
+        settings: { unit: 'kg', paymentMode: 'off', publicRelays: [], ownedEquipment: ['Dumbbells', 'Bench'] }
       } as unknown as Partial<AppState>);
       expect(updateTrainingPreferences(root, changed)).toBe(true);
 
@@ -279,40 +321,12 @@ describe('the Settings page', () => {
 // A reshuffle that breaks one of them fails silently: the page looks right and the disclosure
 // bug comes back. These assert against the real page markup rather than a fixture.
 describe('the background patchers still find their cards', () => {
-  it('writes the funding surface inside the grouped page', () => {
-    const root = render(signedIn());
-    const card = root.querySelector('.support-panel') as HTMLDetailsElement;
-    card.open = true;
-
-    expect(updateSupportFunding(root, { status: 'ready', receipts: [] })).toBe(true);
-
-    expect(root.querySelector('.support-panel')).toBe(card);
-    expect(card.open).toBe(true);
-    expect(root.querySelector('.support-panel #support-funding')).toBeTruthy();
-    expect(root.querySelector('.support-panel > summary .settings-category-copy small')?.textContent).toContain('sats this month');
-  });
-
-  it('leaves the Monero support card alone instead of rerendering the page for it', () => {
-    const root = render(signedIn({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>));
-    const card = root.querySelector('.support-panel') as HTMLDetailsElement;
-    card.open = true;
-    const before = card.innerHTML;
-
-    // True without touching anything: a rerender here would close whatever the reader has open.
-    expect(updateSupportFunding(root, { status: 'ready', receipts: [] })).toBe(true);
-
-    expect(root.querySelector('.support-panel')).toBe(card);
-    expect(card.open).toBe(true);
-    expect(card.innerHTML).toBe(before);
-    expect(root.querySelector('#support-funding')).toBeNull();
-  });
-
   it('writes the sync card inside the grouped page', () => {
-    const root = render({ pubkey: 'ab'.repeat(32), settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [], backup: { enabled: true } } } as Partial<AppState>);
+    const root = render({ pubkey: 'ab'.repeat(32), settings: { unit: 'kg', paymentMode: 'off', publicRelays: [], backup: { enabled: true } } } as Partial<AppState>);
     const card = root.querySelector('.data-sync-card') as HTMLDetailsElement;
     card.open = true;
 
-    expect(updateBackupCard(root, backupPanelState(state({ pubkey: 'ab'.repeat(32), settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [], backup: { enabled: true } }, backup: { state: 'syncing', pending: 2 } } as Partial<AppState>)))).toBe(true);
+    expect(updateBackupCard(root, backupPanelState(state({ pubkey: 'ab'.repeat(32), settings: { unit: 'kg', paymentMode: 'off', publicRelays: [], backup: { enabled: true } }, backup: { state: 'syncing', pending: 2 } } as Partial<AppState>)))).toBe(true);
 
     expect(root.querySelector('.data-sync-card')).toBe(card);
     expect(card.open).toBe(true);
@@ -342,11 +356,11 @@ describe('the background patchers still find their cards', () => {
   });
 
   it('patches the sync status line inside the grouped page', () => {
-    const root = render({ pubkey: 'ab'.repeat(32), settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [], backup: { enabled: true } } } as Partial<AppState>);
+    const root = render({ pubkey: 'ab'.repeat(32), settings: { unit: 'kg', paymentMode: 'off', publicRelays: [], backup: { enabled: true } } } as Partial<AppState>);
 
     const patched = updateBackupStatus(root, backupPanelState(state({
       pubkey: 'ab'.repeat(32),
-      settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [], backup: { enabled: true } },
+      settings: { unit: 'kg', paymentMode: 'off', publicRelays: [], backup: { enabled: true } },
       backup: { state: 'syncing', pending: 3 }
     } as Partial<AppState>)));
 

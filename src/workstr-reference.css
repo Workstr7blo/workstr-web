@@ -2,7 +2,7 @@
 
    Colour is expressed as channel tokens (bare `R, G, B` triplets) so a rule can pick its own
    alpha via `rgba(var(--accent-rgb), .18)` while still routing through one definition. That
-   is what lets Monero Mode repaint the app from the single override block at the end of
+   is what lets Monero tips repaint payments from the single override block at the end of
    `style.css` instead of shipping a second stylesheet.
 
    Rule of thumb when adding CSS: never write a theme colour literal. Reach for `--accent*`
@@ -45,15 +45,16 @@
   --accent-glow: rgba(var(--accent-rgb), 0.28);
   --on-accent: #fff;                 /* foreground on an accent fill */
 
-  /* Creator-payment accent. Defaults to Lightning gold; Monero Mode swaps it.
-     Kept separate from --bitcoin-gold on purpose: gold also marks records, badges and
-     training accents, so repointing it would drag the training UI along with the payment
-     UI. */
-  --payment-rgb: 247, 147, 26;
+  /* Creator-payment accent. Workstr purple while Monero tips are off, so a payment surface
+     still on screen - Support Workstr, or an address left published - carries no Monero
+     orange until tips are turned on; the Monero block in style.css swaps it then. Kept
+     apart from --accent-* on purpose: only payment rules read these, which is what lets that
+     block repaint payments without touching the Workstr identity. */
+  --payment-rgb: var(--accent-rgb);
   --payment-accent: rgb(var(--payment-rgb));
-  --payment-accent-strong: #ffbd4a;  /* second stop of the payment CTA gradient */
+  --payment-accent-strong: var(--accent-soft); /* second stop of the payment CTA gradient */
   --payment-glow: rgba(var(--payment-rgb), 0.3);
-  --on-payment: #1b0f02;             /* foreground on a payment fill */
+  --on-payment: var(--on-accent);    /* foreground on a payment fill */
 
   --void: #040208;
   --panel: rgba(var(--surface-rgb), 0.78);
@@ -76,7 +77,7 @@
   --sidebar-w: 88px;
   --topbar-h: 62px;
 
-  /* The full-page backdrop, so Monero Mode inherits it instead of restating it. */
+  /* The full-page backdrop, so the Monero override inherits it instead of restating it. */
   --surface-hero:
     radial-gradient(circle at 20% 0%, rgba(var(--accent-rgb), 0.28), transparent 28rem),
     radial-gradient(circle at 80% 10%, rgba(var(--accent-soft-rgb), 0.12), transparent 24rem),
@@ -171,7 +172,7 @@ h2, h3 { letter-spacing: -.03em; }
    Hue encodes domain and nothing else:
 
      violet   --accent-rgb    Workstr acting on your training
-     gold     --payment-rgb   money, and only money (Monero Mode repaints it)
+     payment  --payment-rgb   money, and only money (Monero tips repaint it orange)
      red      --danger-rgb    destroys something
      neutral  white           everything else
 
@@ -228,7 +229,7 @@ h2, h3 { letter-spacing: -.03em; }
   --btn-tint: var(--accent-rgb); --btn-fill: .2; --btn-edge: .62;
   --btn-lip: rgba(var(--accent-line-rgb), .5); --btn-cast: .55;
 }
-/* Money. The only gold left in the app, and the only variant Monero Mode repaints. */
+/* Money. The only variant Monero tips repaint. */
 .button.payment {
   --btn-tint: var(--payment-rgb); --btn-fill: .1; --btn-edge: .38;
   --btn-lip: rgba(var(--payment-rgb), .38); --btn-ink: var(--payment-accent-strong);
@@ -591,8 +592,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .manual-backup-group { padding-top: 10px; border-top: 1px solid var(--border); }
 .manual-backup-row { margin: 0; }
 .compact-select select { min-width: 150px; }
-.compact-support .support-summary-row { margin-top: 0; }
-.support-details .support-zap-card { margin-top: 10px; }
 .status-pill { justify-self: end; display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); font: 800 10px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
 .status-pill.ok { color: var(--success-green); border-color: rgba(0,208,132,.38); background: rgba(0,208,132,.08); }
 .status-pill.bad { color: var(--danger-red); border-color: rgba(255,56,100,.4); background: rgba(255,56,100,.08); }
@@ -645,11 +644,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .workout-card { border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,.03); overflow: hidden; transition: border-color .15s ease, box-shadow .15s ease; }
 .workout-card:hover { border-color: var(--border-hot); }
 .workout-card.expanded { border-color: var(--border-hot); box-shadow: 0 0 26px rgba(var(--accent-rgb), .12); }
-.workout-card.top-zapped { position: relative; border-color: rgba(var(--accent-line-rgb), .55); box-shadow: 0 0 26px rgba(var(--accent-rgb), .18), inset 0 1px 0 rgba(255,255,255,.06); }
-.workout-card.top-zapped.rank-1 { border-color: rgba(var(--payment-rgb), .82); box-shadow: 0 0 34px rgba(var(--payment-rgb), .26), inset 0 1px 0 rgba(255,255,255,.08); }
-.workout-card.top-zapped.rank-2 { border-color: rgba(var(--accent-line-rgb), .72); box-shadow: 0 0 30px rgba(var(--accent-rgb), .24), inset 0 1px 0 rgba(255,255,255,.07); }
-.workout-card.top-zapped.rank-3 { border-color: rgba(var(--payment-rgb), .5); box-shadow: 0 0 24px rgba(var(--accent-rgb), .18), 0 0 14px rgba(var(--payment-rgb), .1), inset 0 1px 0 rgba(255,255,255,.06); }
-.program-zap-rank { display: inline-flex; min-height: 22px; align-items: center; justify-content: center; padding: 4px 7px; border: 1px solid rgba(var(--payment-rgb), .46); border-radius: 999px; background: rgba(6,3,12,.86); color: var(--payment-accent); font: 900 9px/1 ui-monospace, monospace; letter-spacing: .08em; text-align: center; text-transform: uppercase; box-shadow: 0 0 16px rgba(var(--payment-rgb), .16); }
 .workout-card-header { display: grid; grid-template-columns: 46px minmax(0,1fr) 18px; gap: 12px; align-items: start; padding: 13px; cursor: pointer; }
 .workout-card-map { width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 13px; background: rgba(0,0,0,.26); color: var(--dim); overflow: hidden; }
 .workout-card-map svg { width: 22px; height: 22px; }
@@ -659,7 +653,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .program-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .program-tag-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; max-width: 230px; }
 .program-tag-grid .tag-pill { min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.program-zap-stats { display: inline-flex; width: fit-content; align-items: center; justify-content: center; margin-left: auto; padding: 6px 9px; border: 1px solid rgba(var(--payment-rgb), .26); border-radius: 999px; background: rgba(var(--payment-rgb), .08); color: var(--payment-accent); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .07em; text-transform: uppercase; }
 .workout-card-name { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-size: 16px; font-weight: 850; letter-spacing: -.03em; }
 .program-chip-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .program-status { font: 800 9px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--dim); }

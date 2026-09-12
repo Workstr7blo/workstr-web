@@ -1,7 +1,7 @@
 import type { IDBPDatabase } from 'idb';
 import { newSessionUid, openWorkstrDB, type WorkstrDB } from './schema';
 import { exportDatabase, importDatabase, type WorkstrExport } from './export';
-import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, TrainingBlock, WorkstrSettings, WorkoutProgramZapAttempt } from '../core/types';
+import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, TrainingBlock, WorkstrSettings } from '../core/types';
 import { normalizePaymentMode } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
@@ -37,7 +37,6 @@ function cleanTags(value: unknown): string[] {
 
 const LEGACY_RELAY_KEY = ['paid', 'Relay'].join('');
 const LEGACY_CATALOG_SOURCE = ['pre', 'mium'].join('');
-const MAX_PROGRAM_ZAP_ATTEMPTS = 50;
 
 export class WorkstrStore extends SyncAwareStore {
   private constructor(db: IDBPDatabase<WorkstrDB>) {
@@ -355,30 +354,17 @@ export class WorkstrStore extends SyncAwareStore {
     if (JSON.stringify(syncedSettings(previous)) !== JSON.stringify(syncedSettings(next))) this.noteChange(SETTINGS_ADDRESS);
   }
 
-  async listWorkoutProgramZapAttempts(programAddress?: string): Promise<WorkoutProgramZapAttempt[]> {
-    const attempts = (await this.getSettings()).nwc?.programZapAttempts ?? [];
-    return attempts
-      .filter((attempt) => !programAddress || attempt.programAddress === programAddress)
-      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
-  }
-
-  async getWorkoutProgramZapAttempt(id: string): Promise<WorkoutProgramZapAttempt | undefined> {
-    return (await this.listWorkoutProgramZapAttempts()).find((attempt) => attempt.id === id);
-  }
-
-  async saveWorkoutProgramZapAttempt(attempt: WorkoutProgramZapAttempt): Promise<void> {
-    const settings = await this.getSettings();
-    const attempts = settings.nwc?.programZapAttempts ?? [];
-    const nextAttempts = [attempt, ...attempts.filter((existing) => existing.id !== attempt.id)]
-      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
-      .slice(0, MAX_PROGRAM_ZAP_ATTEMPTS);
-    await this.saveSettings({
-      ...settings,
-      nwc: {
-        ...settings.nwc,
-        programZapAttempts: nextAttempts
-      }
-    });
+  // Lightning zaps were removed (#218). A row written before then can still carry this
+  // device's zap history under `nwc` and a stored 'lightning' rail. Rewritten once, directly
+  // and without queueing a sync write: the synced value already reads as 'off', so there is
+  // nothing for another device to learn. The wallet credential itself lived in a separate
+  // database, which `src/db/retire-lightning.ts` deletes.
+  async retireLightningSettings(): Promise<void> {
+    const stored = (await this.db.get('settings', 'settings')) as Record<string, unknown> | undefined;
+    if (!stored || (!('nwc' in stored) && stored.paymentMode !== 'lightning')) return;
+    const next: Record<string, unknown> = { ...stored, paymentMode: normalizePaymentMode(stored.paymentMode) };
+    delete next.nwc;
+    await this.db.put('settings', next as unknown as WorkstrSettings, 'settings');
   }
 
 }

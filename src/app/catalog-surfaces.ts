@@ -4,7 +4,7 @@ import { programStatusLine } from './layout';
 import type { AppState } from './state';
 
 // Catalog work runs on every launch and whenever Exercises or Workouts is opened: a status
-// line, then relay answers, then author profiles, zap totals and payment targets arriving
+// line, then relay answers, then author profiles and payment targets arriving
 // separately behind them. Each of those rebuilt the whole root. A reader sitting on
 // Settings or Statistics watched their page redraw several times for data no surface in
 // front of them was showing.

@@ -17,7 +17,6 @@ export interface ProgramListContext {
   // scope for the same reason everything here does.
   bindPublish(scope: ParentNode): void;
   bindTip(scope: ParentNode): void;
-  bindZap(scope: ParentNode): void;
 }
 
 const LIST_IDS: Record<ProgramBrowser, string> = {
@@ -76,7 +75,6 @@ export function createProgramList(ctx: ProgramListContext) {
     }));
     ctx.bindPublish(scope);
     ctx.bindTip(scope);
-    ctx.bindZap(scope);
   }
 
   // The toolbar above the list, and the search field being typed into, are not touched.

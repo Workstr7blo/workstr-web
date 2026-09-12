@@ -11,7 +11,6 @@ import { quickWorkoutPanel, recoveryView } from '../features/recovery/views';
 import { programCard, sheetToProgram } from '../features/sheets/views';
 import { programActiveFilters, programFilterSheet, programMatcher, programToolbar, type ProgramBrowser } from '../features/sheets/program-browser';
 import { exerciseFilterSheet, exerciseSelectionBar } from './exercise-browser';
-import { moneroMode } from '../features/sheets/monero-tip-view';
 
 const navItems: Array<{ view: View; label: string; icon: string }> = [
   { view: 'exercises', label: 'Exercises', icon: '<path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/>' },
@@ -150,16 +149,7 @@ export function programListMarkup(context: ProgramBrowser, state: AppState): str
       || '<div class="empty">No programs match yet. Build one, import from Discover, or clear a filter.</div>';
   }
   const programs = state.programs.filter(matches);
-  // Lightning popularity is not Monero popularity, so the top-zapped badge is not carried
-  // over to the Monero rail. Nothing replaces it: the list is ordered by name either way,
-  // and zaps only ever decorated it.
-  const topProgramRanks = new Map(moneroMode(state) ? [] : programs
-    .map((program) => ({ address: program.address, sats: state.programZapTotals?.[program.address]?.sats || 0 }))
-    .filter((entry) => entry.sats > 0)
-    .sort((a, b) => b.sats - a.sats)
-    .slice(0, 3)
-    .map((entry, index) => [entry.address, index + 1]));
-  return programs.map((program) => programCard(program, state, { showPayment: true, zapRank: topProgramRanks.get(program.address) })).join('')
+  return programs.map((program) => programCard(program, state, { showPayment: true })).join('')
     || `<div class="empty">${state.programs.length ? 'No relay programs match. Refresh or clear a filter.' : 'Relay programs published by Workstr and Beast Mode creators appear here. Importing one adds a local copy to your Programs library, which is what you edit and run.'}</div>`;
 }
 

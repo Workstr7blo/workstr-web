@@ -4,7 +4,6 @@ import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonProgra
 import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
 import { fetchAuthorMoneroPaymentTargets } from '../nostr/payment-targets';
-import { fetchProgramZapTotals } from '../nostr/zaps';
 import { discoverImportState } from '../features/discover/views';
 import { moneroMode } from '../features/sheets/monero-tip-view';
 import { paintBodyMapSvg } from './bodymap';
@@ -97,7 +96,6 @@ async function refreshPrograms(): Promise<void> {
     state.programStatus = `loaded ${programs.length} Workstr and creator programs`;
     await persistCanonCache();
     void refreshDiscoverProfiles();
-    void refreshProgramZapTotals(programs);
     void refreshAuthorPaymentTargets(programs);
   } catch (error) {
     const cached = state.programs.length;
@@ -108,28 +106,9 @@ async function refreshPrograms(): Promise<void> {
   renderProgramSurface();
 }
 
-async function refreshProgramZapTotals(programs = state.programs): Promise<void> {
-  if (!programs.length) return;
-  try {
-    const latest = await fetchProgramZapTotals(programs);
-    // Full catalog refreshes replace the snapshot. Targeted refreshes after a zap merge
-    // just the queried addresses so one cheap receipt check cannot blank the rest of the
-    // Discover leaderboard while relays are still catching up.
-    if (programs.length === state.programs.length) {
-      state.programZapTotals = latest;
-    } else {
-      state.programZapTotals = { ...(state.programZapTotals || {}), ...latest };
-    }
-    renderProgramSurface();
-  } catch {
-    // Zap totals are social proof, not core catalog loading. Keep Discover usable
-    // when receipt relays are unavailable.
-  }
-}
-
 // Which authors on the Discover list can be tipped in Monero. One batched query for every
-// unknown author, and only in Monero Mode: on the Lightning rail nothing on screen would
-// use the answer, so asking for it would be a relay round trip that buys nothing.
+// unknown author, and only while Monero tips are on: with them off no card shows a Tip action,
+// so asking would be a relay round trip that buys nothing.
 //
 // An author is asked about once. A `null` answer is a real answer — "publishes no Monero
 // target" — and is cached exactly like an address so scrolling and rerenders stay free.
@@ -162,7 +141,6 @@ function primeFromCache(): void {
   state.exerciseStatus = `showing ${cached.exercises.length} Workstr exercises from the last sync`;
   state.programStatus = `showing ${cached.programs.length} Workstr and creator programs from the last sync`;
   void refreshDiscoverProfiles();
-  void refreshProgramZapTotals(cached.programs);
   void refreshAuthorPaymentTargets(cached.programs);
 }
 
@@ -334,7 +312,7 @@ async function toggleFavourite(slug: string): Promise<void> {
 }
 
   return {
-    refreshMergedExercises, reloadLibrary, persistCanonCache, primeFromCache, refreshExercises, refreshPrograms, refreshProgramZapTotals,
+    refreshMergedExercises, reloadLibrary, persistCanonCache, primeFromCache, refreshExercises, refreshPrograms,
     refreshDiscoverProfiles, refreshAuthorPaymentTargets, openExerciseDetail, importDiscovered, importSelectedDiscovered,
     importProgram, deleteExerciseFromLibrary, deleteSelectedExercises, toggleFavourite
   };
