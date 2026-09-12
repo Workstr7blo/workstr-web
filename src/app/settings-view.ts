@@ -4,14 +4,12 @@ import { displayIdentity, displayNpub, exerciseFilterValues, html } from './form
 import { APP_VERSION } from './version';
 import { countdownAudioState } from '../features/train/countdown-audio';
 import { supportPanel } from '../features/support/views';
-import { paymentModeCard } from '../features/support/payment-mode-views';
+import { moneroTipsCard } from '../features/support/payment-mode-views';
 import { isFreeEquipment, ownedEquipmentKeys } from '../core/equipment';
-import { normalizePaymentMode } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { hasNip07 } from '../signer/nip07';
 import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { backupPanel, backupPanelState } from '../features/backup/views';
-import { redactNwcSecrets } from '../nostr/nwc';
 
 // Settings is read top to bottom by someone who is not thinking in features: who I am, how I
 // train, how I pay, how I support this, and then the technical drawer. The cards themselves
@@ -104,19 +102,6 @@ function equipmentPreference(state: AppState): string {
   </div>`;
 }
 
-function nwcWalletRows(state: AppState): string {
-  const detail = state.nwc.message || (state.nwc.active
-    ? `${state.nwc.walletLabel || 'Wallet connected'}${state.nwc.relayLabel ? ` · ${state.nwc.relayLabel}` : ''}`
-    : 'Paste the NWC string from your wallet. Workstr validates it before saving.');
-  return `<div class="settings-row-main nwc-wallet-row">
-    <div><strong>Zap wallet (NWC)</strong><small>${html(redactNwcSecrets(detail))}</small></div>
-    <div class="settings-row-actions">
-      <button id="nwc-connect" class="button ${state.nwc.active ? '' : 'payment'}">${state.nwc.active ? 'Replace wallet' : 'Connect wallet'}</button>
-      ${state.nwc.active ? '<button id="nwc-disconnect" class="button quiet">Disconnect</button>' : ''}
-    </div>
-  </div>`;
-}
-
 // Only worth a line of its own when it is not already the name above it: with no profile
 // the display name *is* the shortened npub, and printing it twice says nothing.
 function npubLine(state: AppState): string {
@@ -176,28 +161,19 @@ function advancedCard(state: AppState): string {
 
 export function settingsView(state: AppState): string {
   const signedIn = Boolean(state.pubkey);
-  const nwc = state.nwc ?? { active: false, status: 'idle' as const };
-  // Monero Mode replaces the wallet layer rather than adding to it: an NWC connection is a
-  // Lightning instrument, and offering to connect one while creator support is on Monero
-  // would be an invitation to pay over a rail this mode has switched off. The stored
-  // connection is untouched — picking Lightning again brings the card back as it was.
-  const moneroMode = normalizePaymentMode(state.settings.paymentMode) === 'monero';
-  const nwcCard = !signedIn || moneroMode ? '' : `<details class="settings-category nwc-card" data-settings-section="zap-wallet">
-      <summary><span class="settings-category-copy"><strong>Zap Wallet</strong><small>${nwc.active ? html(nwc.walletLabel || 'Wallet connected') : 'Not connected'}</small></span><span class="status-pill ${nwc.active ? 'ok' : ''}">${nwc.active ? 'ACTIVE' : 'OFF'}</span></summary>
-      <div class="settings-category-body">${nwcWalletRows({ ...state, nwc })}</div>
-    </details>`;
   const trainingCards = [
     trainingPreferencesCard(state),
     signedIn ? beastModeSettingsCard(state) : ''
   ];
-  const paymentCards = signedIn ? [paymentModeCard(state), nwcCard] : [];
-  const supportCards = signedIn ? [supportPanel(state.support, nwc, true, moneroMode)] : [];
+  const paymentCards = signedIn ? [moneroTipsCard(state)] : [];
+  // Supporting Workstr is not creator tipping, so it does not follow the Monero tips switch.
+  const supportCards = signedIn ? [supportPanel()] : [];
   return `<div class="page active settings-page">
     <div class="page-title">Settings</div>
     <p class="page-blurb">Customize your experience, keep your data safe, and support a stronger, more sovereign future.</p>
     ${settingsGroup({ id: 'account', label: 'Account', blurb: 'Your identity and device connection', icon: GROUP_ICONS.account, cards: [accountCard(state)] })}
     ${settingsGroup({ id: 'training', label: 'Training', blurb: 'Configure your training experience', icon: GROUP_ICONS.training, cards: trainingCards })}
-    ${settingsGroup({ id: 'payments', label: 'Payments', blurb: 'Choose your creator support method', icon: GROUP_ICONS.payments, cards: paymentCards })}
+    ${settingsGroup({ id: 'payments', label: 'Payments', blurb: 'Tip program creators with Monero', icon: GROUP_ICONS.payments, cards: paymentCards })}
     ${settingsGroup({ id: 'support', label: 'Support', blurb: 'Help keep Workstr independent', icon: GROUP_ICONS.support, cards: supportCards, variant: 'support' })}
     ${settingsGroup({ id: 'system', label: 'System & Data', blurb: 'Manage your data and advanced settings', icon: GROUP_ICONS.system, cards: [backupPanel(backupPanelState(state)), advancedCard(state)] })}
   </div>`;

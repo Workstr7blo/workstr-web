@@ -18,16 +18,16 @@ describe('network guard', () => {
   });
 
   it('leaves loopback alone, so a test can stand up its own server', () => {
-    // The NWC mock wallet runs a real ws server on 127.0.0.1 and must keep working.
+    // A test that needs a real server runs it on 127.0.0.1, and that must keep working.
     // Constructing against a closed port fails asynchronously, not by the guard.
-    expect(() => new WebSocket('ws://127.0.0.1:1/nwc')).not.toThrow();
-    expect(() => new WebSocket('ws://localhost:1/nwc')).not.toThrow();
+    expect(() => new WebSocket('ws://127.0.0.1:1/loopback')).not.toThrow();
+    expect(() => new WebSocket('ws://localhost:1/loopback')).not.toThrow();
   });
 
   it('keeps sockets recognisable as sockets', () => {
     // Wrapping instead of subclassing broke `instanceof` for every socket in the suite,
-    // which timed out the NWC integration tests.
-    const socket = new WebSocket('ws://127.0.0.1:1/nwc');
+    // which timed out every test that ran a server of its own.
+    const socket = new WebSocket('ws://127.0.0.1:1/loopback');
     expect(socket).toBeInstanceOf(WebSocket);
     socket.close();
   });

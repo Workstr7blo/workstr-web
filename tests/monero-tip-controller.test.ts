@@ -33,13 +33,10 @@ function state(overrides: Partial<AppState> = {}): AppState {
     authorPaymentTargets: { [AUTHOR]: ADDRESS },
     settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] },
     monero: { status: 'idle', address: '' },
-    nwc: { active: false, status: 'idle' },
-    support: { status: 'idle', receipts: [] },
     view: 'workouts',
     subState: { exercises: 'library', workouts: 'discover', statistics: 'training' },
     exercises: [],
     programs: [program],
-    programZapAttempts: [],
     sheets: [],
     library: [],
     discoverExercises: [],
@@ -103,8 +100,8 @@ describe('Monero Tip on program cards', () => {
     expect(moneroTipButton(program, app)).toBe('');
   });
 
-  it('replaces the Lightning zap surfaces rather than recolouring them', () => {
-    const monero = shellMarkup(state({ programZapTotals: { [program.address]: { sats: 2000, count: 3 } } }));
+  it('shows the Tip action with nothing counted beside it', () => {
+    const monero = shellMarkup(state());
 
     expect(monero).toContain('monero-tip-cta');
     expect(monero).not.toContain('program-zap-cta');
@@ -114,30 +111,13 @@ describe('Monero Tip on program cards', () => {
     expect(monero).not.toContain('rank-1');
   });
 
-  it('leaves the Lightning rail exactly as it was', () => {
-    const lightning = shellMarkup(state({
-      settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [] },
-      programZapTotals: { [program.address]: { sats: 2000, count: 3 } }
-    }));
+  // Even for an author who publishes an address: off means no payment action on any card.
+  it('shows no payment action while Monero tips are off', () => {
+    const off = shellMarkup(state({ settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] } }));
 
-    expect(lightning).toContain('program-zap-cta');
-    expect(lightning).toContain('2,000 sats');
-    expect(lightning).toContain('#1 top zapped');
-    // The Monero action belongs to the Monero rail, even for an author who has an address.
-    expect(lightning).not.toContain('monero-tip-cta');
-  });
-
-  it('withdraws the local Lightning zap record from an expanded card', () => {
-    const attempt = [{
-      id: 'zap-1', status: 'succeeded', programAddress: program.address, programName: 'Push Day',
-      amountSats: 21, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:01Z'
-    }];
-    const lightning = programCard(program, state({ settings: { unit: 'kg', paymentMode: 'lightning', publicRelays: [] }, expandedProgramAddress: program.address, programZapAttempts: attempt } as Partial<AppState>), { showPayment: true });
-    expect(lightning).toContain('Zap sent · 21 sats');
-
-    const monero = programCard(program, state({ expandedProgramAddress: program.address, programZapAttempts: attempt } as Partial<AppState>), { showPayment: true });
-    expect(monero).not.toContain('Creator zap');
-    expect(monero).not.toContain('Zap sent');
+    expect(off).not.toContain('monero-tip-cta');
+    expect(off).not.toContain('program-zap-cta');
+    expect(off).not.toContain('sats');
   });
 
   it('never invents Monero social proof', () => {

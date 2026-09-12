@@ -17,10 +17,6 @@ import { clearLocalSecret, LEGACY_LOCAL_KEY_STORAGE, loadLocalSecret } from '../
 // fast and loudly instead of outliving the test and rendering into a torn-down jsdom. These
 // mocks remain because these paths need to resolve with data, not merely be prevented — they
 // are no longer the thing keeping the suite from flaking.
-vi.mock('../src/nostr/zaps', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../src/nostr/zaps')>(),
-  fetchMonthlyZapReceipts: vi.fn(async () => [])
-}));
 vi.mock('../src/nostr/canon', async (importOriginal) => ({
   ...await importOriginal<typeof import('../src/nostr/canon')>(),
   fetchCanonExercises: vi.fn(async () => []),
@@ -450,13 +446,12 @@ describe('shell', () => {
     expect(settings?.textContent).toContain('Data & Sync');
     expect(settings?.textContent).toContain('Training Preferences');
     expect(settings?.textContent).not.toContain('Support Workstr');
-    expect(settings?.textContent).not.toContain('Payment Mode');
-    expect(settings?.textContent).not.toContain('Lightning zaps');
+    expect(settings?.textContent).not.toContain('Monero tips');
     expect(settings?.querySelector('.advanced-settings:not([open])')).toBeTruthy();
     expect(settings?.querySelectorAll('.settings-category:not([open])')).toHaveLength(4);
     expect(settings?.querySelector('.account-card summary')?.textContent).toContain('Local only');
     expect(settings?.querySelector('.beast-mode-card')).toBeNull();
-    expect(settings?.querySelector('.payment-mode-card')).toBeNull();
+    expect(settings?.querySelector('.monero-tips-card')).toBeNull();
     expect(settings?.querySelector('.support-panel')).toBeNull();
     expect(settings?.querySelector('.account-card .terminal-mini')).toBeNull();
     expect(settings?.querySelector('#sign-in-settings')).toBeTruthy();
@@ -471,7 +466,9 @@ describe('shell', () => {
     await drainBoot(shell);
   });
 
-  it('swaps the wallet card for the Monero payment address when the rail changes', async () => {
+  // Written in place: the switch is already where the reader put it, and a page render would
+  // close every other card they had open.
+  it('turns Monero tips on and off without rendering the page', async () => {
     localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
@@ -479,41 +476,42 @@ describe('shell', () => {
     await shell.ready;
     root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
 
-    const rail = (value: string) => root.querySelector<HTMLInputElement>(`input[name="payment-mode"][value="${value}"]`);
-    const selected = () => root.querySelector('.payment-rail-option.selected .payment-rail-copy strong')?.textContent;
-    const pick = (value: string) => {
-      const input = rail(value)!;
-      input.checked = true;
-      input.dispatchEvent(new Event('change', { bubbles: true }));
+    const toggle = () => root.querySelector<HTMLInputElement>('#monero-tips-toggle')!;
+    const body = () => root.querySelector<HTMLElement>('#monero-tips-body')!;
+    const chipMark = () => root.querySelector('#account-chip .connection-payment-mark');
+    const flip = (on: boolean) => {
+      toggle().checked = on;
+      toggle().dispatchEvent(new Event('change', { bubbles: true }));
     };
 
-    // Lightning is the default rail, and it is a choice rather than an off state.
-    expect(rail('lightning')?.checked).toBe(true);
-    expect(rail('monero')?.checked).toBe(false);
-    expect(selected()).toBe('Lightning zaps');
+    // Off is the default, and off carries no payment colour and no medallion.
+    expect(toggle().checked).toBe(false);
     expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false);
+    expect(body().hidden).toBe(true);
+    expect(chipMark()).toBeNull();
+    const card = root.querySelector('.monero-tips-card');
+    const before = shell.renders.rebuilds;
 
-    pick('monero');
+    flip(true);
     await vi.waitFor(() => expect(document.documentElement.getAttribute('data-payment-mode')).toBe('monero'));
-    expect(selected()).toBe('Monero tips');
-    expect(root.querySelector('.payment-mode-card .status-pill.ok')?.textContent).toBe('MONERO');
+    expect(shell.state.settings.paymentMode).toBe('monero');
+    expect(body().hidden).toBe(false);
+    expect(root.querySelector('#monero-tips-body #monero-address-section')).toBeTruthy();
+    expect(chipMark()).toBeTruthy();
 
-    // The wallet card is replaced, not deleted: nothing about the stored NWC connection
-    // changes, and the section that takes its place is a payment address rather than a wallet.
-    expect(root.querySelector('.nwc-card')).toBeNull();
-    expect(root.querySelector('#nwc-connect')).toBeNull();
-    expect(root.querySelector('#monero-address-section')).toBeTruthy();
-    expect(root.querySelector('.payment-mode-card[open]')).toBeTruthy();
-    expect(root.querySelector('#open-nwc-zap')).toBeNull();
-
-    pick('lightning');
+    flip(false);
     await vi.waitFor(() => expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false));
-    expect(selected()).toBe('Lightning zaps');
-    expect(root.querySelector('.nwc-card')).toBeTruthy();
-    expect(root.querySelector('#nwc-connect')).toBeTruthy();
-    expect(root.querySelector('#monero-address-section')).toBeNull();
-    expect(root.querySelector('#open-nwc-zap')).toBeTruthy();
+    expect(shell.state.settings.paymentMode).toBe('off');
+    expect(body().hidden).toBe(true);
+    expect(chipMark()).toBeNull();
+
+    expect(root.querySelector('.monero-tips-card')).toBe(card);
+    expect(shell.renders.rebuilds).toBe(before);
+    // Supporting Workstr is not creator tipping and did not move with the switch.
+    expect(root.querySelector('.support-panel')).toBeTruthy();
+    expect(root.querySelector('.settings-page')?.textContent).not.toMatch(/Zap|Lightning|NWC/);
     localStorage.removeItem('workstr.currentPubkey');
+    await drainBoot(shell);
   });
 
   // A live session keeps state nothing but the DOM has: the reps and load typed into the
@@ -725,15 +723,12 @@ describe('shell', () => {
     authorProfiles: {},
     store: null,
     settings: { unit: 'kg', publicRelays: [] },
-    support: { status: 'idle', receipts: [] },
-    nwc: { active: false, status: 'idle' },
     monero: { status: 'idle', address: '' },
     signerType: 'local',
     view: 'exercises',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     exercises: [],
     programs: [],
-    programZapAttempts: [],
     activeSession: null,
     finishedSessions: [],
     publishingSessionId: null,
@@ -802,26 +797,26 @@ describe('shell', () => {
     expect(chip).not.toContain('<img class="connection-avatar"');
   });
 
-  it('marks the account pill with the Lightning rail by default', () => {
+  it('leaves the account pill unmarked while Monero tips are off', () => {
     const chip = accountChip(shellMarkup(signedIn()));
 
-    expect(chip).toContain('class="connection-payment-mark" role="img" aria-label="Lightning payments"');
-    expect(chip).toContain('title="Lightning payment mode"');
-    expect(chip).toContain('₿');
+    expect(chip).not.toContain('connection-payment-mark');
     expect(chip).not.toContain('monero-mark');
-    // Informational only: the pill stays one button, so no nested control appears.
-    expect(chip).not.toContain('<button');
-    // The rail sits between the name and the chevron.
-    expect(chip.indexOf('connection-payment-mark')).toBeLessThan(chip.indexOf('connection-chip-chevron'));
+    expect(chip).not.toContain('₿');
+    expect(chip).toContain('connection-identity-status');
   });
 
-  it('swaps the account pill to the Monero rail without changing its structure', () => {
+  it('marks the account pill once Monero tips are on, without changing its structure', () => {
     const chip = accountChip(shellMarkup(signedIn({ settings: { unit: 'kg', publicRelays: [], paymentMode: 'monero' } })));
 
-    expect(chip).toContain('class="connection-payment-mark" role="img" aria-label="Monero payments"');
-    expect(chip).toContain('title="Monero payment mode"');
+    expect(chip).toContain('class="connection-payment-mark" role="img" aria-label="Monero tips on"');
+    expect(chip).toContain('title="Monero tips on"');
     expect(chip).toContain('monero-mark');
     expect(chip).not.toContain('₿');
+    // Informational only: the pill stays one button, so no nested control appears.
+    expect(chip).not.toContain('<button');
+    // The medallion sits between the name and the chevron.
+    expect(chip.indexOf('connection-payment-mark')).toBeLessThan(chip.indexOf('connection-chip-chevron'));
     // Same component, same identity badge — only the rail changed.
     expect(chip).toContain('connection-identity-status');
     expect(chip).toContain('class="connection-avatar-wrap"');
@@ -847,15 +842,12 @@ describe('shell', () => {
       authorProfiles: {},
       store: null,
       settings: { unit: 'kg', publicRelays: [] },
-      support: { status: 'idle', receipts: [] },
-      nwc: { active: false, status: 'idle' },
       monero: { status: 'idle', address: '' },
       signerType: 'local',
       view: 'settings',
       subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
       exercises: [],
       programs: [],
-      programZapAttempts: [],
       activeSession: null,
       finishedSessions: [
         { id: 1, sheetName: 'A', startedAt: '2026-08-01T10:00:00', finishedAt: '2026-08-01T10:30:00', exercises: [], sets: [] },

@@ -26,8 +26,7 @@ function blocked(kind: string, target: unknown): Error {
   );
 }
 
-// Loopback is a test standing up its own server - the NWC mock wallet does exactly this -
-// and is the opposite of the problem: it is deterministic and shuts down with the test.
+// Loopback is a test standing up its own server, and is the opposite of the problem: it is deterministic and shuts down with the test.
 function isLoopback(url: string): boolean {
   return /^(wss?|https?):\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(url);
 }

@@ -215,7 +215,7 @@ describe('sheetToProgram', () => {
     expect(card).not.toContain('~');
   });
   it('adds a local program Publish action that stays available for locked users', () => {
-    const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets: [baseSheet], finishedSessions: [], pubkey: null, profilePicture: null, programZapAttempts: [] } as unknown as AppState);
+    const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets: [baseSheet], finishedSessions: [], pubkey: null, profilePicture: null } as unknown as AppState);
     expect(card).toContain('data-publish-program="local:7"');
     expect(card).toContain('>Publish</button>');
     // Available, but not the lead action while Beast Mode is locked.
@@ -223,7 +223,7 @@ describe('sheetToProgram', () => {
   });
   it('marks the local Publish action primary when Beast Mode is unlocked', () => {
     const completed = [1, 2, 3, 4, 5].map((id) => ({ id, sheetName: `S${id}`, startedAt: `2026-08-0${Math.min(id, 3)}T10:00:00`, finishedAt: `2026-08-0${Math.min(id, 3)}T10:30:00`, exercises: [], sets: [] }));
-    const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets: [baseSheet], finishedSessions: completed, pubkey: 'f'.repeat(64), profilePicture: 'https://example.com/avatar.png', programZapAttempts: [] } as unknown as AppState);
+    const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets: [baseSheet], finishedSessions: completed, pubkey: 'f'.repeat(64), profilePicture: 'https://example.com/avatar.png' } as unknown as AppState);
     expect(card).toContain('button primary small');
     expect(card).toContain('data-publish-program="local:7"');
   });
@@ -231,16 +231,15 @@ describe('sheetToProgram', () => {
     expect(sheetToProgram(baseSheet).sourceLabel).toBe('local');
     expect(sheetToProgram({ ...baseSheet, nostr_address: 'workstr:program:push-day' }).sourceLabel).toBe('in library');
   });
-  it('keeps the imported program author pubkey so creator zaps are discoverable locally', () => {
+  it('keeps the imported program author pubkey', () => {
     const pubkey = 'f'.repeat(64);
     const imported = { ...baseSheet, nostr_address: `33402:${pubkey}:workstr:program:push-day`, nostr_pubkey: pubkey };
     const program = sheetToProgram(imported);
-    const card = programCard(program, { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: program.address, sheets: [imported], programZapAttempts: [] } as unknown as AppState);
+    const card = programCard(program, { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: program.address, sheets: [imported] } as unknown as AppState);
     expect(program.pubkey).toBe(pubkey);
-    expect(card).toContain('program-zap-cta');
-    expect(card).toContain('program-zap-icon');
-    expect(card).toContain('program-zap-label');
-    expect(card).toContain('>Zap</span>');
+    // With Monero tips off a card carries no payment action at all.
+    expect(card).not.toContain('program-zap-cta');
+    expect(card).not.toContain('monero-tip-cta');
   });
 });
 

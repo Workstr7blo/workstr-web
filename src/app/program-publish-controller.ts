@@ -3,7 +3,7 @@ import type { SheetDraft, SheetWithExercises } from '../db/store';
 import { beastModeEligibility, beastModeLockedMarkup } from '../features/sheets/beast-mode';
 import { creatorProgramDTag, publishCreatorProgram } from '../nostr/program-publish';
 import type { PublishCreatorProgramResult } from '../nostr/program-publish';
-import { redactNwcSecrets } from '../nostr/nwc';
+import { redactSecrets } from '../nostr/secret-redaction';
 import type { Signer } from '../signer/types';
 import type { AppState } from './state';
 
@@ -83,7 +83,7 @@ export function createProgramPublishController(ctx: ProgramPublishControllerCont
       const relayCount = result.okRelays.length;
       toast(`Published ${sheet.name} to ${relayCount} public relay${relayCount === 1 ? '' : 's'}${result.confirmed ? ' and confirmed.' : '.'}`, 'ok');
     } catch (error) {
-      const message = redactNwcSecrets(error instanceof Error ? error.message : String(error || 'Program publish failed.'));
+      const message = redactSecrets(error instanceof Error ? error.message : String(error || 'Program publish failed.'));
       toast(message || 'Program publish failed.', 'bad');
     }
   }

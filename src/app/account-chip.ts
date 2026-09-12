@@ -37,17 +37,16 @@ export function avatarFace(className: string, identity: AccountIdentity): string
   return `<img class="${className}" src="${html(identity.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="${className} fallback" hidden>${html(identity.initial)}</span>`;
 }
 
-// The badge on the avatar answers "is my identity connected"; the medallion answers "which
-// rail pays creators". Signed out, the rail is not actionable and the chip already carries
-// a second line, so only the badge is dropped.
+// The badge on the avatar answers "is my identity connected"; the medallion answers "are
+// Monero tips on". Off, there is no payment to mark, so the chip carries no medallion at all.
+// Signed out, tips are not actionable and the chip already carries a second line.
 function badge(identity: AccountIdentity): string {
   return identity.signedIn ? '<span class="connection-identity-status" role="img" aria-label="Signed in"></span>' : '';
 }
 
 function paymentMark(identity: AccountIdentity): string {
-  if (!identity.signedIn) return '';
-  const label = identity.monero ? 'Monero payments' : 'Lightning payments';
-  return `<span class="connection-payment-mark" role="img" aria-label="${label}" title="${identity.monero ? 'Monero' : 'Lightning'} payment mode">${identity.monero ? moneroMark(13) : '₿'}</span>`;
+  if (!identity.signedIn || !identity.monero) return '';
+  return `<span class="connection-payment-mark" role="img" aria-label="Monero tips on" title="Monero tips on">${moneroMark(13)}</span>`;
 }
 
 function chipStatus(identity: AccountIdentity): string {

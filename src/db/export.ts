@@ -33,10 +33,9 @@ export async function exportDatabase(db: IDBPDatabase<WorkstrDB>, pubkeyNamespac
   return { schema: EXPORT_SCHEMA, app: 'workstr-web', exportedAt: new Date().toISOString(), pubkeyNamespace, stores };
 }
 
-// The settings row mixes user preferences with device-local state. NWC credentials are
-// intentionally not stored here at all: `src/nostr/nwc-storage.ts` keeps them encrypted
-// in a dedicated secure-storage database. Keep this scrubber for old/dev rows and as a
-// defense-in-depth guard before writing any manual JSON archive.
+// The settings row mixes user preferences with device-local state. A row from a Lightning
+// build also carried local zap history under `nwc`. `WorkstrStore.retireLightningSettings`
+// removes it when a namespace opens; this scrubber keeps an archive clean regardless.
 function exportValue(store: KvStore, value: unknown): unknown {
   if (store !== 'settings' || !value || typeof value !== 'object') return value;
   const copy = { ...(value as Record<string, unknown>) };

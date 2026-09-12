@@ -5,7 +5,7 @@ import { WorkstrStore, type ExerciseDraft } from '../db/store';
 import { LOCAL_NAMESPACE } from '../db/adopt';
 import { downloadExport, parseExport } from '../db/export';
 import { applyStarterSeed } from '../db/seed';
-import { fetchMonthlyZapReceipts } from '../nostr/zaps';
+import { deleteRetiredWalletDatabase } from '../db/retire-lightning';
 import type { Exercise, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { addMonths, dateKeyFromDate, isDateKey, monthKeyOf } from '../core/dates';
@@ -37,7 +37,6 @@ import { migrateLegacyLocalSecret } from '../signer/local-key-storage';
 import { createIdentityController, launchSignerUri } from './identity-controller';
 import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
-import { createNwcController } from './nwc-controller';
 import { createMoneroAddressController } from './monero-address-controller';
 import { createMoneroTipController } from './monero-tip-controller';
 import { createProgramPublishController } from './program-publish-controller';
@@ -45,12 +44,12 @@ import type { ShellHandle, ShellOptions } from './shell-types';
 export { launchSignerUri };
 const SESSION_KEY = 'workstr.currentPubkey';
 const SIGNER_TYPE_KEY = 'workstr.signerType';
-const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'lightning', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
+const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'off', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
 
 function profileName(profile: RelayProfile | null): string | null { return profile?.name?.trim() || profile?.nip05?.trim() || null; }
 
 export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, support: { status: 'idle', receipts: [] }, nwc: { active: false, status: 'idle' }, monero: { status: 'idle', address: '' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], programZapTotals: {}, programZapAttempts: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, monero: { status: 'idle', address: '' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   const trace = createRenderTrace();
   async function boot(): Promise<void> {
@@ -68,6 +67,8 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     // history would otherwise keep the plaintext key on disk forever. Cleanup, so it runs
     // after first paint and a failure is swallowed — the key just stays where it was.
     await migrateLegacyLocalSecret().catch(() => undefined);
+    // Same reasoning for the zap wallet connection a Lightning build may have left behind.
+    await deleteRetiredWalletDatabase();
     if (state.pubkey) await openIdentity(state.pubkey, false);
     else await openLocal();
     render({ reason: 'boot-account-open' });
@@ -113,6 +114,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     // namespace rather than carried into the next account's Settings.
     state.monero = { status: 'idle', address: '' };
     state.store = await WorkstrStore.open(namespace);
+    await state.store.retireLightningSettings();
     state.settings = await state.store.getSettings();
     // A saved kit is the useful default view; without one the option does not
     // exist yet and both grids stay on "All equipment".
@@ -138,10 +140,9 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     state.finishedSessions = await sessionPersistence.loadFinished();
     state.bodyEntries = await state.store.listBody();
     state.sheets = await state.store.listSheets();
-    state.programZapAttempts = await state.store.listWorkoutProgramZapAttempts();
     await catalog.reloadLibrary();
     state.activeSession = await sessionPersistence.loadUnfinished();
-    await nwc.loadConnection(); render({ reason: 'store-reload' }); syncSessionOverlay();
+    render({ reason: 'store-reload' }); syncSessionOverlay();
   }
 
   // Written once. The topbar, the navigation, the scroll pane, the live session overlay,
@@ -153,8 +154,8 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     render({ reason: 'boot-first-paint' });
   }
 
-  // Monero Mode is a token swap, and the tokens are declared on `:root`, so the flag has to
-  // land there too — an override on `body` cannot win against a `:root` declaration.
+  // Monero tips swap the payment tokens, and the tokens are declared on `:root`, so the flag
+  // has to land there too — an override on `body` cannot win against a `:root` declaration.
   function applyPaymentMode(): void {
     if (state.settings.paymentMode === 'monero') document.documentElement.setAttribute('data-payment-mode', 'monero');
     else document.documentElement.removeAttribute('data-payment-mode');
@@ -234,7 +235,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     render({ toTop: true, reason });
     if (view === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
     if (view === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
-    if (view === 'settings') { void preferences.refreshFunding(); moneroAddress.refreshIfNeeded(); }
+    if (view === 'settings') moneroAddress.refreshIfNeeded();
   }
 
   // Everything a page render replaces, rebound with it.
@@ -245,12 +246,21 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     }));
     identity.bindSettingsAuth();
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void preferences.saveUnitPreference((event.target as HTMLSelectElement).value); });
-    root.querySelectorAll('input[name="payment-mode"]').forEach((input) => input.addEventListener('change', (event) => {
-      const rail = event.target as HTMLInputElement;
-      // Picking Monero reveals the payment-address section and makes Discover's authors
-      // worth asking about, so both lookups start once the rerender has landed.
-      if (rail.checked) void preferences.savePaymentMode(rail.value).then(() => { moneroAddress.refreshIfNeeded(); void catalog.refreshAuthorPaymentTargets(); });
-    }));
+    root.querySelector('#monero-tips-toggle')?.addEventListener('change', (event) => {
+      const on = (event.target as HTMLInputElement).checked;
+      // Written in place, not rendered: the switch is already in the position the reader put
+      // it, and a page render would close every other card they have open. What the setting
+      // moves on this page is the payment tokens, the account chip's medallion, and the address
+      // section under the switch. Discover reads the setting when it is next drawn, and its
+      // authors only become worth asking about once tips are on.
+      void preferences.savePaymentMode(on ? 'monero' : 'off').then(() => {
+        applyPaymentMode();
+        updateAccountIdentity(root, accountIdentity(state));
+        moneroAddress.repaint();
+        moneroAddress.refreshIfNeeded();
+        void catalog.refreshAuthorPaymentTargets();
+      });
+    });
     root.querySelectorAll('.equip-toggle').forEach((box) => box.addEventListener('change', () => { void preferences.saveOwnedEquipment(); }));
     bindBackupCard();
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void catalog.refreshExercises(); }));
@@ -282,7 +292,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       state.expandedSessionId = state.expandedSessionId === id ? null : id;
       render();
     }));
-    bindHistoryCalendar(); nwc.bind(); moneroAddress.bind();
+    bindHistoryCalendar(); moneroAddress.bind();
     preferences.bindRecoveryControls();
     preferences.bindBodyControls();
   }
@@ -336,7 +346,6 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     persistCanonCache: catalog.persistCanonCache, loadFinishedSessions: sessionPersistence.loadFinished, getActiveSigner: identity.getActiveSigner
   });
   const preferences = createPreferencesController({ root, state, render, toast, startTrainingSession: sessionRunner.startTrainingSession, loadFinishedSessions: sessionPersistence.loadFinished });
-  const nwc = createNwcController({ root, state, render, toast, openModal, closeModal, getSigner: identity.getActiveSigner, refreshFunding: preferences.refreshFunding, refreshProgramZapTotals: catalog.refreshProgramZapTotals });
   const moneroAddress = createMoneroAddressController({ root, state, toast, getSigner: identity.getActiveSigner });
   const moneroTip = createMoneroTipController({ root, state, toast, openModal });
   const programList = createProgramList({
@@ -345,8 +354,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     importProgram: (program, button) => catalog.importProgram(program, button),
     openBuilder: (sheet) => { void programBuilder.open(sheet); },
     bindPublish: programPublish.bind,
-    bindTip: moneroTip.bind,
-    bindZap: nwc.bindProgramCards
+    bindTip: moneroTip.bind
   });
   const backup = createBackupController({ root, state, render, toast, getSigner: identity.getActiveSigner, onSignerStalled: identity.dropActiveSigner, onRestored: () => { void refreshFromStore(); }, requestSignIn: () => { identity.startAccountChoice(); }, bindCard: bindBackupCard });
 

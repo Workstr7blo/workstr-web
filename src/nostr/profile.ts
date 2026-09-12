@@ -24,8 +24,6 @@ export function parseProfileEvent(pubkey: string, event: SignedNostrEvent): Rela
       name: text('display_name', 'displayName', 'name', 'username', 'nip05'),
       picture: text('picture', 'image', 'avatar'),
       nip05: text('nip05'),
-      lud16: text('lud16'),
-      lud06: text('lud06'),
       createdAt: event.created_at
     };
   } catch {

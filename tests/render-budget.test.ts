@@ -18,10 +18,6 @@ import { WorkstrStore } from '../src/db/store';
 // with the same content and still have thrown away the image the reader was looking at,
 // the modal they had open, or the set they were typing. Appearance would pass that. Node
 // identity is the only assertion that fails it.
-vi.mock('../src/nostr/zaps', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../src/nostr/zaps')>(),
-  fetchMonthlyZapReceipts: vi.fn(async () => [])
-}));
 vi.mock('../src/nostr/canon', async (importOriginal) => ({
   ...await importOriginal<typeof import('../src/nostr/canon')>(),
   fetchCanonExercises: vi.fn(async () => []),
@@ -31,6 +27,8 @@ vi.mock('../src/nostr/profile', async (importOriginal) => ({
   ...await importOriginal<typeof import('../src/nostr/profile')>(),
   fetchProfile: vi.fn(async () => null)
 }));
+
+const addressSettled = (shell: ShellHandle): boolean => shell.state.monero.status === 'ready' || shell.state.monero.status === 'error';
 
 async function drainBoot(shell: ShellHandle): Promise<void> {
   await shell.ready;
@@ -107,17 +105,17 @@ describe('the render budget', () => {
     await cleanup(shell);
   });
 
-  // Reading the zap receipts starts when Settings opens and answers twice - once to say it
-  // is reading, once with the month. Both used to redraw the page the reader was on.
-  it('draws the funding answer without rendering the page', async () => {
+  // Reading the user's own Monero address starts when Settings opens, tips on or off, and
+  // answers a moment later into the card rather than through a page render.
+  it('draws the address lookup without rendering the page', async () => {
     localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     const { root, shell } = await boot();
     root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
     const before = shell.renders.rebuilds;
-    await waitFor(() => shell.state.support.status === 'ready', 'the funding answer');
+    await waitFor(() => addressSettled(shell), 'the address lookup');
 
     expect(shell.renders.rebuilds).toBe(before);
-    expect(root.querySelector('.support-panel #support-funding')).toBeTruthy();
+    expect(root.querySelector('.monero-tips-card #monero-address-section')).toBeTruthy();
     localStorage.removeItem('workstr.currentPubkey');
     await drainBoot(shell);
   });
@@ -131,7 +129,7 @@ describe('the render budget', () => {
     localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     const { root, shell } = await boot();
     root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
-    await waitFor(() => shell.state.support.status === 'ready', 'the funding answer');
+    await waitFor(() => addressSettled(shell), 'the address lookup');
     const card = root.querySelector<HTMLDetailsElement>('.data-sync-card')!;
     card.open = true;
     const before = shell.renders.rebuilds;
@@ -162,7 +160,7 @@ describe('the render budget', () => {
     document.body.innerHTML = '<div id="app"></div>';
     const store = await WorkstrStore.open(LOCAL_NAMESPACE);
     await store.upsertExercise({ slug: 'db-row', name: 'Dumbbell Row', muscles: ['back'], equipment: ['Dumbbells'], tags: [], instructions: [], favourite: false, source_type: 'manual', status: 'active' });
-    await store.saveSettings({ unit: 'kg', paymentMode: 'lightning', publicRelays: [], ownedEquipment: [] });
+    await store.saveSettings({ unit: 'kg', paymentMode: 'off', publicRelays: [], ownedEquipment: [] });
     store.close();
     const { root, shell } = await boot();
     root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
@@ -266,7 +264,7 @@ describe('what a background answer must not replace', () => {
 
   // What `settings-disclosure.ts` used to capture and put back. The category stays open
   // because nothing threw it away, not because something reopened it.
-  it('leaves an open Settings category open while the funding answer lands', async () => {
+  it('leaves an open Settings category open while the address lookup lands', async () => {
     localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     const { root, shell } = await boot();
     root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
@@ -274,7 +272,7 @@ describe('what a background answer must not replace', () => {
     account.open = true;
     const support = root.querySelector<HTMLDetailsElement>('.support-panel')!;
 
-    await waitFor(() => shell.state.support.status === 'ready', 'the funding answer');
+    await waitFor(() => addressSettled(shell), 'the address lookup');
 
     expect(root.querySelector('.account-card')).toBe(account);
     expect(account.open).toBe(true);

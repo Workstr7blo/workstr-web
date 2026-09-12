@@ -2,7 +2,7 @@
 // is never written to Workstr settings, JSON export, sync records, logs, or error
 // messages, and as of this module it is no longer written to localStorage either.
 //
-// Same platform pattern as `nostr/nwc-storage.ts`: browsers give a PWA no Keychain or
+// The usual pattern for a PWA secret: browsers give a PWA no Keychain or
 // Keystore, so the closest available thing is a non-extractable AES-GCM CryptoKey held by
 // IndexedDB structured clone, with only ciphertext kept beside it in a dedicated
 // origin-private database.

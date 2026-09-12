@@ -1,11 +1,10 @@
-import { normalizePaymentMode } from '../core/types';
 import {
   fetchPaymentTargetsEvent,
   looksLikeMoneroAddress,
   parseMoneroPaymentTarget,
   publishMoneroPaymentTarget
 } from '../nostr/payment-targets';
-import { moneroAddressBody, moneroAddressValue, type MoneroAddressState } from '../features/support/payment-mode-views';
+import { moneroAddressBody, moneroAddressValue, moneroAddressVisible, moneroTipsCopy, type MoneroAddressState } from '../features/support/payment-mode-views';
 import type { Signer } from '../signer/types';
 import type { AppState } from './state';
 
@@ -42,10 +41,6 @@ function reason(error: unknown): string {
 export function createMoneroAddressController(ctx: MoneroAddressControllerContext) {
   const { root, state, toast, getSigner } = ctx;
 
-  function moneroMode(): boolean {
-    return normalizePaymentMode(state.settings.paymentMode) === 'monero';
-  }
-
   function set(next: Partial<MoneroAddressState>): void {
     state.monero = { ...state.monero, ...next };
     paint();
@@ -53,15 +48,24 @@ export function createMoneroAddressController(ctx: MoneroAddressControllerContex
 
   // Repainted in place rather than through the shell render: a full render rebuilds the
   // Settings page and closes the very category the user is reading the result in.
+  //
+  // The section shows while tips are on, and while tips are off only for an address that is
+  // still published - so a lookup answering, a removal succeeding and the switch moving can
+  // each show or hide it, and the line under the switch changes with it.
   function paint(): void {
+    const body = root.querySelector<HTMLElement>('#monero-tips-body');
+    if (body) body.hidden = !moneroAddressVisible(state);
+    const copy = root.querySelector('#monero-tips-copy');
+    if (copy) copy.textContent = moneroTipsCopy(state);
     const host = root.querySelector('#monero-address-section');
     if (!host) return;
     host.innerHTML = moneroAddressBody(state.monero, Boolean(state.pubkey));
     bind();
   }
 
+  // Read with tips off as well as on. An address published while tips were on stays public
+  // when they are switched off, and the card can only offer to remove it once it knows.
   async function refresh(): Promise<void> {
-    if (!moneroMode()) return;
     if (!state.pubkey) { set({ status: 'idle', address: '', draft: undefined, event: undefined, message: SIGN_IN_FIRST, messageKind: undefined }); return; }
     if (state.monero.status === 'loading' || state.monero.status === 'saving') return;
     const pubkey = state.pubkey;
@@ -77,15 +81,15 @@ export function createMoneroAddressController(ctx: MoneroAddressControllerContex
     }
   }
 
-  // The first visit to Settings in Monero Mode loads the address; after that only the
-  // Refresh button asks the relays again.
+  // The first visit to Settings loads the address; after that only the Refresh button asks the
+  // relays again.
   function refreshIfNeeded(): void {
-    if (!moneroMode() || !state.pubkey || state.monero.status !== 'idle') return;
+    if (!state.pubkey || state.monero.status !== 'idle') return;
     void refresh();
   }
 
+  // Allowed with tips off: that is how an address left published gets removed.
   async function save(): Promise<void> {
-    if (!moneroMode()) return;
     if (!state.pubkey) { set({ message: SIGN_IN_FIRST, messageKind: 'bad' }); toast('Sign in to publish a Monero address', 'bad'); return; }
     if (state.monero.status === 'loading' || state.monero.status === 'saving') return;
     const field = root.querySelector<HTMLInputElement>('#monero-address');
@@ -145,5 +149,5 @@ export function createMoneroAddressController(ctx: MoneroAddressControllerContex
     root.querySelector('#monero-address-refresh')?.addEventListener('click', () => { void refresh(); });
   }
 
-  return { bind, refresh, refreshIfNeeded, save };
+  return { bind, refresh, refreshIfNeeded, repaint: paint, save };
 }

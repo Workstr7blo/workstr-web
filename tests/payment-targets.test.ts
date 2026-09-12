@@ -72,15 +72,15 @@ function pool(outcomes: Record<string, string | Error> = {}, fallback: string | 
 }
 
 describe('module boundaries', () => {
-  it('never reaches for local storage, the database or the wallet credential store', async () => {
+  it('never reaches for local storage or the database', async () => {
     // The address is public Nostr metadata whose source of truth is the signed kind:10133
-    // event. Persisting it as Workstr state — encrypted sync, workout records, or the NWC
-    // secret store — would create a second, authoritative-looking copy that can drift.
+    // event. Persisting it as Workstr state — encrypted sync or workout records —
+    // would create a second, authoritative-looking copy that can drift.
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(__dirname, '../src/nostr/payment-targets.ts'), 'utf8');
 
-    for (const forbidden of ['nwc-storage', '../db/', '../sync/', 'localStorage', 'sessionStorage', 'indexedDB']) {
+    for (const forbidden of ['../db/', '../sync/', 'localStorage', 'sessionStorage', 'indexedDB']) {
       expect(source, `payment-targets.ts should not reference ${forbidden}`).not.toContain(forbidden);
     }
   });

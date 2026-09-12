@@ -59,7 +59,7 @@ describe('discoverImportState', () => {
   });
 });
 
-// Whose Monero address Discover asks the relays for. The rail decides whether the question
+// Whose Monero address Discover asks the relays for. The Monero tips switch decides whether the question
 // is worth asking at all, and an author is only ever asked about once.
 describe('Discover author payment targets', () => {
   const AUTHOR = 'f'.repeat(64);
@@ -98,9 +98,9 @@ describe('Discover author payment targets', () => {
     return { state, render, renderProgramLists, controller };
   }
 
-  it('asks nothing on the Lightning rail, where no card would use the answer', async () => {
+  it('asks nothing while Monero tips are off, when no card would use the answer', async () => {
     fetchAuthorMoneroPaymentTargetsMock.mockReset();
-    const app = harness('lightning', [program(AUTHOR, 'push')]);
+    const app = harness('off', [program(AUTHOR, 'push')]);
 
     await app.controller.refreshAuthorPaymentTargets();
 

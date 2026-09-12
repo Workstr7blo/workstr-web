@@ -15,8 +15,7 @@ import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from './types';
 //
 // These kinds are the whole surface: 30078 is the encrypted sync record
 // (`src/nostr/codecs30078.ts`), kind 1 the workout summary a user chooses to share
-// (`src/nostr/share.ts`), kind 9734 the NIP-57 zap request a user signs before the app can
-// request a creator invoice, 33402 a published creator program
+// (`src/nostr/share.ts`), 33402 a published creator program
 // (`src/nostr/program-publish.ts`) and 10133 the public payment target
 // (`src/nostr/payment-targets.ts`). Naming them rather than asking for blanket
 // `sign_event` means a signer can show what it is granting, and Workstr cannot quietly
@@ -32,7 +31,6 @@ export const SIGNER_PERMS = [
   'nip44_decrypt',
   `sign_event:${PRIVATE_RECORD_KIND}`,
   'sign_event:1',
-  'sign_event:9734',
   `sign_event:${CREATOR_PROGRAM_KIND}`,
   `sign_event:${PAYMENT_TARGETS_KIND}`
 ];

@@ -83,7 +83,7 @@ describe('buildCreatorProgramEvent', () => {
     });
   });
 
-  it('rejects NWC-like material before public event serialization', () => {
+  it('rejects wallet connection strings and secret keys before public event serialization', () => {
     const unsafeSheets = [
       sheet({ notes: `Do not publish ${NWC_URI}` }),
       sheet({ tags: ['hypertrophy', `secret=${NWC_HEX_SECRET}`] }),
@@ -162,7 +162,7 @@ describe('publishCreatorProgram', () => {
       .rejects.toThrow('no public relay accepted the program');
   });
 
-  it('rejects NWC-like material before signing or publishing', async () => {
+  it('rejects wallet connection strings and secret keys before signing or publishing', async () => {
     const activeSigner = signer();
     const poolFactory = vi.fn<() => ProgramPublishPool>(() => ({
       publish: vi.fn(() => [Promise.resolve('success')]),
