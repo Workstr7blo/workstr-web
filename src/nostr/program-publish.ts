@@ -1,4 +1,6 @@
 import { SimplePool } from 'nostr-tools';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import type { SheetExercise } from '../core/types';
 import { slugify } from '../core/ids';
 import type { SheetWithExercises } from '../db/store';
@@ -77,7 +79,13 @@ export function normalizeProgramPublishRelays(relays: string[] = DEFAULT_PUBLIC_
   return dedupe(relays).filter(isPublicProgramRelay);
 }
 
-export function creatorProgramDTag(sheet: Pick<SheetWithExercises, 'id' | 'slug' | 'name' | 'nostr_address'>): string {
+// What a creator program event is built from. A saved sheet satisfies it, and so does an
+// import plan's draft, which has no slug yet but already carries the address.
+export type PublishableProgram = Pick<SheetWithExercises, 'name' | 'notes' | 'difficulty' | 'tags' | 'blocks'>
+  & Partial<Pick<SheetWithExercises, 'id' | 'slug' | 'nostr_address'>>
+  & { exercises: Array<Omit<SheetExercise, 'id' | 'sheet_id'>> };
+
+export function creatorProgramDTag(sheet: Pick<PublishableProgram, 'id' | 'slug' | 'name' | 'nostr_address'>): string {
   // A program already out under a creator d tag keeps it, so republishing replaces that event
   // even when the local slug differs - your own program imported on another device, say.
   const [kind, , ...rest] = (sheet.nostr_address || '').split(':');
@@ -87,7 +95,7 @@ export function creatorProgramDTag(sheet: Pick<SheetWithExercises, 'id' | 'slug'
   return `${CREATOR_PROGRAM_D_PREFIX}${stable}`;
 }
 
-function exerciseAddress(row: SheetExercise): string {
+function exerciseAddress(row: PublishableProgram['exercises'][number]): string {
   const slug = row.exercise_slug || slugify(row.exercise_name || '') || 'exercise';
   return `workstr:exercise:${slug}`;
 }
@@ -106,7 +114,7 @@ function assertNoSecretMaterial(value: unknown): void {
   }
 }
 
-function assertCreatorProgramPublicFieldsSafe(sheet: SheetWithExercises): void {
+function assertCreatorProgramPublicFieldsSafe(sheet: PublishableProgram): void {
   assertNoSecretMaterial({
     slug: sheet.slug,
     name: sheet.name,
@@ -127,7 +135,7 @@ function assertCreatorProgramPublicFieldsSafe(sheet: SheetWithExercises): void {
   });
 }
 
-function programMeta(sheet: SheetWithExercises): Record<string, unknown> {
+function programMeta(sheet: PublishableProgram): Record<string, unknown> {
   return {
     v: 1,
     description: sheet.notes || '',
@@ -148,8 +156,7 @@ function programMeta(sheet: SheetWithExercises): Record<string, unknown> {
   };
 }
 
-export function buildCreatorProgramEvent(sheet: SheetWithExercises): UnsignedNostrEvent {
-  assertCreatorProgramPublicFieldsSafe(sheet);
+function creatorProgramPayload(sheet: PublishableProgram): Pick<UnsignedNostrEvent, 'tags' | 'content'> {
   const dTag = creatorProgramDTag(sheet);
   const tags = [
     ['d', dTag],
@@ -176,12 +183,20 @@ export function buildCreatorProgramEvent(sheet: SheetWithExercises): UnsignedNos
     ]);
   }
   tags.push(['workstr_meta', JSON.stringify(programMeta(sheet))]);
-  return {
-    kind: CREATOR_PROGRAM_KIND,
-    created_at: Math.floor(Date.now() / 1000),
-    tags,
-    content: sheet.notes || ''
-  };
+  return { tags, content: sheet.notes || '' };
+}
+
+export function buildCreatorProgramEvent(sheet: PublishableProgram): UnsignedNostrEvent {
+  assertCreatorProgramPublicFieldsSafe(sheet);
+  return { kind: CREATOR_PROGRAM_KIND, created_at: Math.floor(Date.now() / 1000), ...creatorProgramPayload(sheet) };
+}
+
+// The public content of a program, without its timestamp. Stored when a publish lands and
+// compared on every render, so an edit that changes nothing the event carries - or a sync
+// that only moves updated_at - does not read as unpublished changes.
+export function creatorProgramFingerprint(sheet: PublishableProgram): string {
+  const { tags, content } = creatorProgramPayload(sheet);
+  return bytesToHex(sha256(utf8ToBytes(JSON.stringify([tags, content]))));
 }
 
 export function summarizeProgramPublishResults(relays: string[], results: PromiseSettledResult<string>[]): ProgramPublishRelayResult[] {

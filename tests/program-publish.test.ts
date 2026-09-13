@@ -3,7 +3,10 @@ import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
 import type { SheetWithExercises } from '../src/db/store';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 import { CREATOR_PROGRAM_D_PREFIX } from '../src/nostr/creator-programs';
-import { buildCreatorProgramEvent, creatorProgramDTag, normalizeProgramPublishRelays, publishCreatorProgram, summarizeProgramPublishResults, type ProgramPublishPool } from '../src/nostr/program-publish';
+import type { Event } from 'nostr-tools';
+import { programFromEvent } from '../src/nostr/canon';
+import { planProgramImport } from '../src/nostr/programImport';
+import { buildCreatorProgramEvent, creatorProgramDTag, creatorProgramFingerprint, normalizeProgramPublishRelays, publishCreatorProgram, summarizeProgramPublishResults, type ProgramPublishPool } from '../src/nostr/program-publish';
 
 const secret = generateSecretKey();
 const pubkey = getPublicKey(secret);
@@ -185,5 +188,30 @@ describe('creatorProgramDTag', () => {
 
   it('uses the slug when the stored address is not a creator program', () => {
     expect(creatorProgramDTag(sheet({ nostr_address: '33402:op:workstr:program:legs' }))).toBe(`${CREATOR_PROGRAM_D_PREFIX}push-day`);
+  });
+});
+
+describe('creatorProgramFingerprint', () => {
+  it('ignores what the event does not carry', () => {
+    const base = sheet();
+    const resaved: SheetWithExercises = { ...base, updated_at: '2026-09-01T00:00:00.000Z', created_at: '2026-08-01T00:00:00.000Z' };
+    expect(creatorProgramFingerprint(resaved)).toBe(creatorProgramFingerprint(base));
+    expect(creatorProgramFingerprint({ ...base, exercises: base.exercises.map((row) => ({ ...row, id: 500, sheet_id: 900 })) })).toBe(creatorProgramFingerprint(base));
+  });
+
+  it('changes with public content', () => {
+    const base = sheet();
+    expect(creatorProgramFingerprint({ ...base, name: 'Pull Day' })).not.toBe(creatorProgramFingerprint(base));
+    expect(creatorProgramFingerprint({ ...base, notes: 'Different.' })).not.toBe(creatorProgramFingerprint(base));
+    expect(creatorProgramFingerprint({ ...base, exercises: base.exercises.map((row) => ({ ...row, sets: 9 })) })).not.toBe(creatorProgramFingerprint(base));
+  });
+
+  it('matches the import snapshot of its own published event', () => {
+    const base = sheet();
+    const event = { ...buildCreatorProgramEvent(base), pubkey, id: 'e'.repeat(64), sig: '' } as Event;
+    const program = programFromEvent(event);
+    expect(program).toBeTruthy();
+    const snapshot = planProgramImport(program!, [], []).sheet;
+    expect(creatorProgramFingerprint(snapshot)).toBe(creatorProgramFingerprint(base));
   });
 });

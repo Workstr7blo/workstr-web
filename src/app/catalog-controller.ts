@@ -3,7 +3,7 @@ import type { Exercise } from '../core/types';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
-import { findOwnedProgramSource, relayProgramIdentity, sheetDraftWithIdentity } from '../nostr/program-ownership';
+import { findOwnedProgramSource, relayBaselineIdentity, sheetDraftWithIdentity } from '../nostr/program-ownership';
 import { fetchAuthorMoneroPaymentTargets } from '../nostr/payment-targets';
 import { discoverImportState } from '../features/discover/views';
 import { moneroMode } from '../features/sheets/monero-tip-view';
@@ -261,7 +261,10 @@ async function importProgram(program: RelayProgram, button: HTMLButtonElement | 
   const ownSource = findOwnedProgramSource(program, sheets, state.pubkey);
   if (ownSource) {
     // A sheet whose address an earlier edit cleared is linked back, never copied.
-    if (!ownSource.nostr_address && ownSource.id) await state.store.saveSheet(sheetDraftWithIdentity(ownSource, relayProgramIdentity(program)), ownSource.id);
+    if (!ownSource.nostr_address && ownSource.id) {
+      const snapshot = planProgramImport(program, state.library, state.discoverExercises).sheet;
+      await state.store.saveSheet(sheetDraftWithIdentity(ownSource, relayBaselineIdentity(program, snapshot)), ownSource.id);
+    }
     state.sheets = await state.store.listSheets();
     render();
     toast('This is your published program. It is already in Programs.');

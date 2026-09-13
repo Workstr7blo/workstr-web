@@ -79,6 +79,9 @@ export interface Sheet {
   nostr_address?: string;
   nostr_event_id?: string;
   nostr_published_at?: ISODateTime;
+  // Fingerprint of the public payload as last published (or, for a publication that
+  // predates it, as first seen). A sheet whose current payload differs has unpublished changes.
+  nostr_published_content_hash?: string;
   // created_at (unix seconds) of the origin canon event this sheet was imported
   // from; newer remote created_at on the same address = update available.
   origin_created_at?: number;

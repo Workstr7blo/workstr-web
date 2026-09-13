@@ -3,7 +3,7 @@ import { normalizeWeightUnit, storeWeightInput } from '../core/units';
 import type { SheetWithExercises } from '../db/store';
 import { builderRowsMarkup } from '../features/sheets/builder-views';
 import { emomBlocksFromBuilder, PROGRAM_GOALS, programDisplayTags, selectedProgramGoals, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
-import { ownsPublishedSheet, publicationIdentity, type PublicationIdentity } from '../nostr/program-ownership';
+import { editablePublicationIdentity, type PublicationIdentity } from '../nostr/program-ownership';
 import { html } from './format';
 import type { AppState } from './state';
 
@@ -67,7 +67,7 @@ export function createProgramBuilder(ctx: ProgramBuilderContext): ProgramBuilder
 
 async function open(sheet: SheetWithExercises | null = null): Promise<void> {
   if (!state.store) { toast('Sign in to create programs.', 'bad'); return; }
-  publication = sheet && ownsPublishedSheet(sheet, state.pubkey) ? publicationIdentity(sheet) : {};
+  publication = sheet ? editablePublicationIdentity(sheet, state.pubkey) : {};
   // Programs are built from the user's library only, never the relay catalog.
   const library = await state.store.listExercises();
   const emomBlocks = sheet?.blocks?.filter((block) => block.type === 'emom') || [];

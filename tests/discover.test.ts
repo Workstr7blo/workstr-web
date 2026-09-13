@@ -195,6 +195,8 @@ describe('importing your own published program', () => {
       nostr_pubkey: ME,
       nostr_address: relay.address,
       nostr_event_id: relay.eventId,
+      // The relay copy is the baseline, so the local edit reads as unpublished changes.
+      nostr_published_content_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
       origin_created_at: relay.createdAt,
       exercises: [expect.objectContaining({ exercise_slug: 'burpee', sets: 10 })]
     }), 4);

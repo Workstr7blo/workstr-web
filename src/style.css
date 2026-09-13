@@ -346,6 +346,7 @@
 .monero-tip-cta .monero-tip-label { display: inline-block; line-height: 1; letter-spacing: .01em; }
 .diff-badge.inline { position: static; display: inline-flex; align-items: center; padding: 4px 7px; }
 .program-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.program-status.changed { color: var(--accent-soft); border-color: rgba(var(--accent-line-rgb), .45); }
 .program-tag-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; max-width: 230px; }
 .program-tag-grid .tag-pill { min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workout-card-author { margin-top: 8px; display: flex; align-items: center; gap: 8px; max-width: 230px; }

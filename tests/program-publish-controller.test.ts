@@ -11,6 +11,7 @@ const { publishCreatorProgramMock } = vi.hoisted(() => ({
 
 vi.mock('../src/nostr/program-publish', () => ({
   creatorProgramDTag: (sheet: SheetWithExercises) => `workstr:beastmode:program:${sheet.slug}`,
+  creatorProgramFingerprint: (sheet: SheetWithExercises) => `fingerprint:${sheet.name}`,
   publishCreatorProgram: publishCreatorProgramMock
 }));
 
@@ -155,6 +156,7 @@ describe('createProgramPublishController', () => {
       nostr_pubkey: 'pubkey',
       nostr_address: '33402:pubkey:workstr:beastmode:program:push-day',
       nostr_event_id: 'event123',
+      nostr_published_content_hash: 'fingerprint:Push Day',
       origin_created_at: 1780000000
     }), 7);
     expect(appState.sheets).toBe(savedSheets);

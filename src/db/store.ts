@@ -26,6 +26,7 @@ export interface SheetDraft {
   nostr_address?: string;
   nostr_event_id?: string;
   nostr_published_at?: string;
+  nostr_published_content_hash?: string;
   origin_created_at?: number;
   exercises: Omit<SheetExercise, 'id' | 'sheet_id'>[];
 }
@@ -187,6 +188,7 @@ export class WorkstrStore extends SyncAwareStore {
       nostr_address: draft.nostr_address,
       nostr_event_id: draft.nostr_event_id,
       nostr_published_at: draft.nostr_published_at,
+      nostr_published_content_hash: draft.nostr_published_content_hash,
       origin_created_at: draft.origin_created_at,
       created_at: existing?.created_at ?? now,
       updated_at: now
