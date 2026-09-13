@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Programs you publish now say whether public relays have your latest version. A program
+  card reads Published while nothing has changed, and Unpublished changes with a Publish
+  update button once you edit it; in Discover your own programs read Yours, or Yours ·
+  Unpublished changes. Only changes to what the published program carries count, so syncing
+  or reopening a program without editing it does not mark it changed. Deleting a published
+  program now says that it removes it from this device only and the published copy stays on
+  public relays.
+
 - Sign in on a new device by scanning a QR code from a device already signed in. Open
   Account on the new device and choose Scan code from another device; on the device you
   already use, open Settings and press Add device. The code holds no private key, expires
@@ -50,9 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dropped the program's link to what you had published, so Discover offered your own program
   back as an import, and taking it added a second card to Programs. Edits now keep the link,
   Publish replaces the program you already published instead of starting another, and Discover
-  shows your own programs as In library. Pressing Import on one you edited before this fix
-  links it back to your copy rather than adding a new one. Duplicates made before the fix are
-  not removed yet: delete the copy marked In library and your original takes its place.
+  marks your own programs Yours instead of offering Import. A duplicate made before the fix is
+  folded away the next time you open the app signed in: your original program keeps its
+  content and takes over the published link, and the imported copy is removed. Workstr only
+  does this when the copy is unmistakably your own program imported back; anything less
+  certain is left for you to delete.
 
 - Encrypted sync now points at the Workstr relay's current AirVPN forwarded port `58956`.
 

@@ -13,6 +13,7 @@ import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonProgra
 import type { RelayProfile } from '../nostr/pool';
 import { fetchProfile, profileRelays, readCachedProfile, writeCachedProfile } from '../nostr/profile';
 import { planProgramImport, programImportState } from '../nostr/programImport';
+import { repairOwnedProgramDuplicates } from '../nostr/program-ownership';
 import type { ActiveSession, AppState, SubView, View } from './state';
 import { EX_PLACEHOLDER, exerciseImage, exerciseSourceLabel, filterExercises, formatMinutes, html } from './format';
 import { accountIdentity, updateAccountIdentity } from './account-chip';
@@ -125,6 +126,9 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     // Backfills the starter programs on a fresh namespace, and is a no-op
     // afterwards. Also retires any pre-seed bundled rows on first run.
     if ((await applyStarterSeed(state.store)).applied) state.settings = await state.store.getSettings();
+    // Folds away a copy of the user's own program imported back beside its source (#221).
+    // Deterministic, so every device reaches the same result without syncing the repair.
+    await repairOwnedProgramDuplicates(state.store, state.pubkey);
     catalog.primeFromCache();
     await refreshFromStore();
     // Last: the engine attaches a change listener to this store, and every load step

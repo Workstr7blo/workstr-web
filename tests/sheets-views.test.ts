@@ -8,6 +8,8 @@ import type { RelayProgram, RelayProgramExercise } from '../src/nostr/canon';
 import type { SheetWithExercises } from '../src/db/store';
 import type { AppState } from '../src/app/state';
 import { displayPubkey } from '../src/app/format';
+import { programActions } from '../src/features/sheets/program-actions';
+import { creatorProgramFingerprint } from '../src/nostr/program-publish';
 
 function ex(partial: Partial<Exercise>): Exercise {
   return {
@@ -345,5 +347,67 @@ describe('programBody mixed programs', () => {
     expect(body).not.toContain('Strength ·');
     expect(body).not.toContain('EMOM');
     expect(body).toContain('3 × 8');
+  });
+});
+
+describe('publication status on program cards', () => {
+  const ME = 'a'.repeat(64);
+  const address = `33402:${ME}:workstr:beastmode:program:push-day`;
+  const source: SheetWithExercises = {
+    id: 7, slug: 'push-day', name: 'Push Day', notes: '', difficulty: 'advanced', tags: [], is_temporary: false,
+    created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    exercises: [{ sheet_id: 7, exercise_slug: 'bench', exercise_name: 'Bench Press', position: 0, sets: 4, reps: 8, rest: 120, weight: 60 }]
+  };
+  const publishedSheet = (): SheetWithExercises => {
+    const linked = { ...source, nostr_pubkey: ME, nostr_address: address, nostr_event_id: 'e'.repeat(64) };
+    return { ...linked, nostr_published_content_hash: creatorProgramFingerprint(linked) };
+  };
+  const appState = (sheet: SheetWithExercises) => ({
+    exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets: [sheet], finishedSessions: [], pubkey: ME, profilePicture: null
+  } as unknown as AppState);
+  const relay = (pubkey = ME): RelayProgram => ({
+    slug: 'push-day', name: 'Push Day', description: '', tags: [], exercises: [], sourceLabel: 'creator',
+    eventId: 'f'.repeat(64), pubkey, address: `33402:${pubkey}:workstr:beastmode:program:push-day`, createdAt: 1
+  });
+
+  it('shows a never-published program as local with Publish', () => {
+    const card = programCard(sheetToProgram(source), appState(source));
+    expect(card).toContain('program-status local">local<');
+    expect(card).toContain('>Publish</button>');
+  });
+
+  it('shows an unchanged publication as published with no publish action', () => {
+    const sheet = publishedSheet();
+    const card = programCard(sheetToProgram(sheet), appState(sheet));
+    expect(card).toContain('program-status published">Published<');
+    expect(card).toContain('disabled>Published</button>');
+    expect(card).not.toContain('data-publish-program');
+    expect(card).toContain('data-edit-sheet="7"');
+    expect(card).toContain('data-del-sheet="7"');
+  });
+
+  it('shows an edited publication as unpublished changes with Publish update', () => {
+    const sheet = { ...publishedSheet(), name: 'Push Day Heavy' };
+    const card = programCard(sheetToProgram(sheet), appState(sheet));
+    expect(card).toContain('program-status changed">Unpublished changes<');
+    expect(card).toContain('data-publish-program="local:7"');
+    expect(card).toContain('>Publish update</button>');
+  });
+
+  it('keeps someone else import labelled in library', () => {
+    const other = 'b'.repeat(64);
+    const sheet = { ...source, nostr_pubkey: other, nostr_address: `33402:${other}:workstr:beastmode:program:push-day` };
+    expect(programCard(sheetToProgram(sheet), appState(sheet))).toContain('program-status local">in library<');
+  });
+
+  it('marks the user own relay program as Yours in Discover, never Import', () => {
+    const actions = programActions(relay(), appState(publishedSheet()));
+    expect(actions).toContain('disabled>Yours</button>');
+    expect(actions).not.toContain('Import');
+    expect(programActions(relay(), appState({ ...publishedSheet(), notes: 'edited' }))).toContain('disabled>Yours · Unpublished changes</button>');
+  });
+
+  it('still offers Import for another author program', () => {
+    expect(programActions(relay('b'.repeat(64)), appState(publishedSheet()))).toContain('>Import</button>');
   });
 });

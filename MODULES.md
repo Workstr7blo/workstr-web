@@ -45,7 +45,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Responsive image delivery for exercise photos | `src/core/media.ts` | `src/features/train/session-hero.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/features/sheets/builder-views.ts`, `src/app/catalog-controller.ts` | `tests/media.test.ts`, `tests/session-runner.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
-| Programs and program builder | `src/app/program-builder.ts`, `src/app/program-publish-controller.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-actions.ts`, `src/features/sheets/beast-mode.ts` | `src/db/store.ts`, `src/nostr/programImport.ts`, `src/nostr/program-publish.ts`, `src/nostr/program-ownership.ts` (whether a program is the user's own publication) | `tests/sheets.test.ts`, `tests/program-ownership.test.ts`, `tests/sheets-views.test.ts`, `tests/beast-mode.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/program-publish-controller.test.ts`, `tests/program-publish.test.ts`, browser verification |
+| Programs and program builder | `src/app/program-builder.ts`, `src/app/program-publish-controller.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-actions.ts`, `src/features/sheets/beast-mode.ts` | `src/db/store.ts`, `src/nostr/programImport.ts`, `src/nostr/program-publish.ts`, `src/nostr/program-ownership.ts` (whether a program is the user's own publication, whether it has unpublished changes, and the load-time repair of a copy imported back beside its source) | `tests/sheets.test.ts`, `tests/program-ownership.test.ts`, `tests/sheets-views.test.ts`, `tests/beast-mode.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/program-publish-controller.test.ts`, `tests/program-publish.test.ts`, browser verification |
 | Programs/Discover browsing chrome: toolbar, filter chips, filter sheet | `src/features/sheets/program-browser.ts`, `src/app/program-browser-controller.ts` | `src/app/layout.ts`, `src/features/sheets/program-labels.ts` | `tests/program-browser.test.ts`, browser verification |
 | Exercise browsing chrome: toolbar, filter chips, filter sheet, selection bar | `src/app/exercise-browser.ts`, `src/app/exercise-browser-controller.ts` | `src/app/format.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts` | `tests/exercise-browser.test.ts`, `tests/equipment-views.test.ts`, browser verification |
 | Writing a result region when a filter changes it, instead of the page | `src/app/browse-surfaces.ts`, `src/app/program-list-controller.ts` | `src/app/catalog-surfaces.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/app/layout.ts` | `tests/shell.test.ts`, browser verification |
@@ -148,8 +148,11 @@ and patch it directly, which is also why a page render can leave it standing.
 - `src/features/sheets/builder-views.ts` renders the builder's row and EMOM-section
   markup from `BuilderState`. It is pure markup; all builder state lives in the
   controller above.
-- `src/features/sheets/program-actions.ts` renders a program card's Start/Publish/Edit/
-  Delete or Import/Update actions. The card's only payment action, the Monero Tip, comes
+- `src/features/sheets/program-actions.ts` renders a program card's status pill and its
+  Start/Publish/Edit/Delete or Import/Update actions. The user's own publication reads
+  Published or Unpublished changes (Publish update) in Programs and Yours in Discover; the
+  state compares `creatorProgramFingerprint` from `src/nostr/program-publish.ts` with the
+  fingerprint stored when the publish landed. The card's only payment action, the Monero Tip, comes
   from `src/features/sheets/monero-tip-view.ts`.
 - `src/features/sheets/beast-mode.ts` owns the objective local Beast Mode eligibility
   helper, compact Settings category summary, and reusable Settings and locked-Publish

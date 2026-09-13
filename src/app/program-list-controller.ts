@@ -1,5 +1,6 @@
 import type { RelayProgram } from '../nostr/canon';
 import type { SheetWithExercises } from '../db/store';
+import { ownsPublishedSheet } from '../nostr/program-ownership';
 import { sheetToProgram } from '../features/sheets/views';
 import type { ProgramBrowser } from '../features/sheets/program-browser';
 import { renderProgramResults, updateProgramFilterSheet } from './browse-surfaces';
@@ -67,7 +68,12 @@ export function createProgramList(ctx: ProgramListContext) {
     }));
     scope.querySelectorAll<HTMLElement>('[data-del-sheet]').forEach((button) => button.addEventListener('click', async (event) => {
       event.stopPropagation();
-      if (!state.store || !window.confirm('Delete this program?')) return;
+      const sheet = state.sheets.find((item) => item.id === Number(button.dataset.delSheet));
+      // Deleting never reaches relays, so a published program must not read as retracted.
+      const prompt = sheet && ownsPublishedSheet(sheet, state.pubkey)
+        ? 'Delete this program from this device? It stays published on public relays and can still appear in Discover.'
+        : 'Delete this program?';
+      if (!state.store || !window.confirm(prompt)) return;
       await state.store.deleteSheet(Number(button.dataset.delSheet) || 0);
       state.sheets = await state.store.listSheets();
       render();

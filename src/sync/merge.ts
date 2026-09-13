@@ -116,6 +116,7 @@ async function applySheet(store: WorkstrStore, record: DecodedPrivateRecord): Pr
     nostr_address: payload.nostr_address,
     nostr_event_id: payload.nostr_event_id,
     nostr_published_at: payload.nostr_published_at,
+    nostr_published_content_hash: payload.nostr_published_content_hash,
     origin_created_at: payload.origin_created_at,
     exercises: (payload.exercises || []).map((row, index) => ({ ...row, position: row.position ?? index }))
   }, existing?.id));

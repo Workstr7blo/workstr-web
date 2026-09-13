@@ -1,6 +1,6 @@
 import { beastModeEligibility, beastModeLockedMarkup } from '../features/sheets/beast-mode';
 import { expectedCreatorProgramAddress, sheetDraftWithIdentity } from '../nostr/program-ownership';
-import { publishCreatorProgram } from '../nostr/program-publish';
+import { creatorProgramFingerprint, publishCreatorProgram } from '../nostr/program-publish';
 import type { PublishCreatorProgramResult } from '../nostr/program-publish';
 import { redactSecrets } from '../nostr/secret-redaction';
 import type { Signer } from '../signer/types';
@@ -48,6 +48,7 @@ export function createProgramPublishController(ctx: ProgramPublishControllerCont
           nostr_address: expectedCreatorProgramAddress(sheet, pubkey),
           nostr_event_id: id,
           nostr_published_at: new Date(publishedAt * 1000).toISOString(),
+          nostr_published_content_hash: creatorProgramFingerprint(sheet),
           origin_created_at: publishedAt
         }), sheet.id);
         state.sheets = await state.store.listSheets();

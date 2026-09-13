@@ -7,7 +7,7 @@ import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 import { programDisplayTags } from './program-labels';
-import { programActions } from './program-actions';
+import { programActions, programStatusBadge } from './program-actions';
 import { moneroMode, moneroTipButton } from './monero-tip-view';
 export { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, inferProgramLabels, programDisplayTags, programSearchTags, selectedProgramGoals } from './program-labels';
 
@@ -253,7 +253,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
   // The Tip action is the card's only payment surface, and only while Monero tips are on.
   // Nothing sits beside it: a Monero transfer leaves no total or ranking Workstr could count.
   const paymentCta = options.showPayment !== false && moneroMode(state) ? moneroTipButton(program, state) : '';
-  const statusCls = isLocalProgram(program) ? 'local' : 'published';
+  const status = programStatusBadge(program, state);
   const fallbackMap = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg>';
   return `<div class="workout-card ${isExpanded ? 'expanded' : ''}" data-program-address="${html(program.address)}">
     <div class="workout-card-header" data-toggle-program="${html(program.address)}">
@@ -265,7 +265,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
         <div class="workout-card-name">${html(program.name)}</div>
         <div class="workout-card-meta">${trainingLabel}</div>
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(' · '))}</div>` : ''}
-        <div class="program-badge-row"><span class="program-status ${statusCls}">${html(program.sourceLabel || 'Workstr')}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(program.difficulty)}</span>` : ''}</div>
+        <div class="program-badge-row"><span class="program-status ${status.cls}">${html(status.label)}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(program.difficulty)}</span>` : ''}</div>
         ${tagPills ? `<div class="program-tag-grid">${tagPills}</div>` : ''}
         ${program.pubkey ? `<div class="workout-card-author">${programAuthorPill(program, state)}</div>` : ''}
       </div>
