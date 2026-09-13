@@ -15,7 +15,7 @@ export interface EmomSessionViewInput {
   timerPhase: EmomTimerPhase | null;
   mixed: boolean;
   expandedInstructions: Set<string>;
-  roundNav(current: EmomSlot, complete: boolean): string;
+  minuteNav(current: EmomSlot, complete: boolean): string;
   weightDisplay(weight: number | string | null | undefined): string;
   unitLabel(): string;
   onStart(): void;
@@ -140,18 +140,17 @@ function nextUp(nextSlot: EmomSlot | undefined, nextStep: TrainingStep | undefin
   return `<div class="emom-next-card">
     <span>Next up</span>
     <strong>${nextStep ? html(nextStep.exerciseName || nextStep.exerciseSlug) : 'Finish session'}</strong>
-    <small>${nextSlot ? `Round ${nextSlot.roundIndex + 1} · ${nextSlot.durationSec}s interval` : 'Workout complete'}</small>
+    <small>${nextSlot ? `Minute ${nextSlot.minuteIndex + 1} · ${nextSlot.durationSec}s interval` : 'Workout complete'}</small>
   </div>`;
 }
 
-// SECTION/ROUND/INTERVAL as fractions rather than "1 of 4" three times over: at a glance
-// mid-effort the numbers are the content, and a single section names nothing.
-function liveMeta(blocks: EmomBlock[], slot: EmomSlot, block: EmomBlock): string {
+// SECTION/MINUTE as fractions rather than "1 of 4" twice over: at a glance mid-effort the numbers
+// are the content, and a single section names nothing. The minute counts within its own section.
+function liveMeta(blocks: EmomBlock[], slot: EmomSlot): string {
   return [
     'EMOM',
     blocks.length > 1 ? `Section ${slot.blockIndex + 1}/${blocks.length}` : '',
-    `Round ${slot.roundIndex + 1}/${block.rounds}`,
-    `Interval ${slot.intervalIndex + 1}/${block.intervals.length}`
+    `Minute ${slot.minuteIndex + 1}/${slot.minuteCount}`
   ].filter(Boolean).join(' · ');
 }
 
@@ -168,15 +167,15 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
   const findExercise = (slug: string | undefined): SessionExercise | undefined =>
     session.exercises.find((candidate) => candidate.exerciseSlug === slug);
   if (position.phase === 'pending') {
-    const rounds = blocks.reduce((total, block) => total + block.rounds, 0);
+    const minutes = Math.ceil(emomDurationSec(schedule) / 60);
     const firstStep = schedule[0]?.steps[0];
-    meta.textContent = `EMOM · ${rounds} round${rounds === 1 ? '' : 's'} · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}`;
+    meta.textContent = `EMOM · ${minutes} min · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}`;
     nav.innerHTML = '';
     body.innerHTML = `${firstStep ? heroMedia(findExercise(firstStep.exerciseSlug), stepName(firstStep, findExercise(firstStep.exerciseSlug))) : ''}
       <div class="emom-transition">
         <span class="emom-transition-label">EMOM next</span>
-        <strong>${rounds} round${rounds === 1 ? '' : 's'} · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}</strong>
-        <small>${Math.ceil(emomDurationSec(schedule) / 60)} min${firstStep ? ` · opens on ${html(stepName(firstStep, findExercise(firstStep.exerciseSlug)))}` : ''}</small>
+        <strong>${minutes} min · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}</strong>
+        <small>${firstStep ? `Opens on ${html(stepName(firstStep, findExercise(firstStep.exerciseSlug)))}` : 'Ready when you are'}</small>
         <p>${input.mixed ? 'Strength section done. ' : ''}The clock starts when you are ready. Actual reps are logged separately from each timed target.</p>
       </div>`;
     footer.innerHTML = '<button class="session-emom-btn" id="emom-start" type="button">Start EMOM</button>';
@@ -185,14 +184,13 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
     return;
   }
   if (position.phase === 'complete' || !position.slot) {
-    const rounds = blocks.reduce((total, block) => total + block.rounds, 0);
     const lastSlot = schedule.at(-1);
     meta.textContent = 'EMOM complete';
-    nav.innerHTML = lastSlot ? input.roundNav(lastSlot, true) : '';
+    nav.innerHTML = lastSlot ? input.minuteNav(lastSlot, true) : '';
     body.innerHTML = `<div class="emom-transition complete">
       <span class="emom-transition-label">EMOM complete</span>
-      <strong>${rounds} round${rounds === 1 ? '' : 's'} completed</strong>
-      <small>${schedule.length} interval${schedule.length === 1 ? '' : 's'} · ${Math.ceil(emomDurationSec(schedule) / 60)} min</small>
+      <strong>${Math.ceil(emomDurationSec(schedule) / 60)} min completed</strong>
+      <small>${schedule.length} interval${schedule.length === 1 ? '' : 's'}</small>
       <p>Review your logged work, then finish the session.</p>
     </div>`;
     footer.innerHTML = '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>';
@@ -200,13 +198,12 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
     return;
   }
   const slot = position.slot;
-  const block = blocks[slot.blockIndex];
   const activeStep = slot.steps[position.activeStepIndex ?? 0] || slot.steps[0];
   const activeExercise = findExercise(activeStep?.exerciseSlug);
   const activeName = activeStep ? stepName(activeStep, activeExercise) : 'EMOM';
   title.textContent = activeName;
-  meta.textContent = liveMeta(blocks, slot, block);
-  nav.innerHTML = input.roundNav(slot, false);
+  meta.textContent = liveMeta(blocks, slot);
+  nav.innerHTML = input.minuteNav(slot, false);
   // A timed interval promotes one movement at a time. With no movement under the clock -
   // a rep-based interval, or the recovery that follows the timed work - every movement in
   // the interval is loggable, so nothing worked through can become unloggable.

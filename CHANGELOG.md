@@ -60,6 +60,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An EMOM section now lasts exactly as long as you set it. A 10-minute section with two moves
+  ran for 20 minutes, because each extra move added another pass through the whole duration.
+  Moves now take turns, one per minute in the order shown, until the section's time is up. The
+  builder asks for the section's total duration, labels each move with its minute, and lets you
+  reorder moves with arrow buttons instead of typing a minute; the remove button is a proper
+  trash icon that no longer overlaps the target on a phone. The live workout counts
+  "Minute 2/10" instead of rounds and intervals. Programs saved before this keep playing for
+  as long as they always did; one that put several moves in the same minute gives each its own
+  minute when you next save it, and the builder says so.
+
 - Updated exercise pictures and details now reach your library, programs and workouts by
   themselves. When the Workstr catalog republishes an exercise, the copy in your library is
   replaced the next time the catalog loads - your favourite stars are kept - so there is no

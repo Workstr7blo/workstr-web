@@ -18,8 +18,8 @@ export interface EmomSessionControllerContext {
   bindSharedControls(): void;
 }
 
-// How many rounds the track shows at once before it pages.
-const ROUND_WINDOW = 5;
+// How many minutes the track shows at once before it pages.
+const MINUTE_WINDOW = 5;
 
 export class EmomSessionController {
   private timer = 0;
@@ -109,7 +109,7 @@ export class EmomSessionController {
       paused: readEmomClock(session).runningSinceMs == null,
       mixed: isMixedSession(session),
       expandedInstructions: this.expandedInstructions,
-      roundNav: (slot, complete) => this.roundNav(schedule, slot, complete),
+      minuteNav: (slot, complete) => this.minuteNav(schedule, slot, complete),
       weightDisplay: this.ctx.weightDisplay,
       unitLabel: this.ctx.unitLabel,
       onStart: () => { unlockCountdownAudio(); void this.start(); },
@@ -162,7 +162,7 @@ export class EmomSessionController {
 
   private shiftRoundWindow(direction: -1 | 1): void {
     this.roundWindowManual = true;
-    this.roundWindowStart += direction * ROUND_WINDOW;
+    this.roundWindowStart += direction * MINUTE_WINDOW;
     this.invalidate();
     this.reconcileClocks();
   }
@@ -261,23 +261,23 @@ export class EmomSessionController {
     return cues;
   }
 
-  // Rounds on the standard session's exercise track: same pip, connector, green done and lit
-  // current, seeking a round instead of jumping an exercise. A long EMOM pages five rounds at
-  // a time rather than shrinking twenty pips into an unreadable row.
-  private roundNav(schedule: EmomSlot[], current: EmomSlot, complete: boolean): string {
-    const rounds = schedule.filter((candidate, index) => candidate.blockIndex === current.blockIndex
-      && schedule.findIndex((slot) => slot.blockIndex === candidate.blockIndex && slot.roundIndex === candidate.roundIndex) === index);
-    const maxStart = Math.max(0, rounds.length - ROUND_WINDOW);
+  // The current section's minutes on the standard session's exercise track: same pip, connector,
+  // green done and lit current, seeking a minute instead of jumping an exercise. A long EMOM pages
+  // five minutes at a time rather than shrinking twenty pips into an unreadable row, and a new
+  // section starts its own count.
+  private minuteNav(schedule: EmomSlot[], current: EmomSlot, complete: boolean): string {
+    const minutes = schedule.filter((candidate) => candidate.blockIndex === current.blockIndex);
+    const maxStart = Math.max(0, minutes.length - MINUTE_WINDOW);
     if (this.roundWindowBlock !== current.blockIndex) { this.roundWindowBlock = current.blockIndex; this.roundWindowManual = false; }
-    if (!this.roundWindowManual) this.roundWindowStart = Math.max(0, Math.min(maxStart, current.roundIndex - 2));
+    if (!this.roundWindowManual) this.roundWindowStart = Math.max(0, Math.min(maxStart, current.minuteIndex - 2));
     this.roundWindowStart = Math.max(0, Math.min(maxStart, this.roundWindowStart));
-    const pips = rounds.slice(this.roundWindowStart, this.roundWindowStart + ROUND_WINDOW).map((candidate) => {
-      const isCurrent = !complete && candidate.roundIndex === current.roundIndex;
-      const cls = isCurrent ? 'current' : complete || candidate.roundIndex < current.roundIndex ? 'done' : '';
+    const pips = minutes.slice(this.roundWindowStart, this.roundWindowStart + MINUTE_WINDOW).map((candidate) => {
+      const isCurrent = !complete && candidate.minuteIndex === current.minuteIndex;
+      const cls = isCurrent ? 'current' : complete || candidate.minuteIndex < current.minuteIndex ? 'done' : '';
       const state = isCurrent ? ', current' : cls === 'done' ? ', done' : '';
-      return `<button class="session-ex-dot ${cls}" data-emom-seek="${candidate.startsAtSec}" type="button" aria-label="Go to round ${candidate.roundIndex + 1} of ${rounds.length}${state}"${isCurrent ? ' aria-current="step"' : ''}><span class="session-ex-pip">${candidate.roundIndex + 1}</span></button>`;
+      return `<button class="session-ex-dot ${cls}" data-emom-seek="${candidate.startsAtSec}" type="button" aria-label="Go to minute ${candidate.minuteIndex + 1} of ${minutes.length}${state}"${isCurrent ? ' aria-current="step"' : ''}><span class="session-ex-pip">${candidate.minuteIndex + 1}</span></button>`;
     }).join('');
-    if (rounds.length <= ROUND_WINDOW) return pips;
-    return `<button class="session-track-arrow" data-emom-window="-1" type="button" aria-label="Show previous rounds" ${this.roundWindowStart === 0 ? 'disabled' : ''}>&lsaquo;</button>${pips}<button class="session-track-arrow" data-emom-window="1" type="button" aria-label="Show next rounds" ${this.roundWindowStart >= maxStart ? 'disabled' : ''}>&rsaquo;</button>`;
+    if (minutes.length <= MINUTE_WINDOW) return pips;
+    return `<button class="session-track-arrow" data-emom-window="-1" type="button" aria-label="Show previous minutes" ${this.roundWindowStart === 0 ? 'disabled' : ''}>&lsaquo;</button>${pips}<button class="session-track-arrow" data-emom-window="1" type="button" aria-label="Show next minutes" ${this.roundWindowStart >= maxStart ? 'disabled' : ''}>&rsaquo;</button>`;
   }
 }

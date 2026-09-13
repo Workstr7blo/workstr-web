@@ -1,7 +1,8 @@
 import type { StraightBlock } from '../core/types';
 import { normalizeWeightUnit, storeWeightInput } from '../core/units';
 import type { SheetWithExercises } from '../db/store';
-import { builderRowsMarkup } from '../features/sheets/builder-views';
+import { builderRowsMarkup, emomSectionSummary } from '../features/sheets/builder-views';
+import { emomBlockDurationSec } from '../core/emom-blocks';
 import { emomBlocksFromBuilder, PROGRAM_GOALS, programDisplayTags, selectedProgramGoals, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
 import { editablePublicationIdentity, type PublicationIdentity } from '../nostr/program-ownership';
 import { html } from './format';
@@ -121,7 +122,8 @@ async function open(sheet: SheetWithExercises | null = null): Promise<void> {
     difficulty: builderLevel(sheet?.difficulty),
     tags: sheet?.tags || [],
     mode: emomBlocks.length && normalRows.length ? 'mixed' : emomBlocks.length ? 'emom' : 'normal',
-    emomSections: emomBlocks.length ? emomBlocks.map((emom) => ({ rounds: emom.rounds, intervalSec: 60 })) : [{ rounds: 10, intervalSec: 60 }],
+    // A legacy section opens at its real length; saving converts it to one move per minute.
+    emomSections: emomBlocks.length ? emomBlocks.map((emom) => ({ durationMin: Math.max(1, Math.round(emomBlockDurationSec(emom) / 60)), intervalSec: 60, splitMinutes: emom.intervals.some((interval) => interval.steps.length > 1) })) : [{ durationMin: 10, intervalSec: 60 }],
     library,
     rows: [...normalRows, ...emomRows]
   };
@@ -173,7 +175,7 @@ function renderModal(): void {
     current.mode = mode === 'emom' || mode === 'mixed' ? mode : 'normal';
     renderModal();
   });
-  root.querySelector('#add-emom-section')?.addEventListener('click', () => { current.emomSections.push({ rounds: 10, intervalSec: 60 }); renderModal(); });
+  root.querySelector('#add-emom-section')?.addEventListener('click', () => { current.emomSections.push({ durationMin: 10, intervalSec: 60 }); renderModal(); });
   const search = root.querySelector<HTMLInputElement>('#builder-search');
   const picker = root.querySelector<HTMLElement>('#builder-picker');
   const sorted = [...current.library].sort((a, b) => Number(b.favourite) - Number(a.favourite) || a.name.localeCompare(b.name));
@@ -235,7 +237,12 @@ function renderModal(): void {
     const target = event.target as HTMLInputElement;
     const sectionHost = target.closest<HTMLElement>('[data-section]');
     const section = sectionHost ? current.emomSections[Number(sectionHost.dataset.section)] : undefined;
-    if (section && target.dataset.sectionField === 'rounds') { section.rounds = Math.max(1, Number(target.value) || 1); return; }
+    if (section && target.dataset.sectionField === 'durationMin') {
+      section.durationMin = Math.max(1, Math.floor(Number(target.value) || 1));
+      const summary = sectionHost?.querySelector('.emom-section-title span');
+      if (summary) summary.textContent = emomSectionSummary(section, current.rows.filter((row) => row.sectionIndex === Number(sectionHost?.dataset.section)).length);
+      return;
+    }
     if (section && target.dataset.sectionField === 'intervalSec') { section.intervalSec = Math.max(1, Number(target.value) || 60); return; }
     const row = target.closest<HTMLElement>('[data-i]');
     const entry = row ? current.rows[Number(row.dataset.i)] : undefined;
@@ -243,7 +250,6 @@ function renderModal(): void {
     if (!entry || !field) return;
     if (field === 'sets') entry.sets = Number(target.value) || 0;
     else if (field === 'restSec') entry.restSec = Number(target.value) || 0;
-    else if (field === 'intervalIndex') entry.intervalIndex = Math.max(0, (Number(target.value) || 1) - 1);
     else if (field === 'durationSec') entry.durationSec = Math.max(0, Number(target.value) || 0);
     else if (field === 'targetValue') {
       const type = target.dataset.targetType;
@@ -288,7 +294,9 @@ function renderModal(): void {
       renderRows();
       return;
     }
-    if (target.dataset.rm != null) { current.rows.splice(Number(target.dataset.rm), 1); renderRows(); renderPicker(); return; }
+    const removeButton = target.closest<HTMLElement>('[data-rm]');
+    if (removeButton) { current.rows.splice(Number(removeButton.dataset.rm), 1); renderRows(); renderPicker(); return; }
+    const moveButton = target.closest<HTMLElement>('[data-move]');
     if (target.dataset.toggleSuperset != null) {
       const index = Number(target.dataset.toggleSuperset);
       if (index > 0 && current.rows[index]) {
@@ -310,11 +318,11 @@ function renderModal(): void {
       [current.emomSections[from], current.emomSections[to]] = [current.emomSections[to], current.emomSections[from]];
       current.rows.forEach((row) => { if (row.sectionIndex === from) row.sectionIndex = to; else if (row.sectionIndex === to) row.sectionIndex = from; });
       renderRows();
-    } else if (target.dataset.move != null) {
-      const index = Number(target.dataset.move);
+    } else if (moveButton) {
+      const index = Number(moveButton.dataset.move);
       const sectionRows = current.rows.map((row, rowIndex) => ({ row, rowIndex })).filter(({ row }) => row.sectionIndex === current.rows[index]?.sectionIndex);
       const position = sectionRows.findIndex(({ rowIndex }) => rowIndex === index);
-      const next = sectionRows[position + Number(target.dataset.dir)]?.rowIndex;
+      const next = sectionRows[position + Number(moveButton.dataset.dir)]?.rowIndex;
       if (next != null) {
         [current.rows[index], current.rows[next]] = [current.rows[next], current.rows[index]];
         renderRows();
@@ -332,6 +340,7 @@ function renderModal(): void {
     const blocks = [...normalBlocks, ...emomBlocks].length ? [...normalBlocks, ...emomBlocks] : undefined;
     if (builder.mode !== 'normal') {
       if (!emomBlocks.length) { toast('Add an exercise to an EMOM section', 'bad'); return; }
+      if (builder.emomSections.some((_, sectionIndex) => !emomRows.some((row) => row.sectionIndex === sectionIndex))) { toast('Add a move to every EMOM section', 'bad'); return; }
       const invalid = emomBlocks.some((block) => block.intervals.some((interval) => interval.steps.reduce((sum, step) => sum + (Number(step.targetDurationSec) || 0), 0) > interval.durationSec));
       if (invalid) { toast('Timed steps cannot exceed the interval length', 'bad'); return; }
     }
@@ -348,7 +357,7 @@ function renderModal(): void {
         muscle_group: row.muscleGroup,
         image_url: row.imageUrl,
         sets: row.sectionIndex >= 0
-          ? current.emomSections[row.sectionIndex]?.rounds || 1
+          ? emomBlocks[row.sectionIndex]?.rounds || 1
           : normalBlocks.find((block) => block.steps.some((step) => step.exerciseSlug === row.exerciseSlug))?.rounds || row.sets,
         reps: row.reps,
         rest: row.restSec,

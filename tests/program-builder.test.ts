@@ -152,9 +152,9 @@ describe('program builder controller', () => {
     const name = root.querySelector<HTMLInputElement>('#sheet-name')!;
     name.value = 'Strength + core EMOM';
     name.dispatchEvent(new Event('input'));
-    const rounds = root.querySelector<HTMLInputElement>('[data-section-field="rounds"]')!;
-    rounds.value = '3';
-    rounds.dispatchEvent(new Event('input', { bubbles: true }));
+    const duration = root.querySelector<HTMLInputElement>('[data-section-field="durationMin"]')!;
+    duration.value = '3';
+    duration.dispatchEvent(new Event('input', { bubbles: true }));
     (root.querySelector('[data-toggle-section-picker="0"]') as HTMLButtonElement).click();
     for (const slug of ['plank-to-push-up', 'sit-up', 'shoulder-tap', 'leg-raise']) {
       (root.querySelector(`[data-section-exercise="0"][data-slug="${slug}"]`) as HTMLButtonElement).click();
@@ -174,11 +174,13 @@ describe('program builder controller', () => {
       exercises: expect.arrayContaining([
         expect.objectContaining({ exercise_slug: 'push-up', sets: 4, reps: '15', rest: 30 }),
         expect.objectContaining({ exercise_slug: 'triceps-dip', sets: 4, reps: '15', rest: 45 }),
-        expect.objectContaining({ exercise_slug: 'plank-to-push-up', sets: 3, reps: '', rest: 60 })
+        expect.objectContaining({ exercise_slug: 'plank-to-push-up', sets: 1, reps: '', rest: 60 })
       ]),
       blocks: [{
         type: 'emom',
-        rounds: 3,
+        // Three minutes of four moves: the section still stops at three minutes.
+        totalDurationSec: 180,
+        rounds: 1,
         intervals: [
           expect.objectContaining({ durationSec: 60, steps: [expect.objectContaining({ exerciseSlug: 'plank-to-push-up', targetDurationSec: 40 })] }),
           expect.objectContaining({ durationSec: 60, steps: [expect.objectContaining({ exerciseSlug: 'sit-up', targetDurationSec: 40 })] }),
@@ -225,5 +227,100 @@ describe('builder exercise pictures', () => {
     (root.querySelector('#sheet-save') as HTMLButtonElement).click();
     await tick();
     expect(saveSheet).toHaveBeenCalledWith(expect.objectContaining({ exercises: [expect.objectContaining({ image_url: 'https://x/new.png' })] }), 7);
+  });
+});
+
+describe('EMOM moves in the builder', () => {
+  const minuteLabels = (root: HTMLElement) => [...root.querySelectorAll('.emom-rx-minute-label')].map((label) => label.textContent);
+  const moveNames = (root: HTMLElement) => [...root.querySelectorAll('.emom-rx-name strong')].map((name) => name.textContent);
+
+  async function emomBuilder() {
+    const app = setup();
+    await app.controller.open();
+    const mode = app.root.querySelector<HTMLSelectElement>('#sheet-mode')!;
+    mode.value = 'emom';
+    mode.dispatchEvent(new Event('change'));
+    const name = app.root.querySelector<HTMLInputElement>('#sheet-name')!;
+    name.value = 'Minute work';
+    name.dispatchEvent(new Event('input'));
+    return app;
+  }
+  const addMoves = (root: HTMLElement, sectionIndex: number, ...slugs: string[]) => {
+    (root.querySelector(`[data-toggle-section-picker="${sectionIndex}"]`) as HTMLButtonElement).click();
+    for (const slug of slugs) (root.querySelector(`[data-section-exercise="${sectionIndex}"][data-slug="${slug}"]`) as HTMLButtonElement).click();
+  };
+
+  it('schedules moves by their order, with no minute to type, and keeps the total duration', async () => {
+    const { root, saveSheet } = await emomBuilder();
+    addMoves(root, 0, 'sit-up', 'leg-raise', 'squat');
+    expect(root.querySelector('[data-f="intervalIndex"]')).toBeNull();
+    expect(minuteLabels(root)).toEqual(['Minute 1', 'Minute 2', 'Minute 3']);
+    expect(root.querySelector('.emom-section-help')?.textContent).toBe('One move begins each minute, in the order shown.');
+    expect(root.querySelector('.emom-section-title span')?.textContent).toBe('10 min · 10 intervals · 3 moves');
+
+    (root.querySelector('[aria-label="Move Squat up"]') as HTMLButtonElement).click();
+    expect(moveNames(root)).toEqual(['Sit Up', 'Squat', 'Leg Raise']);
+    expect(root.querySelector('[aria-label="Move Sit Up up"]')?.hasAttribute('disabled')).toBe(true);
+
+    (root.querySelector('[aria-label="Remove Sit Up"] svg') as SVGElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(moveNames(root)).toEqual(['Squat', 'Leg Raise']);
+    expect(minuteLabels(root)).toEqual(['Minute 1', 'Minute 2']);
+
+    const duration = root.querySelector<HTMLInputElement>('[data-section-field="durationMin"]')!;
+    duration.value = '8';
+    duration.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(root.querySelector('.emom-section-title span')?.textContent).toBe('8 min · 8 intervals · 2 moves');
+
+    (root.querySelector('#sheet-save') as HTMLButtonElement).click();
+    await tick();
+    expect(saveSheet).toHaveBeenCalledWith(expect.objectContaining({
+      blocks: [expect.objectContaining({
+        type: 'emom', totalDurationSec: 480, rounds: 4,
+        intervals: [
+          expect.objectContaining({ steps: [expect.objectContaining({ exerciseSlug: 'squat' })] }),
+          expect.objectContaining({ steps: [expect.objectContaining({ exerciseSlug: 'leg-raise' })] })
+        ]
+      })]
+    }), undefined);
+  });
+
+  it('opens a legacy section at its real length and says shared minutes were split', async () => {
+    const { root, controller } = setup();
+    await controller.open({
+      id: 5, slug: 'legacy', name: 'Legacy', notes: '', difficulty: '', tags: [], is_temporary: false, created_at: '', updated_at: '', exercises: [],
+      blocks: [{ type: 'emom', rounds: 10, intervals: [
+        { durationSec: 60, steps: [{ exerciseSlug: 'sit-up', exerciseName: 'Sit Up' }, { exerciseSlug: 'leg-raise', exerciseName: 'Leg Raise' }] },
+        { durationSec: 60, steps: [{ exerciseSlug: 'squat', exerciseName: 'Squat' }] }
+      ] }]
+    } as SheetWithExercises);
+    expect(root.querySelector<HTMLInputElement>('[data-section-field="durationMin"]')?.value).toBe('20');
+    expect(root.querySelector('.emom-section-note')?.textContent).toContain('shared a minute');
+    expect(minuteLabels(root)).toEqual(['Minute 1', 'Minute 2', 'Minute 3']);
+  });
+
+  it('refuses a section with no moves', async () => {
+    const { root, saveSheet, toast } = await emomBuilder();
+    addMoves(root, 0, 'sit-up');
+    (root.querySelector('#add-emom-section') as HTMLButtonElement).click();
+    (root.querySelector('#sheet-save') as HTMLButtonElement).click();
+    await tick();
+    expect(saveSheet).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('Add a move to every EMOM section', 'bad');
+  });
+
+  it('refuses a timed target longer than the minute', async () => {
+    const { root, saveSheet, toast } = await emomBuilder();
+    addMoves(root, 0, 'sit-up');
+    const type = root.querySelector<HTMLSelectElement>('.emom-rx-type')!;
+    type.value = 'seconds';
+    type.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(root.querySelector('.emom-rx-value')?.getAttribute('max')).toBe('60');
+    const seconds = root.querySelector<HTMLInputElement>('.emom-rx-value')!;
+    seconds.value = '75';
+    seconds.dispatchEvent(new Event('input', { bubbles: true }));
+    (root.querySelector('#sheet-save') as HTMLButtonElement).click();
+    await tick();
+    expect(saveSheet).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('Timed steps cannot exceed the interval length', 'bad');
   });
 });
