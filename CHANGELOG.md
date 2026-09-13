@@ -54,6 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Importing a creator's program from Discover now brings in the exercises it uses from the
+  Workstr catalog. Before, any exercise you did not already have was reported as "not found
+  in the catalog" and the program was imported with a bare name in its place.
+
 - Exercise pictures are no longer cropped. Library and Discover cards, the exercise details,
   program and builder rows, and the live workout screen each cut a different part off the
   same picture - hands, feet, the Workstr symbol or the floor ring. Every picture is now
