@@ -60,6 +60,15 @@ export abstract class SyncAwareStore {
     });
   }
 
+  // The awaited form, for a write whose caller can wait for its journal row. The row exists by
+  // the time the write that caused it returns, so nothing is left running against a database
+  // that may close, and a burst of writes to one uid cannot race to add its pending row twice.
+  protected async noteLogChangeNow(kind: JournalRow['kind'], uid: string, updatedAt = new Date().toISOString(), deleted = false): Promise<void> {
+    if (this.applyingRemote) return;
+    await this.noteJournal(kind, uid, updatedAt, deleted);
+    this.changeListener?.(`${kind}:${uid}`, updatedAt);
+  }
+
   // Every write inside `apply` is treated as a merge rather than an edit.
   async applyRemote<T>(apply: () => Promise<T>): Promise<T> {
     this.applyingRemote = true;

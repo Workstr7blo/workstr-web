@@ -286,6 +286,17 @@ describe('exercise library in the log', () => {
     expect(await seedJournal(store)).toBe(0);
   });
 
+  it('has the journal row in place by the time the write returns', async () => {
+    const store = await freshStore();
+    await store.upsertExercise(exercise('plank'));
+    expect((await store.listJournal('library')).map((row) => row.uid)).toEqual(['plank']);
+    const id = (await store.listExercises())[0].id!;
+    await store.upsertExercise({ ...(await store.getExercise(id))!, favourite: true });
+    await store.deleteExercise(id);
+    // Awaited writes cannot race each other into a second pending row for one exercise.
+    expect((await store.listJournal('library')).map((row) => row.uid)).toEqual(['plank']);
+  });
+
   it('keeps the library out of the per-address queue, where each exercise would cost a signature', async () => {
     const store = await freshStore();
     await store.upsertExercise(exercise('plank'));

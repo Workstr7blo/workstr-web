@@ -51,8 +51,8 @@ Append-heavy data uses immutable, device-owned journal chunks:
 
 A library entry is the whole exercise row keyed by slug. A deleted exercise is still a row,
 marked deleted, so its deletion lands like any newer version and a device that still had it
-cannot bring it back. Record format 6 seeds an existing library into the log once on devices
-already syncing; packed into chunks, a whole library costs a signature or two and its `d` tags
+cannot bring it back. Record format 7 seeds an existing library into the log once on devices
+already syncing, and drops any per-exercise upload format 6 briefly queued; packed into chunks, a whole library costs a signature or two and its `d` tags
 reveal nothing about which exercises it holds.
 
 A journal entry contains a stable object UID, update timestamp, payload or tombstone,

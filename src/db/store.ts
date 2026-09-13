@@ -101,15 +101,15 @@ export class WorkstrStore extends SyncAwareStore {
     else if (requestedId) value.id = requestedId;
     const id = value.id ? await tx.store.put(value) : await tx.store.add(value);
     await tx.done;
-    this.noteExerciseChange(value.slug, value.updated_at);
+    await this.noteExerciseChange(value.slug, value.updated_at);
     return Number(id);
   }
 
   // Every library write - an import, a favourite, a catalog update, a deletion - goes into the
   // library log under the exercise's slug. A deletion is the row marked deleted, not a
   // journal deletion: the row still exists, and its newer version is what says it went.
-  private noteExerciseChange(slug: string, updatedAt: string): void {
-    if (slug) this.noteLogChange('library', slug, updatedAt);
+  private async noteExerciseChange(slug: string, updatedAt: string): Promise<void> {
+    if (slug) await this.noteLogChangeNow('library', slug, updatedAt);
   }
 
   async getExercise(id: number): Promise<Exercise | undefined> {
@@ -134,7 +134,7 @@ export class WorkstrStore extends SyncAwareStore {
     if (!existing) return;
     const updatedAt = new Date().toISOString();
     await this.db.put('exercises', { ...existing, status: 'deleted', updated_at: updatedAt });
-    this.noteExerciseChange(existing.slug, updatedAt);
+    await this.noteExerciseChange(existing.slug, updatedAt);
   }
 
   // One-time cleanup for installs created while the app still shipped a
