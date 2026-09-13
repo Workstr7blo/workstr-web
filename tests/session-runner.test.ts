@@ -280,6 +280,13 @@ describe('session runner', () => {
     expect(hero!.hasAttribute('srcset')).toBe(false);
   });
 
+  // A republished catalog picture reaches the workout even though the program saved the old one.
+  it('shows the exercise current picture over the one the program carries', async () => {
+    state.exercises = [{ slug: 'row', name: 'Row', image_url: 'https://blossom.example/new.jpg', muscles: [], equipment: [], tags: [], instructions: [] } as never];
+    await runner.startTrainingSession({ ...oneExerciseProgram(), exercises: [{ address: '', name: 'Row', sets: 2, reps: '8', restSec: 60, imageUrl: 'https://blossom.example/old.jpg' }] });
+    expect(root.querySelector<HTMLImageElement>('.session-ex-image.wide')!.getAttribute('src')).toBe('https://blossom.example/new.jpg');
+  });
+
   it('reconciles and dismisses an active rest timer after its deadline', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));

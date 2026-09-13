@@ -85,7 +85,7 @@ async function open(sheet: SheetWithExercises | null = null): Promise<void> {
       exerciseSlug: step.exerciseSlug,
       exerciseName: step.exerciseName || row?.exercise_name || exercise?.name || step.exerciseSlug,
       muscleGroup: row?.muscle_group || exercise?.muscle_group,
-      imageUrl: row?.image_url || exercise?.image_url,
+      imageUrl: exercise?.image_url || row?.image_url,
       sets: emom.rounds,
       reps: step.targetReps || String(row?.reps ?? ''),
       restSec: interval.durationSec,
@@ -101,7 +101,8 @@ async function open(sheet: SheetWithExercises | null = null): Promise<void> {
         exerciseSlug: row.exercise_slug || '',
         exerciseName: row.exercise_name || row.exercise_slug || 'Exercise',
         muscleGroup: row.muscle_group,
-        imageUrl: row.image_url,
+        // Saving heals the program's copy of the picture from the library.
+        imageUrl: library.find((candidate) => candidate.slug === row.exercise_slug)?.image_url || row.image_url,
         sets: Number(row.sets) || 3,
         reps: String(row.reps ?? '8-12'),
         restSec: Number(row.rest) || 90,

@@ -303,7 +303,7 @@ export function programBody(program: RelayProgram, state: AppState): string {
     const full = resolveProgramExercise(member, state.exercises);
     const name = programExerciseName(member, full);
     const muscle = programMuscleLabel(member.muscleGroup || full?.muscle_group || inferProgramMuscle(name));
-    const image = exerciseImage(member.imageUrl || full?.image_url);
+    const image = exerciseImage(full?.image_url || member.imageUrl);
     const placement = strengthMembers.has(member) ? null : takePlacement(member);
     const weightValue = displayWeightKg(member.weight, unit);
     const weight = weightValue != null ? ` @ ${html(String(weightValue))}` : '';

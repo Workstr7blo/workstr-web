@@ -5,7 +5,16 @@ import { createCatalogController } from '../src/app/catalog-controller';
 import type { AppState } from '../src/app/state';
 import type { RelayProgram } from '../src/nostr/canon';
 
-const { fetchAuthorMoneroPaymentTargetsMock } = vi.hoisted(() => ({ fetchAuthorMoneroPaymentTargetsMock: vi.fn() }));
+const { fetchAuthorMoneroPaymentTargetsMock, fetchCanonExercisesMock } = vi.hoisted(() => ({
+  fetchAuthorMoneroPaymentTargetsMock: vi.fn(),
+  // Offline unless a test answers, which is what the network guard made every refresh before.
+  fetchCanonExercisesMock: vi.fn<() => Promise<Exercise[]>>(async () => { throw new Error('offline'); })
+}));
+
+vi.mock('../src/nostr/canon', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/nostr/canon')>(),
+  fetchCanonExercises: fetchCanonExercisesMock
+}));
 
 vi.mock('../src/nostr/payment-targets', async (importOriginal) => ({
   ...await importOriginal<typeof import('../src/nostr/payment-targets')>(),
@@ -211,5 +220,57 @@ describe('importing your own published program', () => {
 
     expect(app.saveSheet).not.toHaveBeenCalled();
     expect(app.toast).toHaveBeenCalledWith('This is your published program. It is already in Programs.');
+  });
+});
+
+describe('the library following the catalog', () => {
+  const address = '33401:op:workstr:exercise:mountain-climbers';
+
+  function harness(library: Exercise[]) {
+    const rows = library.map((row) => ({ ...row }));
+    const store = {
+      listExercises: vi.fn(async () => rows.map((row) => ({ ...row }))),
+      upsertExercise: vi.fn(async (exercise: Exercise) => {
+        const index = rows.findIndex((row) => row.slug === exercise.slug);
+        rows[index >= 0 ? index : rows.length] = { ...exercise };
+        return exercise.id || 1;
+      }),
+      saveSettings: vi.fn(async () => {})
+    };
+    const state = {
+      store, settings: { unit: 'kg', publicRelays: [] }, view: 'exercises',
+      subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
+      library: [], exercises: [], discoverExercises: [], programs: [], sheets: [],
+      authorProfiles: {}, profileNames: {}, authorPaymentTargets: {}, exerciseStatus: ''
+    } as unknown as AppState;
+    const render = vi.fn();
+    const root = { querySelector: () => null, querySelectorAll: () => [] } as unknown as HTMLElement;
+    const controller = createCatalogController({
+      root, state, render, toast: vi.fn(), openModal: vi.fn(), closeModal: vi.fn(), fetchProfile: vi.fn(async () => null), renderProgramLists: vi.fn()
+    });
+    return { controller, state, store, render };
+  }
+
+  it('replaces an older library copy on refresh, keeps the favourite, and draws the page again', async () => {
+    const app = harness([{ ...base, id: 3, slug: 'mountain-climbers', nostr_address: address, origin_created_at: 100, image_url: 'old.png', favourite: true }]);
+    fetchCanonExercisesMock.mockResolvedValueOnce([{ ...base, slug: 'mountain-climbers', nostr_address: address, origin_created_at: 200, image_url: 'new.png' }]);
+
+    await app.controller.refreshExercises();
+
+    expect(app.store.upsertExercise).toHaveBeenCalledWith(expect.objectContaining({ id: 3, image_url: 'new.png', favourite: true, origin_created_at: 200 }));
+    expect(app.state.library[0]).toMatchObject({ image_url: 'new.png', favourite: true });
+    expect(app.state.exercises.find((exercise) => exercise.slug === 'mountain-climbers')?.image_url).toBe('new.png');
+    expect(app.render).toHaveBeenCalledWith({ reason: 'exercise-catalog-loaded' });
+  });
+
+  it('writes and draws nothing when the library is already current', async () => {
+    const current = { ...base, id: 3, slug: 'mountain-climbers', nostr_address: address, origin_created_at: 200, image_url: 'new.png' };
+    const app = harness([current]);
+    fetchCanonExercisesMock.mockResolvedValueOnce([{ ...current, id: undefined }]);
+
+    await app.controller.refreshExercises();
+
+    expect(app.store.upsertExercise).not.toHaveBeenCalled();
+    expect(app.render).not.toHaveBeenCalled();
   });
 });
