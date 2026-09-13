@@ -207,8 +207,8 @@ describe('sheetToProgram', () => {
     expect(card).toContain('advanced');
     expect(card).toContain('diff-advanced');
     expect(card).toContain('program-tag-grid');
-    expect(card).toContain('hypertrophy');
-    expect(card).toContain('upper-body');
+    expect(card).toContain('Hypertrophy');
+    expect(card).toContain('Upper Body');
   });
   it('keeps collapsed program card metadata concise', () => {
     const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState);

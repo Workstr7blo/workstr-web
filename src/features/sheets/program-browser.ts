@@ -1,14 +1,16 @@
 import type { AppState } from '../../app/state';
+import { EQUIPMENT_KEYS, kitCoversEquipment, MY_EQUIPMENT, ownedEquipmentKeys } from '../../core/equipment';
+import { formatTaxonomyLabel, TRAINING_LEVELS } from '../../core/training-taxonomy';
 import type { Exercise } from '../../core/types';
 import type { RelayProgram } from '../../nostr/canon';
 import { html } from '../../app/format';
 import { sheetToProgram } from './views';
 import {
-  PROGRAM_EQUIPMENT_LABELS,
   PROGRAM_FOCUS_LABELS,
   PROGRAM_FORMAT_LABELS,
   PROGRAM_GOALS,
-  programSearchTags
+  programSearchTags,
+  programTaxonomy
 } from './program-labels';
 
 /**
@@ -21,25 +23,26 @@ import {
  * side changed.
  */
 
-export type ProgramFilterKey = 'goal' | 'focus' | 'format' | 'equipment';
+export type ProgramFilterKey = 'goal' | 'focus' | 'format' | 'level' | 'equipment';
 export type ProgramBrowser = 'programs' | 'discover';
 
-type ProgramFilters = Record<ProgramFilterKey, string>;
+export type ProgramFilters = Record<ProgramFilterKey, string>;
 type MatchableProgram = Pick<RelayProgram, 'name' | 'description' | 'exercises'> & {
   difficulty?: string;
   tags: string[];
   blocks?: RelayProgram['blocks'];
 };
 
-const NO_FILTERS: ProgramFilters = { goal: '', focus: '', format: '', equipment: '' };
+// The one place the set of filters is spelled out, so adding a filter is not a hunt through
+// every default and reset.
+export function emptyProgramFilters(): ProgramFilters {
+  return { goal: '', focus: '', format: '', level: '', equipment: '' };
+}
 
 // Order is the order the groups appear in the sheet and the chips in the row.
-const FILTER_GROUPS: { key: ProgramFilterKey; label: string; values: string[] }[] = [
-  { key: 'goal', label: 'Goal', values: PROGRAM_GOALS },
-  { key: 'focus', label: 'Focus', values: PROGRAM_FOCUS_LABELS },
-  { key: 'format', label: 'Format', values: PROGRAM_FORMAT_LABELS },
-  { key: 'equipment', label: 'Equipment', values: PROGRAM_EQUIPMENT_LABELS }
-];
+const FILTER_LABELS: Record<ProgramFilterKey, string> = {
+  goal: 'Goal', focus: 'Focus', format: 'Format', level: 'Level', equipment: 'Equipment'
+};
 
 const ICONS = {
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
@@ -53,7 +56,7 @@ function icon(name: keyof typeof ICONS, cls = ''): string {
 }
 
 export function programFilterValues(state: AppState): ProgramFilters {
-  return { ...NO_FILTERS, ...(state.programFilters || {}) };
+  return { ...emptyProgramFilters(), ...(state.programFilters || {}) };
 }
 
 /**
@@ -65,20 +68,43 @@ export function activeProgramFilterCount(state: AppState): number {
 }
 
 export function programFilterLabel(value: string): string {
-  if (value === 'emom') return 'EMOM';
-  return value.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+  return value === MY_EQUIPMENT ? 'My equipment' : formatTaxonomyLabel(value);
+}
+
+// Equipment is the shared vocabulary exercises filter on. My equipment appears once a kit is
+// saved, as it does for exercises, and a selection nothing offers any more stays listed so it
+// can still be undone.
+function filterGroups(state: AppState): { key: ProgramFilterKey; label: string; values: string[] }[] {
+  const selected = programFilterValues(state).equipment;
+  const equipment = [...(ownedEquipmentKeys(state.settings?.ownedEquipment).length ? [MY_EQUIPMENT] : []), ...EQUIPMENT_KEYS];
+  if (selected && !equipment.includes(selected)) equipment.push(selected);
+  return [
+    { key: 'goal', label: FILTER_LABELS.goal, values: PROGRAM_GOALS },
+    { key: 'focus', label: FILTER_LABELS.focus, values: PROGRAM_FOCUS_LABELS },
+    { key: 'format', label: FILTER_LABELS.format, values: PROGRAM_FORMAT_LABELS },
+    { key: 'level', label: FILTER_LABELS.level, values: [...TRAINING_LEVELS] },
+    { key: 'equipment', label: FILTER_LABELS.equipment, values: equipment }
+  ];
 }
 
 export function programMatcher(state: AppState): (program: MatchableProgram) => boolean {
   const query = state.programFilter.toLowerCase();
   const filter = programFilterValues(state);
+  const owned = ownedEquipmentKeys(state.settings?.ownedEquipment);
   return (program) => {
-    const labels = programSearchTags(program as RelayProgram, state.exercises as Exercise[]);
-    return [program.name, program.description, program.difficulty || '', ...labels].join(' ').toLowerCase().includes(query)
-      && (!filter.goal || labels.includes(filter.goal))
-      && (!filter.focus || labels.includes(filter.focus))
-      && (!filter.format || labels.includes(filter.format))
-      && (!filter.equipment || labels.includes(filter.equipment));
+    const exercises = state.exercises as Exercise[];
+    const taxonomy = programTaxonomy(program as RelayProgram, exercises);
+    const labels = programSearchTags(program as RelayProgram, exercises);
+    // The author's own tags stay searchable even when they are not a Workstr goal.
+    const text = [program.name, program.description, program.difficulty || '', ...(program.tags || []), ...labels, ...labels.map(formatTaxonomyLabel)];
+    return text.join(' ').toLowerCase().includes(query)
+      && (!filter.goal || taxonomy.goals.includes(filter.goal))
+      && (!filter.focus || taxonomy.focus.includes(filter.focus))
+      && (!filter.format || taxonomy.format.includes(filter.format))
+      && (!filter.level || taxonomy.level === filter.level)
+      && (!filter.equipment || (filter.equipment === MY_EQUIPMENT
+        ? kitCoversEquipment(taxonomy.equipment, owned)
+        : taxonomy.equipment.includes(filter.equipment)));
   };
 }
 
@@ -115,9 +141,9 @@ export function programToolbar(context: ProgramBrowser, state: AppState): string
  */
 export function programActiveFilters(context: ProgramBrowser, state: AppState): string {
   const filter = programFilterValues(state);
-  const chips = FILTER_GROUPS
-    .filter((group) => filter[group.key])
-    .map((group) => `<button class="program-filter-chip" type="button" data-program-filter-remove="${group.key}" data-program-filter-context="${context}" aria-label="Remove ${html(group.label.toLowerCase())} filter ${html(programFilterLabel(filter[group.key]))}"><span>${html(programFilterLabel(filter[group.key]))}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`)
+  const chips = (Object.keys(FILTER_LABELS) as ProgramFilterKey[])
+    .filter((key) => filter[key])
+    .map((key) => `<button class="program-filter-chip" type="button" data-program-filter-remove="${key}" data-program-filter-context="${context}" aria-label="Remove ${html(FILTER_LABELS[key].toLowerCase())} filter ${html(programFilterLabel(filter[key]))}"><span>${html(programFilterLabel(filter[key]))}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`)
     .join('');
   if (!chips) return '';
   return `<div class="program-active-filters">${chips}<button class="program-filter-clear" type="button" data-program-filter-clear="${context}">Clear</button></div>`;
@@ -169,7 +195,7 @@ export function programFilterSheet(state: AppState): string {
     <div class="program-filter-sheet-handle" aria-hidden="true"></div>
     <div class="program-filter-sheet-header"><h2 id="program-filter-title">Filter ${context === 'discover' ? 'relay programs' : 'programs'}</h2></div>
     <div class="program-filter-sheet-body">
-      ${FILTER_GROUPS.map((group) => filterGroup(group, filter[group.key])).join('')}
+      ${filterGroups(state).map((group) => filterGroup(group, filter[group.key])).join('')}
     </div>
     <div class="program-filter-sheet-footer">
       <button class="button quiet" id="program-filter-reset" type="button">Reset filters</button>

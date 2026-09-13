@@ -5,11 +5,14 @@ import { builderRowsMarkup } from '../features/sheets/builder-views';
 import { emomBlocksFromBuilder, PROGRAM_GOALS, programDisplayTags, selectedProgramGoals, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
 import { editablePublicationIdentity, type PublicationIdentity } from '../nostr/program-ownership';
 import { html } from './format';
+import { formatTaxonomyLabel, normalizeTrainingLevel, TRAINING_LEVELS } from '../core/training-taxonomy';
 import type { AppState } from './state';
 
-const PROGRAM_DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
-function tagLabel(tag: string): string {
-  return tag.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+
+// A level stored as "Beginner" opens on the Beginner option rather than on no level at all.
+function builderLevel(difficulty: string | undefined): string {
+  const level = normalizeTrainingLevel(difficulty);
+  return (TRAINING_LEVELS as readonly string[]).includes(level) ? level : difficulty || '';
 }
 
 function builderProgram(current: BuilderState) {
@@ -37,7 +40,7 @@ function builderProgram(current: BuilderState) {
 
 function builderAutoLabelMarkup(current: BuilderState): string {
   const autoLabels = programDisplayTags(builderProgram(current), current.library).filter((tag) => !PROGRAM_GOALS.includes(tag));
-  return autoLabels.length ? autoLabels.map((tag) => `<span class="tag-pill auto">${html(tag)}</span>`).join('') : '<span class="builder-auto-empty">Add exercises to detect split, equipment, and format.</span>';
+  return autoLabels.length ? autoLabels.map((tag) => `<span class="tag-pill auto">${html(formatTaxonomyLabel(tag))}</span>`).join('') : '<span class="builder-auto-empty">Add exercises to detect split, equipment, and format.</span>';
 }
 
 function refreshAutoLabels(current: BuilderState): void {
@@ -114,7 +117,7 @@ async function open(sheet: SheetWithExercises | null = null): Promise<void> {
     sheetId: sheet?.id,
     name: sheet?.name || '',
     desc: sheet?.notes || '',
-    difficulty: sheet?.difficulty || '',
+    difficulty: builderLevel(sheet?.difficulty),
     tags: sheet?.tags || [],
     mode: emomBlocks.length && normalRows.length ? 'mixed' : emomBlocks.length ? 'emom' : 'normal',
     emomSections: emomBlocks.length ? emomBlocks.map((emom) => ({ rounds: emom.rounds, intervalSec: 60 })) : [{ rounds: 10, intervalSec: 60 }],
@@ -127,9 +130,9 @@ async function open(sheet: SheetWithExercises | null = null): Promise<void> {
 function renderModal(): void {
   const current = builder;
   if (!current) return;
-  const difficultyOptions = [''].concat(PROGRAM_DIFFICULTIES).map((difficulty) => `<option value="${html(difficulty)}" ${current.difficulty === difficulty ? 'selected' : ''}>${difficulty ? html(difficulty) : 'Choose level'}</option>`).join('');
+  const difficultyOptions = ['', ...TRAINING_LEVELS].map((difficulty) => `<option value="${html(difficulty)}" ${current.difficulty === difficulty ? 'selected' : ''}>${difficulty ? html(formatTaxonomyLabel(difficulty)) : 'Choose level'}</option>`).join('');
   const goals = selectedProgramGoals(current.tags);
-  const goalChips = PROGRAM_GOALS.map((goal) => `<button class="goal-chip ${goals.includes(goal) ? 'active' : ''}" type="button" data-goal="${html(goal)}" aria-pressed="${goals.includes(goal) ? 'true' : 'false'}">${html(tagLabel(goal))}</button>`).join('');
+  const goalChips = PROGRAM_GOALS.map((goal) => `<button class="goal-chip ${goals.includes(goal) ? 'active' : ''}" type="button" data-goal="${html(goal)}" aria-pressed="${goals.includes(goal) ? 'true' : 'false'}">${html(formatTaxonomyLabel(goal))}</button>`).join('');
   const autoLabelMarkup = builderAutoLabelMarkup(current);
   openModal(`
     <div class="program-builder">

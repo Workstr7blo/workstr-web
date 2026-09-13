@@ -4,6 +4,7 @@ import { equipmentKey, equipmentLabel, equipmentOptions, kitEquipmentKeys, match
 import type { Exercise } from '../core/types';
 import type { RelayProfile } from '../nostr/pool';
 import type { AppState } from './state';
+import { MOVEMENT_TYPES, normalizeMovementType, normalizeTrainingLevel, taxonomyOptions, TRAINING_LEVELS } from '../core/training-taxonomy';
 
 export function html(value: unknown): string {
   return String(value ?? '')
@@ -50,7 +51,7 @@ export function authorPill(profile: RelayProfile | undefined, pubkey: string, { 
 export const EX_PLACEHOLDER = '<div class="card-placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>';
 
 export const difficultyBadgeClass = (difficulty?: string): string =>
-  ({ beginner: 'diff-beginner', intermediate: 'diff-intermediate', advanced: 'diff-advanced' } as Record<string, string>)[String(difficulty || '').trim().toLowerCase()] || 'diff-unknown';
+  ({ beginner: 'diff-beginner', intermediate: 'diff-intermediate', advanced: 'diff-advanced' } as Record<string, string>)[normalizeTrainingLevel(difficulty)] || 'diff-unknown';
 
 // User-facing source badge: anything from the official catalog (imported,
 // legacy bundle rows) is labeled "Workstr"; "canon" stays code-only.
@@ -74,7 +75,8 @@ export function exerciseCanonMuscleSet(exercise: Exercise): Set<string> {
   return set;
 }
 
-// Filter helpers shared by the Library and Discover grids.
+// Filter helpers shared by the Library and Discover grids. `categories` are movement types
+// and `difficulties` levels, both folded onto the shared taxonomy and in its order.
 export function exerciseFilterValues(exercises: Exercise[]): {
   categories: string[];
   muscles: string[];
@@ -85,21 +87,22 @@ export function exerciseFilterValues(exercises: Exercise[]): {
   const muscles = new Set<string>();
   const difficulties = new Set<string>();
   for (const exercise of exercises) {
-    if (exercise.category) categories.add(exercise.category);
-    if (exercise.difficulty) difficulties.add(exercise.difficulty);
+    if (exercise.category) categories.add(normalizeMovementType(exercise.category));
+    if (exercise.difficulty) difficulties.add(normalizeTrainingLevel(exercise.difficulty));
     for (const muscle of exerciseCanonMuscleSet(exercise)) muscles.add(muscle);
   }
   const sort = (set: Set<string>) => [...set].sort((a, b) => a.localeCompare(b));
   return {
-    categories: sort(categories),
+    categories: taxonomyOptions(categories, MOVEMENT_TYPES),
     muscles: sort(muscles),
-    difficulties: sort(difficulties),
+    difficulties: taxonomyOptions(difficulties, TRAINING_LEVELS),
     equipment: equipmentOptions(exercises.map((exercise) => exercise.equipment))
   };
 }
 
 export interface ExerciseFilter {
   q?: string;
+  // Movement type. Still `cat` because it filters the stored `category` field.
   cat?: string;
   muscle?: string;
   diff?: string;
@@ -125,10 +128,10 @@ export function filterExercises(exercises: Exercise[], filter: ExerciseFilter = 
   const { cat, muscle, diff } = filter;
   const allowed = allowedEquipmentKeys(filter.equip, filter.ownedEquipment);
   return exercises.filter((exercise) =>
-    (!query || exercise.name.toLowerCase().includes(query) || (exercise.muscle_group || '').toLowerCase().includes(query))
-    && (!cat || exercise.category === cat)
+    (!query || [exercise.name, exercise.muscle_group, exercise.category, ...(exercise.tags || [])].some((value) => String(value || '').toLowerCase().includes(query)))
+    && (!cat || normalizeMovementType(exercise.category) === normalizeMovementType(cat))
     && (!muscle || exerciseCanonMuscleSet(exercise).has(muscle))
-    && (!diff || exercise.difficulty === diff)
+    && (!diff || normalizeTrainingLevel(exercise.difficulty) === normalizeTrainingLevel(diff))
     && matchesEquipment(exercise.equipment, allowed));
 }
 

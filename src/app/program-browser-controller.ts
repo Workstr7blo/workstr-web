@@ -1,4 +1,4 @@
-import type { ProgramBrowser, ProgramFilterKey } from '../features/sheets/program-browser';
+import { emptyProgramFilters, type ProgramBrowser, type ProgramFilterKey } from '../features/sheets/program-browser';
 import type { AppState } from './state';
 
 export interface ProgramBrowserContext {
@@ -10,7 +10,6 @@ export interface ProgramBrowserContext {
   renderResults(context: ProgramBrowser): void;
 }
 
-const NO_FILTERS = { goal: '', focus: '', format: '', equipment: '' };
 
 /**
  * Wiring for the Programs and Discover browsing chrome: the filter sheet, its options, the
@@ -23,7 +22,7 @@ const NO_FILTERS = { goal: '', focus: '', format: '', equipment: '' };
  */
 export function bindProgramBrowser({ root, state, render, renderResults }: ProgramBrowserContext): void {
   const setFilter = (key: ProgramFilterKey, value: string) => {
-    state.programFilters ||= { ...NO_FILTERS };
+    state.programFilters ||= emptyProgramFilters();
     state.programFilters[key] = value;
   };
 
@@ -58,7 +57,7 @@ export function bindProgramBrowser({ root, state, render, renderResults }: Progr
   }));
 
   root.querySelector('#program-filter-reset')?.addEventListener('click', () => {
-    state.programFilters = { ...NO_FILTERS };
+    state.programFilters = emptyProgramFilters();
     if (state.programFilterSheet) renderResults(state.programFilterSheet);
   });
 
@@ -67,10 +66,10 @@ export function bindProgramBrowser({ root, state, render, renderResults }: Progr
     render();
   }));
 
-  // Clears the four advanced filters only. Text in the search field is the user's own
+  // Clears the advanced filters only. Text in the search field is the user's own
   // typing, is visible where they typed it, and is not one of the chips being cleared.
   root.querySelectorAll<HTMLElement>('[data-program-filter-clear]').forEach((button) => button.addEventListener('click', () => {
-    state.programFilters = { ...NO_FILTERS };
+    state.programFilters = emptyProgramFilters();
     render();
   }));
 }

@@ -43,6 +43,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | The Settings page: which cards exist, the groups they sit in, and their order | `src/app/settings-view.ts` | every settings card below, `src/app/layout.ts` (`appView`) | `tests/settings-view.test.ts`, `tests/shell.test.ts` |
 | Settings surfaces written in place rather than rerendered - a background answer, or the reader's own preference change | `src/app/monero-address-controller.ts` (`repaint`), `src/features/backup/views.ts` (`updateBackupStatus`, `updateBackupCard`), `src/app/settings-view.ts` (`updateTrainingPreferences`) | `src/app/preferences-controller.ts`, `src/app/backup-controller.ts`, `src/app/shell.ts` (`bindBackupCard`, the Monero tips switch handler) | `tests/backup-views.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts`, `tests/render-budget.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
+| Shared taxonomy: Level, Movement type, Equipment, and the labels filters show | `src/core/training-taxonomy.ts`, `src/core/equipment.ts` | `src/app/format.ts` (exercise facets), `src/features/sheets/program-labels.ts` (`programTaxonomy`), `src/features/sheets/program-browser.ts` | `tests/training-taxonomy.test.ts`, `tests/equipment.test.ts`, `tests/exercise-browser.test.ts`, `tests/program-browser.test.ts` |
 | Responsive image delivery for exercise photos | `src/core/media.ts` | `src/features/train/session-hero.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/features/sheets/builder-views.ts`, `src/app/catalog-controller.ts` | `tests/media.test.ts`, `tests/session-runner.test.ts` |
 | Shared domain types, IDs, and muscle vocabulary | `src/core/types.ts`, `src/core/ids.ts`, `src/core/muscles.ts` | consuming feature and persistence modules | relevant feature tests |
 | Programs and program builder | `src/app/program-builder.ts`, `src/app/program-publish-controller.ts`, `src/features/sheets/views.ts`, `src/features/sheets/builder-views.ts`, `src/features/sheets/program-labels.ts`, `src/features/sheets/program-actions.ts`, `src/features/sheets/beast-mode.ts` | `src/db/store.ts`, `src/nostr/programImport.ts`, `src/nostr/program-publish.ts`, `src/nostr/program-ownership.ts` (whether a program is the user's own publication, whether it has unpublished changes, and the load-time repair of a copy imported back beside its source) | `tests/sheets.test.ts`, `tests/program-ownership.test.ts`, `tests/sheets-views.test.ts`, `tests/beast-mode.test.ts`, `tests/program-builder.test.ts`, `tests/programImport.test.ts`, `tests/program-publish-controller.test.ts`, `tests/program-publish.test.ts`, browser verification |
@@ -198,6 +199,10 @@ and patch it directly, which is also why a page render can leave it standing.
   `state.programFilter` and `state.programFilters`; `state.programFilterSheet` only records
   which one has the sheet open. One exported `programMatcher(state)` filters both rendered
   lists and produces the sheet's "Show N" count, so the number and the list cannot disagree.
+  Each filter reads its own source through `programTaxonomy` in
+  `src/features/sheets/program-labels.ts`: Goal only from the author's explicit tags, Level
+  from the stated difficulty, Focus, Format and Equipment from the exercises and blocks.
+  Equipment uses the same keys as the exercise facet and a saved kit.
   The sheet is rendered next to the modal in `shellMarkup`, not inside the page: `.content`
   is a fixed stacking context at z-index 1, so a sheet inside it cannot paint over the
   mobile bottom nav. `src/app/program-browser-controller.ts` owns its event bindings.

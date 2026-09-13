@@ -225,3 +225,43 @@ describe('exerciseSelectionBar', () => {
     expect(markup).not.toContain('lib-delete-selected');
   });
 });
+
+describe('movement type and level facets', () => {
+  const list = [
+    ex({ slug: 'a', name: 'Squat', category: 'strength', difficulty: 'Beginner' }),
+    ex({ slug: 'b', name: 'Hamstring Stretch', category: 'stretching', difficulty: 'beginner' }),
+    ex({ slug: 'c', name: 'Hip Flow', category: 'mobility', difficulty: 'advanced' }),
+    ex({ slug: 'd', name: 'Rower', category: 'cardio' }),
+    ex({ slug: 'e', name: 'Clean', category: 'olympic', tags: ['barbell-complex'] })
+  ];
+  const facetValues = (markup: string, facet: string) => [...markup.matchAll(new RegExp(`data-exercise-filter="${facet}" data-exercise-filter-value="([^"]*)"`, 'g'))].map((match) => match[1]);
+
+  it('names the group Movement type and offers the shared values in order', () => {
+    const markup = exerciseFilterSheet(browserState({ exerciseFilterSheet: 'library', library: list }));
+    expect(markup).toContain('>Movement type<');
+    expect(markup).toContain('>All types<');
+    expect(markup).not.toContain('All categories');
+    expect(facetValues(markup, 'cat')).toEqual(['', 'strength', 'cardio', 'mobility', 'olympic']);
+    expect(markup).toContain('>Mobility<');
+    expect(markup).not.toContain('>stretching<');
+    expect(markup).toContain('>Olympic<');
+    expect(facetValues(markup, 'diff')).toEqual(['', 'beginner', 'advanced']);
+    expect(markup).toContain('>Beginner<');
+  });
+
+  it('shows legacy stretching exercises under Mobility without rewriting them', () => {
+    const state = browserState({ library: list, exFilter: { cat: 'mobility', muscle: '', diff: '', equip: '' } });
+    expect(exerciseResults('library', state).map((exercise) => exercise.name)).toEqual(['Hamstring Stretch', 'Hip Flow']);
+    expect(list[1].category).toBe('stretching');
+  });
+
+  it('matches a level whatever its stored capitalisation', () => {
+    const state = browserState({ library: list, exFilter: { cat: '', muscle: '', diff: 'beginner', equip: '' } });
+    expect(exerciseResults('library', state).map((exercise) => exercise.name)).toEqual(['Squat', 'Hamstring Stretch']);
+  });
+
+  it('keeps unknown categories and tags searchable', () => {
+    expect(exerciseResults('library', browserState({ library: list, filter: 'olympic' })).map((exercise) => exercise.name)).toEqual(['Clean']);
+    expect(exerciseResults('library', browserState({ library: list, filter: 'barbell-complex' })).map((exercise) => exercise.name)).toEqual(['Clean']);
+  });
+});

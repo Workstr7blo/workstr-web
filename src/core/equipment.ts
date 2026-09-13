@@ -1,9 +1,11 @@
 // Equipment taxonomy, deliberately thinner than muscles.ts. Muscle names arrive
 // messy from imports and need an alias table; equipment comes from the Workstr
-// catalog and is already consistent. What this does need is a stable key: a kit
+// catalog and is mostly consistent. What this does need is a stable key: a kit
 // saved as "Dumbbell" must keep matching when an exercise later arrives as
-// "Dumbbells " or "dumbbell", so matching runs on the normalized key while the
-// UI shows the label as its publisher wrote it.
+// "Dumbbells " or "dumbbell", so matching runs on the normalized key. Exercises
+// and programs share these keys and labels - there is no second equipment
+// vocabulary for programs - and a stored kit written before an alias existed
+// still resolves, because stored values are read through the same key.
 
 export const MY_EQUIPMENT = '@mine';
 
@@ -14,16 +16,37 @@ export const MY_EQUIPMENT = '@mine';
 // Workout. They are free, so a kit filter always lets them through.
 export const FREE_EQUIPMENT_KEYS = new Set(['body weight', 'bodyweight', 'body only', 'none', 'no equipment']);
 
+// Spellings of one piece of kit folded onto a single key.
+const EQUIPMENT_ALIASES: Record<string, string> = {
+  bodyweight: 'body weight', 'body-weight': 'body weight', 'body only': 'body weight', none: 'body weight', 'no equipment': 'body weight',
+  dumbbells: 'dumbbell', barbells: 'barbell', kettlebells: 'kettlebell',
+  band: 'bands', 'resistance band': 'bands', 'resistance bands': 'bands',
+  machines: 'machine'
+};
+
+// The equipment a program filter offers, in the order it offers it.
+export const EQUIPMENT_KEYS = ['body weight', 'dumbbell', 'barbell', 'kettlebell', 'bands', 'machine'];
+
+const EQUIPMENT_LABELS: Record<string, string> = {
+  'body weight': 'Body Weight', dumbbell: 'Dumbbell', barbell: 'Barbell', kettlebell: 'Kettlebell', bands: 'Bands', machine: 'Machine'
+};
+
 export function equipmentKey(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const key = String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return EQUIPMENT_ALIASES[key] || key;
 }
 
 export function isFreeEquipment(value: unknown): boolean {
   return FREE_EQUIPMENT_KEYS.has(equipmentKey(value));
 }
 
+// Known equipment always reads the same way. Anything else keeps its publisher's
+// capitalisation, titled only when it arrived all lowercase.
 export function equipmentLabel(value: unknown): string {
-  return String(value ?? '').trim().replace(/\s+/g, ' ');
+  const written = String(value ?? '').trim().replace(/\s+/g, ' ');
+  const known = EQUIPMENT_LABELS[equipmentKey(written)];
+  if (known) return known;
+  return written === written.toLowerCase() ? written.replace(/(^|[\s-])([a-z])/g, (_match, gap: string, letter: string) => gap + letter.toUpperCase()) : written;
 }
 
 // Normalized keys for one exercise. An exercise with no equipment returns an
@@ -68,6 +91,18 @@ export function kitEquipmentKeys(owned: string[] | undefined): Set<string> {
   if (!keys.size) return keys;
   for (const key of FREE_EQUIPMENT_KEYS) keys.add(key);
   return keys;
+}
+
+// True when a kit can do everything a program asks for: every piece it needs is
+// owned or free. No kit means no filtering, and a program needing nothing passes.
+export function kitCoversEquipment(required: Iterable<string>, owned: string[] | undefined): boolean {
+  const kit = kitEquipmentKeys(owned);
+  if (!kit.size) return true;
+  for (const item of required) {
+    const key = equipmentKey(item);
+    if (key && !kit.has(key)) return false;
+  }
+  return true;
 }
 
 // Fold the Settings checkboxes back into the stored kit. Only the options that

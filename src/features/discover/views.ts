@@ -2,6 +2,7 @@ import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
 import type { GridCard } from '../../app/card-grid';
 import { authorPill, difficultyBadgeClass, EX_PLACEHOLDER, html } from '../../app/format';
+import { formatTaxonomyLabel, normalizeTrainingLevel } from '../../core/training-taxonomy';
 import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults, exerciseToolbar } from '../../app/exercise-browser';
 import { responsiveImageUrl } from '../../core/media';
 
@@ -43,7 +44,7 @@ export function discoverCardHtml(exercise: Exercise, state: AppState): string {
         ${img}
         ${selectable ? '<span class="sel-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>' : ''}
         <span class="source-badge badge-nostr">Workstr</span>
-        ${exercise.difficulty ? `<span class="diff-badge ${difficultyBadgeClass(exercise.difficulty)}">${html(exercise.difficulty)}</span>` : ''}
+        ${exercise.difficulty ? `<span class="diff-badge ${difficultyBadgeClass(exercise.difficulty)}">${html(formatTaxonomyLabel(normalizeTrainingLevel(exercise.difficulty)))}</span>` : ''}
       </div>
       <div class="card-body">
         <div class="card-name">${html(exercise.name)}</div>
