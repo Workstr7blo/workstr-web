@@ -1,9 +1,9 @@
 import { canonMuscle } from '../../core/muscles';
 import { EQUIPMENT_KEYS, equipmentKey } from '../../core/equipment';
-import { normalizeTrainingLevel } from '../../core/training-taxonomy';
+import { formatTaxonomyLabel, normalizeTrainingLevel } from '../../core/training-taxonomy';
 import type { Exercise } from '../../core/types';
 import type { RelayProgram } from '../../nostr/canon';
-import { estimateProgramMin, inferProgramMuscle, programExerciseName, resolveProgramExercise } from './views';
+import { estimateProgramMin, inferProgramMuscle, programExerciseName, programGroups, resolveProgramExercise } from './views';
 
 export const PROGRAM_GOALS = ['strength', 'hypertrophy', 'conditioning', 'mobility', 'endurance', 'recovery'];
 export const PROGRAM_FOCUS_LABELS = ['full-body', 'upper-body', 'lower-body', 'push', 'pull', 'legs', 'core'];
@@ -94,4 +94,21 @@ export function programDisplayTags(program: RelayProgram, exercises: Exercise[])
 
 export function programSearchTags(program: RelayProgram, exercises: Exercise[]): string[] {
   return uniqueTags([...selectedProgramGoals(program.tags || []), ...inferProgramLabels(program, exercises)]);
+}
+
+const BROAD_FOCUS = ['full-body', 'upper-body', 'lower-body'];
+
+// The collapsed card's one line of goal and focus, in place of the pills: the goal the author
+// chose, then where the program trains - Full Body on its own, the muscles when there are one or
+// two, otherwise the broad split (with its two leading muscles when no goal is taking the room).
+// Format is on the line above, so it is never repeated here.
+export function programSummary(program: RelayProgram, exercises: Exercise[]): string {
+  const { goals, focus } = programTaxonomy(program, exercises);
+  const goal = goals[0] ? formatTaxonomyLabel(goals[0]) : '';
+  const groups = programGroups(program, exercises);
+  const broad = focus.find((value) => BROAD_FOCUS.includes(value));
+  let where = groups.slice(0, 2).join(' + ');
+  if (broad === 'full-body') where = 'Full Body';
+  else if (broad && groups.length > 2) where = goal ? formatTaxonomyLabel(broad) : `${formatTaxonomyLabel(broad)} · ${where}`;
+  return [goal, where].filter(Boolean).join(' · ');
 }

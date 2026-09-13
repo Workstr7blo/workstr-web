@@ -202,13 +202,12 @@ describe('sheetToProgram', () => {
     expect(program.tags).toEqual(['hypertrophy', 'push']);
     expect(program.exercises[0]).toMatchObject({ name: 'Bench Press', sets: 4, reps: '8', restSec: 120, weight: '60' });
   });
-  it('renders difficulty and tag pills on program cards', () => {
+  it('shows the level inline and the goal as text, with no badges or pills', () => {
     const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState);
-    expect(card).toContain('advanced');
-    expect(card).toContain('diff-advanced');
-    expect(card).toContain('program-tag-grid');
-    expect(card).toContain('Hypertrophy');
-    expect(card).toContain('Upper Body');
+    expect(card).toContain('<span class="card-level level-advanced">Advanced</span>');
+    // The goal the sheet carries, then the muscle inferred from its one exercise.
+    expect(card).toMatch(/<div class="workout-card-summary">Hypertrophy · [A-Z][a-z]+<\/div>/);
+    for (const retired of ['diff-badge', 'program-tag-grid', 'tag-pill', 'program-status', 'workout-card-author', 'workout-card-media']) expect(card).not.toContain(retired);
   });
   it('keeps collapsed program card metadata concise', () => {
     const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState);
@@ -372,14 +371,14 @@ describe('publication status on program cards', () => {
 
   it('shows a never-published program as local with Publish', () => {
     const card = programCard(sheetToProgram(source), appState(source));
-    expect(card).toContain('program-status local">local<');
+    expect(card).not.toContain('workout-card-status');
     expect(card).toContain('>Publish</button>');
   });
 
   it('shows an unchanged publication as published with no publish action', () => {
     const sheet = publishedSheet();
     const card = programCard(sheetToProgram(sheet), appState(sheet));
-    expect(card).toContain('program-status published">Published<');
+    expect(card).not.toContain('workout-card-status');
     expect(card).toContain('disabled>Published</button>');
     expect(card).not.toContain('data-publish-program');
     expect(card).toContain('data-edit-sheet="7"');
@@ -389,7 +388,7 @@ describe('publication status on program cards', () => {
   it('shows an edited publication as unpublished changes with Publish update', () => {
     const sheet = { ...publishedSheet(), name: 'Push Day Heavy' };
     const card = programCard(sheetToProgram(sheet), appState(sheet));
-    expect(card).toContain('program-status changed">Unpublished changes<');
+    expect(card).toContain('<div class="workout-card-status">Unpublished changes</div>');
     expect(card).toContain('data-publish-program="local:7"');
     expect(card).toContain('>Publish update</button>');
   });
@@ -397,7 +396,9 @@ describe('publication status on program cards', () => {
   it('keeps someone else import labelled in library', () => {
     const other = 'b'.repeat(64);
     const sheet = { ...source, nostr_pubkey: other, nostr_address: `33402:${other}:workstr:beastmode:program:push-day` };
-    expect(programCard(sheetToProgram(sheet), appState(sheet))).toContain('program-status local">in library<');
+    const card = programCard(sheetToProgram(sheet), appState(sheet));
+    expect(card).not.toContain('in library');
+    expect(card).not.toContain('workout-card-status');
   });
 
   it('marks the user own relay program as Yours in Discover, never Import', () => {
@@ -463,5 +464,53 @@ describe('program card exercise pictures', () => {
     expect(card).not.toContain('src="https://x/old.png"');
     // An exercise the library does not have keeps the picture the program saved.
     expect(card).toContain('src="https://x/ghost.png"');
+  });
+});
+
+describe('collapsed program card', () => {
+  const OPERATOR = 'ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6';
+  const CREATOR = 'c'.repeat(64);
+  const relayProgram = (partial: Partial<RelayProgram>): RelayProgram => ({
+    slug: 'p', name: 'Cardio Carnage #2', description: '', tags: [], exercises: [], sourceLabel: 'creator', eventId: '', pubkey: CREATOR,
+    address: `33402:${CREATOR}:workstr:beastmode:program:p`, createdAt: 1, ...partial
+  });
+  const members = (...muscles: string[]) => muscles.map((muscle, index) => ({ address: '', name: `Move ${index}`, muscleGroup: muscle, sets: 3, reps: '10' }));
+  const view = (partial: Partial<AppState> = {}) => ({ exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [], authorProfiles: {}, profileNames: {}, ...partial } as unknown as AppState);
+  const byline = (card: string) => /<div class="workout-card-byline">([^]*?)<\/div>\s*<div class="workout-card-meta">/.exec(card)?.[1] || '';
+
+  it('names Workstr as the creator of an official program, with its level, and no source badge', () => {
+    const card = programCard(relayProgram({ pubkey: OPERATOR, name: 'Upper Body', difficulty: 'intermediate', sourceLabel: 'Workstr' }), view());
+    expect(byline(card)).toContain('workstr-author');
+    expect(byline(card)).toContain('<span>Workstr</span></span><span class="card-level level-intermediate">Intermediate</span>');
+    expect(card).not.toContain('program-status');
+  });
+
+  it('names a creator by profile, falling back to a short npub', () => {
+    const named = programCard(relayProgram({ difficulty: 'beginner' }), view({ authorProfiles: { [CREATOR]: { name: 'Settebello' } } as AppState['authorProfiles'] }));
+    expect(byline(named)).toContain('<span>Settebello</span></span><span class="card-level level-beginner">Beginner</span>');
+    expect(byline(programCard(relayProgram({ difficulty: 'beginner' }), view()))).toContain('npub1');
+  });
+
+  it('omits the creator of a program nobody has published, and the byline when nothing is left', () => {
+    const local = relayProgram({ pubkey: '', address: 'local:3', difficulty: 'beginner' });
+    expect(byline(programCard(local, view()))).toBe('<span class="card-level level-beginner">Beginner</span>');
+    expect(programCard({ ...local, difficulty: '' }, view())).not.toContain('workout-card-byline');
+  });
+
+  it('summarises goal and focus in one line without repeating the format', () => {
+    const summary = (program: RelayProgram) => /<div class="workout-card-summary">([^<]*)<\/div>/.exec(programCard(program, view()))?.[1];
+    expect(summary(relayProgram({ tags: ['endurance'], exercises: members('Core', 'Calves') }))).toBe('Endurance · Core + Calves');
+    expect(summary(relayProgram({ exercises: members('Chest', 'Quadriceps', 'Back') }))).toBe('Full Body');
+    expect(summary(relayProgram({ exercises: members('Chest', 'Back', 'Shoulders') }))).toBe('Upper Body · Chest + Back');
+    expect(summary(relayProgram({ tags: ['strength'], exercises: members('Chest', 'Back', 'Shoulders') }))).toBe('Strength · Upper Body');
+    expect(summary(relayProgram({ tags: ['emom'], exercises: members('Core') }))).toBe('Core');
+  });
+
+  it('keeps the map beside the text and a real disclosure button in the corner', () => {
+    const collapsed = programCard(relayProgram({}), view());
+    expect(collapsed).not.toContain('workout-card-media');
+    expect(collapsed).toContain('<button class="workout-card-toggle" type="button" aria-expanded="false" aria-label="Expand Cardio Carnage #2">');
+    const expanded = programCard(relayProgram({}), view({ expandedProgramAddress: `33402:${CREATOR}:workstr:beastmode:program:p`, finishedSessions: [], pubkey: null } as Partial<AppState>));
+    expect(expanded).toContain('aria-expanded="true" aria-label="Collapse Cardio Carnage #2"');
   });
 });

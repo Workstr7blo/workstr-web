@@ -152,7 +152,12 @@ and patch it directly, which is also why a page render can leave it standing.
 - `src/features/sheets/builder-views.ts` renders the builder's row and EMOM-section
   markup from `BuilderState`. It is pure markup; all builder state lives in the
   controller above.
-- `src/features/sheets/program-actions.ts` renders a program card's status pill and its
+- `programCard` in `src/features/sheets/views.ts` draws the collapsed program card shared by
+  Programs and Discover: the map, the title, a byline (creator - Workstr for the official
+  catalog - then the level and, in Discover, the Monero Tip), the duration and format line, and
+  one goal and focus line from `programSummary` in `src/features/sheets/program-labels.ts`. No
+  badges or pills; the only status it shows is Unpublished changes.
+- `src/features/sheets/program-actions.ts` renders a program card's expanded
   Start/Publish/Edit/Delete or Import/Update actions. The user's own publication reads
   Published or Unpublished changes (Publish update) in Programs and Yours in Discover; the
   state compares `creatorProgramFingerprint` from `src/nostr/program-publish.ts` with the

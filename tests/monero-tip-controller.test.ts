@@ -94,6 +94,15 @@ describe('Monero Tip on program cards', () => {
     expect(programCard(program, state({ authorPaymentTargets: {} }), { showPayment: true })).not.toContain('monero-tip-cta');
   });
 
+  it('puts the Tip on the creator byline, named for the creator, never under the map', () => {
+    const card = programCard(program, state(), { showPayment: true });
+    const byline = card.slice(card.indexOf('workout-card-byline'), card.indexOf('workout-card-meta'));
+    expect(byline).toContain('monero-tip-cta');
+    expect(card).not.toContain('workout-card-media');
+    expect(card).toMatch(/aria-label="Tip [^"]+ with Monero"/);
+    expect(programCard(program, state(), { showPayment: false })).not.toContain('monero-tip-cta');
+  });
+
   it('ignores a target that is not a Monero address', () => {
     const app = state({ authorPaymentTargets: { [AUTHOR]: 'bc1qexamplenotmonero' } });
     expect(moneroTipAddress(program, app)).toBe('');
