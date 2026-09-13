@@ -411,3 +411,37 @@ describe('publication status on program cards', () => {
     expect(programActions(relay('b'.repeat(64)), appState(publishedSheet()))).toContain('>Import</button>');
   });
 });
+
+describe('Delete from relays action', () => {
+  const ME = 'a'.repeat(64);
+  const address = `33402:${ME}:workstr:beastmode:program:push-day`;
+  const base: SheetWithExercises = {
+    id: 7, slug: 'push-day', name: 'Push Day', notes: '', difficulty: 'advanced', tags: [], is_temporary: false,
+    created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', exercises: []
+  };
+  const appState = (sheets: SheetWithExercises[], pubkey: string | null = ME) =>
+    ({ exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets, finishedSessions: [], pubkey, profilePicture: null } as unknown as AppState);
+  const relayCopy = (pubkey = ME): RelayProgram => ({
+    slug: 'push-day', name: 'Push Day', description: '', tags: [], exercises: [], sourceLabel: 'creator',
+    eventId: 'f'.repeat(64), pubkey, address: `33402:${pubkey}:workstr:beastmode:program:push-day`, createdAt: 1
+  });
+
+  it('is offered on a published Programs card and never on a local-only one', () => {
+    const published = { ...base, nostr_pubkey: ME, nostr_address: address };
+    expect(programActions(sheetToProgram(published), appState([published]))).toContain('data-delete-program="local:7">Delete from relays</button>');
+    expect(programActions(sheetToProgram(base), appState([base]))).not.toContain('data-delete-program');
+  });
+
+  it('is offered on your own relay copy in Discover, linked or not', () => {
+    const orphan = programActions(relayCopy(), appState([]));
+    expect(orphan).toContain(`data-delete-program="${address}"`);
+    expect(orphan).toContain('>Import</button>');
+    const linked = { ...base, nostr_pubkey: ME, nostr_address: address };
+    expect(programActions(relayCopy(), appState([linked]))).toContain(`data-delete-program="${address}"`);
+  });
+
+  it('is never offered for another author or while signed out', () => {
+    expect(programActions(relayCopy('b'.repeat(64)), appState([]))).not.toContain('data-delete-program');
+    expect(programActions(relayCopy(), appState([], null))).not.toContain('data-delete-program');
+  });
+});

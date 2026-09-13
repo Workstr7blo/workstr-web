@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Delete a program you published from public relays. Your published programs in Programs,
+  and your own programs in Discover, have a Delete from relays button. It sends a deletion
+  request signed by your account; relays that honour it stop serving the program, and it
+  disappears from Discover. A copy in Programs on your device is kept and becomes local-only,
+  so you can publish it again later.
+
 - Programs you publish now say whether public relays have your latest version. A program
   card reads Published while nothing has changed, and Unpublished changes with a Publish
   update button once you edit it; in Discover your own programs read Yours, or Yours ·

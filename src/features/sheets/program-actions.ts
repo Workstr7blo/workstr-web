@@ -1,4 +1,5 @@
 import type { RelayProgram } from '../../nostr/canon';
+import { CREATOR_PROGRAM_KIND } from '../../nostr/creator-programs';
 import { programImportState } from '../../nostr/programImport';
 import { findOwnedProgramSource, sheetPublicationState, type ProgramPublicationState } from '../../nostr/program-ownership';
 import type { AppState } from '../../app/state';
@@ -28,6 +29,17 @@ export function programStatusBadge(program: RelayProgram, state: AppState): { la
   return { label: program.sourceLabel || 'local', cls: 'local' };
 }
 
+// Only the author can retract a program, so the action appears on the active account's own
+// publications: a published Programs card, and its relay copy in Discover whether or not a
+// local program is still linked to it.
+function deleteFromRelaysButton(address: string): string {
+  return `<button class="button quiet danger small" type="button" data-delete-program="${html(address)}">Delete from relays</button>`;
+}
+
+function authoredByActiveAccount(program: RelayProgram, state: AppState): boolean {
+  return Boolean(state.pubkey && program.pubkey === state.pubkey && program.address.startsWith(`${CREATOR_PROGRAM_KIND}:${state.pubkey}:`));
+}
+
 function localProgramActions(program: RelayProgram, state: AppState): string {
   const publication = localPublicationState(program, state);
   const publishClass = beastModeEligibility(state).unlocked ? ' primary' : '';
@@ -37,6 +49,7 @@ function localProgramActions(program: RelayProgram, state: AppState): string {
   return `<button class="button primary small start-workout-action" type="button" data-start-program="${html(program.address)}">Start workout</button>
       ${publish}
       <button class="button small" type="button" data-edit-sheet="${localSheetId(program)}">Edit</button>
+      ${publication === 'local' ? '' : deleteFromRelaysButton(program.address)}
       <button class="button quiet danger small" type="button" data-del-sheet="${localSheetId(program)}">Delete</button>`;
 }
 
@@ -44,12 +57,13 @@ export function programActions(program: RelayProgram, state: AppState): string {
   if (isLocalProgram(program)) return localProgramActions(program, state);
   // The user's own publication is edited from Programs; the relay copy is only ever a status.
   const owned = findOwnedProgramSource(program, state.sheets, state.pubkey);
+  const retract = authoredByActiveAccount(program, state) ? deleteFromRelaysButton(program.address) : '';
   if (owned) {
     const label = sheetPublicationState(owned, state.pubkey) === 'changed' ? 'Yours · Unpublished changes' : 'Yours';
-    return `<button class="button small" type="button" disabled>${label}</button>`;
+    return `<button class="button small" type="button" disabled>${label}</button>${retract}`;
   }
   const importState = programImportState(program, state.sheets, state.pubkey);
-  return importState === 'in-library'
+  return (importState === 'in-library'
     ? `<button class="button small" type="button" disabled>In library</button>`
-    : `<button class="button primary small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>`;
+    : `<button class="button primary small" type="button" data-import-program="${html(program.address)}">${importState === 'update' ? 'Update' : 'Import'}</button>`) + retract;
 }

@@ -192,3 +192,66 @@ describe('createProgramPublishController', () => {
     expect(publishCreatorProgramMock).not.toHaveBeenCalled();
   });
 });
+
+describe('deleting a program from relays', () => {
+  const ME = 'f'.repeat(64);
+  const address = `33402:${ME}:workstr:beastmode:program:cardio-carnage-2`;
+  const relayCopy = {
+    slug: 'cardio-carnage-2', name: 'Cardio Carnage #2', description: '', tags: [], exercises: [], sourceLabel: 'creator',
+    eventId: 'e'.repeat(64), pubkey: ME, address, createdAt: 1
+  };
+  const deletion = { event: { id: 'd'.repeat(64), pubkey: ME, created_at: 2, kind: 5, tags: [], content: '', sig: '' }, okRelays: ['wss://nos.lol'], failedRelays: [] };
+
+  function setup(partial: Partial<AppState>, confirmed = true) {
+    vi.spyOn(window, 'confirm').mockReturnValue(confirmed);
+    const deleteCreatorProgram = vi.fn(async (..._args: unknown[]) => deletion);
+    const persistCanonCache = vi.fn(async () => {});
+    const toast = vi.fn();
+    const appState = state({ pubkey: ME, settings: { unit: 'kg', publicRelays: ['wss://nos.lol'] }, ...partial });
+    const controller = createProgramPublishController({
+      root: document.createElement('div'), state: appState, render: vi.fn(), toast, openModal: vi.fn(),
+      getSigner: vi.fn(async () => ({ type: 'local' }) as Signer), deleteCreatorProgram, persistCanonCache
+    });
+    return { controller, appState, deleteCreatorProgram, persistCanonCache, toast };
+  }
+
+  it('retracts a relay copy with no local program and drops it from Discover', async () => {
+    const app = setup({ programs: [relayCopy] as unknown as AppState['programs'] });
+
+    await app.controller.deleteFromRelays(address);
+
+    expect(app.deleteCreatorProgram).toHaveBeenCalledWith(expect.anything(), { address, eventId: 'e'.repeat(64) }, expect.arrayContaining(['wss://nos.lol', 'wss://relay.damus.io']), expect.any(Object));
+    expect(app.appState.programs).toEqual([]);
+    expect(app.persistCanonCache).toHaveBeenCalled();
+    expect(app.toast).toHaveBeenLastCalledWith('Deleted Cardio Carnage #2 from 1 public relay.', 'ok');
+  });
+
+  it('keeps a linked local program but makes it local-only', async () => {
+    const linked = sheet({ nostr_pubkey: ME, nostr_address: address, nostr_event_id: 'e'.repeat(64) });
+    const store = { saveSheet: vi.fn(async () => 7), listSheets: vi.fn(async () => [sheet()]) } as unknown as WorkstrStore;
+    const app = setup({ sheets: [linked], programs: [relayCopy] as unknown as AppState['programs'], store });
+
+    await app.controller.deleteFromRelays('local:7');
+
+    expect(app.deleteCreatorProgram).toHaveBeenCalledWith(expect.anything(), { address, eventId: 'e'.repeat(64) }, expect.any(Array), expect.any(Object));
+    expect(store.saveSheet).toHaveBeenCalledWith(expect.objectContaining({ name: 'Push Day', nostr_address: undefined, nostr_event_id: undefined }), 7);
+    expect(app.appState.programs).toEqual([]);
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('It stays in Programs on this device.'));
+  });
+
+  it('does nothing when the confirmation is cancelled', async () => {
+    const app = setup({ programs: [relayCopy] as unknown as AppState['programs'] }, false);
+    await app.controller.deleteFromRelays(address);
+    expect(app.deleteCreatorProgram).not.toHaveBeenCalled();
+    expect(app.appState.programs).toHaveLength(1);
+  });
+
+  it('changes nothing when no relay accepts the deletion', async () => {
+    const app = setup({ programs: [relayCopy] as unknown as AppState['programs'] });
+    app.deleteCreatorProgram.mockRejectedValueOnce(new Error('no public relay accepted the deletion'));
+    await app.controller.deleteFromRelays(address);
+    expect(app.appState.programs).toHaveLength(1);
+    expect(app.persistCanonCache).not.toHaveBeenCalled();
+    expect(app.toast).toHaveBeenLastCalledWith('no public relay accepted the deletion', 'bad');
+  });
+});

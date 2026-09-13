@@ -343,7 +343,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const catalog = createCatalogController({ root, state, render, toast, openModal, closeModal, fetchProfile, renderProgramLists: () => programList.renderMounted() });
   const sessionPersistence = createSessionPersistence(state);
   const identity = createIdentityController({ root, state, render, openModal, closeModal, openLocal, openIdentity });
-  const programPublish = createProgramPublishController({ root, state, render, toast, openModal, getSigner: options.programPublish?.getSigner || identity.getActiveSigner, publishCreatorProgram: options.programPublish?.publishCreatorProgram, programPublishRelays: options.programPublish?.programPublishRelays });
+  const programPublish = createProgramPublishController({ root, state, render, toast, openModal, getSigner: options.programPublish?.getSigner || identity.getActiveSigner, publishCreatorProgram: options.programPublish?.publishCreatorProgram, programPublishRelays: options.programPublish?.programPublishRelays, persistCanonCache: catalog.persistCanonCache });
 
   const sessionRunner = createSessionRunner({
     root, state, render, toast, openModal, closeModal, wDisplay, wFmt, unitLabel,
