@@ -70,7 +70,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | Isolated browser smoke verification | `src/app/isolated-browser-smoke.ts`, `src/browser-smoke.ts`, `scripts/browser-smoke.mjs` | `vite.smoke.config.ts`, `smoke.html`, `src/app/program-publish-controller.ts` | `tests/isolated-browser-smoke.test.ts`, `tests/program-publish-controller.test.ts` |
 | NIP-07 signing and device-local keys | `src/signer/nip07.ts`, `src/signer/local-key.ts` | `src/signer/types.ts` | `tests/local-key-signer.test.ts`, shell/share tests use fakes |
 | NIP-46 remote signing | `src/signer/nip46.ts` | `src/signer/types.ts`, shell sign-in flow | `tests/shell.test.ts` plus browser validation |
-| Workout-summary and creator-program event publishing | `src/nostr/share.ts`, `src/nostr/program-publish.ts` | `src/features/train/session-summary.ts`, `src/nostr/secret-redaction.ts`, signer contract | `tests/share.test.ts`, `tests/program-publish.test.ts`, `tests/secret-redaction.test.ts` |
+| Workout-summary and creator-program event publishing | `src/nostr/share.ts`, `src/nostr/program-publish.ts`, `src/nostr/program-delete.ts` | `src/features/train/session-summary.ts`, `src/nostr/secret-redaction.ts`, signer contract | `tests/share.test.ts`, `tests/program-publish.test.ts`, `tests/program-delete.test.ts`, `tests/secret-redaction.test.ts` |
 | NIP-A3 Monero payment targets (`kind:10133`) | `src/nostr/payment-targets.ts` | `src/nostr/pool.ts`, `src/signer/types.ts` | `tests/payment-targets.test.ts` |
 | Monero Tip on Discover program cards | `src/features/sheets/monero-tip-view.ts`, `src/app/monero-tip-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/catalog-controller.ts`, `src/features/sheets/views.ts` | `tests/monero-tip-controller.test.ts`, `tests/discover.test.ts` |
 | The Monero tips switch and the user's public Monero address | `src/features/support/payment-mode-views.ts`, `src/app/monero-address-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/settings-view.ts`, `src/app/shell.ts` (the switch handler) | `tests/monero-address-controller.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts` |
@@ -139,7 +139,9 @@ and patch it directly, which is also why a page render can leave it standing.
 - `src/app/program-builder.ts` owns program-builder modal state, exercise selection,
   normal/superset and EMOM prescriptions, row ordering, validation, and persistence.
 - `src/app/program-publish-controller.ts` owns Beast Mode local program publish
-  execution through the active signer and configured public relays.
+  execution through the active signer and configured public relays, and Delete from relays:
+  a NIP-09 request built by `src/nostr/program-delete.ts`, after which the program leaves
+  Discover and the catalog snapshot and any linked local program becomes local-only.
 - `src/app/isolated-browser-smoke.ts` owns the production-build browser-smoke
   composition: an in-memory signer/publisher and an empty relay list that fail
   closed before any creator-program public transport is reachable.
