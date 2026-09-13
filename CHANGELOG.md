@@ -54,6 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Exercise pictures are no longer cropped. Library and Discover cards, the exercise details,
+  program and builder rows, and the live workout screen each cut a different part off the
+  same picture - hands, feet, the Workstr symbol or the floor ring. Every picture is now
+  shown whole, centred on black, and every card, row and workout screen keeps the size it
+  had, so nothing moves.
+
 - Editing a program you published no longer leaves you with two copies of it. Saving an edit
   dropped the program's link to what you had published, so Discover offered your own program
   back as an import, and taking it added a second card to Programs. Edits now keep the link,
