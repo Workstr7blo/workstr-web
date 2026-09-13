@@ -1,7 +1,7 @@
 import { slugify } from '../core/ids';
 import type { Exercise, Sheet } from '../core/types';
 import type { SheetDraft } from '../db/store';
-import type { RelayProgram, RelayProgramExercise } from './canon';
+import { EXERCISE_D_PREFIX, type RelayProgram, type RelayProgramExercise } from './canon';
 import { findOwnedProgramSource } from './program-ownership';
 
 export type ProgramImportState = 'new' | 'in-library' | 'update';
@@ -45,13 +45,25 @@ function findInLibrary(member: RelayProgramExercise, library: Exercise[]): Exerc
   return undefined;
 }
 
+// Creator programs published from Workstr Web reference an exercise by its bare d tag
+// (`workstr:exercise:<slug>`) rather than the full `33401:<operator>:...` address, and the
+// copies already on relays will never change. The catalog is operator-only, so a bare d tag
+// names exactly one catalog exercise; a full address from another author is never matched by
+// slug, or someone else's exercise would import as the operator's.
+function findInCanon(address: string, canon: Exercise[]): Exercise | undefined {
+  const exact = canon.find((exercise) => exercise.nostr_address === address);
+  if (exact || !address.startsWith(EXERCISE_D_PREFIX)) return exact;
+  const slug = address.slice(EXERCISE_D_PREFIX.length);
+  return canon.find((exercise) => exercise.slug === slug);
+}
+
 export function planProgramImport(program: RelayProgram, library: Exercise[], canon: Exercise[]): ProgramImportPlan {
   const exercisesToImport: Exercise[] = [];
   const unresolved: string[] = [];
   const rows = program.exercises.map((member, index) => {
     let full = findInLibrary(member, library);
     if (!full && member.address) {
-      const fromCanon = canon.find((exercise) => exercise.nostr_address === member.address);
+      const fromCanon = findInCanon(member.address, canon);
       if (fromCanon) {
         full = fromCanon;
         if (!exercisesToImport.some((exercise) => exercise.nostr_address === fromCanon.nostr_address)) exercisesToImport.push(fromCanon);

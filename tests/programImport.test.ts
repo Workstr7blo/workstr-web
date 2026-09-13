@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { Exercise, Sheet } from '../src/core/types';
 import type { RelayProgram, RelayProgramExercise } from '../src/nostr/canon';
 import { planProgramImport, programImportState } from '../src/nostr/programImport';
+import type { Event } from 'nostr-tools';
+import type { SheetWithExercises } from '../src/db/store';
+import { programFromEvent } from '../src/nostr/canon';
+import { buildCreatorProgramEvent } from '../src/nostr/program-publish';
 
 const exerciseBase: Omit<Exercise, 'slug'> = {
   name: 'Bench Press',
@@ -148,5 +152,56 @@ describe('planProgramImport', () => {
       nostr_event_id: 'ev1',
       origin_created_at: 321
     });
+  });
+});
+
+// Creator programs published from Workstr Web name exercises by bare d tag, not full address.
+describe('planProgramImport for creator programs', () => {
+  const bare = (slug: string) => `workstr:exercise:${slug}`;
+  const creator = (members: RelayProgramExercise[]) => program(members, { pubkey: 'creator', address: '33402:creator:workstr:beastmode:program:cardio', sourceLabel: 'creator' });
+
+  it('imports a catalog exercise the library lacks when referenced by its bare d tag', () => {
+    const canon = [exercise('burpee', address('burpee'), { muscle_group: 'Core', image_url: 'img' })];
+    const plan = planProgramImport(creator([{ address: bare('burpee'), name: 'Burpee' }]), [], canon);
+    expect(plan.unresolved).toEqual([]);
+    expect(plan.exercisesToImport.map((entry) => entry.nostr_address)).toEqual([address('burpee')]);
+    expect(plan.sheet.exercises[0]).toMatchObject({ exercise_slug: 'burpee', exercise_name: 'Burpee', muscle_group: 'Core', image_url: 'img' });
+  });
+
+  it('still prefers the library copy and imports nothing', () => {
+    const canon = [exercise('burpee', address('burpee'))];
+    const plan = planProgramImport(creator([{ address: bare('burpee') }]), [exercise('burpee', address('burpee'))], canon);
+    expect(plan.exercisesToImport).toEqual([]);
+    expect(plan.unresolved).toEqual([]);
+  });
+
+  it('imports once when a bare and a full reference name the same exercise', () => {
+    const canon = [exercise('burpee', address('burpee'))];
+    const plan = planProgramImport(creator([{ address: bare('burpee') }, { address: address('burpee') }]), [], canon);
+    expect(plan.exercisesToImport).toHaveLength(1);
+  });
+
+  it('never resolves another author full address by slug', () => {
+    const canon = [exercise('burpee', address('burpee'))];
+    const plan = planProgramImport(creator([{ address: '33401:someone:workstr:exercise:burpee', name: 'Their Burpee' }]), [], canon);
+    expect(plan.exercisesToImport).toEqual([]);
+    expect(plan.unresolved).toEqual(['33401:someone:workstr:exercise:burpee']);
+  });
+
+  it('still reports a bare reference the catalog does not have', () => {
+    expect(planProgramImport(creator([{ address: bare('ghost-move') }]), [], []).unresolved).toEqual([bare('ghost-move')]);
+  });
+
+  it('resolves the references Workstr Web itself publishes', () => {
+    const published = {
+      id: 1, slug: 'cardio', name: 'Cardio', notes: '', difficulty: 'beginner', tags: [], is_temporary: false, created_at: '', updated_at: '',
+      exercises: [{ sheet_id: 1, exercise_slug: 'burpee', exercise_name: 'Burpee', position: 0, sets: 3, reps: '10', rest: 60 }]
+    } as SheetWithExercises;
+    const event = { ...buildCreatorProgramEvent(published), pubkey: 'c'.repeat(64), id: 'e'.repeat(64), sig: '' } as Event;
+    const relay = programFromEvent(event);
+    expect(relay?.exercises[0].address).toBe(bare('burpee'));
+    const plan = planProgramImport(relay!, [], [exercise('burpee', address('burpee'))]);
+    expect(plan.unresolved).toEqual([]);
+    expect(plan.exercisesToImport.map((entry) => entry.slug)).toEqual(['burpee']);
   });
 });
