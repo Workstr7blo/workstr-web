@@ -17,7 +17,7 @@ export interface ExerciseBrowserContext {
   catalog: CatalogController;
 }
 
-const NO_FACETS = { cat: '', muscle: '', diff: '', equip: '' };
+const NO_FACETS = { cat: '', muscle: '', diff: '', equip: '', fav: '' };
 
 /**
  * Wiring for the exercise filter sheet, its options, the active-facet chips, and Clear.
@@ -53,6 +53,14 @@ export function bindExerciseBrowser({ root, state, render, renderResults, catalo
     render();
     root.querySelector<HTMLElement>(`[data-exercise-filter-open="${opener}"]`)?.focus();
   };
+
+  // The toolbar badge and the chip row change with it, so this is a page render; focus goes back
+  // to the toggle so a keyboard user stays where they were.
+  root.querySelector('#lib-favourites-toggle')?.addEventListener('click', () => {
+    state.exFilter = { ...state.exFilter, fav: state.exFilter.fav === 'on' ? '' : 'on' };
+    render();
+    root.querySelector<HTMLElement>('#lib-favourites-toggle')?.focus();
+  });
 
   root.querySelectorAll<HTMLElement>('[data-exercise-filter-open]').forEach((button) => button.addEventListener('click', () => {
     state.exerciseFilterSheet = button.dataset.exerciseFilterOpen as AppState['exerciseFilterSheet'];

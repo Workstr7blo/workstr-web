@@ -9,7 +9,7 @@ import { fetchAuthorMoneroPaymentTargets } from '../nostr/payment-targets';
 import { discoverImportState } from '../features/discover/views';
 import { moneroMode } from '../features/sheets/monero-tip-view';
 import { paintBodyMapSvg } from './bodymap';
-import { EX_PLACEHOLDER, exerciseSourceLabel, html } from './format';
+import { authorPill, EX_PLACEHOLDER, exerciseSourceLabel, html } from './format';
 import { formatTaxonomyLabel, normalizeMovementType, normalizeTrainingLevel } from '../core/training-taxonomy';
 import { programSurfaceMounted, updateDiscoverExercises, updateExerciseCatalogStatus, updateProgramCatalogStatus } from './catalog-surfaces';
 import type { RenderOptions } from './root-rebuild';
@@ -203,8 +203,12 @@ function openExerciseDetail(exercise: Exercise, source: 'library' | 'discover'):
   const importState = discoverImportState(exercise, state.library);
   const importLabel = importState === 'update' ? 'Update' : importState === 'in-library' ? 'In library' : 'Import';
   const importCls = importState === 'in-library' ? '' : 'primary';
+  // What the compact card leaves out is here: the source and, for a Nostr exercise, who published it.
+  const sourceName = ({ ai: 'AI', manual: 'Manual' } as Record<string, string>)[sourceLabel] || sourceLabel;
+  const creator = exercise.nostr_pubkey ? authorPill(state.authorProfiles?.[exercise.nostr_pubkey], exercise.nostr_pubkey, { compact: true }) : '';
+  const favouriteLabel = (on: boolean) => on ? '★ Remove from favorites' : '☆ Add to favorites';
   const actions = source === 'library'
-    ? `<button class="button quiet danger" id="ex-detail-delete">Delete</button>`
+    ? `<button class="button" id="ex-detail-fav" type="button" aria-pressed="${exercise.favourite}">${favouriteLabel(exercise.favourite)}</button><button class="button quiet danger" id="ex-detail-delete">Delete</button>`
     : `<button class="button ${importCls}" id="ex-import"${importState === 'in-library' ? ' disabled' : ''}>${importLabel}</button>`;
   openModal(`
     <div class="detail-img${src ? '' : ' placeholder'}">${src ? `<img src="${html(responsiveImageUrl(src, 720))}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('placeholder');this.remove()">` : EX_PLACEHOLDER}</div>
@@ -212,8 +216,8 @@ function openExerciseDetail(exercise: Exercise, source: 'library' | 'discover'):
     <div class="detail-badges">
       ${exercise.difficulty ? `<span class="badge diff">${html(formatTaxonomyLabel(normalizeTrainingLevel(exercise.difficulty)))}</span>` : ''}
       ${exercise.category ? `<span class="badge cat">${html(formatTaxonomyLabel(normalizeMovementType(exercise.category)))}</span>` : ''}
-      <span class="badge">${html(sourceLabel)}</span>
     </div>
+    <div class="detail-source"><span>Source</span>${html(sourceName)}${creator}</div>
     ${showDescription ? `<p class="detail-desc">${html(description)}</p>` : ''}
     <div class="sets-info">
       <div class="sets-item"><div class="val">${exercise.default_sets ?? 3}</div><div class="lbl">Sets</div></div>
@@ -232,6 +236,14 @@ function openExerciseDetail(exercise: Exercise, source: 'library' | 'discover'):
     const mapHost = root.querySelector<HTMLElement>('#detail-muscle-map');
     if (mapHost) mapHost.innerHTML = paintBodyMapSvg(primarySet, secondarySet);
   }
+  root.querySelector('#ex-detail-fav')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    await toggleFavourite(exercise.slug);
+    // The page behind the modal is redrawn; the modal is not, so its button is written in place.
+    const on = state.library.find((entry) => entry.slug === exercise.slug)?.favourite ?? false;
+    button.textContent = favouriteLabel(on);
+    button.setAttribute('aria-pressed', String(on));
+  });
   root.querySelector('#ex-detail-delete')?.addEventListener('click', async () => {
     if (await deleteExerciseFromLibrary(exercise)) closeModal();
   });

@@ -109,6 +109,7 @@ export interface ExerciseFilter {
   // '' = every exercise, MY_EQUIPMENT = the saved kit, anything else = one key.
   equip?: string;
   ownedEquipment?: string[];
+  favourite?: boolean;
 }
 
 // Resolve the equipment select into the set of keys an exercise may require.
@@ -132,7 +133,8 @@ export function filterExercises(exercises: Exercise[], filter: ExerciseFilter = 
     && (!cat || normalizeMovementType(exercise.category) === normalizeMovementType(cat))
     && (!muscle || exerciseCanonMuscleSet(exercise).has(muscle))
     && (!diff || normalizeTrainingLevel(exercise.difficulty) === normalizeTrainingLevel(diff))
-    && matchesEquipment(exercise.equipment, allowed));
+    && matchesEquipment(exercise.equipment, allowed)
+    && (!filter.favourite || exercise.favourite));
 }
 
 export function fillSelectHtml(id: string, values: string[], allLabel: string, current: string): string {

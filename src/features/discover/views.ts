@@ -1,10 +1,9 @@
 import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
 import type { GridCard } from '../../app/card-grid';
-import { authorPill, difficultyBadgeClass, EX_PLACEHOLDER, html } from '../../app/format';
-import { formatTaxonomyLabel, normalizeTrainingLevel } from '../../core/training-taxonomy';
+import { html } from '../../app/format';
+import { exerciseCard } from '../../app/exercise-card';
 import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults, exerciseToolbar } from '../../app/exercise-browser';
-import { responsiveImageUrl } from '../../core/media';
 
 export type DiscoverImportState = 'new' | 'in-library' | 'update';
 
@@ -30,31 +29,19 @@ function importButton(exercise: Exercise, importState: DiscoverImportState): str
 }
 
 export function discoverCardHtml(exercise: Exercise, state: AppState): string {
-  const src = exercise.image_url || '';
-  const img = `${EX_PLACEHOLDER}${src ? `<img class="card-photo" src="${html(responsiveImageUrl(src, 360))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}`;
   const importState = discoverImportState(exercise, state.library);
   const sel = state.discoverSelect;
   // Only importable cards (new/update) take part in select mode.
   const selectable = sel.active && importState !== 'in-library';
   const selected = selectable && sel.addresses.has(exercise.nostr_address || exercise.slug);
-  const author = exercise.nostr_pubkey ? authorPill(state.authorProfiles?.[exercise.nostr_pubkey], exercise.nostr_pubkey, { compact: true }) : '';
-  return `
-    <div class="ex-card${selected ? ' selected' : ''}${sel.active && !selectable ? ' unselectable' : ''}" data-address="${html(exercise.nostr_address || exercise.slug)}">
-      <div class="card-img">
-        ${img}
-        ${selectable ? '<span class="sel-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>' : ''}
-        <span class="source-badge badge-nostr">Workstr</span>
-        ${exercise.difficulty ? `<span class="diff-badge ${difficultyBadgeClass(exercise.difficulty)}">${html(formatTaxonomyLabel(normalizeTrainingLevel(exercise.difficulty)))}</span>` : ''}
-      </div>
-      <div class="card-body">
-        <div class="card-name">${html(exercise.name)}</div>
-        <div class="card-meta discover-card-meta">
-          ${exercise.muscle_group ? `<span class="muscle">${html(exercise.muscle_group)}</span>` : ''}
-          ${author}
-        </div>
-        ${importButton(exercise, importState)}
-      </div>
-    </div>`;
+  // No star: a catalog exercise is favorited after it is imported, never by a tap that imports it.
+  return exerciseCard({
+    exercise,
+    keyAttribute: `data-address="${html(exercise.nostr_address || exercise.slug)}"`,
+    classes: `${selected ? ' selected' : ''}${sel.active && !selectable ? ' unselectable' : ''}`,
+    selectable,
+    footer: importButton(exercise, importState)
+  });
 }
 
 export function discoverImportable(list: Exercise[], library: Exercise[]): Exercise[] {

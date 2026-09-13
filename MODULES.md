@@ -64,6 +64,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | Body-weight UI and calculations | `src/features/progress/views.ts` | `src/db/store.ts`, `src/core/units.ts` | `tests/progress-views.test.ts`, `tests/store.test.ts` |
 | Recovery calculation and body map | `src/features/recovery/recovery.ts` | `views.ts`, `src/app/bodymap.ts`, `src/core/muscles.ts` | `tests/recovery.test.ts` |
 | Quick Workout generation | `src/features/recovery/quickWorkout.ts` | recovery module, `src/app/preferences-controller.ts` | `tests/recovery.test.ts`, relevant shell/session tests |
+| Exercise cards shared by Library and Discover: photo, name, muscle and level line | `src/app/exercise-card.ts` | `src/features/library/views.ts`, `src/features/discover/views.ts` | `tests/exercise-cards.test.ts` |
 | Exercise library UI | `src/features/library/views.ts` | shell library handlers, `src/app/format.ts`, `src/db/store.ts` | `tests/equipment-views.test.ts`, `tests/shell.test.ts`, `tests/store.test.ts` |
 | Discover exercise/program UI | `src/features/discover/views.ts` | `src/nostr/canon.ts`, `programImport.ts`, shell import handlers | `tests/discover.test.ts`, `tests/canon.test.ts`, `tests/programImport.test.ts` |
 | Catalog event parsing/fetch/cache | `src/nostr/canon.ts`, `src/nostr/creator-programs.ts` | `src/nostr/pool.ts`, `src/core/types.ts` | `tests/canon.test.ts` |
@@ -221,7 +222,9 @@ and patch it directly, which is also why a page render can leave it standing.
   only records which one has the sheet open. `exerciseResults(view, state)` produces both
   the grid and the sheet's "Show N". Sheet options are derived from the exercises that view
   holds, and a selected value whose option has disappeared stays listed so the filter can
-  still be undone. `src/app/exercise-browser-controller.ts` owns its event bindings.
+  still be undone. Favorites only is the Library-only `fav` facet, switched by the toolbar star
+  rather than the sheet, so the chip, the badge count, Clear and Reset treat it like any other;
+  Discover always reads it as off. `src/app/exercise-browser-controller.ts` owns its event bindings.
 - `src/app/session-persistence.ts` adapts stored session rows into live/history state.
 - `src/app/layout.ts` composes top-level pages from feature view functions. It owns the
   Settings category order and disclosure shell; backup, payment, support, and Beast Mode

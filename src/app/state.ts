@@ -86,7 +86,8 @@ export interface AppState {
   librarySelect: { active: boolean; slugs: Set<string> };
   discoverSelect: { active: boolean; addresses: Set<string> };
   discoverExercises: Exercise[];
-  exFilter: { cat: string; muscle: string; diff: string; equip: string };
+  // `fav` is Favorites only ('on' or ''), a Library-only facet.
+  exFilter: { cat: string; muscle: string; diff: string; equip: string; fav?: string };
   discoverFilter: { q: string; cat: string; muscle: string; diff: string; equip: string };
   // Which exercise view has the filter sheet open, and null when none does. The facet
   // values themselves stay in exFilter/discoverFilter, which are deliberately separate.
