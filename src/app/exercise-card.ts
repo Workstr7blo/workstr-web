@@ -17,10 +17,18 @@ const SELECTED_CHECK = '<span class="sel-check"><svg width="14" height="14" view
 // what the word already says.
 export function exerciseMetaLine(exercise: Exercise): string {
   const muscle = (exercise.muscle_group || '').trim();
-  const level = normalizeTrainingLevel(exercise.difficulty);
+  const level = trainingLevelMark(exercise.difficulty);
   if (!muscle && !level) return '';
+  return `<div class="card-meta">${muscle ? `<span class="muscle">${html(muscle)}</span>` : ''}${level}</div>`;
+}
+
+// A level the way every card shows it - exercise and program alike: its word, behind a dot
+// whose colour repeats that word. An unrecognised level gets a neutral dot.
+export function trainingLevelMark(difficulty: string | undefined): string {
+  const level = normalizeTrainingLevel(difficulty);
+  if (!level) return '';
   const known = (TRAINING_LEVELS as readonly string[]).includes(level) ? ` level-${level}` : '';
-  return `<div class="card-meta">${muscle ? `<span class="muscle">${html(muscle)}</span>` : ''}${level ? `<span class="card-level${known}">${html(formatTaxonomyLabel(level))}</span>` : ''}</div>`;
+  return `<span class="card-level${known}">${html(formatTaxonomyLabel(level))}</span>`;
 }
 
 export interface ExerciseCardParts {

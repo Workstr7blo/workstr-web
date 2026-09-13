@@ -39,10 +39,14 @@ export function createProgramList(ctx: ProgramListContext) {
   const { root, state, render, toast } = ctx;
 
   function bindCards(scope: ParentNode): void {
-    scope.querySelectorAll<HTMLElement>('[data-toggle-program]').forEach((header) => header.addEventListener('click', () => {
+    // The whole header toggles for a pointer; the chevron is the real button inside it, so a
+    // keyboard reaches the same click. After the redraw focus goes back to that button.
+    scope.querySelectorAll<HTMLElement>('[data-toggle-program]').forEach((header) => header.addEventListener('click', (event) => {
       const address = header.dataset.toggleProgram || null;
+      const fromToggle = Boolean((event.target as HTMLElement).closest('.workout-card-toggle'));
       state.expandedProgramAddress = state.expandedProgramAddress === address ? null : address;
       render();
+      if (fromToggle && address) root.querySelector<HTMLElement>(`[data-program-address="${CSS.escape(address)}"] .workout-card-toggle`)?.focus();
     }));
     scope.querySelectorAll<HTMLElement>('[data-toggle-exitem]').forEach((header) => header.addEventListener('click', (event) => {
       event.stopPropagation();

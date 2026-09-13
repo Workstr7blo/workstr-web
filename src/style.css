@@ -326,9 +326,9 @@
 .metric-grid.mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .workout-card:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(0,0,0,.22); }
 .workout-card-map.has-map {
-  width: 148px;
-  height: 148px;
-  padding: 6px;
+  width: 112px;
+  height: 112px;
+  padding: 5px;
   border-color: var(--border);
   background: radial-gradient(circle at 50% 16%, rgba(var(--accent-rgb), .14), transparent 62%), rgba(0,0,0,.3);
   box-shadow: none;
@@ -336,21 +336,25 @@
 }
 .workout-card-map.has-map svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 14px rgba(var(--accent-rgb), .12)); }
 .workout-card-map.has-map polygon { vector-effect: non-scaling-stroke; }
-.workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 148px minmax(0,1fr) 22px; align-items: start; }
-.workout-card-media { display: grid; gap: 9px; align-content: start; justify-items: stretch; }
-/* The card's payment action: `.button.payment` at card width. Colour stops here - the card,
-   its title, its creator and its border stay Workstr. */
-.workout-card-media .monero-tip-cta { width: 100%; min-height: 38px; padding-inline: 0; gap: 8px; }
+/* The collapsed program card: the map, then one flexible column. The chevron is pinned to the
+   corner rather than given a column of its own, so the title, byline and Tip keep the width. */
+.workout-card-header { position: relative; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }
+.workout-card-name { padding-right: 32px; line-height: 1.2; }
+.workout-card-toggle { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 12px; background: transparent; color: var(--dim); cursor: pointer; }
+.workout-card-toggle:focus-visible { outline: 2px solid var(--border-hot); outline-offset: -2px; }
+.workout-card-byline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 7px; min-width: 0; }
+.workout-card-byline .author-pill { min-width: 0; max-width: 62%; gap: 6px; font-size: 11px; }
+.workout-card-byline .author-pill img,
+.workout-card-byline .author-avatar-fallback { width: 18px; height: 18px; max-width: 18px; max-height: 18px; flex-basis: 18px; }
+.workout-card-byline .workstr-author img { border: 0; background: transparent; }
+/* Colour stops at the Tip itself: the card, its title, its creator and its border stay Workstr. */
+.workout-card-byline .monero-tip-cta { margin-left: auto; min-height: 40px; padding: 0 12px; gap: 6px; }
+.workout-card-header .workout-card-meta { margin-top: 5px; }
+.workout-card-summary { margin-top: 4px; color: var(--purple-2); font: 700 11px/1.3 ui-monospace, monospace; }
+.workout-card-status { margin-top: 5px; color: var(--accent-soft); font: 700 11px/1 ui-monospace, monospace; }
 .monero-tip-cta .monero-mark,
 .monero-tip-cta .monero-badge { display: block; flex: none; filter: drop-shadow(0 0 7px rgba(var(--payment-rgb), .45)); }
 .monero-tip-cta .monero-tip-label { display: inline-block; line-height: 1; letter-spacing: .01em; }
-.diff-badge.inline { position: static; display: inline-flex; align-items: center; padding: 4px 7px; }
-.program-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.program-status.changed { color: var(--accent-soft); border-color: rgba(var(--accent-line-rgb), .45); }
-.program-tag-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; max-width: 230px; }
-.program-tag-grid .tag-pill { min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workout-card-author { margin-top: 8px; display: flex; align-items: center; gap: 8px; max-width: 230px; }
-.workout-card-author .author-pill { min-width: 0; }
 .program-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .program-tags .tag-pill { padding: 4px 8px; font-size: 10px; }
 
@@ -529,11 +533,11 @@
 .card-name .card-name-text { min-width: 0; }
 /* Muscle in the accent, then the level quieter behind a dot that separates the two. The dot's
    colour repeats the level's word, so colour is never the only way to read it. */
-.card-meta .card-level { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font: 700 12px/1 ui-monospace, monospace; }
-.card-meta .card-level::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
-.card-meta .card-level.level-beginner::before { background: var(--success-green); }
-.card-meta .card-level.level-intermediate::before { background: var(--bitcoin-gold); }
-.card-meta .card-level.level-advanced::before { background: var(--danger-red); }
+.card-level { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font: 700 12px/1 ui-monospace, monospace; }
+.card-level::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+.card-level.level-beginner::before { background: var(--success-green); }
+.card-level.level-intermediate::before { background: var(--bitcoin-gold); }
+.card-level.level-advanced::before { background: var(--danger-red); }
 /* A 40px target for the star without a taller name row: the extra size is negative margin. */
 .library-panel .card-name .fav { display: grid; place-items: center; min-width: 40px; min-height: 40px; margin: -11px -11px -11px 0; font-size: 18px; }
 .favourites-toggle.on { color: var(--bitcoin-gold); }
@@ -808,18 +812,11 @@
   .support-hero-row { grid-template-columns: 42px minmax(0,1fr); gap: 12px; }
   .support-panel h3 { font-size: 26px; }
   .support-actions .button { justify-content: center; }
-  .workout-card-map.has-map { width: 104px; height: 104px; padding: 4px; }
-  .workout-card:has(.workout-card-map.has-map) .workout-card-header { grid-template-columns: 104px minmax(0,1fr) 22px; gap: 10px; }
-  .workout-card-media .monero-tip-cta { min-height: 36px; padding: 8px 7px; font-size: 14px; }
+  .workout-card-map.has-map { width: 92px; height: 92px; padding: 4px; }
+  .workout-card-header { gap: 11px; padding: 12px; }
+  .workout-card-byline .monero-tip-cta { padding: 0 10px; font-size: 14px; }
   .monero-tip-qr,
   .support-monero-qr { width: 180px; }
-  /* Source and difficulty are one line, as in the approved rendering. They wrapped because
-     the info column is ~230px at this width and the two pills together just missed it. */
-  .program-badge-row { flex-wrap: nowrap; gap: 5px; margin-top: 7px; }
-  .program-badge-row .program-status,
-  .program-badge-row .diff-badge.inline { min-width: 0; padding: 4px 6px; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .program-tag-grid { gap: 6px; max-width: none; }
-  .program-tag-grid .tag-pill { padding: 6px 7px; font-size: 10px; letter-spacing: .02em; }
   .workout-card-name { font-size: 15px; }
   .workout-card-meta { font-size: 11px; }
 }

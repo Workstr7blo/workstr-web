@@ -110,6 +110,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Program cards in Programs and Discover are shorter and easier to scan. Under the title is who
+  made the program - Workstr for official programs, the creator's name and picture otherwise -
+  and its level, then one line with its length and format and one with its goal and what it
+  trains. The source, level and tag badges are gone, the muscle map takes less room, and the
+  Monero Tip sits on the creator's line instead of under the map. Everything else, from the
+  exercises to Publish and Import, is still one tap away in the expanded card.
+
 - Exercise cards are simpler and the same in Library and Discover: the picture, the name, and
   one line with the muscle it trains and its level. The Workstr and level badges over the
   picture and the movement-type pill are gone; the source, movement type, equipment and
