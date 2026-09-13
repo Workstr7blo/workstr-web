@@ -893,7 +893,18 @@
 .emom-library-picker button:hover { background: rgba(var(--accent-rgb), .14); color: var(--purple-2); }
 .emom-section-empty { padding: 10px 0 3px; }
 .emom-rx-list { display: grid; border: 1px solid rgba(var(--accent-line-rgb), .12); border-radius: 11px; overflow: hidden; background: rgba(0,0,0,.14); }
-.emom-prescription-row { display: grid; grid-template-columns: minmax(0,1fr) auto 32px; gap: 8px; align-items: center; min-height: 44px; padding: 6px 7px 6px 10px; border-bottom: 1px solid rgba(var(--accent-line-rgb), .11); }
+/* A move card: its minute and the trash on one line, the name under it, then the target beside the
+   order buttons. Stacked rather than squeezed into one row, so nothing overlaps on a narrow phone. */
+.emom-prescription-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "head head" "name name" "target order"; gap: 6px 10px; align-items: center; padding: 8px 10px 10px; border-bottom: 1px solid rgba(var(--accent-line-rgb), .11); }
+.emom-rx-head { grid-area: head; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
+.emom-rx-minute-label { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
+.emom-prescription-row .emom-rx-name { grid-area: name; }
+.emom-prescription-row .emom-rx-target { grid-area: target; }
+.emom-rx-order { grid-area: order; display: flex; gap: 6px; }
+.emom-rx-move { width: 40px; min-width: 40px; min-height: 40px; padding: 0; border: 1px solid var(--border); border-radius: 10px; background: rgba(0,0,0,.22); color: var(--text); font: 900 14px/1 ui-monospace, monospace; }
+.emom-rx-move:disabled { opacity: .38; }
+.emom-section-help { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.emom-section-note { margin: 0 0 8px; color: var(--accent-soft); font-size: 12px; line-height: 1.4; }
 .emom-prescription-row:last-child { border-bottom: 0; }
 .emom-rx-name { min-width: 0; display: grid; gap: 2px; }
 .emom-rx-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; line-height: 1.15; }
@@ -903,14 +914,16 @@
 .emom-rx-type { padding: 5px 24px 5px 8px !important; background-position: calc(100% - 13px) 15px,calc(100% - 9px) 15px !important; }
 .emom-rx-value { width: 58px; padding: 5px 7px !important; text-align: center; }
 .emom-rx-open { display: grid; place-items: center; width: 58px; min-height: 32px; color: var(--dim); font: 800 10px/1 ui-monospace, monospace; text-transform: uppercase; }
-.emom-rx-remove { width: 30px; min-width: 30px; min-height: 30px; padding: 0; border: 1px solid rgba(255,56,100,.24); border-radius: 8px; background: rgba(255,56,100,.07); color: var(--muted); font: 900 12px/1 ui-monospace, monospace; }
-.emom-rx-remove:hover { color: var(--danger-red); border-color: rgba(255,56,100,.45); }
+/* Quiet until it is pointed at; the negative margin keeps the 40px target from making the head taller. */
+.emom-rx-remove { display: grid; place-items: center; width: 40px; min-width: 40px; height: 40px; margin: -8px -6px -8px 0; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--dim); cursor: pointer; }
+.emom-rx-remove svg { width: 18px; height: 18px; }
+.emom-rx-remove:hover, .emom-rx-remove:focus-visible, .emom-rx-remove:active { color: var(--danger-red); background: rgba(var(--danger-rgb), .1); }
 .emom-add-section { width: 100%; justify-content: center; margin-top: 10px; }
 .emom-program-summary, .program-section-summary { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; color: var(--muted); font-size: 12px; }
 .emom-program-summary strong, .program-section-summary strong { width: 100%; color: var(--text); }
 @media (max-width: 820px) { .program-builder-basics { grid-template-columns: 1fr 1fr; } .program-builder-basics .span-2 { grid-column: 1 / -1; } }
 @media (max-width: 680px) { .modal-card:has(.program-builder) { padding: 12px; } .program-builder h3 { font-size: 21px; } .program-builder-basics { grid-template-columns: 1fr; gap: 10px; } .program-builder-basics .span-2 { grid-column: auto; } .program-builder .subsection-head { margin-top: 16px; margin-bottom: 8px; } .emom-section-header { padding: 8px 9px; } .emom-section-settings { padding: 7px 9px; } .emom-section-exercises { padding: 7px 9px 9px; } .emom-section-settings small { display: none; } .emom-rx-target { grid-template-columns: 78px 52px; } .emom-rx-type { width: 78px; } .emom-rx-value, .emom-rx-open { width: 52px; } }
-@media (max-width: 390px) { .modal-card:has(.program-builder) { padding: 10px; } .emom-prescription-row { grid-template-columns: minmax(0,1fr) auto 28px; gap: 6px; padding-left: 8px; } .emom-rx-name strong { font-size: 13px; } .emom-rx-name small { display: none; } .emom-rx-target { grid-template-columns: 74px 48px; gap: 4px; } .emom-rx-type { width: 74px; font-size: 11px; } .emom-rx-value, .emom-rx-open { width: 48px; } .emom-rx-remove { width: 28px; min-width: 28px; } }
+@media (max-width: 390px) { .modal-card:has(.program-builder) { padding: 10px; } .emom-rx-name strong { font-size: 13px; } .emom-rx-target { grid-template-columns: 74px 48px; gap: 4px; } .emom-rx-type { width: 74px; font-size: 11px; } .emom-rx-value, .emom-rx-open { width: 48px; } }
 .discover-import { justify-content: center; text-align: center; }
 .ex-grid.selecting .ex-card.unselectable { opacity: .45; }
 .glyph { background: #0b0616; border: 1px solid var(--border-hot); }

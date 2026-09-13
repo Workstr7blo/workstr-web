@@ -1,27 +1,44 @@
 import { displayWeightKg, type WeightUnit } from '../../core/units';
-import { formatMinutes, html } from '../../app/format';
-import type { BuilderRow, BuilderState } from './views';
+import { html } from '../../app/format';
+import type { BuilderEmomSection, BuilderRow, BuilderState } from './views';
 import { responsiveImageUrl } from '../../core/media';
 
-// Rows with sectionIndex < 0 are the strength half; the rest belong to an EMOM section.
-function prescriptionRowMarkup(row: BuilderRow, index: number): string {
+const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></svg>';
+
+// Exported because the duration field rewrites this line in place while it is being typed into.
+export function emomSectionSummary(section: BuilderEmomSection, moveCount: number): string {
+  const minutes = Math.max(1, Math.floor(Number(section.durationMin) || 1));
+  const intervals = Math.floor((minutes * 60) / Math.max(1, Number(section.intervalSec) || 60));
+  return `${minutes} min · ${intervals} interval${intervals === 1 ? '' : 's'} · ${moveCount} move${moveCount === 1 ? '' : 's'}`;
+}
+
+// A move's minute is its place in the list, so there is nothing to type. The order changes with
+// the arrow buttons rather than drag and drop, which is unreliable on iOS.
+function prescriptionRowMarkup(row: BuilderRow, index: number, position: number, count: number): string {
+  const name = html(row.exerciseName);
   const targetType = row.durationSec ? 'seconds' : row.reps ? 'reps' : 'open';
   const targetValue = targetType === 'seconds' ? row.durationSec : targetType === 'reps' ? row.reps : '';
   return `<div class="emom-prescription-row" data-i="${index}">
+    <div class="emom-rx-head">
+      <span class="emom-rx-minute-label">Minute ${position + 1}</span>
+      <button class="emom-rx-remove" type="button" data-rm="${index}" aria-label="Remove ${name}" title="Remove ${name}">${TRASH}</button>
+    </div>
     <div class="emom-rx-name">
-      <strong>${html(row.exerciseName)}</strong>
+      <strong>${name}</strong>
       ${row.muscleGroup ? `<small>${html(row.muscleGroup)}</small>` : ''}
     </div>
     <div class="emom-rx-target">
-      <label class="emom-rx-minute"><span>Minute</span><input aria-label="Minute for ${html(row.exerciseName)}" type="number" min="1" max="999" data-f="intervalIndex" value="${row.intervalIndex + 1}"></label>
-      <select class="emom-rx-type" aria-label="Target type for ${html(row.exerciseName)}" data-target-type="${index}">
+      <select class="emom-rx-type" aria-label="Target type for ${name}" data-target-type="${index}">
         <option value="reps" ${targetType === 'reps' ? 'selected' : ''}>Reps</option>
         <option value="seconds" ${targetType === 'seconds' ? 'selected' : ''}>Seconds</option>
         <option value="open" ${targetType === 'open' ? 'selected' : ''}>Open</option>
       </select>
-      ${targetType !== 'open' ? `<input class="emom-rx-value" aria-label="${targetType === 'reps' ? 'Repetitions' : 'Work seconds'} for ${html(row.exerciseName)}" type="number" min="1" max="999" data-f="targetValue" data-target-type="${targetType}" value="${html(String(targetValue))}">` : '<span class="emom-rx-open">open</span>'}
+      ${targetType !== 'open' ? `<input class="emom-rx-value" aria-label="${targetType === 'reps' ? 'Repetitions' : 'Work seconds'} for ${name}" type="number" min="1" max="${targetType === 'seconds' ? 60 : 999}" data-f="targetValue" data-target-type="${targetType}" value="${html(String(targetValue))}">` : '<span class="emom-rx-open">open</span>'}
     </div>
-    <button class="emom-rx-remove" type="button" data-rm="${index}" title="Remove ${html(row.exerciseName)}">✕</button>
+    <div class="emom-rx-order">
+      <button class="emom-rx-move" type="button" data-move="${index}" data-dir="-1" aria-label="Move ${name} up" ${position === 0 ? 'disabled' : ''}>↑</button>
+      <button class="emom-rx-move" type="button" data-move="${index}" data-dir="1" aria-label="Move ${name} down" ${position === count - 1 ? 'disabled' : ''}>↓</button>
+    </div>
   </div>`;
 }
 
@@ -50,14 +67,12 @@ function strengthRowMarkup(row: BuilderRow, index: number, current: BuilderState
   </div>`;
 }
 
-function emomSectionsMarkup(current: BuilderState, unit: WeightUnit): string {
+function emomSectionsMarkup(current: BuilderState): string {
   const exerciseOptions = [...current.library]
     .sort((a, b) => Number(b.favourite) - Number(a.favourite) || a.name.localeCompare(b.name))
     .map((exercise) => `<button type="button" data-section-exercise="SECTION_INDEX" data-slug="${html(exercise.slug)}">${html(exercise.name)}</button>`).join('');
   return `<div class="emom-section-list">${current.emomSections.map((section, sectionIndex) => {
     const rows = current.rows.map((row, index) => ({ row, index })).filter(({ row }) => row.sectionIndex === sectionIndex);
-    const sectionSeconds = section.rounds * section.intervalSec;
-    const summary = `${section.rounds} min · every ${formatMinutes(section.intervalSec / 60) || '1 min'} · ${rows.length} move${rows.length === 1 ? '' : 's'}`;
     const sectionActions = current.emomSections.length > 1
       ? `<div class="emom-section-actions">
           <button type="button" data-move-section="${sectionIndex}" data-dir="-1" title="Move section up" ${sectionIndex === 0 ? 'disabled' : ''}>↑</button>
@@ -67,33 +82,31 @@ function emomSectionsMarkup(current: BuilderState, unit: WeightUnit): string {
       : '';
     return `<section class="emom-section-card" data-section="${sectionIndex}">
       <div class="emom-section-header">
-        <div class="emom-section-title"><strong>Section ${sectionIndex + 1}</strong><span>${html(summary)}</span></div>
+        <div class="emom-section-title"><strong>Section ${sectionIndex + 1}</strong><span>${html(emomSectionSummary(section, rows.length))}</span></div>
         ${sectionActions}
       </div>
       <div class="emom-section-settings">
-        <label class="emom-duration-inline"><span>Duration</span><input data-section-field="rounds" type="number" min="1" max="999" value="${section.rounds}"><strong>min</strong></label>
-        <small>${Math.ceil(sectionSeconds / 60)} rounds · every 1:00</small>
+        <label class="emom-duration-inline"><span>Total duration</span><input data-section-field="durationMin" type="number" min="1" max="999" aria-label="Total duration of section ${sectionIndex + 1} in minutes" value="${section.durationMin}"><strong>min</strong></label>
       </div>
       <div class="emom-section-exercises">
-        <div class="emom-section-exercise-head"><span>Every minute</span><button class="button small" type="button" data-toggle-section-picker="${sectionIndex}">+ Add move</button></div>
+        <div class="emom-section-exercise-head"><span>Moves</span><button class="button small" type="button" data-toggle-section-picker="${sectionIndex}">+ Add move</button></div>
+        <p class="emom-section-help">One move begins each minute, in the order shown.</p>
+        ${section.splitMinutes ? '<p class="emom-section-note">Moves that shared a minute now each start their own minute. Save to keep this order.</p>' : ''}
         <div class="emom-library-picker" data-section-picker="${sectionIndex}" hidden>${exerciseOptions.replaceAll('SECTION_INDEX', String(sectionIndex)) || '<div class="empty">Your library is empty.</div>'}</div>
-        ${rows.length ? `<div class="emom-rx-list">${rows.map(({ row, index }) => rowMarkup(row, index, current, unit)).join('')}</div>` : '<div class="empty emom-section-empty">Choose one exercise for this section.</div>'}
+        ${rows.length ? `<div class="emom-rx-list">${rows.map(({ row, index }, position) => prescriptionRowMarkup(row, index, position, rows.length)).join('')}</div>` : '<div class="empty emom-section-empty">Add at least one move to this section.</div>'}
       </div>
     </section>`;
   }).join('')}</div>`;
 }
 
-function rowMarkup(row: BuilderRow, index: number, current: BuilderState, unit: WeightUnit): string {
-  return row.sectionIndex >= 0 ? prescriptionRowMarkup(row, index) : strengthRowMarkup(row, index, current, unit);
-}
-
 // Indices stay global across both halves: the click handlers address current.rows directly.
+// Rows with sectionIndex < 0 are the strength half; the rest belong to an EMOM section.
 export function builderRowsMarkup(current: BuilderState, unit: WeightUnit): string {
-  if (current.mode === 'emom') return emomSectionsMarkup(current, unit);
+  if (current.mode === 'emom') return emomSectionsMarkup(current);
   const strengthRows = current.rows.map((row, index) => ({ row, index })).filter(({ row }) => row.sectionIndex < 0);
   const strengthMarkup = strengthRows.length
-    ? strengthRows.map(({ row, index }) => rowMarkup(row, index, current, unit)).join('')
+    ? strengthRows.map(({ row, index }) => strengthRowMarkup(row, index, current, unit)).join('')
     : '<div class="empty" style="padding:8px 0">No normal exercises yet. Search above to add.</div>';
   if (current.mode === 'normal') return strengthMarkup;
-  return `<div class="normal-section-list">${strengthMarkup}</div><div class="subsection-head"><span>EMOM sections</span></div>${emomSectionsMarkup(current, unit)}`;
+  return `<div class="normal-section-list">${strengthMarkup}</div><div class="subsection-head"><span>EMOM sections</span></div>${emomSectionsMarkup(current)}`;
 }

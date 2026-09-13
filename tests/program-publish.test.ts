@@ -230,3 +230,18 @@ describe('program taxonomy through publish and parse', () => {
     expect(taxonomy.level).toBe('beginner');
   });
 });
+
+describe('EMOM section length through publish and parse', () => {
+  it('keeps totalDurationSec on the block and leaves a legacy block without it', () => {
+    const timed = [{ type: 'emom' as const, rounds: 5, totalDurationSec: 600, intervals: [
+      { durationSec: 60, steps: [{ exerciseSlug: 'bench-press' }] },
+      { durationSec: 60, steps: [{ exerciseSlug: 'row' }] }
+    ] }];
+    const parsed = programFromEvent({ ...buildCreatorProgramEvent(sheet({ blocks: timed })), pubkey, id: 'e'.repeat(64), sig: '' } as Event);
+    expect(parsed?.blocks).toEqual(timed);
+    const legacy = [{ type: 'emom' as const, rounds: 10, intervals: timed[0].intervals }];
+    const parsedLegacy = programFromEvent({ ...buildCreatorProgramEvent(sheet({ blocks: legacy })), pubkey, id: 'f'.repeat(64), sig: '' } as Event);
+    expect(parsedLegacy?.blocks?.[0]).not.toHaveProperty('totalDurationSec');
+    expect(parsedLegacy?.blocks?.[0]).toMatchObject({ rounds: 10 });
+  });
+});

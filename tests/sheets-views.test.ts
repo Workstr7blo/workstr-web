@@ -245,35 +245,37 @@ describe('sheetToProgram', () => {
 });
 
 describe('emomBlockFromBuilder', () => {
-  it('groups timed exercises into intervals while preserving rep targets', () => {
+  it('makes one interval per move in list order and keeps the section length', () => {
     const base = { muscleGroup: 'Core', imageUrl: '', sets: 1, restSec: 60, weight: null, notes: '', sectionIndex: 0 };
     const block = emomBlockFromBuilder([
       { ...base, exerciseSlug: 'a', exerciseName: 'A', reps: '12', intervalIndex: 0, durationSec: 20 },
       { ...base, exerciseSlug: 'b', exerciseName: 'B', reps: '10', intervalIndex: 0, durationSec: 20 },
       { ...base, exerciseSlug: 'c', exerciseName: 'C', reps: '8', intervalIndex: 1, durationSec: 0 }
-    ], 5, 60);
-    expect(block.rounds).toBe(5);
-    expect(block.intervals).toHaveLength(2);
-    expect(block.intervals[0].steps).toMatchObject([
-      { exerciseSlug: 'a', targetReps: '12', targetDurationSec: 20 },
-      { exerciseSlug: 'b', targetReps: '10', targetDurationSec: 20 }
-    ]);
-    expect(block.intervals[1].steps[0]).toMatchObject({ exerciseSlug: 'c', targetReps: '8' });
+    ], 10, 60);
+    expect(block.totalDurationSec).toBe(600);
+    expect(block.intervals.map((interval) => interval.steps.map((step) => step.exerciseSlug))).toEqual([['a'], ['b'], ['c']]);
+    expect(block.intervals[0].steps[0]).toMatchObject({ targetReps: '12', targetDurationSec: 20 });
+    expect(block.intervals[2].steps[0]).toMatchObject({ exerciseSlug: 'c', targetReps: '8' });
+    // Full passes through the moves, for a client that predates the section length.
+    expect(block.rounds).toBe(3);
+    expect(estimateProgramMin([], [block])).toBe(600);
+    expect(programCard(prog({ blocks: [block] }), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState)).toContain('10 min · EMOM');
   });
 
-  it('creates sequential blocks with independent rounds and interval lengths', () => {
+  it('creates sequential sections whose lengths add up, whatever their move counts', () => {
     const base = { muscleGroup: 'Core', imageUrl: '', sets: 1, restSec: 60, weight: null, notes: '', intervalIndex: 0, durationSec: 0 };
     const blocks = emomBlocksFromBuilder([
       { ...base, exerciseSlug: 'burpees', exerciseName: 'Burpees', reps: '5', sectionIndex: 0 },
+      { ...base, exerciseSlug: 'squat', exerciseName: 'Squat', reps: '10', sectionIndex: 0 },
       { ...base, exerciseSlug: 'sit-up', exerciseName: 'Sit-Up', reps: '8', sectionIndex: 1 },
       { ...base, exerciseSlug: 'jumping-jack', exerciseName: 'Jumping Jack', reps: '', sectionIndex: 2, durationSec: 40 }
-    ], [{ rounds: 10, intervalSec: 60 }, { rounds: 15, intervalSec: 60 }, { rounds: 10, intervalSec: 60 }]);
-    expect(blocks.map((block) => block.rounds)).toEqual([10, 15, 10]);
+    ], [{ durationMin: 10, intervalSec: 60 }, { durationMin: 15, intervalSec: 60 }, { durationMin: 10, intervalSec: 60 }]);
+    expect(blocks.map((block) => block.totalDurationSec)).toEqual([600, 900, 600]);
     expect(estimateProgramMin([], blocks)).toBe(2100);
     expect(programCard(prog({ blocks }), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: null, sheets: [] } as unknown as AppState)).toContain('35 min · 3-section EMOM');
     const body = programBody(prog({ blocks }), { exercises: [], settings: { unit: 'kg' }, sheets: [] } as unknown as AppState);
-    expect(body).toContain('Section 1: 10 rounds · 10 min');
-    expect(body).toContain('Section 2: 15 rounds · 15 min');
+    expect(body).toContain('Section 1: 10 min · 2 moves');
+    expect(body).toContain('Section 2: 15 min · 1 move');
   });
 });
 
@@ -308,10 +310,10 @@ describe('programBody mixed programs', () => {
     expect(body.indexOf('Bench Press')).toBeLessThan(body.indexOf('Burpees'));
   });
 
-  it('describes timed members by rounds and interval rather than sets and rest', () => {
+  it('describes timed members by section minutes and interval rather than sets and rest', () => {
     const body = programBody(mixed(), state);
-    expect(body).toContain('10 rounds · 60s');
-    expect(body).toContain('>Rounds</div>');
+    expect(body).toContain('10 min · 60s interval');
+    expect(body).toContain('>Min</div>');
     expect(body).toContain('>Interval</div>');
     // The strength rows keep their own vocabulary.
     expect(body).toContain('3 × 8');
@@ -326,8 +328,8 @@ describe('programBody mixed programs', () => {
         { type: 'emom', rounds: 15, intervals: [{ durationSec: 90, steps: [{ exerciseSlug: 'burpees', exerciseName: 'Burpees', targetDurationSec: 40 }] }] }
       ]
     }), state);
-    expect(body).toContain('10 rounds · 60s');
-    expect(body).toContain('15 rounds · 90s · 40s work');
+    expect(body).toContain('10 min · 60s interval');
+    expect(body).toContain('23 min · 90s interval · 40s work');
   });
 
   it('leaves a pure EMOM program without strength headings', () => {

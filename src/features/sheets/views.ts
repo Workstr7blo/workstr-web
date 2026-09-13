@@ -1,4 +1,5 @@
 import { canonMuscle } from '../../core/muscles';
+import { emomBlockDurationSec } from '../../core/emom-blocks';
 import type { EmomBlock, Exercise, StraightBlock, TrainingStep } from '../../core/types';
 import { displayWeightKg, normalizeWeightUnit } from '../../core/units';
 import type { SheetWithExercises } from '../../db/store';
@@ -14,37 +15,27 @@ export { PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, inferProgra
 
 export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; sectionIndex: number; intervalIndex: number; durationSec: number; supersetWithPrevious?: boolean }
 
-export interface BuilderEmomSection { rounds: number; intervalSec: number }
+// `splitMinutes` marks a legacy section whose shared minutes the builder has split one move per minute.
+export interface BuilderEmomSection { durationMin: number; intervalSec: number; splitMinutes?: boolean }
 
 export interface BuilderState { sheetId?: number; name: string; desc: string; difficulty: string; tags: string[]; mode: 'normal' | 'emom' | 'mixed'; emomSections: BuilderEmomSection[]; rows: BuilderRow[]; library: Exercise[] }
 
-export function emomBlockFromBuilder(rows: BuilderRow[], rounds: number, intervalSec: number): EmomBlock {
-  const byInterval = new Map<number, BuilderRow[]>();
-  for (const row of rows) {
-    const index = Math.max(0, Math.floor(Number(row.intervalIndex) || 0));
-    byInterval.set(index, [...(byInterval.get(index) || []), row]);
-  }
-  const lastIndex = Math.max(0, ...byInterval.keys());
-  return {
-    type: 'emom',
-    rounds: Math.max(1, Math.floor(Number(rounds) || 1)),
-    intervals: Array.from({ length: lastIndex + 1 }, (_, index) => ({
-      durationSec: Math.max(1, Math.floor(Number(intervalSec) || 60)),
-      steps: (byInterval.get(index) || []).map((row) => ({
-        exerciseSlug: row.exerciseSlug,
-        exerciseName: row.exerciseName,
-        targetReps: row.reps || undefined,
-        targetDurationSec: Number(row.durationSec) || undefined,
-        weight: row.weight,
-        notes: row.notes || undefined
-      }))
-    })).filter((interval) => interval.steps.length)
-  };
+// One move per minute: each row is one interval, in list order, and the section lasts its total
+// duration however many moves it has. `rounds` is still written - full passes through the moves,
+// at least one - so an app from before sections had a length still plays something sensible.
+export function emomBlockFromBuilder(rows: BuilderRow[], durationMin: number, intervalSec: number): EmomBlock {
+  const interval = Math.max(1, Math.floor(Number(intervalSec) || 60));
+  const totalDurationSec = Math.max(1, Math.floor(Number(durationMin) || 1)) * 60;
+  const intervals = rows.map((row) => ({
+    durationSec: interval,
+    steps: [{ exerciseSlug: row.exerciseSlug, exerciseName: row.exerciseName, targetReps: row.reps || undefined, targetDurationSec: Number(row.durationSec) || undefined, weight: row.weight, notes: row.notes || undefined }]
+  }));
+  return { type: 'emom', totalDurationSec, rounds: Math.max(1, Math.floor(totalDurationSec / (Math.max(1, intervals.length) * interval))), intervals };
 }
 
 export function emomBlocksFromBuilder(rows: BuilderRow[], sections: BuilderEmomSection[]): EmomBlock[] {
   return sections.map((section, sectionIndex) => emomBlockFromBuilder(
-    rows.filter((row) => (row.sectionIndex || 0) === sectionIndex), section.rounds, section.intervalSec
+    rows.filter((row) => (row.sectionIndex || 0) === sectionIndex), section.durationMin, section.intervalSec
   )).filter((block) => block.intervals.length);
 }
 
@@ -95,7 +86,7 @@ export function standardProgramExercises(exercises: RelayProgram['exercises'], b
 // disagree with the card total the way an EMOM-only estimate used to.
 export function emomSeconds(blocks?: RelayProgram['blocks']): number {
   return (blocks || []).reduce((total, block) => block.type === 'emom'
-    ? total + block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0)
+    ? total + emomBlockDurationSec(block)
     : total, 0);
 }
 
@@ -245,7 +236,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
   const emom = emomBlocks[0];
   const supersetCount = program.blocks?.filter((block) => block.type === 'straight' && block.steps.length > 1).length || 0;
   const map = programMuscleMap(program, state.exercises);
-  const emomLabel = emomBlocks.length > 1 ? `${emomBlocks.length}-section EMOM` : emom ? `${emom.rounds}-round EMOM` : '';
+  const emomLabel = emomBlocks.length > 1 ? `${emomBlocks.length}-section EMOM` : emom ? 'EMOM' : '';
   const trainingLabel = [time || '', emomLabel, supersetCount ? `${supersetCount} superset${supersetCount === 1 ? '' : 's'}` : '', exerciseCount || !emomLabel ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
   const summary = programSummary(program, state.exercises);
   const isExpanded = state.expandedProgramAddress === program.address;
@@ -316,11 +307,11 @@ export function programBody(program: RelayProgram, state: AppState): string {
     let short: string;
     let grid: string;
     if (placement) {
-      const rounds = placement.block.rounds;
+      const minutes = Math.round(emomBlockDurationSec(placement.block) / 60);
       const work = Number(placement.step.targetDurationSec) || 0;
       const reps = placement.step.targetReps || member.reps || '';
-      short = `${rounds} round${rounds === 1 ? '' : 's'} · ${placement.interval.durationSec}s${work ? ` · ${work}s work` : ''}${weight}`;
-      grid = `<div class="wk-ex-detail-cell"><div class="val">${rounds}</div><div class="lbl">Rounds</div></div>
+      short = `${minutes} min · ${placement.interval.durationSec}s interval${work ? ` · ${work}s work` : ''}${weight}`;
+      grid = `<div class="wk-ex-detail-cell"><div class="val">${minutes}</div><div class="lbl">Min</div></div>
           <div class="wk-ex-detail-cell"><div class="val">${placement.interval.durationSec}s</div><div class="lbl">Interval</div></div>
           <div class="wk-ex-detail-cell"><div class="val">${work ? `${work}s` : html(String(reps || '—'))}</div><div class="lbl">${work ? 'Work' : 'Reps'}</div></div>
           <div class="wk-ex-detail-cell"><div class="val">${weightValue != null ? html(String(weightValue)) : '—'}</div><div class="lbl">${unit}</div></div>`;
@@ -368,13 +359,13 @@ export function programBody(program: RelayProgram, state: AppState): string {
   const strengthSection = strength.length ? `${strengthHead}<div class="wk-ex-list">${strength.map(exerciseRow).join('')}</div>` : strengthHead;
 
   const emomHead = emomBlocks.length
-    ? `<div class="program-section-summary"><strong>${split ? 'EMOM · ' : ''}${emomBlocks.length} ${split ? `section${emomBlocks.length === 1 ? '' : 's'}` : `EMOM section${emomBlocks.length === 1 ? '' : 's'}`} · ${formatMinutes(emomSeconds(emomBlocks))}</strong>${emomBlocks.map((block, index) => `<span>Section ${index + 1}: ${block.rounds} round${block.rounds === 1 ? '' : 's'} · ${formatMinutes(block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0))}</span>`).join('')}</div>`
+    ? `<div class="program-section-summary"><strong>${split ? 'EMOM · ' : ''}${emomBlocks.length} ${split ? `section${emomBlocks.length === 1 ? '' : 's'}` : `EMOM section${emomBlocks.length === 1 ? '' : 's'}`} · ${formatMinutes(emomSeconds(emomBlocks))}</strong>${emomBlocks.map((block, index) => { const moves = block.intervals.reduce((count, interval) => count + interval.steps.length, 0); return `<span>Section ${index + 1}: ${formatMinutes(emomBlockDurationSec(block))} · ${moves} move${moves === 1 ? '' : 's'}</span>`; }).join('')}</div>`
     : '';
   const emomSection = emomBlocks.length ? `${emomHead}${timed.length ? `<div class="wk-ex-list">${timed.map(exerciseRow).join('')}</div>` : ''}` : '';
   const total = formatMinutes(estimateProgramMin(program.exercises, program.blocks));
   const focus = programGroups(program, state.exercises).join(' · ') || `${program.exercises.length} exercise${program.exercises.length === 1 ? '' : 's'}`;
   const plan = emomBlocks.length
-    ? `<div class="program-timeline">${emomBlocks.map((block, index) => `<span><strong>${formatMinutes(block.rounds * block.intervals.reduce((sum, interval) => sum + interval.durationSec, 0))}</strong><small>Section ${index + 1}</small></span>`).join('')}</div>`
+    ? `<div class="program-timeline">${emomBlocks.map((block, index) => `<span><strong>${formatMinutes(emomBlockDurationSec(block))}</strong><small>Section ${index + 1}</small></span>`).join('')}</div>`
     : '';
   const overview = `<div class="program-preview"><div class="program-preview-main"><strong>${total}</strong><span>${html(focus)}</span></div>${plan}</div>`;
 

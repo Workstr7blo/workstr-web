@@ -93,7 +93,7 @@ function parseTrainingBlocks(value: unknown): TrainingBlock[] | undefined {
         const durationSec = Math.max(1, Math.floor(Number(interval.durationSec) || 60));
         return steps.length ? [{ durationSec, steps }] : [];
       });
-      if (intervals.length) blocks.push({ type: 'emom', rounds, intervals });
+      if (intervals.length) blocks.push({ type: 'emom', rounds, intervals, ...(Number(item.totalDurationSec) >= 1 ? { totalDurationSec: Math.floor(Number(item.totalDurationSec)) } : {}) });
     } else if (item.type === 'straight') {
       const steps = parseTrainingSteps(item.steps);
       if (steps.length) blocks.push({ type: 'straight', rounds, steps, restAfterRoundSec: Number(item.restAfterRoundSec) || undefined });

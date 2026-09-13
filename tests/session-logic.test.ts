@@ -35,6 +35,8 @@ function slot(durationSec: number, targetDurations: number[]): EmomSlot {
     blockIndex: 0,
     roundIndex: 0,
     intervalIndex: 0,
+    minuteIndex: 0,
+    minuteCount: 1,
     durationSec,
     startsAtSec: 0,
     endsAtSec: durationSec,

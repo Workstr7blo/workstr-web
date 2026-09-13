@@ -28,6 +28,9 @@ export interface EmomBlock {
   type: 'emom';
   rounds: number;
   intervals: EmomInterval[];
+  // The section's length. When present the moves repeat in order until it runs out, and `rounds`
+  // is only what an older client falls back to; a block without it plays rounds x intervals.
+  totalDurationSec?: number;
 }
 
 export type TrainingBlock = StraightBlock | EmomBlock;

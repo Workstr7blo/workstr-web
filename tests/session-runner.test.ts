@@ -592,7 +592,7 @@ describe('session runner', () => {
     expect(root.querySelector('#session-body')?.textContent).toContain('Strength section done');
     (root.querySelector('#emom-start') as HTMLButtonElement).click();
     await tick();
-    expect(root.querySelector('#session-meta')?.textContent).toBe('EMOM · Round 1/2 · Interval 1/1');
+    expect(root.querySelector('#session-meta')?.textContent).toBe('EMOM · Minute 1/2');
   });
 
   it('carries the progress bar across both sections of a mixed session', async () => {
@@ -793,17 +793,34 @@ describe('session runner', () => {
     expect(root.querySelector('[data-emom-instructions]')?.textContent).toContain('Brace firmly.');
   });
 
-  it('shows five rounds at a time and browses the round window without seeking', async () => {
+  it('counts the minutes of a timed section and names the next minute', async () => {
+    const program = emomProgram();
+    program.blocks = [{ type: 'emom', rounds: 5, totalDurationSec: 600, intervals: [
+      { durationSec: 60, steps: [{ exerciseSlug: 'bench-press', exerciseName: 'Bench Press', targetReps: '8' }] },
+      { durationSec: 60, steps: [{ exerciseSlug: 'row', exerciseName: 'Row', targetReps: '8' }] }
+    ] }];
+    await runner.startTrainingSession(program);
+    expect(root.querySelector('#session-meta')?.textContent).toBe('EMOM · 10 min · 10 intervals');
+    (root.querySelector('#emom-start') as HTMLButtonElement).click();
+    await tick();
+    expect(root.querySelector('#session-meta')?.textContent).toBe('EMOM · Minute 1/10');
+    expect(root.querySelector('#session-meta')?.textContent).not.toMatch(/Round|Interval/);
+    expect(root.querySelector('.emom-next-card')?.textContent).toContain('Row');
+    expect(root.querySelector('.emom-next-card')?.textContent).toContain('Minute 2 · 60s interval');
+    expect([...root.querySelectorAll('[data-emom-seek]')].map((button) => button.getAttribute('aria-label'))[0]).toBe('Go to minute 1 of 10, current');
+  });
+
+  it('shows five minutes at a time and browses the window without seeking', async () => {
     const program = emomProgram();
     if (program.blocks?.[0]?.type === 'emom') program.blocks[0].rounds = 35;
     await runner.startTrainingSession(program);
     (root.querySelector('#emom-start') as HTMLButtonElement).click();
     await tick();
     expect([...root.querySelectorAll('[data-emom-seek]')].map((button) => button.textContent)).toEqual(['1', '2', '3', '4', '5']);
-    expect(root.querySelector('#session-meta')?.textContent).toContain('Round 1/35');
+    expect(root.querySelector('#session-meta')?.textContent).toContain('Minute 1/35');
     (root.querySelector('[data-emom-window="1"]') as HTMLButtonElement).click();
     expect([...root.querySelectorAll('[data-emom-seek]')].map((button) => button.textContent)).toEqual(['6', '7', '8', '9', '10']);
-    expect(root.querySelector('#session-meta')?.textContent).toContain('Round 1/35');
+    expect(root.querySelector('#session-meta')?.textContent).toContain('Minute 1/35');
     expect(root.querySelector('#emom-countdown')?.textContent).toBe('20');
   });
 });
