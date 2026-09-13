@@ -615,7 +615,10 @@
 
 /* Media. Wide when there is a frame worth looking at; a slim strip when there is not, so a
    missing image costs a line rather than a screenful. */
-.session-ex-image.wide { aspect-ratio: 16 / 7; height: auto; margin: 0 0 14px; border-radius: 18px; }
+/* The hero stays 16:7 so the timer and logging controls keep their place; 4:3 art letterboxes
+   on black instead of losing hands, feet and the floor ring to the crop. */
+.session-ex-image.wide { aspect-ratio: 16 / 7; height: auto; margin: 0 0 14px; border-radius: 18px; object-fit: contain; object-position: center; }
+.session-ex-image.wide:not(.placeholder) { background: #000; }
 .session-ex-image.wide.placeholder { aspect-ratio: auto; height: 54px; min-height: 0; border-style: dashed; box-shadow: none; }
 
 /* Target: one line under the media, not a card. */
