@@ -1,7 +1,7 @@
 import type { Session, SessionSet } from '../core/types';
 import type { WorkstrStore } from '../db/store';
 import { parseAddress } from './addresses';
-import { bodyweightRecord, sessionRecord, settingsRecord, sheetRecord, type RecordSnapshot } from './records';
+import { bodyweightRecord, exerciseRecord, sessionRecord, settingsRecord, sheetRecord, type RecordSnapshot } from './records';
 
 export interface BackfillProgress {
   cursor: number;
@@ -35,6 +35,13 @@ export async function collectRecords(store: WorkstrStore): Promise<RecordSnapsho
     // A temporary sheet is a Quick Workout scratch row, not a program the user owns.
     if (sheet.is_temporary) continue;
     records.push(sheetRecord(sheet));
+  }
+
+  // Deleted exercises are collected too. They are rows marked deleted, and leaving them out
+  // would let a device that still has one bring it back.
+  const exercises = await store.listExercisesIncludingDeleted();
+  for (const exercise of [...exercises].sort((a, b) => a.slug.localeCompare(b.slug))) {
+    if (exercise.slug && !exercise.slug.includes(':')) records.push(exerciseRecord(exercise));
   }
 
   // Workout history is not here any more: it travels in the append-only log, whose chunks
@@ -82,6 +89,10 @@ export async function resolveRecord(store: WorkstrStore, address: string, entrie
   if (parsed.kind === 'sheet') {
     const sheet = (await store.listSheets()).find((candidate) => candidate.slug === parsed.id);
     return sheet && !sheet.is_temporary ? sheetRecord(sheet) : null;
+  }
+  if (parsed.kind === 'exercise') {
+    const exercise = await store.getExerciseBySlug(String(parsed.id));
+    return exercise ? exerciseRecord(exercise) : null;
   }
   // Per-session records are read-only compatibility for the brief V2 object-record era.
   if (parsed.kind === 'session') {

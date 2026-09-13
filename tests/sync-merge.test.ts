@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { mergeRecords } from '../src/sync/merge';
-import { BODYWEIGHT_ADDRESS, RECORD_PREFIX, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
+import { BODYWEIGHT_ADDRESS, exerciseRecordAddress, RECORD_PREFIX, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
 import type { DecodedPrivateRecord } from '../src/nostr/codecs30078';
 
 let namespace = 0;
@@ -151,5 +151,53 @@ describe('merge safety', () => {
     expect(summary.unreadable).toBe(3);
     expect(summary.applied).toBe(1);
     expect((await store.getSettings()).unit).toBe('lbs');
+  });
+});
+
+describe('exercise library records', () => {
+  const at = (minute: number) => `2026-09-14T10:${String(minute).padStart(2, '0')}:00.000Z`;
+  const row = (extra: Record<string, unknown> = {}) => ({
+    slug: 'plank', name: 'Plank', muscles: ['Core'], equipment: [], tags: [], instructions: [], favourite: false,
+    source_type: 'imported', status: 'active', image_url: 'new.png', created_at: at(0), updated_at: at(1), ...extra
+  });
+  const plank = exerciseRecordAddress('plank');
+
+  it('adds an exercise another device imported, keeping its own timestamps', async () => {
+    const store = await freshStore();
+    const summary = await mergeRecords(store, [record(plank, at(5), row({ favourite: true }))]);
+    expect(summary.applied).toBe(1);
+    expect(await store.listExercises()).toEqual([expect.objectContaining({ slug: 'plank', favourite: true, image_url: 'new.png', created_at: at(0), updated_at: at(5) })]);
+  });
+
+  it('carries a favourite and then a deletion across, on one row', async () => {
+    const store = await freshStore();
+    await mergeRecords(store, [record(plank, at(5), row())]);
+    await mergeRecords(store, [record(plank, at(6), row({ favourite: true }))]);
+    expect((await store.listExercises())[0].favourite).toBe(true);
+    await mergeRecords(store, [record(plank, at(7), row({ status: 'deleted' }))]);
+    expect(await store.listExercises()).toEqual([]);
+    expect(await store.listExercisesIncludingDeleted()).toHaveLength(1);
+  });
+
+  it('never lets an older record overwrite newer local work, and lets an unsent edit win', async () => {
+    const store = await freshStore();
+    await mergeRecords(store, [record(plank, at(9), row({ favourite: true }))]);
+    await mergeRecords(store, [record(plank, at(8), row({ favourite: false }))]);
+    expect((await store.listExercises())[0].favourite).toBe(true);
+
+    await store.enqueueSync(plank, '2099-01-01T00:00:00.000Z');
+    await mergeRecords(store, [record(plank, at(30), row({ status: 'deleted' }))]);
+    expect(await store.listExercises()).toHaveLength(1);
+  });
+
+  it('soft-deletes on a tombstone without re-enqueueing what it merged', async () => {
+    const store = await freshStore();
+    await mergeRecords(store, [record(plank, at(5), row())]);
+    const seen: string[] = [];
+    store.setChangeListener((address) => seen.push(address));
+    const summary = await mergeRecords(store, [record(plank, at(6), undefined, true)]);
+    expect(summary.deleted).toBe(1);
+    expect(await store.listExercises()).toEqual([]);
+    expect(seen).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { collectRecords, resolveRecord, runBackfill, seedJournal } from '../src/sync/backfill';
-import { SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
+import { exerciseRecordAddress, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
 import { sessionUpdatedAt, syncedSettings } from '../src/sync/records';
 
 let namespace = 0;
@@ -256,5 +256,47 @@ describe('database upgrade to version 3', () => {
     for (const session of sessions) expect(session.backup_version).toBe(1);
     const records = await collectRecords(store);
     for (const session of sessions) expect(records.map((record) => record.address)).not.toContain(sessionAddress(session.uid!));
+  });
+});
+
+describe('exercise library records', () => {
+  const exercise = (slug: string, extra: Record<string, unknown> = {}) => ({ slug, name: slug, muscles: [], equipment: [], tags: [], instructions: [], source_type: 'imported' as const, ...extra });
+
+  it('collects every library exercise, deleted ones included, without local keys', async () => {
+    const store = await freshStore();
+    await store.upsertExercise(exercise('plank', { favourite: true }));
+    const burpee = await store.upsertExercise(exercise('burpee'));
+    await store.deleteExercise(burpee);
+    const records = await collectRecords(store);
+    const plank = records.find((record) => record.address === exerciseRecordAddress('plank'));
+    expect(plank?.payload).toMatchObject({ slug: 'plank', favourite: true, status: 'active' });
+    expect((plank?.payload as { id?: number }).id).toBeUndefined();
+    expect(records.find((record) => record.address === exerciseRecordAddress('burpee'))?.payload).toMatchObject({ status: 'deleted' });
+  });
+
+  it('reports an import, a favourite and a deletion by exercise address', async () => {
+    const store = await freshStore();
+    const seen: string[] = [];
+    store.setChangeListener((address) => seen.push(address));
+    const id = await store.upsertExercise(exercise('plank'));
+    await store.upsertExercise({ ...(await store.getExercise(id))!, favourite: true });
+    await store.deleteExercise(id);
+    expect(seen).toEqual([exerciseRecordAddress('plank'), exerciseRecordAddress('plank'), exerciseRecordAddress('plank')]);
+  });
+
+  it('resolves a deleted exercise to its deleted row, never to a tombstone, and an unknown one to nothing', async () => {
+    const store = await freshStore();
+    const id = await store.upsertExercise(exercise('plank'));
+    await store.deleteExercise(id);
+    expect((await resolveRecord(store, exerciseRecordAddress('plank')))?.payload).toMatchObject({ status: 'deleted' });
+    expect(await resolveRecord(store, exerciseRecordAddress('ghost'))).toBeNull();
+  });
+
+  it('queues the library when the backfill runs again for the new record format', async () => {
+    const store = await freshStore();
+    await store.upsertExercise(exercise('plank'));
+    await store.upsertExercise(exercise('bird-dog'));
+    await runBackfill(store, 0);
+    expect((await store.listSyncQueue()).map((entry) => entry.address)).toEqual(expect.arrayContaining([exerciseRecordAddress('bird-dog'), exerciseRecordAddress('plank')]));
   });
 });

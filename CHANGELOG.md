@@ -60,6 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Your exercise library now syncs between devices. Encrypted sync carried programs, workouts,
+  body weight and settings but never the library, so an exercise imported, starred or deleted
+  on your phone stayed that way only on your phone. Imports, favourite stars and deletions now
+  reach every device signed into the account, and a deleted exercise is not brought back by a
+  device that still had it. The first sync after updating sends each device's existing library
+  once.
+
 - An EMOM section now lasts exactly as long as you set it. A 10-minute section with two moves
   ran for 20 minutes, because each extra move added another pass through the whole duration.
   Moves now take turns, one per minute in the order shown, until the section's time is up. The
