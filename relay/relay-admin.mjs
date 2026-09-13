@@ -161,7 +161,9 @@ async function main(argv) {
     writeState(usagePath, rebuilt);
     const after = authorTotals(rebuilt);
     process.stdout.write(`rebuilt: ${after.length} author(s), ${humanBytes(after.reduce((sum, a) => sum + a.bytes, 0))}\n`);
-    process.stdout.write('restart the relay so the plugin reloads the ledger\n');
+    // The plugin reads the ledger at startup and writes its own copy on every write and at
+    // shutdown, so this only sticks when the stack was down while it ran (relay/README.md).
+    process.stdout.write('start the relay now; it reads this ledger at startup. A rebuild done while the relay runs is overwritten.\n');
     return;
   }
 

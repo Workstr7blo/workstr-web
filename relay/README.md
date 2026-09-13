@@ -233,14 +233,50 @@ admin unblock <pubkey>
 ```
 
 `rebuild` recomputes the ledger from what the relay actually holds, which is the fix for
-drift after a restore, a manual delete, or a lost state file:
+drift after a restore, a manual delete, or a lost state file.
+
+**Rebuild with the stack down, never while it runs.** The plugin keeps the ledger in memory,
+reads `usage.json` only at startup, and writes its in-memory copy back to disk five seconds
+after any accepted write and again when it shuts down (SIGTERM, SIGINT, or its input closing).
+A ledger rebuilt while the relay is up is therefore overwritten twice over: by the next sync
+that lands, and by the `docker compose down` that was supposed to make the plugin reload it.
+Restarting after a live rebuild loads the stale ledger straight back.
+
+Stop the stack first, so the plugin has already flushed and nothing can write, rebuild from a
+one-off container with the stack's mounts and no network, then start the stack:
 
 ```sh
-docker exec <container> /app/strfry --config=/app/strfry.conf export \
-  | docker exec -i -e WORKSTR_POLICY_STATE=/app/policy-state <container> node /app/relay-admin.mjs rebuild
+cd <relay compose directory>
+docker compose down
+docker run --rm --network none --entrypoint sh \
+  -v "$PWD/strfry/strfry.conf:/app/strfry.conf:ro" \
+  -v "$PWD/strfry/relay-admin.mjs:/app/relay-admin.mjs:ro" \
+  -v "$PWD/strfry-db:/app/strfry-db" \
+  -v "$PWD/strfry/policy-state:/app/policy-state" \
+  -e WORKSTR_POLICY_STATE=/app/policy-state \
+  workstr-strfry:local \
+  -c '/app/strfry --config=/app/strfry.conf export | node /app/relay-admin.mjs rebuild'
+docker compose up -d
+admin usage <pubkey>             # once the stack is back up
 ```
 
-Restart the relay afterwards so the plugin reloads the ledger.
+The one-off container is not a stack service, so the whole-stack restart rule above does not
+apply to it: it never joins the gluetun namespace, runs as the same user as the relay
+container, and nothing else is running while it writes.
+
+**A manual delete belongs in that same downtime.** Check the filter while the relay is up,
+where a scan only reads, then delete and rebuild in the one-off container before starting the
+stack again. Deleting while the relay runs and rebuilding afterwards leaves the ledger counting
+the deleted events until the next rebuild done this way, which only ever overstates usage:
+
+```sh
+docker exec <container> /app/strfry --config=/app/strfry.conf scan '<filter>' | grep -c '^{'
+docker compose down
+docker run --rm --network none --entrypoint sh <same mounts as above> -e FILTER='<filter>' \
+  workstr-strfry:local \
+  -c '/app/strfry --config=/app/strfry.conf delete --filter "$FILTER" && /app/strfry --config=/app/strfry.conf export | node /app/relay-admin.mjs rebuild'
+docker compose up -d
+```
 
 ## Scope
 
