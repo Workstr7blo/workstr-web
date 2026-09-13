@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { collectRecords, resolveRecord, runBackfill, seedJournal } from '../src/sync/backfill';
-import { exerciseRecordAddress, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
+import { SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
 import { sessionUpdatedAt, syncedSettings } from '../src/sync/records';
 
 let namespace = 0;
@@ -259,44 +259,36 @@ describe('database upgrade to version 3', () => {
   });
 });
 
-describe('exercise library records', () => {
+describe('exercise library in the log', () => {
   const exercise = (slug: string, extra: Record<string, unknown> = {}) => ({ slug, name: slug, muscles: [], equipment: [], tags: [], instructions: [], source_type: 'imported' as const, ...extra });
 
-  it('collects every library exercise, deleted ones included, without local keys', async () => {
-    const store = await freshStore();
-    await store.upsertExercise(exercise('plank', { favourite: true }));
-    const burpee = await store.upsertExercise(exercise('burpee'));
-    await store.deleteExercise(burpee);
-    const records = await collectRecords(store);
-    const plank = records.find((record) => record.address === exerciseRecordAddress('plank'));
-    expect(plank?.payload).toMatchObject({ slug: 'plank', favourite: true, status: 'active' });
-    expect((plank?.payload as { id?: number }).id).toBeUndefined();
-    expect(records.find((record) => record.address === exerciseRecordAddress('burpee'))?.payload).toMatchObject({ status: 'deleted' });
-  });
-
-  it('reports an import, a favourite and a deletion by exercise address', async () => {
+  it('journals an import, a favourite and a deletion under the exercise slug', async () => {
     const store = await freshStore();
     const seen: string[] = [];
     store.setChangeListener((address) => seen.push(address));
     const id = await store.upsertExercise(exercise('plank'));
     await store.upsertExercise({ ...(await store.getExercise(id))!, favourite: true });
     await store.deleteExercise(id);
-    expect(seen).toEqual([exerciseRecordAddress('plank'), exerciseRecordAddress('plank'), exerciseRecordAddress('plank')]);
+    await vi.waitFor(() => expect(seen).toEqual(['library:plank', 'library:plank', 'library:plank']));
+    expect(new Set((await store.listJournal('library')).map((row) => row.uid))).toEqual(new Set(['plank']));
   });
 
-  it('resolves a deleted exercise to its deleted row, never to a tombstone, and an unknown one to nothing', async () => {
-    const store = await freshStore();
-    const id = await store.upsertExercise(exercise('plank'));
-    await store.deleteExercise(id);
-    expect((await resolveRecord(store, exerciseRecordAddress('plank')))?.payload).toMatchObject({ status: 'deleted' });
-    expect(await resolveRecord(store, exerciseRecordAddress('ghost'))).toBeNull();
-  });
-
-  it('queues the library when the backfill runs again for the new record format', async () => {
+  it('seeds an existing library into the log once, deleted exercises included', async () => {
     const store = await freshStore();
     await store.upsertExercise(exercise('plank'));
-    await store.upsertExercise(exercise('bird-dog'));
-    await runBackfill(store, 0);
-    expect((await store.listSyncQueue()).map((entry) => entry.address)).toEqual(expect.arrayContaining([exerciseRecordAddress('bird-dog'), exerciseRecordAddress('plank')]));
+    const burpee = await store.upsertExercise(exercise('burpee'));
+    await store.deleteExercise(burpee);
+    await vi.waitFor(async () => expect(new Set((await store.listJournal('library')).map((row) => row.uid)).size).toBe(2));
+    await store.clearJournal();
+
+    expect(await seedJournal(store)).toBe(2);
+    expect((await store.listJournal('library')).map((row) => row.uid).sort()).toEqual(['burpee', 'plank']);
+    expect(await seedJournal(store)).toBe(0);
+  });
+
+  it('keeps the library out of the per-address queue, where each exercise would cost a signature', async () => {
+    const store = await freshStore();
+    await store.upsertExercise(exercise('plank'));
+    expect((await collectRecords(store)).some((record) => record.address.includes('plank'))).toBe(false);
   });
 });

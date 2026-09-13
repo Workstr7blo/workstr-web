@@ -14,7 +14,7 @@ export interface WorkstrDB extends DBSchema {
   // an entry landed in, and null until it has actually been published.
   journal: {
     key: number;
-    value: { id?: number; kind: 'log' | 'body'; uid: string; updated_at: string; deleted?: boolean; seq: number | null };
+    value: { id?: number; kind: 'log' | 'body' | 'library'; uid: string; updated_at: string; deleted?: boolean; seq: number | null };
     indexes: { kind: string; uid: string };
   };
   sync_seen: { key: string; value: { address: string; event_id: string; created_at: number } };

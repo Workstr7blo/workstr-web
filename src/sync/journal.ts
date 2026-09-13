@@ -7,7 +7,7 @@ import { chunkAddress } from './addresses';
 import { MAX_CHUNK_CONTENT_BYTES, packChunks, replayChunks, supersededRatio, type ChunkPayload, type ChunkSource, type LogEntry } from './chunks';
 import { publishRecord, type PublishOutcome } from './relay';
 import { sessionRecord } from './records';
-import type { BodyWeightEntry } from '../core/types';
+import type { BodyWeightEntry, Exercise } from '../core/types';
 import { loadSessionEntries, type SessionEntry } from './backfill';
 
 export interface JournalPushSummary {
@@ -25,9 +25,25 @@ export interface JournalPushOptions {
   budgetBytes?: number;
 }
 
+export type JournalKind = 'log' | 'body' | 'library';
+// Pushed in this order, each after the one before it has landed.
+export const JOURNAL_KINDS: readonly JournalKind[] = ['log', 'body', 'library'];
+
+const OPEN_SEQ_KEY = { log: 'logOpenSeq', body: 'bodyOpenSeq', library: 'libraryOpenSeq' } as const;
+
 interface Resolvable {
   sessions: Map<string, SessionEntry>;
   body: Map<string, BodyWeightEntry>;
+  library: Map<string, Exercise>;
+}
+
+// Only the side being published is read.
+async function holdings(store: WorkstrStore, kind: JournalKind): Promise<Resolvable> {
+  return {
+    sessions: kind === 'log' ? new Map((await loadSessionEntries(store)).map((entry) => [String(entry.session.uid), entry])) : new Map(),
+    body: kind === 'body' ? new Map((await store.listBody(Number.MAX_SAFE_INTEGER)).map((entry) => [String(entry.date), entry])) : new Map(),
+    library: kind === 'library' ? new Map((await store.listExercisesIncludingDeleted()).map((exercise) => [exercise.slug, exercise])) : new Map()
+  };
 }
 
 // Turns a journal row into the entry that actually goes in a chunk. A row whose subject is
@@ -43,6 +59,14 @@ function entryFor(row: JournalRow, held: Resolvable): LogEntry {
     // The autoincrement key means nothing on another device, so it never travels.
     const { id: _id, ...payload } = entry;
     return { uid: row.uid, updatedAt: entry.updated_at || row.updated_at, payload };
+  }
+
+  // A deleted exercise is still a row, marked deleted, and travels as one.
+  if (row.kind === 'library') {
+    const exercise = held.library.get(row.uid);
+    if (!exercise) return gone;
+    const { id: _id, ...payload } = exercise;
+    return { uid: row.uid, updatedAt: exercise.updated_at || row.updated_at, payload };
   }
 
   const session = held.sessions.get(row.uid);
@@ -67,7 +91,7 @@ export async function pushJournal(
   signer: Signer,
   cipher: RecordCipher,
   relayUrl: string,
-  kind: 'log' | 'body' = 'log',
+  kind: JournalKind = 'log',
   options: JournalPushOptions = {}
 ): Promise<JournalPushSummary> {
   const settings = await store.getSettings();
@@ -78,21 +102,13 @@ export async function pushJournal(
   const pending = rows.filter((row) => row.seq === null);
   if (pending.length === 0) return { published: 0, skipped: 0, rejected: [], failed: [] };
 
-  const openSeq = (kind === 'body' ? settings.backup?.bodyOpenSeq : settings.backup?.logOpenSeq) ?? 0;
+  const openSeq = settings.backup?.[OPEN_SEQ_KEY[kind]] ?? 0;
   // The tail's existing rows come first so the chunk stays chronological: entries already
   // on the relay keep their place, and only the end of the chunk grows.
   const tail = rows.filter((row) => row.seq === openSeq);
   const packing = [...tail, ...pending];
 
-  // Only the side this pass is actually publishing is read.
-  const held: Resolvable = {
-    sessions: kind === 'log'
-      ? new Map((await loadSessionEntries(store)).map((entry) => [String(entry.session.uid), entry]))
-      : new Map(),
-    body: kind === 'body'
-      ? new Map((await store.listBody(Number.MAX_SAFE_INTEGER)).map((entry) => [String(entry.date), entry]))
-      : new Map()
-  };
+  const held = await holdings(store, kind);
   const entries = packing.map((row) => entryFor(row, held));
 
   const measure = async (candidate: LogEntry[]): Promise<number> => {
@@ -151,7 +167,7 @@ export async function pushJournal(
     await store.assignJournalSeq(rowsHere.map((row) => row.id as number), seq);
     // Only once the chunk it belongs to is actually on the relay. Moving the open sequence
     // before that would seal a chunk the relay never received.
-    await store.saveBackupState(kind === 'body' ? { bodyOpenSeq: seq } : { logOpenSeq: seq });
+    await store.saveBackupState({ [OPEN_SEQ_KEY[kind]]: seq });
     summary.published += 1;
   }
 
@@ -194,11 +210,11 @@ export async function compactJournal(
   signer: Signer,
   cipher: RecordCipher,
   relayUrl: string,
-  kind: 'log' | 'body' = 'log'
+  kind: JournalKind = 'log'
 ): Promise<CompactionSummary> {
   const settings = await store.getSettings();
   const device = settings.backup?.device;
-  const openSeq = (kind === 'body' ? settings.backup?.bodyOpenSeq : settings.backup?.logOpenSeq) ?? 0;
+  const openSeq = settings.backup?.[OPEN_SEQ_KEY[kind]] ?? 0;
   const summary: CompactionSummary = { rewritten: 0, reclaimed: 0 };
   if (!device) return summary;
 
@@ -213,14 +229,7 @@ export async function compactJournal(
   }
   if (sealed.size === 0) return summary;
 
-  const held: Resolvable = {
-    sessions: kind === 'log'
-      ? new Map((await loadSessionEntries(store)).map((entry) => [String(entry.session.uid), entry]))
-      : new Map(),
-    body: kind === 'body'
-      ? new Map((await store.listBody(Number.MAX_SAFE_INTEGER)).map((entry) => [String(entry.date), entry]))
-      : new Map()
-  };
+  const held = await holdings(store, kind);
 
   for (const [seq, chunkRows] of [...sealed].sort((a, b) => a[0] - b[0])) {
     const kept = chunkRows.filter((row) => live.get(row.uid) === row);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { mergeRecords } from '../src/sync/merge';
-import { BODYWEIGHT_ADDRESS, exerciseRecordAddress, RECORD_PREFIX, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
+import { BODYWEIGHT_ADDRESS, chunkAddress, RECORD_PREFIX, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../src/sync/addresses';
 import type { DecodedPrivateRecord } from '../src/nostr/codecs30078';
 
 let namespace = 0;
@@ -154,50 +154,59 @@ describe('merge safety', () => {
   });
 });
 
-describe('exercise library records', () => {
+describe('exercise library chunks', () => {
   const at = (minute: number) => `2026-09-14T10:${String(minute).padStart(2, '0')}:00.000Z`;
   const row = (extra: Record<string, unknown> = {}) => ({
     slug: 'plank', name: 'Plank', muscles: ['Core'], equipment: [], tags: [], instructions: [], favourite: false,
     source_type: 'imported', status: 'active', image_url: 'new.png', created_at: at(0), updated_at: at(1), ...extra
   });
-  const plank = exerciseRecordAddress('plank');
+  const entry = (minute: number, extra: Record<string, unknown> = {}) => ({ uid: 'plank', updatedAt: at(minute), payload: row(extra) });
+  const chunk = (...entries: unknown[]) => record(chunkAddress('library', 'abcd1234', 0), at(59), { device: 'abcd1234', seq: 0, entries });
 
-  it('adds an exercise another device imported, keeping its own timestamps', async () => {
+  it('adds exercises another device imported, several in one chunk, with their own timestamps', async () => {
     const store = await freshStore();
-    const summary = await mergeRecords(store, [record(plank, at(5), row({ favourite: true }))]);
-    expect(summary.applied).toBe(1);
-    expect(await store.listExercises()).toEqual([expect.objectContaining({ slug: 'plank', favourite: true, image_url: 'new.png', created_at: at(0), updated_at: at(5) })]);
+    const summary = await mergeRecords(store, [chunk(entry(5, { favourite: true }), { uid: 'burpee', updatedAt: at(4), payload: row({ slug: 'burpee', name: 'Burpee' }) })]);
+    expect(summary.applied).toBe(2);
+    expect(await store.listExercises()).toEqual([
+      expect.objectContaining({ slug: 'burpee', updated_at: at(4) }),
+      expect.objectContaining({ slug: 'plank', favourite: true, image_url: 'new.png', created_at: at(0), updated_at: at(5) })
+    ]);
   });
 
   it('carries a favourite and then a deletion across, on one row', async () => {
     const store = await freshStore();
-    await mergeRecords(store, [record(plank, at(5), row())]);
-    await mergeRecords(store, [record(plank, at(6), row({ favourite: true }))]);
+    await mergeRecords(store, [chunk(entry(5))]);
+    await mergeRecords(store, [chunk(entry(6, { favourite: true }))]);
     expect((await store.listExercises())[0].favourite).toBe(true);
-    await mergeRecords(store, [record(plank, at(7), row({ status: 'deleted' }))]);
+    const deleted = await mergeRecords(store, [chunk(entry(7, { status: 'deleted' }))]);
+    expect(deleted.deleted).toBe(1);
     expect(await store.listExercises()).toEqual([]);
     expect(await store.listExercisesIncludingDeleted()).toHaveLength(1);
   });
 
-  it('never lets an older record overwrite newer local work, and lets an unsent edit win', async () => {
+  it('never lets an older entry overwrite newer local work', async () => {
     const store = await freshStore();
-    await mergeRecords(store, [record(plank, at(9), row({ favourite: true }))]);
-    await mergeRecords(store, [record(plank, at(8), row({ favourite: false }))]);
-    expect((await store.listExercises())[0].favourite).toBe(true);
-
-    await store.enqueueSync(plank, '2099-01-01T00:00:00.000Z');
-    await mergeRecords(store, [record(plank, at(30), row({ status: 'deleted' }))]);
-    expect(await store.listExercises()).toHaveLength(1);
+    await mergeRecords(store, [chunk(entry(9, { favourite: true }))]);
+    const summary = await mergeRecords(store, [chunk(entry(8, { favourite: false, status: 'deleted' }))]);
+    expect(summary.skipped).toBe(1);
+    expect(await store.listExercises()).toEqual([expect.objectContaining({ favourite: true })]);
   });
 
-  it('soft-deletes on a tombstone without re-enqueueing what it merged', async () => {
+  it('applies a deletion entry to the row it names and ignores one for an exercise it never had', async () => {
     const store = await freshStore();
-    await mergeRecords(store, [record(plank, at(5), row())]);
+    await mergeRecords(store, [chunk(entry(5))]);
+    const summary = await mergeRecords(store, [chunk({ uid: 'plank', updatedAt: at(6), deleted: true }, { uid: 'ghost', updatedAt: at(6), deleted: true })]);
+    expect(summary.deleted).toBe(1);
+    expect(summary.skipped).toBe(1);
+    expect(await store.listExercises()).toEqual([]);
+  });
+
+  it('does not journal what it merged', async () => {
+    const store = await freshStore();
     const seen: string[] = [];
     store.setChangeListener((address) => seen.push(address));
-    const summary = await mergeRecords(store, [record(plank, at(6), undefined, true)]);
-    expect(summary.deleted).toBe(1);
-    expect(await store.listExercises()).toEqual([]);
+    await mergeRecords(store, [chunk(entry(5))]);
     expect(seen).toEqual([]);
+    expect(await store.listJournal('library')).toEqual([]);
   });
 });
