@@ -1,6 +1,6 @@
 import type { IDBPDatabase } from 'idb';
 import type { WorkstrDB } from './schema';
-import type { BackupSettings, BodyWeightEntry, Session, SessionSet, Sheet, WorkstrSettings } from '../core/types';
+import type { BackupSettings, BodyWeightEntry, Exercise, Session, SessionSet, Sheet, WorkstrSettings } from '../core/types';
 import { isRecordAddress } from '../sync/addresses';
 
 export interface JournalRow {
@@ -72,6 +72,20 @@ export abstract class SyncAwareStore {
 
   async getSheetBySlug(slug: string): Promise<Sheet | undefined> {
     return this.db.getFromIndex('sheets', 'slug', slug);
+  }
+
+  // Includes a row marked deleted: a deletion is a version of the exercise like any other.
+  async getExerciseBySlug(slug: string): Promise<Exercise | undefined> {
+    return this.db.getFromIndex('exercises', 'slug', slug);
+  }
+
+  // Writes an exercise exactly as it arrived, timestamps included. Stamping it with the merge
+  // time would make this copy look newer than a later edit from the device that sent it.
+  async putExerciseRecord(exercise: Omit<Exercise, 'id'>): Promise<void> {
+    const tx = this.db.transaction('exercises', 'readwrite');
+    const existing = await tx.store.index('slug').get(exercise.slug);
+    await tx.store.put({ ...exercise, ...(existing?.id ? { id: existing.id } : {}) } as Exercise);
+    await tx.done;
   }
 
   async getSessionByUid(uid: string): Promise<Session | undefined> {

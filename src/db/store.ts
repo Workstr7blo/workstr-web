@@ -5,7 +5,7 @@ import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExerci
 import { normalizePaymentMode } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
-import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
+import { BODYWEIGHT_ADDRESS, exerciseRecordAddress, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
 import { syncedSettings } from '../sync/records';
 import { SyncAwareStore } from './sync-store';
 
@@ -101,7 +101,14 @@ export class WorkstrStore extends SyncAwareStore {
     else if (requestedId) value.id = requestedId;
     const id = value.id ? await tx.store.put(value) : await tx.store.add(value);
     await tx.done;
+    this.noteExerciseChange(value.slug, value.updated_at);
     return Number(id);
+  }
+
+  // Every library write - an import, a favourite, a catalog update, a deletion - reports its
+  // exercise record. A slug that cannot be an address stays a usable local row and is skipped.
+  private noteExerciseChange(slug: string, updatedAt: string): void {
+    if (slug && !slug.includes(':')) this.noteChange(exerciseRecordAddress(slug), updatedAt);
   }
 
   async getExercise(id: number): Promise<Exercise | undefined> {
@@ -124,11 +131,9 @@ export class WorkstrStore extends SyncAwareStore {
   async deleteExercise(id: number): Promise<void> {
     const existing = await this.db.get('exercises', id);
     if (!existing) return;
-    await this.db.put('exercises', {
-      ...existing,
-      status: 'deleted',
-      updated_at: new Date().toISOString()
-    });
+    const updatedAt = new Date().toISOString();
+    await this.db.put('exercises', { ...existing, status: 'deleted', updated_at: updatedAt });
+    this.noteExerciseChange(existing.slug, updatedAt);
   }
 
   // One-time cleanup for installs created while the app still shipped a

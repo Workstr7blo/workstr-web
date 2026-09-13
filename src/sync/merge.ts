@@ -1,4 +1,4 @@
-import type { BodyWeightEntry, Session, SessionSet, Sheet, SheetExercise, WorkstrSettings } from '../core/types';
+import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExercise, WorkstrSettings } from '../core/types';
 import type { WorkstrStore } from '../db/store';
 import type { SignedNostrEvent, Signer } from '../signer/types';
 import { decodePrivateRecord, type DecodedPrivateRecord, type RecordCipher } from '../nostr/codecs30078';
@@ -96,7 +96,7 @@ async function localUpdatedAt(store: WorkstrStore, address: string, pending: Map
   // Singletons are rebuilt with a read timestamp, which says nothing about when they last
   // changed. Only per-row records carry a timestamp worth comparing.
   const kind = parseAddress(address)?.kind;
-  if (kind !== 'sheet' && kind !== 'session') return null;
+  if (kind !== 'sheet' && kind !== 'exercise' && kind !== 'session') return null;
   const snapshot = await resolveRecord(store, address);
   return snapshot ? snapshot.updatedAt : null;
 }
@@ -120,6 +120,28 @@ async function applySheet(store: WorkstrStore, record: DecodedPrivateRecord): Pr
     origin_created_at: payload.origin_created_at,
     exercises: (payload.exercises || []).map((row, index) => ({ ...row, position: row.position ?? index }))
   }, existing?.id));
+}
+
+// A library exercise, written with the timestamps it arrived with. A deleted exercise arrives as
+// a row marked deleted, so the deletion lands like any other newer version.
+async function applyExercise(store: WorkstrStore, record: DecodedPrivateRecord): Promise<void> {
+  const payload = record.payload as Exercise;
+  const slug = String(record.parsed.id);
+  const existing = await store.getExerciseBySlug(slug);
+  const { id: _id, ...fields } = payload;
+  await store.applyRemote(() => store.putExerciseRecord({
+    ...fields,
+    slug,
+    muscles: payload.muscles || [],
+    equipment: payload.equipment || [],
+    tags: payload.tags || [],
+    instructions: payload.instructions || [],
+    favourite: Boolean(payload.favourite),
+    status: payload.status === 'deleted' ? 'deleted' : 'active',
+    source_type: payload.source_type || existing?.source_type || 'imported',
+    created_at: payload.created_at || existing?.created_at || record.updatedAt,
+    updated_at: record.updatedAt
+  }));
 }
 
 async function applySessionPayload(store: WorkstrStore, uid: string, raw: unknown): Promise<void> {
@@ -227,6 +249,12 @@ async function applyTombstone(store: WorkstrStore, record: DecodedPrivateRecord)
     await store.applyRemote(() => store.deleteSheet(existing.id!));
     return true;
   }
+  if (record.parsed.kind === 'exercise') {
+    const existing = await store.getExerciseBySlug(String(record.parsed.id));
+    if (existing?.id == null || existing.status === 'deleted') return false;
+    await store.applyRemote(() => store.putExerciseRecord({ ...existing, status: 'deleted', updated_at: record.updatedAt }));
+    return true;
+  }
   if (record.parsed.kind === 'session') {
     const existing = await store.getSessionByUid(String(record.parsed.id));
     if (existing?.id == null) return false;
@@ -259,6 +287,9 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
         await applyBodyChunk(store, record, summary);
       } else if (record.parsed.kind === 'sheet') {
         await applySheet(store, record);
+        summary.applied += 1;
+      } else if (record.parsed.kind === 'exercise') {
+        await applyExercise(store, record);
         summary.applied += 1;
       } else if (record.parsed.kind === 'session') {
         await applySession(store, record);

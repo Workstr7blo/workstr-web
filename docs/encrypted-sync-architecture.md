@@ -43,6 +43,11 @@ Replaceable object records use stable addresses where replacement is desirable:
 - `workstr:v2:settings`
 - `workstr:v2:key`
 
+An exercise record is one library row. A deleted exercise stays a row marked deleted, so its
+deletion travels like any newer version and a device that still had it cannot bring it back.
+Record format 6 reruns the first-run backfill once on devices already syncing, which is how an
+existing library reaches the relay; records already there unchanged are skipped at push.
+
 Append-heavy data uses immutable, device-owned journal chunks:
 
 - `workstr:v2:log:<device>:<sequence>` for workout entries and deletions

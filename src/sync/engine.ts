@@ -23,7 +23,7 @@ export const CHANGE_DEBOUNCE_MS = 4000;
 // 5 moves workout history into the append-only log. A device on 4 wrote one record per
 // workout; its sessions are seeded into the journal once and travel as chunks from then on.
 // The per-workout records it already wrote stay readable and are simply never added to.
-export const RECORD_FORMAT = 5;
+export const RECORD_FORMAT = 6; // 6: the exercise library joins the backfill, so a synced device sends it once
 
 export type SyncState = 'off' | 'idle' | 'syncing' | 'error';
 
