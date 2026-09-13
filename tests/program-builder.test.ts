@@ -112,7 +112,7 @@ describe('program builder controller', () => {
     await controller.open();
     expect(root.querySelector('#sheet-tags')).toBeNull();
     (root.querySelector('[data-pick-slug="push-up"]') as HTMLElement).click();
-    expect(root.querySelector('.builder-auto-labels')?.textContent).toContain('upper-body');
+    expect(root.querySelector('.builder-auto-labels')?.textContent).toContain('Upper Body');
     for (const goal of ['strength', 'hypertrophy', 'conditioning']) {
       (root.querySelector(`[data-goal="${goal}"]`) as HTMLElement).click();
     }

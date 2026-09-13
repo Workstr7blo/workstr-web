@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isFreeEquipment, kitEquipmentKeys, mergeOwnedEquipment, ownedEquipmentKeys } from '../src/core/equipment';
+import { equipmentKey, equipmentLabel, isFreeEquipment, kitCoversEquipment, kitEquipmentKeys, mergeOwnedEquipment, ownedEquipmentKeys } from '../src/core/equipment';
 
 describe('ownedEquipmentKeys', () => {
   it('normalizes, dedupes and drops what nobody owns', () => {
@@ -56,5 +56,30 @@ describe('mergeOwnedEquipment', () => {
 
   it('normalizes on the way in and never stores a free key', () => {
     expect(mergeOwnedEquipment([], ['Dumbbell'], ['Dumbbell', 'Body Weight'])).toEqual(['dumbbell']);
+  });
+});
+
+describe('shared equipment vocabulary', () => {
+  it('resolves the spellings of one piece of kit to one key and one label', () => {
+    for (const value of ['bodyweight', 'body-weight', 'Body Weight', 'no equipment', 'None']) {
+      expect(equipmentKey(value)).toBe('body weight');
+      expect(equipmentLabel(value)).toBe('Body Weight');
+    }
+    expect(equipmentKey('Dumbbells ')).toBe('dumbbell');
+    expect(equipmentLabel('dumbbells')).toBe('Dumbbell');
+    expect(equipmentKey('Resistance Band')).toBe('bands');
+  });
+
+  it('keeps unknown equipment, titling only an all-lowercase label', () => {
+    expect(equipmentKey('Pull-up Bar')).toBe('pull-up bar');
+    expect(equipmentLabel('pull-up bar')).toBe('Pull-Up Bar');
+    expect(equipmentLabel('EZ Bar')).toBe('EZ Bar');
+  });
+
+  it('keeps a kit saved under an older spelling matching', () => {
+    expect(ownedEquipmentKeys(['Dumbbells'])).toEqual(['dumbbell']);
+    expect(kitCoversEquipment(['dumbbell', 'body weight'], ['Dumbbells'])).toBe(true);
+    expect(kitCoversEquipment(['barbell'], ['dumbbell'])).toBe(false);
+    expect(kitCoversEquipment(['barbell'], [])).toBe(true);
   });
 });

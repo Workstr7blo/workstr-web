@@ -78,13 +78,13 @@ describe('exerciseCanonMuscleSet', () => {
 });
 
 describe('exerciseFilterValues', () => {
-  it('collects sorted unique categories, canonical muscles, and difficulties', () => {
+  it('collects movement types and levels in taxonomy order, and sorted canonical muscles', () => {
     const values = exerciseFilterValues([
       ex({ category: 'Strength', difficulty: 'beginner', muscle_group: 'chest' }),
       ex({ category: 'Cardio', difficulty: 'advanced', muscle_group: 'lats', muscles: ['chest'] })
     ]);
-    expect(values.categories).toEqual(['Cardio', 'Strength']);
-    expect(values.difficulties).toEqual(['advanced', 'beginner']);
+    expect(values.categories).toEqual(['strength', 'cardio']);
+    expect(values.difficulties).toEqual(['beginner', 'advanced']);
     expect(values.muscles).toEqual(['Back', 'Chest']);
   });
 });

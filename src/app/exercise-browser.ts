@@ -2,6 +2,7 @@ import type { Exercise } from '../core/types';
 import type { AppState } from './state';
 import { equipmentLabel, MY_EQUIPMENT, ownedEquipmentKeys } from '../core/equipment';
 import { exerciseFilterValues, filterExercises, html } from './format';
+import { formatTaxonomyLabel } from '../core/training-taxonomy';
 
 /**
  * The Library and Discover browsing chrome: the compact toolbar, the active-facet chips,
@@ -18,6 +19,7 @@ export type ExerciseView = 'library' | 'discover';
 export type ExerciseFacet = 'cat' | 'muscle' | 'diff' | 'equip';
 
 export interface ExerciseFacets {
+  // Movement type, filtering the stored `category` field.
   cat: string;
   muscle: string;
   diff: string;
@@ -72,12 +74,14 @@ export function exerciseResults(view: ExerciseView, state: AppState): Exercise[]
 }
 
 const FACET_LABELS: Record<ExerciseFacet, string> = {
-  cat: 'Category', muscle: 'Muscle', diff: 'Level', equip: 'Equipment'
+  cat: 'Movement type', muscle: 'Muscle', diff: 'Level', equip: 'Equipment'
 };
 
 export function facetValueLabel(facet: ExerciseFacet, value: string): string {
-  if (facet !== 'equip') return value;
-  return value === MY_EQUIPMENT ? 'My equipment' : equipmentLabel(value);
+  if (facet === 'equip') return value === MY_EQUIPMENT ? 'My equipment' : equipmentLabel(value);
+  // Movement type and Level are stored lowercase and shown the way program filters show them;
+  // muscles are already canonical names.
+  return facet === 'muscle' ? value : formatTaxonomyLabel(value);
 }
 
 /**
@@ -96,20 +100,20 @@ function facetGroups(view: ExerciseView, state: AppState): { facet: ExerciseFace
   const owned = ownedEquipmentKeys(state.settings.ownedEquipment);
   const current = exerciseFacets(view, state);
   // Equipment carries its own curated label from `equipmentOptions`; the other three are
-  // the stored values themselves, shown as they are stored.
+  // normalized values, labelled by `facetValueLabel`.
   const equipment: FacetOption[] = [
     ...(owned.length ? [{ value: MY_EQUIPMENT, label: 'My equipment' }] : []),
     ...values.equipment.map((item) => ({ value: item.key, label: item.label }))
   ];
-  const plain = (list: string[]): FacetOption[] => list.map((value) => ({ value, label: value }));
+  const labelled = (facet: ExerciseFacet, list: string[]): FacetOption[] => list.map((value) => ({ value, label: facetValueLabel(facet, value) }));
   const withOrphan = (facet: ExerciseFacet, options: FacetOption[]): FacetOption[] =>
     current[facet] && !options.some((option) => option.value === current[facet])
       ? [...options, { value: current[facet], label: facetValueLabel(facet, current[facet]) }]
       : options;
   return [
-    { facet: 'cat', label: FACET_LABELS.cat, anyLabel: 'All categories', options: withOrphan('cat', plain(values.categories)) },
-    { facet: 'muscle', label: FACET_LABELS.muscle, anyLabel: 'All muscles', options: withOrphan('muscle', plain(values.muscles)) },
-    { facet: 'diff', label: FACET_LABELS.diff, anyLabel: 'All levels', options: withOrphan('diff', plain(values.difficulties)) },
+    { facet: 'cat', label: FACET_LABELS.cat, anyLabel: 'All types', options: withOrphan('cat', labelled('cat', values.categories)) },
+    { facet: 'muscle', label: FACET_LABELS.muscle, anyLabel: 'All muscles', options: withOrphan('muscle', labelled('muscle', values.muscles)) },
+    { facet: 'diff', label: FACET_LABELS.diff, anyLabel: 'All levels', options: withOrphan('diff', labelled('diff', values.difficulties)) },
     { facet: 'equip', label: FACET_LABELS.equip, anyLabel: 'All equipment', options: withOrphan('equip', equipment) }
   ];
 }

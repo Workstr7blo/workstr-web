@@ -87,6 +87,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Exercises and programs now use one set of filter terms. The exercise Category filter is
+  called Movement type and offers Strength, Cardio and Mobility; exercises saved as
+  Stretching appear under Mobility without being changed. Programs gain a Level filter that
+  uses the same Beginner, Intermediate and Advanced as exercises, and their Equipment filter
+  now uses the same equipment names as exercises, including My equipment once you have saved
+  your kit. Different spellings of the same equipment - Bodyweight, Body Weight, Dumbbells -
+  are treated as one. Filter options, card labels and badges show the same capitalised names
+  everywhere. A program's Goal still comes only from the goals its author chose, never from
+  the exercises in it.
+
 - Creator tipping is one Monero tips switch in Settings → Payments, off by default, in place
   of the choice between Lightning and Monero. On, Discover program cards show a Tip button
   for creators who publish a Monero address, and your own public address is set under the

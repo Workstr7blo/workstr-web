@@ -101,7 +101,7 @@ export interface AppState {
   editingId: number | null;
   filter: string;
   programFilter: string;
-  programFilters?: { goal: string; focus: string; format: string; equipment: string };
+  programFilters?: { goal: string; focus: string; format: string; level: string; equipment: string };
   // Which browser's filter sheet is open, and null when none is. Transient view state:
   // the filter values themselves stay in programFilters, shared by both browsers.
   programFilterSheet?: 'programs' | 'discover' | null;

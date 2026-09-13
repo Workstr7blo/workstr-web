@@ -6,6 +6,7 @@ import { CREATOR_PROGRAM_D_PREFIX } from '../src/nostr/creator-programs';
 import type { Event } from 'nostr-tools';
 import { programFromEvent } from '../src/nostr/canon';
 import { planProgramImport } from '../src/nostr/programImport';
+import { programTaxonomy } from '../src/features/sheets/program-labels';
 import { buildCreatorProgramEvent, creatorProgramDTag, creatorProgramFingerprint, normalizeProgramPublishRelays, publishCreatorProgram, summarizeProgramPublishResults, type ProgramPublishPool } from '../src/nostr/program-publish';
 
 const secret = generateSecretKey();
@@ -213,5 +214,19 @@ describe('creatorProgramFingerprint', () => {
     expect(program).toBeTruthy();
     const snapshot = planProgramImport(program!, [], []).sheet;
     expect(creatorProgramFingerprint(snapshot)).toBe(creatorProgramFingerprint(base));
+  });
+});
+
+describe('program taxonomy through publish and parse', () => {
+  it('publishes goals as t tags and in workstr_meta, and parses unknown tags without making them goals', () => {
+    const event = { ...buildCreatorProgramEvent(sheet({ tags: ['endurance', 'kettlebell-flow'], difficulty: 'Beginner' })), pubkey, id: 'e'.repeat(64), sig: '' } as Event;
+    expect(event.tags).toEqual(expect.arrayContaining([['t', 'endurance'], ['t', 'kettlebell-flow']]));
+    expect(JSON.parse(event.tags.find((tag) => tag[0] === 'workstr_meta')![1]).tags).toEqual(['endurance', 'kettlebell-flow']);
+    const program = programFromEvent(event)!;
+    expect(program.tags).toEqual(['endurance', 'kettlebell-flow']);
+    expect(program.difficulty).toBe('Beginner');
+    const taxonomy = programTaxonomy(program, []);
+    expect(taxonomy.goals).toEqual(['endurance']);
+    expect(taxonomy.level).toBe('beginner');
   });
 });

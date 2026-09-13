@@ -2,6 +2,7 @@ import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
 import type { GridCard } from '../../app/card-grid';
 import { difficultyBadgeClass, EX_PLACEHOLDER, exerciseSourceLabel, html } from '../../app/format';
+import { formatTaxonomyLabel, normalizeMovementType, normalizeTrainingLevel } from '../../core/training-taxonomy';
 import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults, exerciseToolbar } from '../../app/exercise-browser';
 import { responsiveImageUrl } from '../../core/media';
 
@@ -53,13 +54,13 @@ export function exerciseCardHtml(exercise: Exercise, selecting = false, selected
         ${img}
         ${selecting ? '<span class="sel-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>' : ''}
         <span class="source-badge ${sourceCls}">${html(source)}</span>
-        ${exercise.difficulty ? `<span class="diff-badge ${difficultyBadgeClass(exercise.difficulty)}">${html(exercise.difficulty)}</span>` : ''}
+        ${exercise.difficulty ? `<span class="diff-badge ${difficultyBadgeClass(exercise.difficulty)}">${html(formatTaxonomyLabel(normalizeTrainingLevel(exercise.difficulty)))}</span>` : ''}
       </div>
       <div class="card-body">
         <div class="card-name">${html(exercise.name)}<button class="fav ${exercise.favourite ? 'on' : ''}" data-fav="${html(exercise.slug)}" title="Favourite">${exercise.favourite ? '★' : '☆'}</button></div>
         <div class="card-meta">
           ${exercise.muscle_group ? `<span class="muscle">${html(exercise.muscle_group)}</span>` : ''}
-          ${exercise.category ? `<span class="card-tag">${html(exercise.category)}</span>` : ''}
+          ${exercise.category ? `<span class="card-tag">${html(formatTaxonomyLabel(normalizeMovementType(exercise.category)))}</span>` : ''}
         </div>
       </div>
     </div>`;

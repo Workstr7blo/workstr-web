@@ -9,6 +9,7 @@ import { discoverImportState } from '../features/discover/views';
 import { moneroMode } from '../features/sheets/monero-tip-view';
 import { paintBodyMapSvg } from './bodymap';
 import { EX_PLACEHOLDER, exerciseSourceLabel, html } from './format';
+import { formatTaxonomyLabel, normalizeMovementType, normalizeTrainingLevel } from '../core/training-taxonomy';
 import { programSurfaceMounted, updateDiscoverExercises, updateExerciseCatalogStatus, updateProgramCatalogStatus } from './catalog-surfaces';
 import type { RenderOptions } from './root-rebuild';
 import type { AppState } from './state';
@@ -193,8 +194,8 @@ function openExerciseDetail(exercise: Exercise, source: 'library' | 'discover'):
     <div class="detail-img${src ? '' : ' placeholder'}">${src ? `<img src="${html(responsiveImageUrl(src, 720))}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('placeholder');this.remove()">` : EX_PLACEHOLDER}</div>
     <h3 class="detail-title">${html(exercise.name)}</h3>
     <div class="detail-badges">
-      ${exercise.difficulty ? `<span class="badge diff">${html(exercise.difficulty)}</span>` : ''}
-      ${exercise.category ? `<span class="badge cat">${html(exercise.category)}</span>` : ''}
+      ${exercise.difficulty ? `<span class="badge diff">${html(formatTaxonomyLabel(normalizeTrainingLevel(exercise.difficulty)))}</span>` : ''}
+      ${exercise.category ? `<span class="badge cat">${html(formatTaxonomyLabel(normalizeMovementType(exercise.category)))}</span>` : ''}
       <span class="badge">${html(sourceLabel)}</span>
     </div>
     ${showDescription ? `<p class="detail-desc">${html(description)}</p>` : ''}

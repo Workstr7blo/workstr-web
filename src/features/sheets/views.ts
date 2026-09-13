@@ -7,9 +7,10 @@ import type { AppState } from '../../app/state';
 import { authorPill, difficultyBadgeClass, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { paintBodyMapSvg } from '../../app/bodymap';
 import { programDisplayTags } from './program-labels';
+import { formatTaxonomyLabel, normalizeTrainingLevel } from '../../core/training-taxonomy';
 import { programActions, programStatusBadge } from './program-actions';
 import { moneroMode, moneroTipButton } from './monero-tip-view';
-export { PROGRAM_EQUIPMENT_LABELS, PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, inferProgramLabels, programDisplayTags, programSearchTags, selectedProgramGoals } from './program-labels';
+export { PROGRAM_FOCUS_LABELS, PROGRAM_FORMAT_LABELS, PROGRAM_GOALS, inferProgramLabels, programDisplayTags, programSearchTags, selectedProgramGoals } from './program-labels';
 
 export interface BuilderRow { exerciseSlug: string; exerciseName: string; muscleGroup?: string; imageUrl?: string; sets: number; reps: string; restSec: number; weight: number | null; notes: string; sectionIndex: number; intervalIndex: number; durationSec: number; supersetWithPrevious?: boolean }
 
@@ -248,7 +249,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
   const emomLabel = emomBlocks.length > 1 ? `${emomBlocks.length}-section EMOM` : emom ? `${emom.rounds}-round EMOM` : '';
   const trainingLabel = [time || '', emomLabel, supersetCount ? `${supersetCount} superset${supersetCount === 1 ? '' : 's'}` : '', exerciseCount || !emomLabel ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
   const displayTags = programDisplayTags(program, state.exercises).slice(0, 2);
-  const tagPills = displayTags.map((tag) => `<span class="tag-pill">${html(tag)}</span>`).join('');
+  const tagPills = displayTags.map((tag) => `<span class="tag-pill">${html(formatTaxonomyLabel(tag))}</span>`).join('');
   const isExpanded = state.expandedProgramAddress === program.address;
   // The Tip action is the card's only payment surface, and only while Monero tips are on.
   // Nothing sits beside it: a Monero transfer leaves no total or ranking Workstr could count.
@@ -265,7 +266,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
         <div class="workout-card-name">${html(program.name)}</div>
         <div class="workout-card-meta">${trainingLabel}</div>
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(' · '))}</div>` : ''}
-        <div class="program-badge-row"><span class="program-status ${status.cls}">${html(status.label)}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(program.difficulty)}</span>` : ''}</div>
+        <div class="program-badge-row"><span class="program-status ${status.cls}">${html(status.label)}</span>${program.difficulty ? `<span class="diff-badge inline ${difficultyBadgeClass(program.difficulty)}">${html(formatTaxonomyLabel(normalizeTrainingLevel(program.difficulty)))}</span>` : ''}</div>
         ${tagPills ? `<div class="program-tag-grid">${tagPills}</div>` : ''}
         ${program.pubkey ? `<div class="workout-card-author">${programAuthorPill(program, state)}</div>` : ''}
       </div>

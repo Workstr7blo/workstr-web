@@ -228,9 +228,10 @@ describe('the Settings page', () => {
     it('offers owned equipment as real checkboxes, free equipment excluded', () => {
       const card = withKit().querySelector('.training-preferences-card') as HTMLElement;
       const boxes = [...card.querySelectorAll<HTMLInputElement>('.equip-options .equip-toggle')];
-      expect(boxes.map((box) => box.value)).toEqual(['bench', 'dumbbells']);
+      // "Dumbbells" and a kit saved as dumbbells both resolve to the shared dumbbell key.
+      expect(boxes.map((box) => box.value)).toEqual(['bench', 'dumbbell']);
       expect(boxes.every((box) => box.type === 'checkbox')).toBe(true);
-      expect(boxes.filter((box) => box.checked).map((box) => box.value)).toEqual(['dumbbells']);
+      expect(boxes.filter((box) => box.checked).map((box) => box.value)).toEqual(['dumbbell']);
       expect(card.querySelector('.training-preference-block .status-pill')?.textContent).toBe('1 selected');
     });
 
