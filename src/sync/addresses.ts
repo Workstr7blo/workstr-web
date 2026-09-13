@@ -8,13 +8,15 @@ export const LEGACY_RECORD_PREFIX = 'workstr:v1:';
 // that is never rewritten once full. `body` is the same mechanism for the body log.
 // `session` is read but no longer written — one address per workout leaked an exact public
 // count of how often the user trains, which is what the log replaces.
-export type RecordKind = 'sheet' | 'exercise' | 'session' | 'bodyweight' | 'settings' | 'key' | 'log' | 'body';
+// `library` is the exercise library on the same mechanism: rows packed into chunks, so a whole
+// library costs a signature or two and its `d` tags say nothing about which exercises it holds.
+export type RecordKind = 'sheet' | 'session' | 'bodyweight' | 'settings' | 'key' | 'log' | 'body' | 'library';
 
 // Singletons hold the whole collection in one record; the rest are addressed per row.
 const SINGLETON_KINDS: RecordKind[] = ['bodyweight', 'settings', 'key'];
-const KEYED_KINDS: RecordKind[] = ['sheet', 'exercise', 'session'];
+const KEYED_KINDS: RecordKind[] = ['sheet', 'session'];
 // Addressed by the device that wrote them and a sequence number within that device.
-const CHUNKED_KINDS: RecordKind[] = ['log', 'body'];
+const CHUNKED_KINDS: RecordKind[] = ['log', 'body', 'library'];
 
 export interface RecordAddress {
   kind: RecordKind;
@@ -40,12 +42,6 @@ export function sheetAddress(slug: string): string {
   return `${RECORD_PREFIX}sheet:${assertId('sheet', slug)}`;
 }
 
-// One record per library exercise, addressed by its slug. Library slugs are catalog slugs or
-// slugified names, so the cleartext `d` tag says nothing a catalog does not already publish.
-export function exerciseRecordAddress(slug: string): string {
-  return `${RECORD_PREFIX}exercise:${assertId('exercise', slug)}`;
-}
-
 export function sessionAddress(uid: string): string {
   return `${RECORD_PREFIX}session:${assertId('session', uid)}`;
 }
@@ -59,7 +55,7 @@ export function sessionAddress(uid: string): string {
 export const DEVICE_ID_CHARS = 8;
 const SEQ_DIGITS = 6;
 
-export function chunkAddress(kind: 'log' | 'body', device: string, seq: number): string {
+export function chunkAddress(kind: 'log' | 'body' | 'library', device: string, seq: number): string {
   const cleaned = String(device || '').trim();
   if (!/^[0-9a-f]{1,16}$/.test(cleaned)) throw new Error(`${kind} address needs a hex device id`);
   if (!Number.isInteger(seq) || seq < 0) throw new Error(`${kind} address needs a whole sequence number`);

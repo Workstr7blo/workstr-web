@@ -43,15 +43,17 @@ Replaceable object records use stable addresses where replacement is desirable:
 - `workstr:v2:settings`
 - `workstr:v2:key`
 
-An exercise record is one library row. A deleted exercise stays a row marked deleted, so its
-deletion travels like any newer version and a device that still had it cannot bring it back.
-Record format 6 reruns the first-run backfill once on devices already syncing, which is how an
-existing library reaches the relay; records already there unchanged are skipped at push.
-
 Append-heavy data uses immutable, device-owned journal chunks:
 
 - `workstr:v2:log:<device>:<sequence>` for workout entries and deletions
 - `workstr:v2:body:<device>:<sequence>` for body-weight entries and deletions
+- `workstr:v2:library:<device>:<sequence>` for exercise library rows
+
+A library entry is the whole exercise row keyed by slug. A deleted exercise is still a row,
+marked deleted, so its deletion lands like any newer version and a device that still had it
+cannot bring it back. Record format 6 seeds an existing library into the log once on devices
+already syncing; packed into chunks, a whole library costs a signature or two and its `d` tags
+reveal nothing about which exercises it holds.
 
 A journal entry contains a stable object UID, update timestamp, payload or tombstone,
 and ordering information supplied by its device and chunk. A sealed chunk is not

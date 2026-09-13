@@ -1,6 +1,6 @@
-import type { BodyWeightEntry, Exercise, Session, SessionSet, WorkstrSettings } from '../core/types';
+import type { BodyWeightEntry, Session, SessionSet, WorkstrSettings } from '../core/types';
 import type { SheetWithExercises } from '../db/store';
-import { BODYWEIGHT_ADDRESS, exerciseRecordAddress, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from './addresses';
+import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from './addresses';
 
 export interface RecordSnapshot<T = unknown> {
   address: string;
@@ -40,16 +40,6 @@ export function sheetRecord(sheet: SheetWithExercises): RecordSnapshot {
       ...withoutLocalKeys(sheet as unknown as Record<string, unknown>, 'exercises'),
       exercises: (sheet.exercises || []).map((row) => withoutLocalKeys(row as unknown as Record<string, unknown>, 'sheet_id', 'exercise_id'))
     }
-  };
-}
-
-// A library exercise without its local key. A deleted exercise is still a row, marked deleted,
-// so its deletion travels as an ordinary newer version and reaches every device.
-export function exerciseRecord(exercise: Exercise): RecordSnapshot {
-  return {
-    address: exerciseRecordAddress(exercise.slug),
-    updatedAt: exercise.updated_at || exercise.created_at,
-    payload: withoutLocalKeys(exercise as unknown as Record<string, unknown>)
   };
 }
 

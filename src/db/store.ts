@@ -5,7 +5,7 @@ import type { BodyWeightEntry, Exercise, Session, SessionSet, Sheet, SheetExerci
 import { normalizePaymentMode } from '../core/types';
 import { normalizeWeightUnit } from '../core/units';
 import { slugify } from '../core/ids';
-import { BODYWEIGHT_ADDRESS, exerciseRecordAddress, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
+import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
 import { syncedSettings } from '../sync/records';
 import { SyncAwareStore } from './sync-store';
 
@@ -105,10 +105,11 @@ export class WorkstrStore extends SyncAwareStore {
     return Number(id);
   }
 
-  // Every library write - an import, a favourite, a catalog update, a deletion - reports its
-  // exercise record. A slug that cannot be an address stays a usable local row and is skipped.
+  // Every library write - an import, a favourite, a catalog update, a deletion - goes into the
+  // library log under the exercise's slug. A deletion is the row marked deleted, not a
+  // journal deletion: the row still exists, and its newer version is what says it went.
   private noteExerciseChange(slug: string, updatedAt: string): void {
-    if (slug && !slug.includes(':')) this.noteChange(exerciseRecordAddress(slug), updatedAt);
+    if (slug) this.noteLogChange('library', slug, updatedAt);
   }
 
   async getExercise(id: number): Promise<Exercise | undefined> {
