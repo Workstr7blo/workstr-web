@@ -150,3 +150,64 @@ describe('Discover author payment targets', () => {
     expect(app.state.authorPaymentTargets).toEqual({});
   });
 });
+
+// Import is the last line of defence against a second copy of your own program: a card drawn
+// before a publish or an edit landed can still offer it.
+describe('importing your own published program', () => {
+  const ME = 'a'.repeat(64);
+  const relay = {
+    slug: 'cardio-carnage-2', name: 'Cardio Carnage #2', description: '', difficulty: 'beginner', tags: [], exercises: [],
+    sourceLabel: 'Creator', eventId: 'e'.repeat(64), pubkey: ME,
+    address: `33402:${ME}:workstr:beastmode:program:cardio-carnage-2`, createdAt: 1780000000
+  } as RelayProgram;
+
+  const localSheet = (extra: Record<string, unknown> = {}) => ({
+    id: 4, slug: 'cardio-carnage-2', name: 'Cardio Carnage #2', notes: 'edited locally', difficulty: 'beginner', tags: ['endurance'],
+    is_temporary: false, created_at: '2026-09-01T00:00:00.000Z', updated_at: '2026-09-02T00:00:00.000Z',
+    exercises: [{ id: 9, sheet_id: 4, exercise_slug: 'burpee', exercise_name: 'Burpee', position: 0, sets: 10, reps: '10', rest: 60 }],
+    ...extra
+  });
+
+  function harness(sheets: unknown[]) {
+    const saveSheet = vi.fn(async () => 4);
+    const store = { listSheets: vi.fn(async () => sheets), saveSheet, upsertExercise: vi.fn() };
+    // Rendered state is deliberately empty: the guard must read the database.
+    const state = {
+      pubkey: ME, store, settings: { unit: 'kg', publicRelays: [] }, programs: [relay], authorPaymentTargets: {},
+      library: [], exercises: [], discoverExercises: [], sheets: []
+    } as unknown as AppState;
+    const toast = vi.fn();
+    const root = { querySelector: () => null, querySelectorAll: () => [] } as unknown as HTMLElement;
+    const controller = createCatalogController({
+      root, state, render: vi.fn(), toast, openModal: vi.fn(), closeModal: vi.fn(), fetchProfile: vi.fn(), renderProgramLists: vi.fn()
+    });
+    return { controller, saveSheet, toast, store };
+  }
+
+  it('links the local sheet an edit unlinked instead of importing a second copy', async () => {
+    const app = harness([localSheet()]);
+
+    await app.controller.importProgram(relay, null);
+
+    expect(app.saveSheet).toHaveBeenCalledTimes(1);
+    expect(app.saveSheet).toHaveBeenCalledWith(expect.objectContaining({
+      notes: 'edited locally',
+      nostr_pubkey: ME,
+      nostr_address: relay.address,
+      nostr_event_id: relay.eventId,
+      origin_created_at: relay.createdAt,
+      exercises: [expect.objectContaining({ exercise_slug: 'burpee', sets: 10 })]
+    }), 4);
+    expect(app.store.upsertExercise).not.toHaveBeenCalled();
+    expect(app.toast).toHaveBeenCalledWith('This is your published program. It is already in Programs.');
+  });
+
+  it('writes nothing when the local sheet already carries the address', async () => {
+    const app = harness([localSheet({ nostr_pubkey: ME, nostr_address: relay.address, origin_created_at: 1 })]);
+
+    await app.controller.importProgram(relay, null);
+
+    expect(app.saveSheet).not.toHaveBeenCalled();
+    expect(app.toast).toHaveBeenCalledWith('This is your published program. It is already in Programs.');
+  });
+});

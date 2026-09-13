@@ -178,9 +178,10 @@ export class WorkstrStore extends SyncAwareStore {
       blocks: draft.blocks,
       is_temporary: draft.is_temporary ?? existing?.is_temporary ?? false,
       // Import = snapshot: the nostr identity comes only from the draft, so a
-      // builder save (which carries none) forks an imported sheet and canon
-      // updates never clobber local edits. The seed marker follows the same
-      // rule, so editing a starter program makes it the user's own.
+      // builder save forks someone else's imported sheet (it carries no identity)
+      // and canon updates never clobber local edits. The builder carries the
+      // identity through only for the user's own publication. The seed marker
+      // follows the same rule, so editing a starter program makes it the user's own.
       source_type: draft.source_type,
       nostr_pubkey: draft.nostr_pubkey,
       nostr_address: draft.nostr_address,

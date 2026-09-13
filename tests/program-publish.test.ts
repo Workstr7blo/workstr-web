@@ -175,3 +175,15 @@ describe('publishCreatorProgram', () => {
     expect(poolFactory).not.toHaveBeenCalled();
   });
 });
+
+describe('creatorProgramDTag', () => {
+  it('keeps the d tag a program was already published under when the local slug differs', () => {
+    const address = `33402:${pubkey}:${CREATOR_PROGRAM_D_PREFIX}push-day`;
+    expect(creatorProgramDTag(sheet({ slug: 'push-day-2', nostr_address: address }))).toBe(`${CREATOR_PROGRAM_D_PREFIX}push-day`);
+    expect(buildCreatorProgramEvent(sheet({ slug: 'push-day-2', nostr_address: address })).tags).toContainEqual(['d', `${CREATOR_PROGRAM_D_PREFIX}push-day`]);
+  });
+
+  it('uses the slug when the stored address is not a creator program', () => {
+    expect(creatorProgramDTag(sheet({ nostr_address: '33402:op:workstr:program:legs' }))).toBe(`${CREATOR_PROGRAM_D_PREFIX}push-day`);
+  });
+});

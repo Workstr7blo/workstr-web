@@ -77,7 +77,12 @@ export function normalizeProgramPublishRelays(relays: string[] = DEFAULT_PUBLIC_
   return dedupe(relays).filter(isPublicProgramRelay);
 }
 
-export function creatorProgramDTag(sheet: Pick<SheetWithExercises, 'id' | 'slug' | 'name'>): string {
+export function creatorProgramDTag(sheet: Pick<SheetWithExercises, 'id' | 'slug' | 'name' | 'nostr_address'>): string {
+  // A program already out under a creator d tag keeps it, so republishing replaces that event
+  // even when the local slug differs - your own program imported on another device, say.
+  const [kind, , ...rest] = (sheet.nostr_address || '').split(':');
+  const published = rest.join(':');
+  if (kind === String(CREATOR_PROGRAM_KIND) && published.startsWith(CREATOR_PROGRAM_D_PREFIX)) return published;
   const stable = sheet.slug || (sheet.id ? `program-${sheet.id}` : slugify(sheet.name) || 'program');
   return `${CREATOR_PROGRAM_D_PREFIX}${stable}`;
 }
