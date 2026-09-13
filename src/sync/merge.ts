@@ -96,7 +96,7 @@ async function localUpdatedAt(store: WorkstrStore, address: string, pending: Map
   // Singletons are rebuilt with a read timestamp, which says nothing about when they last
   // changed. Only per-row records carry a timestamp worth comparing.
   const kind = parseAddress(address)?.kind;
-  if (kind !== 'sheet' && kind !== 'exercise' && kind !== 'session') return null;
+  if (kind !== 'sheet' && kind !== 'session') return null;
   const snapshot = await resolveRecord(store, address);
   return snapshot ? snapshot.updatedAt : null;
 }
@@ -120,28 +120,6 @@ async function applySheet(store: WorkstrStore, record: DecodedPrivateRecord): Pr
     origin_created_at: payload.origin_created_at,
     exercises: (payload.exercises || []).map((row, index) => ({ ...row, position: row.position ?? index }))
   }, existing?.id));
-}
-
-// A library exercise, written with the timestamps it arrived with. A deleted exercise arrives as
-// a row marked deleted, so the deletion lands like any other newer version.
-async function applyExercise(store: WorkstrStore, record: DecodedPrivateRecord): Promise<void> {
-  const payload = record.payload as Exercise;
-  const slug = String(record.parsed.id);
-  const existing = await store.getExerciseBySlug(slug);
-  const { id: _id, ...fields } = payload;
-  await store.applyRemote(() => store.putExerciseRecord({
-    ...fields,
-    slug,
-    muscles: payload.muscles || [],
-    equipment: payload.equipment || [],
-    tags: payload.tags || [],
-    instructions: payload.instructions || [],
-    favourite: Boolean(payload.favourite),
-    status: payload.status === 'deleted' ? 'deleted' : 'active',
-    source_type: payload.source_type || existing?.source_type || 'imported',
-    created_at: payload.created_at || existing?.created_at || record.updatedAt,
-    updated_at: record.updatedAt
-  }));
 }
 
 async function applySessionPayload(store: WorkstrStore, uid: string, raw: unknown): Promise<void> {
@@ -229,6 +207,43 @@ async function applyBodyChunk(store: WorkstrStore, record: DecodedPrivateRecord,
   }
 }
 
+// The exercise library, merged one exercise at a time like the body log. An entry carries the
+// whole row, so a deleted exercise arrives as its row marked deleted and lands like any newer
+// version: a device that still had it cannot bring it back. Rows are written with the
+// timestamps they arrived with, never the merge time, or this copy would look newer than a
+// later edit from the device that sent it.
+async function applyLibraryChunk(store: WorkstrStore, record: DecodedPrivateRecord, summary: MergeSummary): Promise<void> {
+  const payload = record.payload as ChunkPayload | undefined;
+  const entries = payload?.entries;
+  if (!Array.isArray(entries) || entries.length === 0) return;
+
+  const held = new Map((await store.listExercisesIncludingDeleted()).map((exercise) => [exercise.slug, exercise]));
+  for (const entry of entries) {
+    if (!isLogEntry(entry)) { summary.skipped += 1; continue; }
+    const existing = held.get(entry.uid);
+    if (existing && (existing.updated_at || '') >= entry.updatedAt) { summary.skipped += 1; continue; }
+    const incoming = entry.deleted ? (existing ? { ...existing, status: 'deleted' as const } : undefined) : entry.payload as Exercise | undefined;
+    if (!incoming?.name) { summary.skipped += 1; continue; }
+    const { id: _id, ...fields } = incoming;
+    const row: Omit<Exercise, 'id'> = {
+      ...fields,
+      slug: entry.uid,
+      muscles: fields.muscles || [],
+      equipment: fields.equipment || [],
+      tags: fields.tags || [],
+      instructions: fields.instructions || [],
+      favourite: Boolean(fields.favourite),
+      status: fields.status === 'deleted' ? 'deleted' : 'active',
+      source_type: fields.source_type || existing?.source_type || 'imported',
+      created_at: fields.created_at || existing?.created_at || entry.updatedAt,
+      updated_at: entry.updatedAt
+    };
+    await store.applyRemote(() => store.putExerciseRecord(row));
+    held.set(entry.uid, { ...row, id: existing?.id });
+    if (row.status === 'deleted') summary.deleted += 1; else summary.applied += 1;
+  }
+}
+
 async function applySingleton(store: WorkstrStore, record: DecodedPrivateRecord): Promise<void> {
   if (record.parsed.kind === 'bodyweight') {
     const payload = record.payload as { entries?: BodyWeightEntry[] };
@@ -247,12 +262,6 @@ async function applyTombstone(store: WorkstrStore, record: DecodedPrivateRecord)
     const existing = await store.getSheetBySlug(String(record.parsed.id));
     if (!existing?.id) return false;
     await store.applyRemote(() => store.deleteSheet(existing.id!));
-    return true;
-  }
-  if (record.parsed.kind === 'exercise') {
-    const existing = await store.getExerciseBySlug(String(record.parsed.id));
-    if (existing?.id == null || existing.status === 'deleted') return false;
-    await store.applyRemote(() => store.putExerciseRecord({ ...existing, status: 'deleted', updated_at: record.updatedAt }));
     return true;
   }
   if (record.parsed.kind === 'session') {
@@ -285,11 +294,10 @@ export async function mergeRecords(store: WorkstrStore, records: DecodedPrivateR
         await applyLogChunk(store, record, summary);
       } else if (record.parsed.kind === 'body') {
         await applyBodyChunk(store, record, summary);
+      } else if (record.parsed.kind === 'library') {
+        await applyLibraryChunk(store, record, summary);
       } else if (record.parsed.kind === 'sheet') {
         await applySheet(store, record);
-        summary.applied += 1;
-      } else if (record.parsed.kind === 'exercise') {
-        await applyExercise(store, record);
         summary.applied += 1;
       } else if (record.parsed.kind === 'session') {
         await applySession(store, record);

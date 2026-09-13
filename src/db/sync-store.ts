@@ -5,7 +5,7 @@ import { isRecordAddress } from '../sync/addresses';
 
 export interface JournalRow {
   id?: number;
-  kind: 'log' | 'body';
+  kind: 'log' | 'body' | 'library';
   uid: string;
   updated_at: string;
   deleted?: boolean;
@@ -53,11 +53,20 @@ export abstract class SyncAwareStore {
   //
   // The listener is still told, so the engine debounces and schedules a pass exactly as it
   // does for a sheet: the journal says what to send, the listener says when.
-  protected noteLogChange(kind: 'log' | 'body', uid: string, updatedAt = new Date().toISOString(), deleted = false): void {
+  protected noteLogChange(kind: JournalRow['kind'], uid: string, updatedAt = new Date().toISOString(), deleted = false): void {
     if (this.applyingRemote) return;
     void this.noteJournal(kind, uid, updatedAt, deleted).then(() => {
       this.changeListener?.(`${kind}:${uid}`, updatedAt);
     });
+  }
+
+  // The awaited form, for a write whose caller can wait for its journal row. The row exists by
+  // the time the write that caused it returns, so nothing is left running against a database
+  // that may close, and a burst of writes to one uid cannot race to add its pending row twice.
+  protected async noteLogChangeNow(kind: JournalRow['kind'], uid: string, updatedAt = new Date().toISOString(), deleted = false): Promise<void> {
+    if (this.applyingRemote) return;
+    await this.noteJournal(kind, uid, updatedAt, deleted);
+    this.changeListener?.(`${kind}:${uid}`, updatedAt);
   }
 
   // Every write inside `apply` is treated as a merge rather than an edit.
@@ -165,7 +174,7 @@ export abstract class SyncAwareStore {
   // Appends to this device's log. An entry that has not been published yet is updated in
   // place rather than added twice: until it has a chunk, the only thing that matters about
   // it is that the uid is dirty and how recently it changed.
-  async noteJournal(kind: 'log' | 'body', uid: string, updatedAt: string, deleted = false): Promise<void> {
+  async noteJournal(kind: JournalRow['kind'], uid: string, updatedAt: string, deleted = false): Promise<void> {
     const pending = (await this.db.getAllFromIndex('journal', 'uid', uid))
       .filter((row) => row.kind === kind && row.seq === null);
     const existing = pending[0];
@@ -177,14 +186,14 @@ export abstract class SyncAwareStore {
     await this.db.add('journal', { kind, uid, updated_at: updatedAt, deleted, seq: null });
   }
 
-  async listJournal(kind: 'log' | 'body'): Promise<JournalRow[]> {
+  async listJournal(kind: JournalRow['kind']): Promise<JournalRow[]> {
     return (await this.db.getAllFromIndex('journal', 'kind', kind))
       .sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
   }
 
   // Everything not yet in a chunk, oldest first: the order they are packed in, so a chunk
   // reads chronologically and the tail is what keeps changing.
-  async listPendingJournal(kind: 'log' | 'body'): Promise<JournalRow[]> {
+  async listPendingJournal(kind: JournalRow['kind']): Promise<JournalRow[]> {
     return (await this.listJournal(kind)).filter((row) => row.seq === null);
   }
 
@@ -207,7 +216,7 @@ export abstract class SyncAwareStore {
 
   // A uid this device has an unpublished deletion for. A chunk from another device that
   // still carries the session must not write it back.
-  async pendingDeletions(kind: 'log' | 'body'): Promise<Set<string>> {
+  async pendingDeletions(kind: JournalRow['kind']): Promise<Set<string>> {
     return new Set((await this.listPendingJournal(kind)).filter((row) => row.deleted).map((row) => row.uid));
   }
 

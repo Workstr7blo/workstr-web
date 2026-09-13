@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkstrStore } from '../src/db/store';
 import { compactJournal, COMPACT_THRESHOLD, pushJournal } from '../src/sync/journal';
-import { logAddress } from '../src/sync/addresses';
+import { chunkAddress, logAddress } from '../src/sync/addresses';
 import { testCipher, TEST_PUBKEY } from './cipher';
 import type { Signer, UnsignedNostrEvent } from '../src/signer/types';
 
@@ -255,5 +255,33 @@ describe('compacting a sealed chunk', () => {
     await push(store);
 
     expect(await compact(store)).toMatchObject({ rewritten: 0, reclaimed: 0 });
+  });
+});
+
+describe('publishing the exercise library', () => {
+  it('packs a whole library into one chunk and one signature', async () => {
+    const store = await freshStore();
+    for (let index = 0; index < 40; index += 1) {
+      await store.upsertExercise({ slug: `move-${index}`, name: `Move ${index}`, muscles: ['Core'], equipment: ['Body Weight'], tags: [], instructions: [], source_type: 'imported' });
+    }
+    await vi.waitFor(async () => expect(await store.listJournal('library')).toHaveLength(40));
+
+    const summary = await pushJournal(store, fakeSigner(), await testCipher(), 'ws://memory', 'library');
+
+    expect(summary.published).toBe(1);
+    expect(relay.signatures).toBe(1);
+    expect([...relay.events.keys()]).toEqual([chunkAddress('library', DEVICE, 0)]);
+    expect((await store.getSettings()).backup?.libraryOpenSeq).toBe(0);
+    expect((await store.listJournal('library')).every((row) => row.seq === 0)).toBe(true);
+  });
+
+  it('never signs the library again when nothing in it changed', async () => {
+    const store = await freshStore();
+    await store.upsertExercise({ slug: 'plank', name: 'Plank', muscles: [], equipment: [], tags: [], instructions: [], source_type: 'imported' });
+    await vi.waitFor(async () => expect(await store.listJournal('library')).toHaveLength(1));
+    await pushJournal(store, fakeSigner(), await testCipher(), 'ws://memory', 'library');
+    const second = await pushJournal(store, fakeSigner(), await testCipher(), 'ws://memory', 'library');
+    expect(second.published).toBe(0);
+    expect(relay.signatures).toBe(1);
   });
 });

@@ -210,6 +210,7 @@ export interface BackupSettings {
   device?: string;
   logOpenSeq?: number;
   bodyOpenSeq?: number;
+  libraryOpenSeq?: number;
   v2StartedAt?: string;
   localOnlyHistoryCount?: number;
   // Index into the deterministic backfill list, so an interrupted first run resumes

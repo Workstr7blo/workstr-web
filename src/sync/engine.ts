@@ -3,7 +3,7 @@ import type { SignedNostrEvent, Signer } from '../signer/types';
 import { runBackfill, seedJournal } from './backfill';
 import { pullAndMerge } from './merge';
 import { pushQueue } from './push';
-import { compactJournal, pushJournal } from './journal';
+import { compactJournal, JOURNAL_KINDS, pushJournal, type JournalPushSummary } from './journal';
 import { isRecordAddress, newDeviceId, parseAddress } from './addresses';
 import { SignerTimeoutError, withSignerTimeout } from '../signer/timeout';
 import { BackupKeyUnavailableError, backupKeyFingerprint, keyEventFingerprint, republishBackupKey, resolveBackupKey, unwrapBackupKey } from '../nostr/backup-key';
@@ -23,7 +23,7 @@ export const CHANGE_DEBOUNCE_MS = 4000;
 // 5 moves workout history into the append-only log. A device on 4 wrote one record per
 // workout; its sessions are seeded into the journal once and travel as chunks from then on.
 // The per-workout records it already wrote stay readable and are simply never added to.
-export const RECORD_FORMAT = 6; // 6: the exercise library joins the backfill, so a synced device sends it once
+export const RECORD_FORMAT = 7; // 7: the exercise library moves into the log, after 6 briefly sent one record per exercise
 
 export type SyncState = 'off' | 'idle' | 'syncing' | 'error';
 
@@ -255,39 +255,37 @@ export function createSyncEngine(ctx: SyncEngineContext): SyncEngine {
       throw new StalledSignerError();
     }
 
-    const log = await pushJournal(ctx.store, signer, active, relayUrl, 'log', {
-      onProgress: (done, total) => report({ progress: { phase: 'upload', done, total } }),
-      renewSigner
-    });
-    // The body log only after the workout log, so a stalled signer costs one round of
-    // timeouts rather than two.
-    const body = log.failed.length === 0
-      ? await pushJournal(ctx.store, signer, active, relayUrl, 'body', {
+    // Each log after the one before it, stopping at the first that fails, so a stalled signer
+    // costs one round of timeouts rather than one per log.
+    const chunks: JournalPushSummary[] = [];
+    for (const kind of JOURNAL_KINDS) {
+      if (chunks.some((summary) => summary.failed.length > 0)) break;
+      chunks.push(await pushJournal(ctx.store, signer, active, relayUrl, kind, {
         onProgress: (done, total) => report({ progress: { phase: 'upload', done, total } }),
         renewSigner
-      })
-      : { published: 0, skipped: 0, rejected: [], failed: [] };
+      }));
+    }
     report({ progress: undefined });
 
     // A stalled signer means the same thing whichever half of the pass met it, so it gets
     // the same words the user can act on rather than the name of the call that timed out.
-    if ([...log.failed, ...body.failed].some((outcome) => outcome.failure === 'signer')) throw new StalledSignerError();
+    if (chunks.some((summary) => summary.failed.some((outcome) => outcome.failure === 'signer'))) throw new StalledSignerError();
     if (result.rejected.length > 0) {
       // The relay refused the record itself. Retrying unchanged cannot fix it, and the
       // entry stays queued rather than vanishing, so say so plainly.
       throw new Error(`Relay rejected ${result.rejected.length} record(s): ${result.rejected[0].reason}`);
     }
-    const chunkRejected = [...log.rejected, ...body.rejected];
+    const chunkRejected = chunks.flatMap((summary) => summary.rejected);
     if (chunkRejected.length > 0) throw new Error(`Relay rejected ${chunkRejected.length} record(s): ${chunkRejected[0].reason}`);
     if (result.failed.length > 0) throw new Error(result.failed[0].reason);
-    const chunkFailed = [...log.failed, ...body.failed];
+    const chunkFailed = chunks.flatMap((summary) => summary.failed);
     if (chunkFailed.length > 0) throw new Error(chunkFailed[0].reason);
 
     // Reclaims sealed chunks that later entries have mostly replaced. Decided entirely from
     // this device's own journal, so it costs nothing until there is something to reclaim,
     // and it is the last thing a pass does: a backup that is larger than it needs to be is
     // still a working backup, so this must never be the reason a pass fails.
-    for (const chunked of ['log', 'body'] as const) {
+    for (const chunked of JOURNAL_KINDS) {
       await compactJournal(ctx.store, signer, active, relayUrl, chunked);
     }
   }
