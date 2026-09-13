@@ -110,6 +110,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Exercise cards are simpler and the same in Library and Discover: the picture, the name, and
+  one line with the muscle it trains and its level. The Workstr and level badges over the
+  picture and the movement-type pill are gone; the source, movement type, equipment and
+  secondary muscles are all in the exercise details, which also gain a favorite button. Library
+  has a new star button beside the filters that shows favorite exercises only, with its own
+  filter chip and a message for when nothing is starred yet.
+
 - Exercises and programs now use one set of filter terms. The exercise Category filter is
   called Movement type and offers Strength, Cardio and Mobility; exercises saved as
   Stretching appear under Mobility without being changed. Programs gain a Level filter that

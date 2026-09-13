@@ -526,6 +526,20 @@
 .discover-exercise-panel .card-name { margin-bottom: 7px; font-size: 15px; line-height: 1.16; }
 .library-panel .card-meta,
 .discover-exercise-panel .card-meta { gap: 6px; }
+.card-name .card-name-text { min-width: 0; }
+/* Muscle in the accent, then the level quieter behind a dot that separates the two. The dot's
+   colour repeats the level's word, so colour is never the only way to read it. */
+.card-meta .card-level { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font: 700 12px/1 ui-monospace, monospace; }
+.card-meta .card-level::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+.card-meta .card-level.level-beginner::before { background: var(--success-green); }
+.card-meta .card-level.level-intermediate::before { background: var(--bitcoin-gold); }
+.card-meta .card-level.level-advanced::before { background: var(--danger-red); }
+/* A 40px target for the star without a taller name row: the extra size is negative margin. */
+.library-panel .card-name .fav { display: grid; place-items: center; min-width: 40px; min-height: 40px; margin: -11px -11px -11px 0; font-size: 18px; }
+.favourites-toggle.on { color: var(--bitcoin-gold); }
+.favourites-toggle.on svg { fill: currentColor; }
+.detail-source { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 12px; color: var(--muted); font-size: 13px; }
+.detail-source > span:first-child { color: var(--dim); font: 700 10px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; }
 
 @media (max-width: 760px) {
   /* Phones get icon-only actions: the icon plus its aria-label carries the button, and the
@@ -553,12 +567,8 @@
   .discover-exercise-panel .card-name { font-size: 13px; gap: 4px; }
   .library-panel .card-meta,
   .discover-exercise-panel .card-meta { gap: 5px; }
-  .library-panel .card-meta .card-tag,
-  .discover-exercise-panel .card-meta .card-tag { padding: 3px 6px; font-size: 9px; }
-  .library-panel .source-badge,
-  .discover-exercise-panel .source-badge,
-  .library-panel .diff-badge,
-  .discover-exercise-panel .diff-badge { padding: 3px 6px; font-size: 8px; letter-spacing: .02em; }
+  .card-meta .muscle,
+  .card-meta .card-level { font-size: 11px; }
   .builder-goal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -904,9 +914,6 @@
 @media (max-width: 820px) { .program-builder-basics { grid-template-columns: 1fr 1fr; } .program-builder-basics .span-2 { grid-column: 1 / -1; } }
 @media (max-width: 680px) { .modal-card:has(.program-builder) { padding: 12px; } .program-builder h3 { font-size: 21px; } .program-builder-basics { grid-template-columns: 1fr; gap: 10px; } .program-builder-basics .span-2 { grid-column: auto; } .program-builder .subsection-head { margin-top: 16px; margin-bottom: 8px; } .emom-section-header { padding: 8px 9px; } .emom-section-settings { padding: 7px 9px; } .emom-section-exercises { padding: 7px 9px 9px; } .emom-section-settings small { display: none; } .emom-rx-target { grid-template-columns: 78px 52px; } .emom-rx-type { width: 78px; } .emom-rx-value, .emom-rx-open { width: 52px; } }
 @media (max-width: 390px) { .modal-card:has(.program-builder) { padding: 10px; } .emom-prescription-row { grid-template-columns: minmax(0,1fr) auto 28px; gap: 6px; padding-left: 8px; } .emom-rx-name strong { font-size: 13px; } .emom-rx-name small { display: none; } .emom-rx-target { grid-template-columns: 74px 48px; gap: 4px; } .emom-rx-type { width: 74px; font-size: 11px; } .emom-rx-value, .emom-rx-open { width: 48px; } .emom-rx-remove { width: 28px; min-width: 28px; } }
-.discover-card-meta { justify-content: space-between; gap: 10px; }
-.discover-card-meta .muscle { min-width: 0; }
-.discover-card-meta .author-pill { margin-left: auto; max-width: 46%; }
 .discover-import { justify-content: center; text-align: center; }
 .ex-grid.selecting .ex-card.unselectable { opacity: .45; }
 .glyph { background: #0b0616; border: 1px solid var(--border-hot); }

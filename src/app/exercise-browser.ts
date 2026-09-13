@@ -16,7 +16,7 @@ import { formatTaxonomyLabel } from '../core/training-taxonomy';
  */
 
 export type ExerciseView = 'library' | 'discover';
-export type ExerciseFacet = 'cat' | 'muscle' | 'diff' | 'equip';
+export type ExerciseFacet = 'cat' | 'muscle' | 'diff' | 'equip' | 'fav';
 
 export interface ExerciseFacets {
   // Movement type, filtering the stored `category` field.
@@ -24,15 +24,19 @@ export interface ExerciseFacets {
   muscle: string;
   diff: string;
   equip: string;
+  // Favorites only, 'on' or ''. Library-only: a catalog exercise cannot be a favorite until it
+  // is imported, so Discover always reads it as off.
+  fav: string;
 }
 
-const NO_FACETS: ExerciseFacets = { cat: '', muscle: '', diff: '', equip: '' };
+const NO_FACETS: ExerciseFacets = { cat: '', muscle: '', diff: '', equip: '', fav: '' };
 
 const ICONS = {
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   sliders: '<path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2"/><circle cx="10" cy="16" r="2"/>',
   select: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/>',
-  refresh: '<path d="M20 12a8 8 0 11-2.3-5.6"/><path d="M20 4v5h-5"/>'
+  refresh: '<path d="M20 12a8 8 0 11-2.3-5.6"/><path d="M20 4v5h-5"/>',
+  star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>'
 };
 
 function icon(name: keyof typeof ICONS, cls = ''): string {
@@ -44,13 +48,14 @@ export function exerciseSource(view: ExerciseView, state: AppState): Exercise[] 
 }
 
 /**
- * Picks the four facets by name rather than spreading the slice: `discoverFilter` also
+ * Picks the facets by name rather than spreading the slice: `discoverFilter` also
  * carries the view's search text in `q`, and spreading it would count typing as a filter,
  * inflating the badge and letting Reset wipe what the user typed.
  */
 export function exerciseFacets(view: ExerciseView, state: AppState): ExerciseFacets {
   const source = (view === 'discover' ? state.discoverFilter : state.exFilter) || NO_FACETS;
-  return { cat: source.cat || '', muscle: source.muscle || '', diff: source.diff || '', equip: source.equip || '' };
+  const fav = view === 'library' ? state.exFilter?.fav || '' : '';
+  return { cat: source.cat || '', muscle: source.muscle || '', diff: source.diff || '', equip: source.equip || '', fav };
 }
 
 export function exerciseQuery(view: ExerciseView, state: AppState): string {
@@ -66,18 +71,21 @@ export function activeFacetCount(view: ExerciseView, state: AppState): number {
  * both go through it, so the number and the grid cannot disagree.
  */
 export function exerciseResults(view: ExerciseView, state: AppState): Exercise[] {
+  const facets = exerciseFacets(view, state);
   return filterExercises(exerciseSource(view, state), {
-    ...exerciseFacets(view, state),
+    ...facets,
+    favourite: facets.fav === 'on',
     q: exerciseQuery(view, state),
     ownedEquipment: ownedEquipmentKeys(state.settings.ownedEquipment)
   });
 }
 
 const FACET_LABELS: Record<ExerciseFacet, string> = {
-  cat: 'Movement type', muscle: 'Muscle', diff: 'Level', equip: 'Equipment'
+  cat: 'Movement type', muscle: 'Muscle', diff: 'Level', equip: 'Equipment', fav: 'Favorites'
 };
 
 export function facetValueLabel(facet: ExerciseFacet, value: string): string {
+  if (facet === 'fav') return 'Favorites';
   if (facet === 'equip') return value === MY_EQUIPMENT ? 'My equipment' : equipmentLabel(value);
   // Movement type and Level are stored lowercase and shown the way program filters show them;
   // muscles are already canonical names.
@@ -141,10 +149,17 @@ export function exerciseToolbar(view: ExerciseView, state: AppState): string {
       ${icon('search', 'program-search-icon')}
       <input class="program-search" id="${inputId}" type="search" placeholder="Search exercises..." aria-label="Search exercises" autocomplete="off" value="${html(exerciseQuery(view, state))}" />
     </div>
+    ${discover ? '' : favouritesToggle(exerciseFacets('library', state).fav === 'on')}
     <button class="program-toolbar-action program-filter-toggle ${count ? 'on' : ''}" type="button" data-exercise-filter-open="${view}" aria-label="${html(filterLabel)}" aria-haspopup="dialog" aria-expanded="${state.exerciseFilterSheet === view}" title="Filter exercises">${icon('sliders')}${badge}</button>
     ${refresh}
     <button class="program-toolbar-action program-filter-toggle ${selecting ? 'on' : ''}" id="${selectId}" type="button" aria-label="Select exercises" aria-pressed="${selecting}" title="Select"${selectable ? '' : ' disabled'}>${icon('select')}</button>
   </div>`;
+}
+
+// One tap to Favorites only, beside the filter button. The label stays the same and
+// `aria-pressed` says whether it is on, which is how a toggle is announced.
+function favouritesToggle(on: boolean): string {
+  return `<button class="program-toolbar-action program-filter-toggle favourites-toggle ${on ? 'on' : ''}" id="lib-favourites-toggle" type="button" aria-pressed="${on}" aria-label="Show favorite exercises only" title="${on ? 'Favorites only' : 'Show favorites'}">${icon('star')}</button>`;
 }
 
 export function discoverImportableCount(state: AppState): number {
