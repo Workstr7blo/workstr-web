@@ -13,7 +13,7 @@ function localSheetId(program: RelayProgram): number {
 }
 
 export function programActions(program: RelayProgram, state: AppState): string {
-  const importState = isLocalProgram(program) ? null : programImportState(program, state.sheets);
+  const importState = isLocalProgram(program) ? null : programImportState(program, state.sheets, state.pubkey);
   const publishClass = beastModeEligibility(state).unlocked ? ' primary' : '';
   return importState === null
     ? `<button class="button primary small start-workout-action" type="button" data-start-program="${html(program.address)}">Start workout</button>

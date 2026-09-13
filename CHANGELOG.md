@@ -46,6 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Editing a program you published no longer leaves you with two copies of it. Saving an edit
+  dropped the program's link to what you had published, so Discover offered your own program
+  back as an import, and taking it added a second card to Programs. Edits now keep the link,
+  Publish replaces the program you already published instead of starting another, and Discover
+  shows your own programs as In library. Pressing Import on one you edited before this fix
+  links it back to your copy rather than adding a new one. Duplicates made before the fix are
+  not removed yet: delete the copy marked In library and your original takes its place.
+
 - Encrypted sync now points at the Workstr relay's current AirVPN forwarded port `58956`.
 
 - The Account card now shows Add device only for Workstr-managed device-key accounts.

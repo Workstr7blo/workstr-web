@@ -65,6 +65,27 @@ describe('programImportState', () => {
     // imported again as a separate sheet without clobbering the edit.
     expect(programImportState(program([]), [sheet(undefined, undefined)])).toBe('new');
   });
+
+  describe("the active account's own publication", () => {
+    const me = 'a'.repeat(64);
+    const ownAddress = `33402:${me}:workstr:beastmode:program:push-day`;
+    const own = (extra: Partial<RelayProgram> = {}) => program([], { pubkey: me, address: ownAddress, ...extra });
+
+    it('is in-library when the relay copy is newer than the local sheet, not an update over edits', () => {
+      const local = { ...sheet(ownAddress, 100), nostr_pubkey: me };
+      expect(programImportState(own({ createdAt: 200 }), [local], me)).toBe('in-library');
+      // Signed out, the same pair is an ordinary import again.
+      expect(programImportState(own({ createdAt: 200 }), [local])).toBe('update');
+    });
+
+    it('is in-library when an edit cleared the address of the sheet it was published from', () => {
+      expect(programImportState(own(), [sheet()], me)).toBe('in-library');
+    });
+
+    it('stays new for another author whose slug matches a local sheet', () => {
+      expect(programImportState(program([], { address: '33402:op:workstr:beastmode:program:push-day' }), [sheet()], me)).toBe('new');
+    });
+  });
 });
 
 describe('planProgramImport', () => {

@@ -2,11 +2,33 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createProgramBuilder } from '../src/app/program-builder';
 import type { AppState } from '../src/app/state';
-import type { WorkstrStore } from '../src/db/store';
+import type { SheetWithExercises, WorkstrStore } from '../src/db/store';
 
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+const ME = 'a'.repeat(64);
+const OTHER = 'b'.repeat(64);
 
-function setup() {
+function publishedSheet(pubkey: string): SheetWithExercises {
+  return {
+    id: 7,
+    slug: 'leg-day',
+    name: 'Leg Day',
+    notes: '',
+    difficulty: 'beginner',
+    tags: ['strength'],
+    is_temporary: false,
+    created_at: '2026-09-01T00:00:00.000Z',
+    updated_at: '2026-09-01T00:00:00.000Z',
+    nostr_pubkey: pubkey,
+    nostr_address: `33402:${pubkey}:workstr:beastmode:program:leg-day`,
+    nostr_event_id: 'event1',
+    nostr_published_at: '2026-09-01T00:00:00.000Z',
+    origin_created_at: 1788220800,
+    exercises: [{ id: 1, sheet_id: 7, exercise_slug: 'squat', exercise_name: 'Squat', muscle_group: 'Quadriceps', image_url: '', position: 0, sets: 3, reps: '8', rest: 60, weight: 0, notes: '' }]
+  };
+}
+
+function setup(statePatch: Partial<AppState> = {}) {
   document.body.innerHTML = '<div id="app"><div id="modal"><button id="modal-close"></button><div id="modal-content"></div></div></div>';
   const root = document.getElementById('app') as HTMLElement;
   const saveSheet = vi.fn(async () => 1);
@@ -24,7 +46,7 @@ function setup() {
     saveSheet,
     listSheets: async () => []
   } as unknown as WorkstrStore;
-  const state = { store, settings: { unit: 'kg' }, sheets: [] } as unknown as AppState;
+  const state = { store, settings: { unit: 'kg' }, sheets: [], ...statePatch } as unknown as AppState;
   const render = vi.fn();
   const toast = vi.fn();
   const closeModal = vi.fn();
@@ -54,6 +76,35 @@ describe('program builder controller', () => {
     }), undefined);
     expect(closeModal).toHaveBeenCalled();
     expect(render).toHaveBeenCalled();
+  });
+
+  it('keeps the publication identity when editing your own published program', async () => {
+    const { root, controller, saveSheet } = setup({ pubkey: ME });
+    await controller.open(publishedSheet(ME));
+    const name = root.querySelector<HTMLInputElement>('#sheet-name')!;
+    name.value = 'Leg Day Heavy';
+    name.dispatchEvent(new Event('input'));
+    (root.querySelector('#sheet-save') as HTMLButtonElement).click();
+    await tick();
+
+    expect(saveSheet).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Leg Day Heavy',
+      nostr_pubkey: ME,
+      nostr_address: `33402:${ME}:workstr:beastmode:program:leg-day`,
+      nostr_event_id: 'event1',
+      nostr_published_at: '2026-09-01T00:00:00.000Z',
+      origin_created_at: 1788220800
+    }), 7);
+  });
+
+  it("forks another author's imported program when it is edited", async () => {
+    const { root, controller, saveSheet } = setup({ pubkey: ME });
+    await controller.open(publishedSheet(OTHER));
+    (root.querySelector('#sheet-save') as HTMLButtonElement).click();
+    await tick();
+
+    expect(saveSheet).toHaveBeenCalledWith(expect.not.objectContaining({ nostr_address: expect.anything() }), 7);
+    expect(saveSheet).toHaveBeenCalledWith(expect.not.objectContaining({ nostr_pubkey: expect.anything() }), 7);
   });
 
   it('replaces the comma tag field with capped goal chips and detected labels', async () => {

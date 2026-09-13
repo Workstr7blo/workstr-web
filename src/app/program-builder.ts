@@ -3,6 +3,7 @@ import { normalizeWeightUnit, storeWeightInput } from '../core/units';
 import type { SheetWithExercises } from '../db/store';
 import { builderRowsMarkup } from '../features/sheets/builder-views';
 import { emomBlocksFromBuilder, PROGRAM_GOALS, programDisplayTags, selectedProgramGoals, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
+import { ownsPublishedSheet, publicationIdentity, type PublicationIdentity } from '../nostr/program-ownership';
 import { html } from './format';
 import type { AppState } from './state';
 
@@ -61,9 +62,12 @@ export interface ProgramBuilderController {
 export function createProgramBuilder(ctx: ProgramBuilderContext): ProgramBuilderController {
   const { root, state, render, openModal, closeModal, toast } = ctx;
   let builder: BuilderState | null = null;
+  // Carried onto the save only when the sheet being edited is the user's own publication.
+  let publication: PublicationIdentity = {};
 
 async function open(sheet: SheetWithExercises | null = null): Promise<void> {
   if (!state.store) { toast('Sign in to create programs.', 'bad'); return; }
+  publication = sheet && ownsPublishedSheet(sheet, state.pubkey) ? publicationIdentity(sheet) : {};
   // Programs are built from the user's library only, never the relay catalog.
   const library = await state.store.listExercises();
   const emomBlocks = sheet?.blocks?.filter((block) => block.type === 'emom') || [];
@@ -333,6 +337,7 @@ function renderModal(): void {
       difficulty: builder.difficulty,
       tags: selectedProgramGoals(builder.tags),
       blocks,
+      ...publication,
       exercises: builder.rows.map((row, index) => ({
         exercise_slug: row.exerciseSlug,
         exercise_name: row.exerciseName,
@@ -349,6 +354,7 @@ function renderModal(): void {
       }))
     }, current.sheetId);
     builder = null;
+    publication = {};
     state.sheets = await state.store.listSheets();
     closeModal();
     render();
@@ -364,5 +370,5 @@ function renderRows(): void {
   refreshAutoLabels(current);
 }
 
-  return { open, clear: () => { builder = null; } };
+  return { open, clear: () => { builder = null; publication = {}; } };
 }

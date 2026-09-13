@@ -2,13 +2,17 @@ import { slugify } from '../core/ids';
 import type { Exercise, Sheet } from '../core/types';
 import type { SheetDraft } from '../db/store';
 import type { RelayProgram, RelayProgramExercise } from './canon';
+import { findOwnedProgramSource } from './program-ownership';
 
 export type ProgramImportState = 'new' | 'in-library' | 'update';
 
 // Same identity rule as exercises: a sheet still carrying the program's nostr
-// address is an unmodified import (builder edits fork a sheet by clearing the
-// nostr fields on save), so a newer remote created_at means an update.
-export function programImportState(program: RelayProgram, sheets: Sheet[]): ProgramImportState {
+// address is an unmodified import (builder edits fork someone else's import by
+// clearing the nostr fields on save), so a newer remote created_at means an update.
+// The active account's own publication is different: its local sheet is the copy
+// being edited, so the relay version is never offered as an import or an update.
+export function programImportState(program: RelayProgram, sheets: Sheet[], activePubkey?: string | null): ProgramImportState {
+  if (findOwnedProgramSource(program, sheets, activePubkey)) return 'in-library';
   const local = program.address ? sheets.find((sheet) => sheet.nostr_address === program.address) : undefined;
   if (!local) return 'new';
   return (program.createdAt || 0) > (local.origin_created_at || 0) ? 'update' : 'in-library';

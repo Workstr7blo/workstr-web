@@ -3,6 +3,7 @@ import type { Exercise } from '../core/types';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
+import { findOwnedProgramSource, relayProgramIdentity, sheetDraftWithIdentity } from '../nostr/program-ownership';
 import { fetchAuthorMoneroPaymentTargets } from '../nostr/payment-targets';
 import { discoverImportState } from '../features/discover/views';
 import { moneroMode } from '../features/sheets/monero-tip-view';
@@ -254,7 +255,19 @@ async function importSelectedDiscovered(): Promise<void> {
 
 async function importProgram(program: RelayProgram, button: HTMLButtonElement | null): Promise<void> {
   if (!state.store) { toast('Sign in to import programs.', 'bad'); return; }
-  const importState = programImportState(program, state.sheets);
+  // Read from the database rather than state: a card drawn before a publish or an edit
+  // landed can still be showing Import.
+  const sheets = await state.store.listSheets();
+  const ownSource = findOwnedProgramSource(program, sheets, state.pubkey);
+  if (ownSource) {
+    // A sheet whose address an earlier edit cleared is linked back, never copied.
+    if (!ownSource.nostr_address && ownSource.id) await state.store.saveSheet(sheetDraftWithIdentity(ownSource, relayProgramIdentity(program)), ownSource.id);
+    state.sheets = await state.store.listSheets();
+    render();
+    toast('This is your published program. It is already in Programs.');
+    return;
+  }
+  const importState = programImportState(program, sheets, state.pubkey);
   if (importState === 'in-library') { toast('Already in your programs'); return; }
   if (button) { button.disabled = true; button.textContent = importState === 'update' ? 'Updating...' : 'Importing...'; }
   // The dependency walk resolves referenced exercises from the canon catalog;
@@ -265,7 +278,7 @@ async function importProgram(program: RelayProgram, button: HTMLButtonElement | 
     const { id: _ignored, ...rest } = exercise;
     await state.store.upsertExercise({ ...rest, source_type: 'imported', status: 'active' });
   }
-  const existing = state.sheets.find((sheet) => sheet.nostr_address === program.address);
+  const existing = sheets.find((sheet) => sheet.nostr_address === program.address);
   await state.store.saveSheet(plan.sheet, existing?.id);
   if (plan.exercisesToImport.length) await reloadLibrary();
   state.sheets = await state.store.listSheets();

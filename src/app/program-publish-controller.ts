@@ -1,7 +1,6 @@
-import type { SheetExercise } from '../core/types';
-import type { SheetDraft, SheetWithExercises } from '../db/store';
 import { beastModeEligibility, beastModeLockedMarkup } from '../features/sheets/beast-mode';
-import { creatorProgramDTag, publishCreatorProgram } from '../nostr/program-publish';
+import { expectedCreatorProgramAddress, sheetDraftWithIdentity } from '../nostr/program-ownership';
+import { publishCreatorProgram } from '../nostr/program-publish';
 import type { PublishCreatorProgramResult } from '../nostr/program-publish';
 import { redactSecrets } from '../nostr/secret-redaction';
 import type { Signer } from '../signer/types';
@@ -25,39 +24,6 @@ function localSheetId(address: string): number {
   return address.startsWith('local:') ? Number(address.slice('local:'.length)) || 0 : 0;
 }
 
-function sheetExerciseDraft(row: SheetExercise): Omit<SheetExercise, 'id' | 'sheet_id'> {
-  return {
-    exercise_slug: row.exercise_slug,
-    exercise_name: row.exercise_name,
-    muscle_group: row.muscle_group,
-    image_url: row.image_url,
-    position: row.position,
-    sets: row.sets,
-    reps: row.reps,
-    rest: row.rest,
-    weight: row.weight,
-    notes: row.notes
-  };
-}
-
-function publishedSheetDraft(sheet: SheetWithExercises, eventPubkey: string, eventId: string, publishedAt: number): SheetDraft {
-  return {
-    name: sheet.name,
-    notes: sheet.notes,
-    difficulty: sheet.difficulty,
-    tags: sheet.tags,
-    blocks: sheet.blocks,
-    is_temporary: sheet.is_temporary,
-    source_type: sheet.source_type,
-    nostr_pubkey: eventPubkey,
-    nostr_address: `33402:${eventPubkey}:${creatorProgramDTag(sheet)}`,
-    nostr_event_id: eventId,
-    nostr_published_at: new Date(publishedAt * 1000).toISOString(),
-    origin_created_at: publishedAt,
-    exercises: sheet.exercises.map(sheetExerciseDraft)
-  };
-}
-
 export function createProgramPublishController(ctx: ProgramPublishControllerContext) {
   const { root, state, render, toast, openModal, getSigner } = ctx;
   const publish = ctx.publishCreatorProgram || publishCreatorProgram;
@@ -76,7 +42,14 @@ export function createProgramPublishController(ctx: ProgramPublishControllerCont
         onStage: (stage) => toast(stage === 'waiting-for-signer' ? 'Approve program publish in your signer…' : 'Publishing program to public relays…')
       });
       if (state.store) {
-        await state.store.saveSheet(publishedSheetDraft(sheet, result.event.pubkey, result.event.id, result.event.created_at), sheet.id);
+        const { pubkey, id, created_at: publishedAt } = result.event;
+        await state.store.saveSheet(sheetDraftWithIdentity(sheet, {
+          nostr_pubkey: pubkey,
+          nostr_address: expectedCreatorProgramAddress(sheet, pubkey),
+          nostr_event_id: id,
+          nostr_published_at: new Date(publishedAt * 1000).toISOString(),
+          origin_created_at: publishedAt
+        }), sheet.id);
         state.sheets = await state.store.listSheets();
       }
       render();
