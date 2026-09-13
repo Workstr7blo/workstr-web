@@ -76,7 +76,9 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
         exerciseSlug: full?.slug || slugify(name),
         exerciseName: name,
         muscleGroup: programMuscleLabel(member.muscleGroup || full?.muscle_group || inferProgramMuscle(name)),
-        imageUrl: member.imageUrl || full?.image_url,
+        // The exercise's current picture wins over the copy the program saved, so a republished
+        // catalog image reaches the workout; the saved one covers an exercise that cannot be found.
+        imageUrl: full?.image_url || member.imageUrl,
         sets: program.blocks?.find((block) => block.type === 'straight' && block.steps.some((step) => step.exerciseSlug === (full?.slug || slugify(name))))?.rounds
           || Number(member.sets) || Number(full?.default_sets) || 3,
         reps: String(member.reps || full?.default_reps || '8-12'),

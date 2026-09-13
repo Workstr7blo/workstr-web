@@ -78,7 +78,7 @@ export function planProgramImport(program: RelayProgram, library: Exercise[], ca
       exercise_slug: full?.slug || slugify(name),
       exercise_name: name,
       muscle_group: member.muscleGroup || full?.muscle_group,
-      image_url: member.imageUrl || full?.image_url,
+      image_url: full?.image_url || member.imageUrl,
       sets: Number(member.sets) || Number(full?.default_sets) || 3,
       reps: String(member.reps || full?.default_reps || '8-12'),
       rest: Number(member.restSec || member.rest || full?.default_rest) || 90,

@@ -445,3 +445,23 @@ describe('Delete from relays action', () => {
     expect(programActions(relayCopy(), appState([], null))).not.toContain('data-delete-program');
   });
 });
+
+describe('program card exercise pictures', () => {
+  const saved: SheetWithExercises = {
+    id: 7, slug: 'cardio', name: 'Cardio', notes: '', difficulty: 'beginner', tags: [], is_temporary: false,
+    created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    exercises: [
+      { sheet_id: 7, exercise_slug: 'mountain-climbers', exercise_name: 'Mountain Climbers', image_url: 'https://x/old.png', position: 0, sets: 3, reps: '20', rest: 30 },
+      { sheet_id: 7, exercise_slug: 'ghost-move', exercise_name: 'Ghost Move', image_url: 'https://x/ghost.png', position: 1, sets: 3, reps: '10', rest: 30 }
+    ]
+  };
+  const state = (exercises: Exercise[]) => ({ exercises, settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets: [saved], finishedSessions: [], pubkey: null, profilePicture: null } as unknown as AppState);
+
+  it('shows the exercise current picture over the one the program saved', () => {
+    const card = programCard(sheetToProgram(saved), state([ex({ slug: 'mountain-climbers', name: 'Mountain Climbers', image_url: 'https://x/new.png' })]));
+    expect(card).toContain('src="https://x/new.png"');
+    expect(card).not.toContain('src="https://x/old.png"');
+    // An exercise the library does not have keeps the picture the program saved.
+    expect(card).toContain('src="https://x/ghost.png"');
+  });
+});

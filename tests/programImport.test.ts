@@ -205,3 +205,16 @@ describe('planProgramImport for creator programs', () => {
     expect(plan.exercisesToImport.map((entry) => entry.slug)).toEqual(['burpee']);
   });
 });
+
+describe('program exercise pictures on import', () => {
+  it('uses the current catalog picture over the one the program event carries', () => {
+    const canon = [exercise('mountain-climbers', address('mountain-climbers'), { image_url: 'new.png' })];
+    const plan = planProgramImport(program([{ address: address('mountain-climbers'), imageUrl: 'old.png' }]), [], canon);
+    expect(plan.sheet.exercises[0].image_url).toBe('new.png');
+  });
+
+  it('keeps the event picture for an exercise found nowhere', () => {
+    const plan = planProgramImport(program([{ address: address('ghost-move'), imageUrl: 'old.png' }]), [], []);
+    expect(plan.sheet.exercises[0].image_url).toBe('old.png');
+  });
+});

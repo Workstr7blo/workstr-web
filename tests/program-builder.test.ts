@@ -208,3 +208,22 @@ describe('program builder controller', () => {
     expect(toast).toHaveBeenCalledWith('Sit Up is already in an EMOM section', 'bad');
   });
 });
+
+describe('builder exercise pictures', () => {
+  it('shows and saves the library picture over the one the program saved', async () => {
+    const sheet = {
+      id: 7, slug: 'p', name: 'P', notes: '', difficulty: '', tags: [], is_temporary: false, created_at: '', updated_at: '',
+      exercises: [{ id: 1, sheet_id: 7, exercise_slug: 'push-up', exercise_name: 'Push Up', image_url: 'https://x/old.png', position: 0, sets: 3, reps: '10', rest: 60 }]
+    } as SheetWithExercises;
+    const saveSheet = vi.fn(async () => 7);
+    const store = { listExercises: async () => [{ slug: 'push-up', name: 'Push Up', muscle_group: 'Chest', image_url: 'https://x/new.png' }], saveSheet, listSheets: async () => [] } as unknown as WorkstrStore;
+    const { root, controller } = setup({ store });
+
+    await controller.open(sheet);
+    expect(root.querySelector('.wex-img')?.getAttribute('src')).toBe('https://x/new.png');
+
+    (root.querySelector('#sheet-save') as HTMLButtonElement).click();
+    await tick();
+    expect(saveSheet).toHaveBeenCalledWith(expect.objectContaining({ exercises: [expect.objectContaining({ image_url: 'https://x/new.png' })] }), 7);
+  });
+});

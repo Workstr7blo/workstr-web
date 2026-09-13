@@ -3,6 +3,7 @@ import type { Exercise } from '../core/types';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, primeCanonCache, type RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import { planProgramImport, programImportState } from '../nostr/programImport';
+import { planLibraryCatalogUpdates } from '../nostr/library-updates';
 import { findOwnedProgramSource, relayBaselineIdentity, sheetDraftWithIdentity } from '../nostr/program-ownership';
 import { fetchAuthorMoneroPaymentTargets } from '../nostr/payment-targets';
 import { discoverImportState } from '../features/discover/views';
@@ -56,9 +57,11 @@ async function persistCanonCache(): Promise<void> {
 async function refreshExercises(): Promise<void> {
   state.exerciseStatus = 'loading Workstr exercises from relays...';
   updateExerciseCatalogStatus(root, state);
+  let libraryUpdated = false;
   try {
     const exercises = await fetchCanonExercises();
     state.discoverExercises = exercises;
+    libraryUpdated = await applyCatalogUpdates();
     state.exerciseStatus = `loaded ${exercises.length} Workstr exercises`;
     await persistCanonCache();
     void refreshDiscoverProfiles();
@@ -71,7 +74,20 @@ async function refreshExercises(): Promise<void> {
   refreshMergedExercises();
   // Recovery reads the merged catalog to work out which muscle a logged exercise trained,
   // so it is the one page away from Exercises that a catalog answer changes.
-  if (!updateDiscoverExercises(root, state) && recoveryVisible()) render({ reason: 'exercise-catalog-loaded' });
+  // A library that followed the catalog changes pictures and details on every page that shows
+  // an exercise, so only then is the page drawn again.
+  if (libraryUpdated) render({ reason: 'exercise-catalog-loaded' });
+  else if (!updateDiscoverExercises(root, state) && recoveryVisible()) render({ reason: 'exercise-catalog-loaded' });
+}
+
+// Nobody has to press Update: a republished catalog exercise replaces the library copy on the
+// next refresh, and programs and workouts follow the library.
+async function applyCatalogUpdates(): Promise<boolean> {
+  if (!state.store) return false;
+  const updates = planLibraryCatalogUpdates(await state.store.listExercises(), state.discoverExercises);
+  for (const exercise of updates) await state.store.upsertExercise(exercise);
+  if (updates.length) await reloadLibrary();
+  return updates.length > 0;
 }
 
 function recoveryVisible(): boolean {

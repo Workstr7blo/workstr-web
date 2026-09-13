@@ -60,6 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Updated exercise pictures and details now reach your library, programs and workouts by
+  themselves. When the Workstr catalog republishes an exercise, the copy in your library is
+  replaced the next time the catalog loads - your favourite stars are kept - so there is no
+  Update button to find. Programs and live workouts show the exercise's current picture
+  instead of the one saved when the program was built or imported. Finished workouts in
+  History keep the picture they had.
+
 - Importing a creator's program from Discover now brings in the exercises it uses from the
   Workstr catalog. Before, any exercise you did not already have was reported as "not found
   in the catalog" and the program was imported with a bare name in its place.
