@@ -32,7 +32,7 @@ Milestones are releases. A milestone is done when it is tagged and on the domain
 
 All four Phase 1 pillars are shipped and the app is public. It is a complete offline
 tracker with a working Nostr read path, optional identity, and live training modes,
-deployed to the domain and released as v2.5.0 (2026-09-15).
+deployed to the domain and released as v2.6.0 (2026-09-15).
 
 **Shipped**
 
@@ -73,7 +73,11 @@ deployed to the domain and released as v2.5.0 (2026-09-15).
   already signed in, the exercise library syncs between devices through encrypted sync, and
   creator-published programs track unpublished changes and can be deleted from relays. A
   local account's recovery key is encrypted at rest. Released in v2.5.0.
-- **Delivery** — Pages workflow deploys `main` to the custom domain; more than 1,100 tests
+- **Device security** — a local account's key lives in a device vault behind a nine-digit
+  device code entered once per launch. Each device has its own code; pairing transfers the
+  key, never the code, and the vault keeps separate scopes for a future Monero wallet.
+  Released in v2.6.0.
+- **Delivery** — Pages workflow deploys `main` to the custom domain; more than 1,200 tests
   across the unit, integration, and browser surfaces are green, and `tests/setup.ts` bars
   any test from reaching the network.
 

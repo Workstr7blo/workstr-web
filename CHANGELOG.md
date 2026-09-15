@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-09-15
+
 ### Security
 
 - Your local account is now protected by a nine-digit device code. Workstr asks for it once
@@ -978,7 +980,8 @@ Nostr read path; it is versioned here so releases are traceable while v1.0 is fi
 - Weights are stored canonically in kilograms; the display unit is a user preference.
 - `session_sets.rpe` exists in the schema but is never written — see `ROADMAP.md`.
 
-[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.2.0...v2.3.0
