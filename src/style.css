@@ -281,9 +281,10 @@
 .auth-bunker-details .button { width: 100%; justify-content: center; margin-top: 10px; }
 .settings-muted-action { color: var(--dim); font: 800 11px/1.2 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; }
 .recovery-key-box { user-select: all; }
-/* The device vault's lock layer is opaque and sits above the modal, so neither the page nor
-   an open modal can be reached or read behind it. */
-.vault-lock { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; padding: 20px 16px; overflow-y: auto; background: rgb(var(--void-rgb)); }
+/* The device vault's lock layer is opaque and sits above every other layer - the modal and the
+   rest-timer overlay (9999) included - so nothing can be read behind it. The controller marks
+   everything beside it inert, so nothing can be reached either. */
+.vault-lock { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 20px 16px; overflow-y: auto; background: rgb(var(--void-rgb)); }
 .vault-lock[hidden] { display: none; }
 .vault-lock-card { width: min(440px, 100%); padding: 24px; border: 1px solid var(--border-hot); border-radius: 22px; background: rgba(var(--surface-rgb), .97); }
 .device-pin-form { margin-top: 14px; }

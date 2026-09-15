@@ -2,7 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { createDeviceVaultController, unlockDelayMs, vaultScopeName } from '../src/app/device-vault-controller';
+import { createDeviceVaultController, vaultScopeName } from '../src/app/device-vault-controller';
+import { UNLOCK_BACKOFF_KEY, unlockDelayMs } from '../src/app/device-vault-backoff';
 import { bindPinFields, readPinField } from '../src/app/device-pin-input';
 import { deviceSecurityCard, pinField } from '../src/app/device-vault-view';
 import { createDeviceVault, type DeviceVault } from '../src/security/device-vault';
@@ -189,6 +190,34 @@ describe('launch', () => {
     // Let the redraw scheduled for the end of the wait fire inside this test.
     await new Promise((resolve) => setTimeout(resolve, 1100));
   });
+
+  it('keeps the wait across a reload and clears it once the right code is entered', async () => {
+    const { databaseName, vault } = await vaultWithNostrKey();
+    const h = harness(vault);
+    await h.controller.prepareBoot();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      enter(h.lock(), 'unlock', OTHER_PIN);
+      submit(h.lock(), 'vault-unlock-form');
+      await vi.waitFor(() => expect(h.lock().querySelector('#vault-unlock')?.hasAttribute('disabled')).toBe(false));
+    }
+    expect(localStorage.getItem(UNLOCK_BACKOFF_KEY)).not.toContain(OTHER_PIN);
+
+    // A reload: a new vault object and a new controller, with only storage carried over.
+    const reopened = createDeviceVault({ databaseName });
+    const unlock = vi.spyOn(reopened, 'unlock');
+    const r = harness(reopened);
+    expect(await r.controller.prepareBoot()).toBe('blocked');
+    expect(r.lock().querySelector('.auth-error')?.textContent).toContain('Too many incorrect attempts');
+    enter(r.lock(), 'unlock', PIN);
+    submit(r.lock(), 'vault-unlock-form');
+    expect(unlock).not.toHaveBeenCalled();
+
+    r.advance(1000);
+    enter(r.lock(), 'unlock', PIN);
+    submit(r.lock(), 'vault-unlock-form');
+    await vi.waitFor(() => expect(r.onUnlocked).toHaveBeenCalledWith('boot'));
+    expect(localStorage.getItem(UNLOCK_BACKOFF_KEY)).toBeNull();
+  });
 });
 
 describe('forgotten code', () => {
@@ -369,9 +398,16 @@ describe('Settings', () => {
     expect(h.state.deviceVault).toBe('locked');
     expect(h.lock().hidden).toBe(false);
     expect(await vault.hasSecret(NOSTR_LOCAL_KEY_SCOPE)).toBe(true);
+    // The app is still rendered underneath; keyboard and screen readers must not reach it.
+    const card = h.root.querySelector('.device-security-card') as HTMLElement;
+    expect(card.hasAttribute('inert')).toBe(true);
+    expect(h.root.querySelector('#modal')?.hasAttribute('inert')).toBe(true);
+    expect(h.lock().hasAttribute('inert')).toBe(false);
 
     enter(h.lock(), 'unlock', PIN);
     submit(h.lock(), 'vault-unlock-form');
     await vi.waitFor(() => expect(h.onUnlocked).toHaveBeenCalledWith('relock'));
+    expect(card.hasAttribute('inert')).toBe(false);
+    expect(h.root.querySelector('#modal')?.hasAttribute('inert')).toBe(false);
   });
 });

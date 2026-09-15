@@ -109,3 +109,70 @@ describe('update policy', () => {
     expect((await controller('<div id="modal"></div><div id="session-overlay"></div>', null)).canApplyNow()).toBe(true);
   });
 });
+
+// Installing an update reloads, and a reload locks the device vault. With the vault open, a
+// short trip away must not cost the user their code; a long one may.
+describe('update timing with a device vault', () => {
+  let visibility: DocumentVisibilityState = 'visible';
+
+  afterEach(() => {
+    delete (document as { visibilityState?: unknown }).visibilityState;
+    vi.doUnmock('../src/app/pwa');
+    vi.unstubAllGlobals();
+    vi.resetModules();
+    vi.useRealTimers();
+  });
+
+  async function app(deviceVault: string) {
+    vi.useFakeTimers();
+    visibility = 'visible';
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
+    // A fresh mock per test: controllers from earlier tests stay subscribed to `document`, but
+    // they hold their own copy and cannot touch this one.
+    const applyPendingUpdate = vi.fn();
+    vi.doMock('../src/app/pwa', () => ({ registerServiceWorker: vi.fn(async () => undefined), updatePending: () => true, applyPendingUpdate }));
+    const { createUpdateController, VAULT_UPDATE_AWAY_MS } = await import('../src/app/update-controller');
+    createUpdateController({ root: document.createElement('div'), state: { activeSession: null, deviceVault } as never, toast: vi.fn() });
+    const turn = (next: DocumentVisibilityState) => { visibility = next; document.dispatchEvent(new Event('visibilitychange')); };
+    return { applyPendingUpdate, away: VAULT_UPDATE_AWAY_MS, leave: () => turn('hidden'), back: () => turn('visible') };
+  }
+
+  it('applies the moment the app is left when there is no open vault', async () => {
+    for (const deviceVault of ['absent', 'locked']) {
+      const a = await app(deviceVault);
+      a.leave();
+      expect(a.applyPendingUpdate).toHaveBeenCalledTimes(1);
+      vi.resetModules();
+    }
+  });
+
+  it('waits out a short trip away while the vault is unlocked', async () => {
+    const a = await app('unlocked');
+    a.leave();
+    vi.advanceTimersByTime(60_000);
+    a.back();
+    expect(a.applyPendingUpdate).not.toHaveBeenCalled();
+    // The clock restarts on every departure rather than adding up short trips.
+    a.leave();
+    vi.advanceTimersByTime(a.away - 1);
+    a.back();
+    expect(a.applyPendingUpdate).not.toHaveBeenCalled();
+  });
+
+  it('applies after the full time away, while still in the background', async () => {
+    const a = await app('unlocked');
+    a.leave();
+    vi.advanceTimersByTime(a.away);
+    expect(a.applyPendingUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies on return when a phone froze the background timer', async () => {
+    const a = await app('unlocked');
+    a.leave();
+    // Time passes without the timer running, as on a suspended phone.
+    vi.setSystemTime(Date.now() + a.away);
+    expect(a.applyPendingUpdate).not.toHaveBeenCalled();
+    a.back();
+    expect(a.applyPendingUpdate).toHaveBeenCalledTimes(1);
+  });
+});
