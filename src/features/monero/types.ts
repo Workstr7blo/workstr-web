@@ -55,3 +55,77 @@ export interface MoneroPhase1Report {
   blockers: string[];
   nextStep: string;
 }
+
+export interface MoneroWalletMetadata {
+  version: 1;
+  id: string;
+  scope: 'monero.hot-wallet';
+  network: MoneroNetwork;
+  node: MoneroNodeConfig;
+  restoreHeight: number;
+  primaryAddress: string;
+  creatorSubaddress: string;
+  creatorSubaddressIndex: number;
+  createdAt: string;
+  updatedAt: string;
+  source: 'created' | 'restored' | 'mock-stagenet';
+}
+
+export interface MoneroWalletBalance {
+  atomicBalance: string;
+  atomicUnlockedBalance: string;
+}
+
+export interface MoneroWalletSyncState {
+  height: number | null;
+  daemonHeight: number | null;
+  synchronized: boolean;
+  updatedAt: string;
+}
+
+export interface MoneroWalletSecretBundle {
+  version: 1;
+  metadata: MoneroWalletMetadata;
+  seed: string;
+  privateSpendKey?: string;
+  privateViewKey?: string;
+  keysDataBase64?: string;
+  cacheDataBase64?: string;
+  lastBalance?: MoneroWalletBalance;
+  lastSync?: MoneroWalletSyncState;
+}
+
+export interface MoneroWalletSnapshot {
+  metadata: MoneroWalletMetadata;
+  balance: MoneroWalletBalance | null;
+  sync: MoneroWalletSyncState | null;
+}
+
+export interface MoneroWalletCreateRequest {
+  node?: Partial<MoneroNodeConfig> | null;
+  restoreHeight?: number;
+  now?: Date;
+}
+
+export interface MoneroWalletRestoreRequest extends MoneroWalletCreateRequest {
+  seed: string;
+}
+
+export interface MoneroWalletRuntimeWallet {
+  getSeed(): Promise<string>;
+  getPrivateSpendKey?(): Promise<string>;
+  getPrivateViewKey?(): Promise<string>;
+  getPrimaryAddress(): Promise<string>;
+  createSubaddress(accountIdx: number, label?: string): Promise<{ getAddress?: () => string; getIndex?: () => number; address?: string; index?: number }>;
+  getBalance(accountIdx?: number, subaddressIdx?: number): Promise<bigint>;
+  getUnlockedBalance(accountIdx?: number, subaddressIdx?: number): Promise<bigint>;
+  getHeight(): Promise<number>;
+  getDaemonHeight(): Promise<number>;
+  sync(listenerOrStartHeight?: unknown, startHeight?: number, allowConcurrentCalls?: boolean): Promise<unknown>;
+  save(): Promise<void>;
+  close(save?: boolean): Promise<void>;
+}
+
+export interface MoneroWalletRuntime {
+  createWallet(config: Record<string, unknown>): Promise<MoneroWalletRuntimeWallet>;
+}

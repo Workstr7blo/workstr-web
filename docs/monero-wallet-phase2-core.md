@@ -1,0 +1,49 @@
+# Monero wallet phase 2 core
+
+Issue #246 phase 2 adds the wallet-core boundary without shipping the final wallet UI or native tip send flow.
+
+## What is implemented
+
+- `wallet-runtime.ts` builds the lazy `monero-ts` creation config only after the browser has proved the selected daemon is reachable and on the expected network.
+- `wallet-core.ts` owns create, restore, open, sync, balance, and close lifecycle methods behind a small service API.
+- `wallet-storage.ts` persists wallet material only through the device vault scope `monero.hot-wallet`.
+- The core records a dedicated Workstr creator subaddress in wallet metadata so later phases can publish it through `kind:10133` without exposing the primary address by default.
+
+## Storage boundary
+
+The phase-2 wallet bundle is a device-vault secret:
+
+```text
+device vault
+└── monero.hot-wallet
+    ├── seed
+    ├── private spend/view key when exposed by the runtime
+    ├── restore height
+    ├── node config
+    ├── primary address
+    ├── Workstr creator subaddress
+    ├── last balance snapshot
+    └── last sync snapshot
+```
+
+It is not written to Workstr settings, JSON export, encrypted sync records, Nostr events, or localStorage.
+
+## Runtime boundary
+
+`monero-ts` remains lazy-loaded. Normal Workstr startup and the existing Monero address/tip handoff screens do not import the wallet runtime. A future UI should instantiate `MoneroWalletCore` only after the user opens wallet functionality or enables a production wallet flow.
+
+## Lock behavior
+
+Every wallet-core operation checks `vault.isUnlocked()` before using or updating wallet state. `close()` drops the held runtime wallet. The application integration phase must call `close()` whenever the Workstr device vault locks so spend-capable runtime state is discarded with the session.
+
+## Non-goals in this phase
+
+Phase 2 intentionally does not add:
+
+- final wallet UI;
+- real mainnet send/tip screens;
+- transaction construction/broadcast;
+- custom-node settings UI;
+- iOS production QA sign-off.
+
+Those belong to later #246 phases after this core boundary is integrated into the app shell and Settings screens.
