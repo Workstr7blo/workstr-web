@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the phase-2 Monero wallet core: lazy `monero-ts` runtime configuration, vault-scoped
+  wallet storage under `monero.hot-wallet`, create/restore/open/sync/balance lifecycle APIs,
+  dedicated creator subaddress metadata, and tests that keep Monero secrets out of Nostr and
+  generic Workstr storage.
 - Added a phase-1 Monero wallet technical spike: a lazy `monero-ts` probe, default/custom
   node configuration checks, mock stagenet wallet/vault-boundary tests, desktop headless
   verification, and an iOS Safari/PWA QA checklist before production wallet UI work.
