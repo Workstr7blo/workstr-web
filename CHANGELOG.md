@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-09-15
+
 ### Security
 
 - A local account's recovery key is no longer kept in browser local storage as plain text.
@@ -125,6 +127,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Account row in Settings no longer shows a huge profile picture with your name and npub
   printed on top of it. The picture had no size set, so it rendered at whatever size the file
   happened to be - a 400 pixel image took over the whole row. It is a small round avatar again.
+
+- Settings no longer drags sideways on a phone. A decorative glow on the Support Workstr
+  card was positioned against the whole app pane instead of against the card, so it hung
+  about 47px past the right edge of the screen and turned the page into something you
+  could pan left and right. The glow is contained by its own card now, and the main pane
+  refuses horizontal scrolling outright so a single stray decoration cannot do this again.
+- Settings categories stay open while the app works in the background. Expanding Data &
+  Sync, Account or any other category and then having it collapse on its own was a
+  background sync tick, an arriving profile or a catalog refresh redrawing the whole
+  screen; the categories you opened are now carried across that redraw.
+- Sync status no longer redraws the whole app. The engine reports progress many times
+  during a single pass, and each report rebuilt the topbar, the navigation, every image
+  and whichever page you were on so that one line inside one Settings card could change.
+  Only that card is written now, so the first seconds after launch stop flickering.
+- "How to perform" opens again during a workout. Expanding it worked, but the first
+  background catalog refresh after a session starts rebuilds the screen and closed it
+  straight away; the session now remembers which exercise's instructions you opened.
+- A live workout no longer loses the set you are in the middle of. Background work - the
+  catalog refresh on every launch, a restore from encrypted sync, your profile arriving -
+  redrew the whole app underneath the session: reps and load you had typed but not yet
+  logged were discarded silently, the row coming back filled with the prescription instead,
+  and a running rest countdown vanished from the screen while its timer kept going. The
+  redraw now waits until the workout ends, which is also the first moment it costs nothing.
+  A restore landing mid-workout no longer swaps the running session out from under the
+  screen either.
 
 ### Changed
 
@@ -292,33 +319,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strip instead of a screen-sized empty box.
 - Target sets, reps and rest are one line under the image, and the load column names your
   unit once at the top instead of repeating kg or lbs on every row.
-
-### Fixed
-
-- Settings no longer drags sideways on a phone. A decorative glow on the Support Workstr
-  card was positioned against the whole app pane instead of against the card, so it hung
-  about 47px past the right edge of the screen and turned the page into something you
-  could pan left and right. The glow is contained by its own card now, and the main pane
-  refuses horizontal scrolling outright so a single stray decoration cannot do this again.
-- Settings categories stay open while the app works in the background. Expanding Data &
-  Sync, Account or any other category and then having it collapse on its own was a
-  background sync tick, an arriving profile or a catalog refresh redrawing the whole
-  screen; the categories you opened are now carried across that redraw.
-- Sync status no longer redraws the whole app. The engine reports progress many times
-  during a single pass, and each report rebuilt the topbar, the navigation, every image
-  and whichever page you were on so that one line inside one Settings card could change.
-  Only that card is written now, so the first seconds after launch stop flickering.
-- "How to perform" opens again during a workout. Expanding it worked, but the first
-  background catalog refresh after a session starts rebuilds the screen and closed it
-  straight away; the session now remembers which exercise's instructions you opened.
-- A live workout no longer loses the set you are in the middle of. Background work - the
-  catalog refresh on every launch, a restore from encrypted sync, your profile arriving -
-  redrew the whole app underneath the session: reps and load you had typed but not yet
-  logged were discarded silently, the row coming back filled with the prescription instead,
-  and a running rest countdown vanished from the screen while its timer kept going. The
-  redraw now waits until the workout ends, which is also the first moment it costs nothing.
-  A restore landing mid-workout no longer swaps the running session out from under the
-  screen either.
 
 ## [2.4.0] - 2026-09-04
 
@@ -959,7 +959,8 @@ Nostr read path; it is versioned here so releases are traceable while v1.0 is fi
 - Weights are stored canonically in kilograms; the display unit is a user preference.
 - `session_sets.rpe` exists in the schema but is never written — see `ROADMAP.md`.
 
-[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/Workstr7blo/workstr-web/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/Workstr7blo/workstr-web/compare/v2.0.0...v2.2.0

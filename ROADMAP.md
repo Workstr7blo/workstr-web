@@ -32,7 +32,7 @@ Milestones are releases. A milestone is done when it is tagged and on the domain
 
 All four Phase 1 pillars are shipped and the app is public. It is a complete offline
 tracker with a working Nostr read path, optional identity, and live training modes,
-deployed to the domain and released as v2.4.0 (2026-09-04).
+deployed to the domain and released as v2.5.0 (2026-09-15).
 
 **Shipped**
 
@@ -63,13 +63,17 @@ deployed to the domain and released as v2.4.0 (2026-09-04).
   off by default. On, it shows the user's public `kind:10133` address and a Tip action on
   Discover cards whose author publishes one. Monero shipped as Monero Mode in v2.3.0;
   Lightning zaps, the NWC wallet and the zap-receipt funding meter were removed after it
-  (#218, unreleased).
+  (#218, released in v2.5.0).
 - **Mobile-first browsing** — Programs, Discover and the exercise library each put search,
   a filter sheet and their own actions in one toolbar row, cutting the distance from the
   sub-tabs to the first card from 322px and 214px to 76px on a phone. Statistics scopes to
   a date range, and its empty states, Recovery's and the Body tab's each say one true thing
   rather than several. Released in v2.4.0.
-- **Delivery** — Pages workflow deploys `main` to the custom domain; more than 900 tests
+- **Devices and publishing** — sign in on a new device by scanning a QR code from one
+  already signed in, the exercise library syncs between devices through encrypted sync, and
+  creator-published programs track unpublished changes and can be deleted from relays. A
+  local account's recovery key is encrypted at rest. Released in v2.5.0.
+- **Delivery** — Pages workflow deploys `main` to the custom domain; more than 1,100 tests
   across the unit, integration, and browser surfaces are green, and `tests/setup.ts` bars
   any test from reaching the network.
 
