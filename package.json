@@ -13,7 +13,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:smoke": "vite build --config vite.smoke.config.ts",
-    "smoke:browser": "node scripts/browser-smoke.mjs"
+    "smoke:browser": "node scripts/browser-smoke.mjs",
+    "build:monero-spike": "vite build --config vite.monero-spike.config.ts",
+    "spike:monero:browser": "node scripts/monero-spike-browser.mjs"
   },
   "engines": {
     "node": ">=22"
@@ -29,6 +31,7 @@
     "@types/node": "^25.0.3",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
+    "monero-ts": "^0.11.15",
     "playwright": "^1.61.1",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
