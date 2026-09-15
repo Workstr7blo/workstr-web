@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 .smoke-dist
+.monero-spike-dist
 dist-ssr
 *.local
 

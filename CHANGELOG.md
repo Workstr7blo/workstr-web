@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added a phase-1 Monero wallet technical spike: a lazy `monero-ts` probe, default/custom
+  node configuration checks, mock stagenet wallet/vault-boundary tests, desktop headless
+  verification, and an iOS Safari/PWA QA checklist before production wallet UI work.
+
 ## [2.6.0] - 2026-09-15
 
 ### Security
