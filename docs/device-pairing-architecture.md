@@ -5,9 +5,13 @@ authoritative protocol reference; the relay half is implemented in `relay/write-
 and the client half tracked in issue #168.
 
 Pairing is a transport, not an identity system. It ends in the same local signer that a
-pasted recovery key produces — `importLocalAccount(nsec)` then
-`completeSignIn(pubkey, 'local')`. Create account, restore from nsec and QR transfer are
-three ways to provision one thing.
+pasted recovery key produces: the received key is held in memory, the new device creates a
+device code of its own, the key is stored and verified in the device vault
+(`saveLocalAccount`), and only then `completeSignIn(pubkey, 'local')`. Create account,
+restore from nsec and QR transfer are three ways to provision one thing.
+
+Pairing moves the nsec, never a device code. Each device protects the key it holds under its
+own code; see `docs/device-vault-architecture.md`.
 
 `workstr:v2:` remains the encrypted sync namespace and is untouched by any of this.
 `workstr:pair:` is temporary transport and never carries user data.
@@ -48,7 +52,7 @@ Every field is public and temporary. A photograph of the QR yields nothing: the 
 *private* key never leaves the new device, so an observer cannot decrypt a response even
 with the whole QR in hand.
 
-The QR never carries the nsec, the backup key, NWC credentials or Monero keys.
+The QR never carries the nsec, the backup key, NWC credentials, Monero keys or a device code.
 
 ## Event format
 
@@ -145,6 +149,14 @@ Before importing anything: protocol version, pairing id matches, challenge match
 `expiresAt` has not passed, `getPublicKey(nsec) === event.pubkey`, and this pairing session
 has not already been consumed. On success it marks the session consumed, destroys the
 ephemeral private key, unsubscribes, and ignores every later response.
+
+Passing those checks does not store the key. The new device asks the person to create its
+device code, stores the key in the device vault, reads it back to the same pubkey, and only
+then adopts the account. Cancelling that step stores nothing and shows no success screen.
+
+On the trusted device the key comes out of an already unlocked vault, so approval does not
+ask for the code again. A locked vault cannot export, and pairing does not start until
+Workstr is unlocked.
 
 ## Security argument
 

@@ -34,7 +34,7 @@ import { createUpdateController } from './update-controller';
 import { createProgramBuilder } from './program-builder';
 import { createSessionPersistence } from './session-persistence';
 import { createCatalogController } from './catalog-controller';
-import { migrateLegacyLocalSecret } from '../signer/local-key-storage';
+import { createDeviceVaultController } from './device-vault-controller';
 import { createIdentityController, launchSignerUri } from './identity-controller';
 import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
@@ -50,7 +50,7 @@ const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'off', publ
 function profileName(profile: RelayProfile | null): string | null { return profile?.name?.trim() || profile?.nip05?.trim() || null; }
 
 export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, monero: { status: 'idle', address: '' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', level: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, monero: { status: 'idle', address: '' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', level: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, deviceVault: 'absent', expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   const trace = createRenderTrace();
   async function boot(): Promise<void> {
@@ -64,16 +64,20 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     // Paint the shell immediately; data lands on the next render. Nothing above this line
     // may await, or the first paint slips to a microtask and the shell renders empty.
     mount();
-    // Every boot, not on the first call that wants a signer: someone who only reads their
-    // history would otherwise keep the plaintext key on disk forever. Cleanup, so it runs
-    // after first paint and a failure is swallowed — the key just stays where it was.
-    await migrateLegacyLocalSecret().catch(() => undefined);
-    // Same reasoning for the zap wallet connection a Lightning build may have left behind.
+    // After first paint, so a failure is swallowed and the old wallet database just stays.
     await deleteRetiredWalletDatabase();
+    // A device vault opens before the account does, so no local signer - and no sync that
+    // needs one - exists until the code is entered. Boot stops here while it is locked and
+    // the unlock carries it on.
+    if ((await vaultUi.prepareBoot()) === 'blocked') return;
+    await openAccount();
+    if (!options.skipCatalogRefresh) await catalog.refreshExercises();
+  }
+
+  async function openAccount(): Promise<void> {
     if (state.pubkey) await openIdentity(state.pubkey, false);
     else await openLocal();
     render({ reason: 'boot-account-open' });
-    if (!options.skipCatalogRefresh) await catalog.refreshExercises();
   }
 
   async function openIdentity(pubkey: string, persist = true, signerType: AppState['signerType'] = state.signerType): Promise<void> {
@@ -248,7 +252,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       void navigator.clipboard.writeText(button.dataset.copy || '')
         .then(() => toast('Copied'), () => toast('Could not copy', 'bad'));
     }));
-    identity.bindSettingsAuth();
+    identity.bindSettingsAuth(); vaultUi.bindSettings();
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void preferences.saveUnitPreference((event.target as HTMLSelectElement).value); });
     root.querySelector('#monero-tips-toggle')?.addEventListener('change', (event) => {
       const on = (event.target as HTMLInputElement).checked;
@@ -342,7 +346,13 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const programBuilder = createProgramBuilder({ root, state, render, openModal, closeModal, toast });
   const catalog = createCatalogController({ root, state, render, toast, openModal, closeModal, fetchProfile, renderProgramLists: () => programList.renderMounted() });
   const sessionPersistence = createSessionPersistence(state);
-  const identity = createIdentityController({ root, state, render, openModal, closeModal, openLocal, openIdentity });
+  const vaultUi = createDeviceVaultController({
+    root, state, render, toast, openModal, closeModal,
+    onUnlocked: async (reason) => { if (reason === 'relock') { void backup.resume(); render(); return; } await openAccount(); if (!options.skipCatalogRefresh) await catalog.refreshExercises(); },
+    onLocked: () => { identity.dropActiveSigner(); backup.stop(); },
+    onReset: async () => { identity.dropActiveSigner(); backup.stop(); await openAccount(); identity.startRestoreLocalAccount(); }
+  });
+  const identity = createIdentityController({ root, state, render, openModal, closeModal, openLocal, openIdentity, vault: vaultUi });
   const programPublish = createProgramPublishController({ root, state, render, toast, openModal, getSigner: options.programPublish?.getSigner || identity.getActiveSigner, publishCreatorProgram: options.programPublish?.publishCreatorProgram, programPublishRelays: options.programPublish?.programPublishRelays, persistCanonCache: catalog.persistCanonCache });
 
   const sessionRunner = createSessionRunner({
@@ -376,7 +386,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   }
 
   function closeModal(): void {
-    identity.clearPending();
+    identity.clearPending(); vaultUi.cancelPending();
     // Whatever route the modal closed by - the X, the backdrop, a cancel button - the
     // camera and the relay subscription stop with it. Release is idempotent.
     identity.releasePairing();

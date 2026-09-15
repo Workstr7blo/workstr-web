@@ -4,6 +4,7 @@ import type { RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import type { MoneroAddressState } from '../features/support/payment-mode-views';
 import type { SyncStatus } from '../sync/engine';
+import type { DeviceVaultStatus } from '../security/device-vault-types';
 
 export type View = 'exercises' | 'workouts' | 'statistics' | 'settings';
 export type SubView = 'library' | 'discover' | 'programs' | 'history' | 'recovery' | 'training' | 'body';
@@ -113,6 +114,8 @@ export interface AppState {
   // Live backup status, mirrored from the sync engine so the Settings panel renders from
   // state like every other view rather than reaching into the engine.
   backup: SyncStatus;
+  // Whether this device has a vault and whether it is open. Memory only, like the vault session.
+  deviceVault?: DeviceVaultStatus;
 }
 
 // Session-model helpers shared by more than one feature (features must not

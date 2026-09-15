@@ -10,6 +10,7 @@ import { normalizeWeightUnit } from '../core/units';
 import { hasNip07 } from '../signer/nip07';
 import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { backupPanel, backupPanelState } from '../features/backup/views';
+import { deviceSecurityCard } from './device-vault-view';
 
 // Settings is read top to bottom by someone who is not thinking in features: who I am, how I
 // train, how I pay, how I support this, and then the technical drawer. The cards themselves
@@ -171,7 +172,7 @@ export function settingsView(state: AppState): string {
   return `<div class="page active settings-page">
     <div class="page-title">Settings</div>
     <p class="page-blurb">Customize your experience, keep your data safe, and support a stronger, more sovereign future.</p>
-    ${settingsGroup({ id: 'account', label: 'Account', blurb: 'Your identity and device connection', icon: GROUP_ICONS.account, cards: [accountCard(state)] })}
+    ${settingsGroup({ id: 'account', label: 'Account', blurb: 'Your identity and device connection', icon: GROUP_ICONS.account, cards: [accountCard(state), deviceSecurityCard(state)] })}
     ${settingsGroup({ id: 'training', label: 'Training', blurb: 'Configure your training experience', icon: GROUP_ICONS.training, cards: trainingCards })}
     ${settingsGroup({ id: 'payments', label: 'Payments', blurb: 'Tip program creators with Monero', icon: GROUP_ICONS.payments, cards: paymentCards })}
     ${settingsGroup({ id: 'support', label: 'Support', blurb: 'Help keep Workstr independent', icon: GROUP_ICONS.support, cards: supportCards, variant: 'support' })}

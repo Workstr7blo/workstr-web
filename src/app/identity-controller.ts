@@ -2,7 +2,7 @@ import { renderSVG } from 'uqr';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import { hasNip07, createNip07Signer } from '../signer/nip07';
 import { clearNip46State, createBunkerSigner, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
-import { clearLocalKey, createCachedLocalKeySigner, createLocalAccount, exportLocalNsec, importLocalAccount } from '../signer/local-key';
+import { clearLocalKey, createCachedLocalKeySigner, exportLocalNsec, generateLocalAccount, parseRecoveryKey, type LocalAccountKey } from '../signer/local-key';
 import { accountChoiceMarkup } from './account-choice-view';
 import { createDevicePairingController } from './device-pairing-controller';
 import { WORKSTR_RELAY_URL } from '../sync/engine';
@@ -30,17 +30,19 @@ export interface IdentityControllerContext {
   closeModal(): void;
   openLocal(): Promise<void>;
   openIdentity(pubkey: string, persist?: boolean, signerType?: AppState['signerType']): Promise<void>;
+  // The only way a local key reaches storage, and the vault status Settings draws from.
+  vault: { protectLocalAccount(account: LocalAccountKey): Promise<Signer | null>; refreshStatus(): Promise<void> };
 }
 
 export function createIdentityController(ctx: IdentityControllerContext) {
-  const { root, state, render, openModal, closeModal, openLocal, openIdentity } = ctx;
+  const { root, state, render, openModal, closeModal, openLocal, openIdentity, vault } = ctx;
   let activeSigner: Signer | null = null;
   let pendingConnect: { uri: string; mobile: boolean } | null = null;
 
 async function signOut(): Promise<void> {
   activeSigner = null;
   clearNip46State();
-  await clearLocalKey();
+  await clearLocalKey(); await vault.refreshStatus();
   // It describes the permissions one connection was granted, not this device. The next
   // signer may prompt for everything, and retrying early at it would prompt twice.
   forgetAutoApprove();
@@ -135,7 +137,7 @@ async function connectNip07(): Promise<void> {
     const signer = createNip07Signer();
     const pubkey = await signer.getPublicKey();
     activeSigner = signer;
-    await clearLocalKey();
+    await clearLocalKey(); await vault.refreshStatus();
     await completeSignIn(pubkey, 'nip07');
   } catch (error) {
     state.signInStatus = `extension signer error ${(error as Error).message}`;
@@ -155,7 +157,7 @@ async function startRemoteSignerRequest(): Promise<void> {
     if (mobile) launchSignerRequest(request.uri);
     const connected = await request.signer;
     activeSigner = connected.signer;
-    await clearLocalKey();
+    await clearLocalKey(); await vault.refreshStatus();
     closeModal();
     await completeSignIn(connected.pubkey, 'nip46');
   } catch (error) {
@@ -173,10 +175,14 @@ const pairing = createDevicePairingController({
   closeModal,
   getSigner: getActiveSigner,
   getLocalNsec: () => (state.signerType === 'local' || !state.pubkey ? exportLocalNsec() : Promise.resolve(null)),
+  // Held in memory until this device has its own code. Nothing is stored if that is cancelled.
   adoptTransferredKey: async (nsec: string) => {
-    const account = await importLocalAccount(nsec);
-    activeSigner = account.signer;
+    const account = parseRecoveryKey(nsec);
+    const signer = await vault.protectLocalAccount(account);
+    if (!signer) return false;
+    activeSigner = signer;
     await completeSignIn(account.pubkey, 'local');
+    return true;
   }
 });
 
@@ -203,18 +209,22 @@ function startAccountChoice(): void {
   root.querySelector('#continue-local')?.addEventListener('click', closeModal);
 }
 
-async function createLocalAccountFlow(): Promise<void> {
-  try {
-    const account = await createLocalAccount();
-    activeSigner = account.signer;
-    showRecoveryKeyModal(account.pubkey, account.nsec);
-  } catch (error) {
-    state.signInStatus = `local account error ${(error as Error).message}`;
-    render();
-  }
+// The key exists only in memory until its recovery key has been saved and a device code set,
+// so closing this flow at any step leaves no key behind.
+function createLocalAccountFlow(): void {
+  showRecoveryKeyModal(generateLocalAccount());
 }
 
-function showRecoveryKeyModal(pubkey: string, nsec: string): void {
+async function protectAndSignIn(account: LocalAccountKey): Promise<void> {
+  const signer = await vault.protectLocalAccount(account);
+  if (!signer) return;
+  activeSigner = signer;
+  closeModal();
+  await completeSignIn(account.pubkey, 'local');
+}
+
+function showRecoveryKeyModal(account: LocalAccountKey): void {
+  const { nsec } = account;
   openModal(`<div class="page-title">Save your recovery key</div>
     <p class="section-help">This key restores your encrypted training data on another device. Workstr cannot recover it for you. Store it in a password manager and never share it.</p>
     <div class="terminal-mini recovery-key-box">${html(nsec)}</div>
@@ -222,12 +232,12 @@ function showRecoveryKeyModal(pubkey: string, nsec: string): void {
       <button id="copy-recovery-key" class="button" type="button">Copy recovery key</button>
       <button id="continue-local-account" class="button primary" type="button">I saved it</button>
     </div>
-    <p class="section-help">Workstr saves this key only in this browser profile on this device. This is convenient, but less protected than a dedicated signer.</p>`);
+    <p class="section-help">Next you choose a device code. Workstr keeps this key only on this device, encrypted under that code. This is convenient, but less protected than a dedicated signer.</p>`);
   root.querySelector('#copy-recovery-key')?.addEventListener('click', (event) => {
     void navigator.clipboard.writeText(nsec);
     (event.currentTarget as HTMLButtonElement).textContent = 'Copied';
   });
-  root.querySelector('#continue-local-account')?.addEventListener('click', () => { closeModal(); void completeSignIn(pubkey, 'local'); });
+  root.querySelector('#continue-local-account')?.addEventListener('click', () => { void protectAndSignIn(account); });
 }
 
 function showRestoreLocalAccountModal(input = '', error: string | null = null): void {
@@ -235,7 +245,7 @@ function showRestoreLocalAccountModal(input = '', error: string | null = null): 
   // modal and reopening it to change your mind is not a way back.
   openModal(`<button id="account-back" class="auth-back-button" type="button">← Back</button>
     <div class="page-title">Restore with recovery key</div>
-    <p class="section-help">Paste an nsec recovery key. It stays in this browser profile on this device so sync can run without signer prompts.</p>
+    <p class="section-help">Paste an nsec recovery key. It is kept on this device, encrypted under your device code, so sync can run without signer prompts.</p>
     <textarea id="local-key-input" class="auth-key-input" rows="4" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="nsec1...">${html(input)}</textarea>
     ${error ? `<p class="auth-error" role="alert">Recovery key error: ${html(error)}</p>` : ''}
     <p class="section-help">Only use this on a device you trust. For maximum key protection, use a dedicated signer instead.</p>
@@ -251,10 +261,7 @@ function showRestoreLocalAccountModal(input = '', error: string | null = null): 
   root.querySelector('#restore-local-key')?.addEventListener('click', () => void (async () => {
     const value = keyInput?.value || '';
     try {
-      const account = await importLocalAccount(value);
-      activeSigner = account.signer;
-      closeModal();
-      void completeSignIn(account.pubkey, 'local');
+      void protectAndSignIn(parseRecoveryKey(value));
     } catch (err) {
       // Re-open with the paste preserved: retyping a 63-character nsec from scratch
       // after a typo punishes the exact person this flow exists for.
@@ -302,7 +309,7 @@ async function connectBunkerInput(): Promise<void> {
     const signer = await createBunkerSigner(input, { onAuthUrl: launchSignerRequest });
     const pubkey = await signer.getPublicKey();
     activeSigner = signer;
-    await clearLocalKey();
+    await clearLocalKey(); await vault.refreshStatus();
     pendingConnect = null;
     closeModal();
     await completeSignIn(pubkey, 'nip46');

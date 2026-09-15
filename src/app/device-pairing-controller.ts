@@ -23,6 +23,7 @@ import {
   errorMarkup,
   expiredMarkup,
   externalSignerMarkup,
+  lockedMarkup,
   qrMarkup,
   scannerMarkup,
   sendingMarkup,
@@ -30,6 +31,7 @@ import {
   successMarkup,
   waitingMarkup
 } from '../features/identity/pairing-view';
+import { isDeviceVaultError } from '../security/device-vault-types';
 import type { Signer } from '../signer/types';
 
 export interface DevicePairingContext {
@@ -41,8 +43,8 @@ export interface DevicePairingContext {
   getSigner(): Promise<Signer | null>;
   /** The nsec this device holds, or null for an external signer that Workstr cannot copy. */
   getLocalNsec(): Promise<string | null>;
-  /** Hands a received key to the existing local sign-in path. */
-  adoptTransferredKey(nsec: string): Promise<void>;
+  /** Stores a received key behind this device's own code and signs in. False when that was cancelled. */
+  adoptTransferredKey(nsec: string): Promise<boolean>;
 }
 
 export function createDevicePairingController(ctx: DevicePairingContext) {
@@ -117,7 +119,9 @@ export function createDevicePairingController(ctx: DevicePairingContext) {
       // adopted, so a duplicate response has nothing left to act on.
       release();
       show(sendingMarkup());
-      await adoptTransferredKey(payload.nsec);
+      // This device sets its own code first. Cancelled means nothing was stored and the
+      // screen asking has already closed, so there is nothing further to show.
+      if (!(await adoptTransferredKey(payload.nsec))) return;
       show(successMarkup(nip19.npubEncode(payload.accountPubkey)));
     } catch (error) {
       fail(error);
@@ -129,7 +133,15 @@ export function createDevicePairingController(ctx: DevicePairingContext) {
     release();
     // Refused before the camera opens, not after: an external signer can never complete
     // this, and asking for the camera first would be a prompt for nothing.
-    const nsec = await getLocalNsec().catch(() => null);
+    let nsec: string | null;
+    try {
+      nsec = await getLocalNsec();
+    } catch (error) {
+      // A locked vault cannot hand over its key. Unlock first, then add the device - this
+      // screen does not become a second place to enter the code.
+      show(isDeviceVaultError(error, 'locked') ? lockedMarkup() : externalSignerMarkup());
+      return;
+    }
     if (!nsec) { show(externalSignerMarkup()); return; }
 
     show(scannerMarkup());

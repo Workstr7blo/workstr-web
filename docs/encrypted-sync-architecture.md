@@ -34,6 +34,14 @@ compression mode, author pubkey, and record address, so ciphertext cannot be mov
 different account or address undetected. The signer signs the outer NIP-78 event but is
 not asked to encrypt or decrypt every record. This keeps restore practical with NIP-46.
 
+A local-key account's nsec is held in the device vault (`docs/device-vault-architecture.md`),
+and the device code is not part of this protocol. Nothing derived from the code is used for
+sync, and no code, vault record or vault key is written to a sync record or a backup-key
+event. Until the vault is unlocked a local-key account has no signer and its namespace is
+not opened, so the engine does not start; after unlock the local signer unwraps
+`workstr:v2:key` exactly as a NIP-07 or NIP-46 signer does. That is why a phone on a local
+key and a laptop on an extension sync together when they are the same npub.
+
 ## Record vocabulary
 
 Replaceable object records use stable addresses where replacement is desirable:

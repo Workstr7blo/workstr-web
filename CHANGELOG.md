@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Your local account is now protected by a nine-digit device code. Workstr asks for it once
+  each time the app opens, and until then the account's key cannot be read or used - not by
+  the app, and not by anyone looking through the browser's storage. After unlocking, nothing
+  asks for it again until you close or reload Workstr, or choose Lock Workstr in Settings.
+  The first time you open this version with a local account, Workstr asks you to create the
+  code and moves your key over; if that fails, your key stays exactly where it was. Creating
+  an account, restoring one with a recovery key, and adding a device by QR code each ask for
+  a code before anything is saved, and each device has its own. The code never leaves the
+  device: it is not synced, not in exports, and not part of device pairing. It cannot be
+  recovered either - if you forget it, reset the vault and restore with your recovery key;
+  your training data stays. Accounts using a browser extension or a remote signer are not
+  asked for a code. A nine-digit code slows down someone who copies your device's data; it
+  does not make that data impossible to break into, so keep your recovery key safe.
+
 ## [2.5.0] - 2026-09-15
 
 ### Security
