@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { nip19 } from 'nostr-tools';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { createDeviceVaultController, unlockDelayMs, vaultScopeName } from '../src/app/device-vault-controller';
+import { createDeviceVaultController } from '../src/app/device-vault-controller';
+import { UNLOCK_BACKOFF_KEY, unlockDelayMs } from '../src/app/device-vault-backoff';
 import { bindPinFields, readPinField } from '../src/app/device-pin-input';
-import { deviceSecurityCard, pinField } from '../src/app/device-vault-view';
+import { deviceSecurityCard, pinField, vaultScopeName } from '../src/app/device-vault-view';
 import { createDeviceVault, type DeviceVault } from '../src/security/device-vault';
 import { generateLocalAccount, NOSTR_LOCAL_KEY_SCOPE, saveLocalAccount } from '../src/signer/local-key';
 import { clearLocalSecret, loadLocalSecret, saveLocalSecret } from '../src/signer/local-key-storage';
@@ -20,11 +22,11 @@ function freshVault(): { databaseName: string; vault: DeviceVault } {
   return { databaseName, vault: createDeviceVault({ databaseName }) };
 }
 
-function harness(vault: DeviceVault, stateOverrides: Partial<AppState> = {}) {
+function harness(vault: DeviceVault, stateOverrides: Partial<AppState> = {}, clockStart = 1_000_000) {
   document.body.innerHTML = '<div id="app"><div id="modal"><div id="modal-content"></div></div><div id="vault-lock" hidden></div></div>';
   const root = document.getElementById('app') as HTMLElement;
   const state = { pubkey: null, signerType: null, deviceVault: 'absent', ...stateOverrides } as AppState;
-  let clock = 1_000_000;
+  let clock = clockStart;
   const onUnlocked = vi.fn();
   const onLocked = vi.fn();
   const onReset = vi.fn();
@@ -35,11 +37,12 @@ function harness(vault: DeviceVault, stateOverrides: Partial<AppState> = {}) {
     render: vi.fn(),
     now: () => clock,
     openModal: (markup) => { (root.querySelector('#modal-content') as HTMLElement).innerHTML = markup; modal.classList.add('open'); },
-    // What the shell does: any close cancels a pending prompt.
-    closeModal: () => { modal.classList.remove('open'); (root.querySelector('#modal-content') as HTMLElement).innerHTML = ''; controller.cancelPending(); }
+    closeModal: () => close()
   });
+  // What the shell does: any close cancels a pending prompt.
+  function close(): void { modal.classList.remove('open'); (root.querySelector('#modal-content') as HTMLElement).innerHTML = ''; controller.cancelPending(); }
   return {
-    root, state, controller, onUnlocked, onLocked, onReset, toast,
+    root, state, controller, onUnlocked, onLocked, onReset, toast, close,
     lock: () => root.querySelector('#vault-lock') as HTMLElement,
     modalContent: () => root.querySelector('#modal-content') as HTMLElement,
     advance: (ms: number) => { clock += ms; }
@@ -127,9 +130,17 @@ describe('launch', () => {
   it('removes a vault that holds nothing rather than asking for its code', async () => {
     const { vault } = freshVault();
     await vault.create(PIN);
-    const h = harness(vault);
+    const h = harness(vault, {}, Date.now() + 31_000);
     expect(await h.controller.prepareBoot()).toBe('open');
     expect(await vault.exists()).toBe(false);
+  });
+
+  it('leaves an empty vault alone while it may still be another tab mid-setup', async () => {
+    const { vault } = freshVault();
+    await vault.create(PIN);
+    const h = harness(vault, {}, Date.now());
+    expect(await h.controller.prepareBoot()).toBe('open');
+    expect(await vault.exists()).toBe(true);
   });
 
   it('blocks the app until the right code is entered, saying only that a wrong one is wrong', async () => {
@@ -188,6 +199,58 @@ describe('launch', () => {
     await vi.waitFor(() => expect(h.onUnlocked).toHaveBeenCalled());
     // Let the redraw scheduled for the end of the wait fire inside this test.
     await new Promise((resolve) => setTimeout(resolve, 1100));
+  });
+
+  it('keeps the wait across a reload and clears it once the right code is entered', async () => {
+    const { databaseName, vault } = await vaultWithNostrKey();
+    const h = harness(vault);
+    await h.controller.prepareBoot();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      enter(h.lock(), 'unlock', OTHER_PIN);
+      submit(h.lock(), 'vault-unlock-form');
+      await vi.waitFor(() => expect(h.lock().querySelector('#vault-unlock')?.hasAttribute('disabled')).toBe(false));
+    }
+    expect(localStorage.getItem(UNLOCK_BACKOFF_KEY)).not.toContain(OTHER_PIN);
+
+    // A reload: a new vault object and a new controller, with only storage carried over.
+    const reopened = createDeviceVault({ databaseName });
+    const unlock = vi.spyOn(reopened, 'unlock');
+    const r = harness(reopened);
+    expect(await r.controller.prepareBoot()).toBe('blocked');
+    expect(r.lock().querySelector('.auth-error')?.textContent).toContain('Too many incorrect attempts');
+    enter(r.lock(), 'unlock', PIN);
+    submit(r.lock(), 'vault-unlock-form');
+    expect(unlock).not.toHaveBeenCalled();
+
+    r.advance(1000);
+    enter(r.lock(), 'unlock', PIN);
+    submit(r.lock(), 'vault-unlock-form');
+    await vi.waitFor(() => expect(r.onUnlocked).toHaveBeenCalledWith('boot'));
+    expect(localStorage.getItem(UNLOCK_BACKOFF_KEY)).toBeNull();
+  });
+
+  it('says so when a pre-vault key cannot be moved after unlock, and removes it only on request', async () => {
+    const { vault, pubkey } = await vaultWithNostrKey();
+    const other = generateSecretKey();
+    await saveLocalSecret(bytesToHex(other));
+    const h = harness(vault, { pubkey, signerType: 'local' });
+    await h.controller.prepareBoot();
+    enter(h.lock(), 'unlock', PIN);
+    submit(h.lock(), 'vault-unlock-form');
+    await vi.waitFor(() => expect(h.modalContent().textContent).toContain('Old identity key not protected'));
+    expect(h.onUnlocked).toHaveBeenCalledWith('boot');
+    expect(h.modalContent().textContent).toContain(nip19.npubEncode(getPublicKey(other)).slice(0, 12));
+
+    vi.stubGlobal('confirm', vi.fn(() => false));
+    h.modalContent().querySelector<HTMLElement>('#vault-legacy-remove')!.click();
+    expect(await loadLocalSecret()).toBe(bytesToHex(other));
+
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    h.modalContent().querySelector<HTMLElement>('#vault-legacy-remove')!.click();
+    await vi.waitFor(() => expect(h.toast).toHaveBeenCalledWith('Old identity key removed.'));
+    expect(await loadLocalSecret()).toBeNull();
+    // The account the vault protects is untouched.
+    expect(await vault.hasSecret(NOSTR_LOCAL_KEY_SCOPE)).toBe(true);
   });
 });
 
@@ -320,6 +383,24 @@ describe('storing a new local key', () => {
     await reloaded.unlock(PIN);
     expect((await reloaded.listScopes()).sort()).toEqual(['monero.hot-wallet', NOSTR_LOCAL_KEY_SCOPE]);
   });
+
+  it('does not bring back an unlock prompt that was closed while it was checking the code', async () => {
+    const { databaseName, vault: creator } = freshVault();
+    await creator.create(PIN);
+    await creator.putSecret('monero.hot-wallet', 'seed');
+    const vault = createDeviceVault({ databaseName });
+    const h = harness(vault);
+    const pending = h.controller.protectLocalAccount(generateLocalAccount());
+    await vi.waitFor(() => expect(h.modalContent().querySelector('#vault-modal-unlock-form')).toBeTruthy());
+    enter(h.modalContent(), 'unlock', OTHER_PIN);
+    submit(h.modalContent(), 'vault-modal-unlock-form');
+    h.close();
+
+    expect(await pending).toBeNull();
+    await vi.waitFor(() => expect(localStorage.getItem(UNLOCK_BACKOFF_KEY)).toContain('"failures":1'));
+    expect(h.root.querySelector('#modal')?.classList.contains('open')).toBe(false);
+    expect(h.modalContent().innerHTML).toBe('');
+  });
 });
 
 describe('Settings', () => {
@@ -356,6 +437,24 @@ describe('Settings', () => {
     expect(await reloaded.hasSecret(NOSTR_LOCAL_KEY_SCOPE)).toBe(true);
   });
 
+  it('reports a failed change without reopening a window closed while it ran', async () => {
+    const { vault } = await vaultWithNostrKey();
+    await vault.unlock(PIN);
+    const h = harness(vault, { deviceVault: 'unlocked' });
+    h.root.insertAdjacentHTML('beforeend', deviceSecurityCard(h.state));
+    h.controller.bindSettings();
+    h.root.querySelector<HTMLElement>('#change-device-code')!.click();
+    enter(h.modalContent(), 'current', OTHER_PIN);
+    enter(h.modalContent(), 'new', '111222333');
+    enter(h.modalContent(), 'confirm', '111222333');
+    submit(h.modalContent(), 'vault-change-pin-form');
+    h.close();
+
+    await vi.waitFor(() => expect(h.toast).toHaveBeenCalledWith('The device code was not changed.', 'bad'));
+    expect(h.root.querySelector('#modal')?.classList.contains('open')).toBe(false);
+    expect(h.modalContent().innerHTML).toBe('');
+  });
+
   it('locks: drops the session, keeps the records, and resumes on the next unlock', async () => {
     const { vault } = await vaultWithNostrKey();
     await vault.unlock(PIN);
@@ -369,9 +468,16 @@ describe('Settings', () => {
     expect(h.state.deviceVault).toBe('locked');
     expect(h.lock().hidden).toBe(false);
     expect(await vault.hasSecret(NOSTR_LOCAL_KEY_SCOPE)).toBe(true);
+    // The app is still rendered underneath; keyboard and screen readers must not reach it.
+    const card = h.root.querySelector('.device-security-card') as HTMLElement;
+    expect(card.hasAttribute('inert')).toBe(true);
+    expect(h.root.querySelector('#modal')?.hasAttribute('inert')).toBe(true);
+    expect(h.lock().hasAttribute('inert')).toBe(false);
 
     enter(h.lock(), 'unlock', PIN);
     submit(h.lock(), 'vault-unlock-form');
     await vi.waitFor(() => expect(h.onUnlocked).toHaveBeenCalledWith('relock'));
+    expect(card.hasAttribute('inert')).toBe(false);
+    expect(h.root.querySelector('#modal')?.hasAttribute('inert')).toBe(false);
   });
 });

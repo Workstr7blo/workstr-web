@@ -19,7 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a code before anything is saved, and each device has its own. The code never leaves the
   device: it is not synced, not in exports, and not part of device pairing. It cannot be
   recovered either - if you forget it, reset the vault and restore with your recovery key;
-  your training data stays. Accounts using a browser extension or a remote signer are not
+  your training data stays. After several wrong codes Workstr makes you wait before the next
+  try, and reloading does not skip the wait. Installing an app update does not lock you out
+  after a quick trip to another app: while Workstr is unlocked, an update waits until you have
+  been away for ten minutes. Accounts using a browser extension or a remote signer are not
   asked for a code. A nine-digit code slows down someone who copies your device's data; it
   does not make that data impossible to break into, so keep your recovery key safe.
 

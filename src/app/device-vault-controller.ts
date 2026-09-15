@@ -5,11 +5,10 @@
 // The lock screen is its own layer above the frame and the modal, so nothing behind it can be
 // reached while a vault exists and is locked. The code is read from the inputs at submit time,
 // handed straight to the vault, and never kept: a failed attempt re-renders empty boxes.
-import { nip19 } from 'nostr-tools';
 import { deviceVault as defaultVault, type DeviceVault } from '../security/device-vault';
 import { isDevicePin } from '../security/device-pin';
 import { isDeviceVaultError, type DeviceVaultStatus } from '../security/device-vault-types';
-import { hasLegacyLocalKey, migrateLegacyLocalKey, saveLocalAccount, type LocalAccountKey } from '../signer/local-key';
+import { hasLegacyLocalKey, legacyLocalKeyPubkey, migrateLegacyLocalKey, saveLocalAccount, type LocalAccountKey } from '../signer/local-key';
 import { clearLocalSecret, migrateLegacyLocalSecret } from '../signer/local-key-storage';
 import type { Signer } from '../signer/types';
 import type { AppState } from './state';
@@ -19,12 +18,16 @@ import {
   newPinModalMarkup,
   protectCreateMarkup,
   protectIntroMarkup,
+  shortNpub,
   unlockModalMarkup,
   unlockScreenMarkup,
+  unmovedLegacyKeyModalMarkup,
   vaultBusyModalMarkup,
-  vaultMessageModalMarkup
+  vaultMessageModalMarkup,
+  vaultScopeName
 } from './device-vault-view';
 import { bindPinFields, INVALID_PIN, readNewPin, readPinField } from './device-pin-input';
+import { createUnlockBackoff } from './device-vault-backoff';
 
 export type UnlockReason = 'boot' | 'relock';
 
@@ -45,41 +48,41 @@ export interface DeviceVaultControllerContext {
   now?(): number;
 }
 
-const SCOPE_NAMES: Record<string, string> = {
-  'nostr.local-key': 'Your Nostr identity key',
-  'monero.hot-wallet': 'Monero hot wallet secret'
-};
-
-export const vaultScopeName = (scope: string): string => SCOPE_NAMES[scope] || `Protected secret (${scope})`;
-
-// Browser-side delays only slow someone typing at this screen. Anyone holding a copy of the
-// vault database guesses offline at whatever rate their hardware allows; the Argon2id cost is
-// the defence there, not this.
-export function unlockDelayMs(failures: number): number {
-  return failures < 3 ? 0 : Math.min(60_000, 1000 * 2 ** (failures - 3));
-}
+// An empty vault younger than this may be another tab's setup, seconds from writing its secret.
+const EMPTY_VAULT_GRACE_MS = 30_000;
 
 const messageOf = (error: unknown): string => (isDeviceVaultError(error) ? error.message : 'Something went wrong. Try again.');
-const shortNpub = (pubkey: string): string => { const npub = nip19.npubEncode(pubkey); return `${npub.slice(0, 12)}…${npub.slice(-6)}`; };
 
 export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
   const { root, state, openModal, closeModal } = ctx;
   const vault = ctx.vault || defaultVault;
   const now = ctx.now || Date.now;
-  let failures = 0;
-  let retryAt = 0;
+  const backoff = createUnlockBackoff(now);
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingCancel: (() => void) | null = null;
+  // Bumped whenever the modal closes, so work that finishes after its window closed can tell.
+  let modalGeneration = 0;
 
   const setStatus = (status: DeviceVaultStatus): void => { state.deviceVault = status; };
   const modalHost = (): ParentNode => root.querySelector('#modal-content') || root;
   const lockHost = (): HTMLElement | null => root.querySelector<HTMLElement>('#vault-lock');
+
+  // Opaque is not enough: Tab and screen readers still reach whatever is underneath, and after
+  // Lock Workstr that is the whole app. Everything beside the lock layer is inert while it is up.
+  function setBackgroundInert(host: HTMLElement, inert: boolean): void {
+    for (let node: Element = host; node !== root && node.parentElement; node = node.parentElement) {
+      for (const sibling of Array.from(node.parentElement.children)) {
+        if (sibling !== node) sibling.toggleAttribute('inert', inert);
+      }
+    }
+  }
 
   function showLock(markup: string): HTMLElement | null {
     const host = lockHost();
     if (!host) return null;
     host.innerHTML = markup;
     host.hidden = false;
+    setBackgroundInert(host, true);
     bindPinFields(host);
     host.querySelector<HTMLInputElement>('.device-pin-group:not([disabled])')?.focus();
     return host;
@@ -87,26 +90,18 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
 
   function hideLock(): void {
     const host = lockHost();
-    if (host) { host.hidden = true; host.innerHTML = ''; }
+    if (!host) return;
+    setBackgroundInert(host, false);
+    host.hidden = true;
+    host.innerHTML = '';
   }
 
-  function waitMessage(): string | null {
-    const seconds = Math.ceil((retryAt - now()) / 1000);
-    return seconds > 0 ? `Too many incorrect attempts. Try again in ${seconds} second${seconds === 1 ? '' : 's'}.` : null;
-  }
-
-  // Counts only wrong codes, never malformed ones, and schedules a redraw for when the wait
-  // ends so the screen does not keep saying "wait" after it no longer applies.
-  function recordFailure(error: unknown, redraw: () => void): void {
-    if (!isDeviceVaultError(error, 'incorrect-pin')) return;
-    failures += 1;
-    const delay = unlockDelayMs(failures);
-    retryAt = now() + delay;
+  function clearFailures(): void {
+    backoff.clear();
     clearTimeout(retryTimer);
-    if (delay) retryTimer = setTimeout(redraw, delay);
   }
 
-  const unlockError = (error: unknown): string => waitMessage() || messageOf(error);
+  const unlockError = (error: unknown): string => backoff.waitMessage() || messageOf(error);
 
   async function prepareBoot(): Promise<'open' | 'blocked'> {
     // Every boot, signed in or not: a plaintext key from before encrypted storage leaves
@@ -114,14 +109,16 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
     await migrateLegacyLocalSecret().catch(() => undefined);
     try {
       if (await vault.exists()) {
-        // A vault holding nothing is a setup that never finished. It protects nothing, and
-        // removing it lets the interrupted step start again cleanly.
         if ((await vault.listScopes()).length) {
           setStatus('locked');
           showUnlock('boot');
           return 'blocked';
         }
-        await vault.destroy();
+        // A vault holding nothing is a setup that never finished, and removing it lets the
+        // interrupted step start again - unless it is young enough to be another tab's setup,
+        // whose secret would then be written under a root key nothing can unwrap.
+        const age = Math.abs(now() - ((await vault.createdAt()) ?? 0));
+        if (age >= EMPTY_VAULT_GRACE_MS) await vault.destroy();
       }
       if (state.signerType === 'local' && state.pubkey && await hasLegacyLocalKey()) {
         setStatus('setup-required');
@@ -138,13 +135,18 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
   }
 
   function showUnlock(reason: UnlockReason, error: string | null = null): void {
-    const host = showLock(unlockScreenMarkup({ error: error || waitMessage() }));
+    const host = showLock(unlockScreenMarkup({ error: error || backoff.waitMessage() }));
     host?.querySelector('#vault-unlock-form')?.addEventListener('submit', (event) => { event.preventDefault(); void submitUnlock(reason, host); });
     host?.querySelector('#vault-forgot')?.addEventListener('click', () => { void showForgot(reason); });
+    // Redraws when a wait ends, so the screen does not keep saying "wait" after it no longer
+    // applies - a wait carried over from before a reload included.
+    clearTimeout(retryTimer);
+    const wait = backoff.remainingMs();
+    if (wait > 0) retryTimer = setTimeout(() => { if (state.deviceVault === 'locked') showUnlock(reason); }, wait);
   }
 
   async function submitUnlock(reason: UnlockReason, host: HTMLElement): Promise<void> {
-    if (waitMessage()) return showUnlock(reason);
+    if (backoff.waitMessage()) return showUnlock(reason);
     const pin = readPinField(host, 'unlock');
     if (!isDevicePin(pin)) return showUnlock(reason, INVALID_PIN);
     setStatus('unlocking');
@@ -153,18 +155,34 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
       await vault.unlock(pin);
     } catch (error) {
       setStatus('locked');
-      recordFailure(error, () => { if (state.deviceVault === 'locked') showUnlock(reason); });
+      backoff.recordFailure(error);
       return showUnlock(reason, unlockError(error));
     }
-    failures = 0;
+    clearFailures();
     setStatus('unlocked');
     // A migration interrupted after its vault write, or a pre-vault key on a device whose
-    // vault already existed: the code just entered is all it needs to finish.
+    // vault already existed: the code just entered is all it needs to finish. When it cannot,
+    // that key is still readable without any code, so the user is told rather than left with it.
+    let unmoved = false;
     if (state.signerType === 'local' && await hasLegacyLocalKey().catch(() => false)) {
-      await migrateLegacyLocalKey(state.pubkey, vault).catch(() => undefined);
+      unmoved = await migrateLegacyLocalKey(state.pubkey, vault).then(() => false, () => true);
     }
     hideLock();
     await ctx.onUnlocked(reason);
+    if (unmoved) await showUnmovedLegacyKey();
+  }
+
+  // Most often the old key belongs to a different account. Left alone, the move is tried again
+  // at the next launch; removal is confirmed, since without its recovery key that account is gone.
+  async function showUnmovedLegacyKey(): Promise<void> {
+    const pubkey = await legacyLocalKeyPubkey();
+    openModal(unmovedLegacyKeyModalMarkup(pubkey ? shortNpub(pubkey) : null));
+    const host = modalHost();
+    host.querySelector('#vault-legacy-later')?.addEventListener('click', closeModal);
+    host.querySelector('#vault-legacy-remove')?.addEventListener('click', () => {
+      if (!window.confirm('Remove the old identity key from this device? Without its recovery key that account cannot be recovered.')) return;
+      clearLocalSecret().then(() => { closeModal(); ctx.toast('Old identity key removed.'); }, () => ctx.toast('The old identity key could not be removed.', 'bad'));
+    });
   }
 
   async function showForgot(reason: UnlockReason): Promise<void> {
@@ -187,7 +205,7 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
       showLock(protectIntroMarkup(messageOf(error)));
       return;
     }
-    failures = 0; retryAt = 0;
+    clearFailures();
     setStatus('absent');
     hideLock();
     await ctx.onReset();
@@ -234,8 +252,10 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
   // key it was holding instead of waiting forever.
   function modalPrompt<T>(show: (resolve: (value: T | null) => void) => void): Promise<T | null> {
     return new Promise((resolve) => {
-      pendingCancel = () => resolve(null);
-      show((value) => { pendingCancel = null; resolve(value); });
+      const cancel = (): void => resolve(null);
+      pendingCancel = cancel;
+      // Disarms only its own cancel, so a late answer never strands a newer prompt.
+      show((value) => { if (pendingCancel === cancel) pendingCancel = null; resolve(value); });
     });
   }
 
@@ -259,18 +279,24 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
   function promptModalUnlock(identity: string): Promise<true | null> {
     return modalPrompt<true>((done) => {
       const show = (error: string | null, busy: string | null = null): void => {
-        openModal(unlockModalMarkup(identity, { error: error || waitMessage(), busy }));
+        openModal(unlockModalMarkup(identity, { error: error || backoff.waitMessage(), busy }));
         const host = modalHost();
         bindPinFields(host);
         host.querySelector('#vault-modal-unlock-form')?.addEventListener('submit', (event) => {
           event.preventDefault();
-          if (waitMessage()) return show(null);
+          if (backoff.waitMessage()) return show(null);
           const pin = readPinField(host, 'unlock');
           if (!isDevicePin(pin)) return show(INVALID_PIN);
           show(null, 'Unlocking…');
-          vault.unlock(pin).then(() => { failures = 0; done(true); }, (error) => {
-            recordFailure(error, () => undefined);
-            show(unlockError(error));
+          // Closed while unlocking: the prompt has already answered null and must not reappear.
+          const generation = modalGeneration;
+          vault.unlock(pin).then(() => {
+            clearFailures();
+            if (generation === modalGeneration) done(true);
+            else void refreshStatus();
+          }, (error) => {
+            backoff.recordFailure(error);
+            if (generation === modalGeneration) show(unlockError(error));
           });
         });
       };
@@ -311,23 +337,26 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
   }
 
   function openChangePin(error: string | null = null, busy: string | null = null): void {
-    openModal(changePinModalMarkup({ error: error || waitMessage(), busy }));
+    openModal(changePinModalMarkup({ error: error || backoff.waitMessage(), busy }));
     const host = modalHost();
     bindPinFields(host);
     host.querySelector('#vault-change-pin-form')?.addEventListener('submit', (event) => {
       event.preventDefault();
-      if (waitMessage()) return openChangePin();
+      if (backoff.waitMessage()) return openChangePin();
       const current = readPinField(host, 'current');
       if (!isDevicePin(current)) return openChangePin(INVALID_PIN);
       const next = readNewPin(host);
       if ('error' in next) return openChangePin(next.error);
       openChangePin(null, 'Changing device code…');
+      // Closed while it ran: report the outcome without reopening a window the user dismissed.
+      const generation = modalGeneration;
       vault.changePin(current, next.pin).then(() => {
-        failures = 0;
-        closeModal();
+        clearFailures();
+        if (generation === modalGeneration) closeModal();
         ctx.toast('Device code changed.');
       }, (failure) => {
-        recordFailure(failure, () => undefined);
+        backoff.recordFailure(failure);
+        if (generation !== modalGeneration) return ctx.toast('The device code was not changed.', 'bad');
         openChangePin(isDeviceVaultError(failure, 'incorrect-pin') ? unlockError(failure) : `The device code was not changed. ${messageOf(failure)}`);
       });
     });
@@ -361,6 +390,7 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
     },
     /** Called when the modal closes by any route. */
     cancelPending(): void {
+      modalGeneration += 1;
       const cancel = pendingCancel;
       pendingCancel = null;
       cancel?.();

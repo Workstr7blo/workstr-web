@@ -4,8 +4,31 @@
 // A device code is entered as three boxes of three digits, because nine digits in one field
 // are hard to read back. The boxes are one value: the controller joins them before anything
 // checks it, and the code is never written into markup, so a re-render always starts empty.
+import { nip19 } from 'nostr-tools';
 import type { AppState } from './state';
 import { html } from './format';
+
+const SCOPE_NAMES: Record<string, string> = {
+  'nostr.local-key': 'Your Nostr identity key',
+  'monero.hot-wallet': 'Monero hot wallet secret'
+};
+
+export const vaultScopeName = (scope: string): string => SCOPE_NAMES[scope] || `Protected secret (${scope})`;
+
+export const shortNpub = (pubkey: string): string => { const npub = nip19.npubEncode(pubkey); return `${npub.slice(0, 12)}…${npub.slice(-6)}`; };
+
+// After unlocking, when a key saved before the device vault could not be moved into it. The
+// identity is that key's account, or null when it could not be read.
+export function unmovedLegacyKeyModalMarkup(identity: string | null): string {
+  return `<div class="page-title">Old identity key not protected</div>
+    <p class="section-help">Workstr could not move an identity key saved by an older version into the device vault, so it is still stored on this device without a device code.</p>
+    ${identity ? `<div class="terminal-mini device-vault-identity">${html(identity)}</div>` : ''}
+    <p class="section-help">Remove it only if you have its recovery key. Otherwise Workstr tries to move it again the next time it opens.</p>
+    <div class="web-empty-actions">
+      <button id="vault-legacy-remove" class="button danger" type="button">Remove old key</button>
+      <button id="vault-legacy-later" class="button" type="button">Not now</button>
+    </div>`;
+}
 
 export interface VaultFormOptions {
   error?: string | null;

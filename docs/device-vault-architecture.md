@@ -124,6 +124,12 @@ The unlocked session is memory only. It lasts for the application session and en
 Navigating between pages or briefly backgrounding the app does not lock it, and the code is
 not asked for again before a signature, a sync or a future Monero transaction.
 
+A waiting app update keeps to that. Installing one reloads the page, and a reload locks the
+vault, so while the vault is unlocked an update is applied only after the app has been in the
+background for at least ten minutes - checked by a timer while away, and again on return,
+because phones freeze background timers (`src/app/update-controller.ts`). With no vault, or a
+locked one, the update still applies the moment the app is left.
+
 Locking drops the session and the cached local signer and stops encrypted sync. It keeps
 the encrypted records, the signed-in public key and all workout data. Locking is not signing
 out.
@@ -138,13 +144,17 @@ Is there a vault with at least one secret?
               └── no  → open normally
 ```
 
-The lock screen is its own layer above the page and the modal. While it is up the account
-has not been opened: there is no workout store for this identity, no local signer, and so no
+The lock screen is its own layer above every other one, the modal and the rest-timer overlay
+included. Being opaque is not enough on its own, so while it is up everything beside it is
+marked `inert`: Tab and screen readers cannot reach the page underneath, which after Lock
+Workstr is the whole app. At launch the account has not been opened: there is no workout store for this identity, no local signer, and so no
 sync. Anonymous local training with no vault, and NIP-07 or NIP-46 accounts with no vault,
 open with no prompt.
 
 A vault holding no secrets is a setup that never finished. It is deleted at launch rather
-than asking for a code that protects nothing.
+than asking for a code that protects nothing - once it is more than 30 seconds old. A younger
+one may be another tab's setup about to write its secret, and deleting its metadata then
+would leave that secret under a root key nothing can unwrap.
 
 ## Accounts
 
@@ -187,7 +197,11 @@ An account found there, with no vault, gets **Protect this device** at launch:
 Any failure keeps the old record, removes the vault that attempt created, and says
 protection could not be enabled. Closing the app mid-way is safe: a vault with no secrets is
 removed at the next launch and the process starts again; a vault that already holds the
-matching key finishes by deleting the old record after its code is entered. No default code
+matching key finishes by deleting the old record after its code is entered. If that finish
+fails - most often because the old key belongs to a different account - the app says so once
+it opens, names the old key's identity, and offers to remove it behind a confirmation; left
+alone, the move is tried again at the next launch. The old key is never left behind silently.
+No default code
 is ever invented, and once the screen is shown the old automatically unlocked storage is not
 used to sign.
 
@@ -219,6 +233,12 @@ deleted.
 Every wrong code gets the same message, "That device code is incorrect." - nothing about
 which records exist or which failed. After three wrong codes each further attempt waits
 1, 2, 4... seconds, up to a minute. The vault is never deleted because of failed attempts.
+
+The count and the time of the next allowed attempt are kept in `localStorage`
+(`workstr.deviceVault.unlockBackoff`, never the code; `src/app/device-vault-backoff.ts`), so a
+reload - which is what opens the lock screen - does not end a wait. Clearing site data does,
+which is one more reason these waits are a speed bump for someone at the screen and not a
+defence for a copied database.
 
 ## Encrypted sync
 

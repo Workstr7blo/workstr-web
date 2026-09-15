@@ -250,7 +250,8 @@ is a finding.
 - [ ] **Keypad and masking.** On iPhone and Android the code boxes bring up a numeric keypad,
       show dots rather than digits, and the password manager offers nothing.
 - [ ] **Wrong code.** A wrong code says only that it is incorrect. After three, the next
-      attempt waits and says so. The vault is still there afterwards.
+      attempt waits and says so, and reloading the page does not end the wait. The vault is
+      still there afterwards.
 - [ ] **Create account.** Signed out: Create account, save the recovery key, create a code.
       Close the app at the recovery-key screen once first and confirm no account was left
       behind.
@@ -259,8 +260,12 @@ is a finding.
       transfer and before Signed in; the trusted device is not asked for its code.
 - [ ] **External signers unaffected.** Sign in with NIP-07 and with NIP-46 on a device with
       no local key. No code is ever asked for.
-- [ ] **Lock.** Settings → Device security → Lock Workstr. The lock screen appears; the
-      right code returns to the same place with sync running.
+- [ ] **Lock.** Settings → Device security → Lock Workstr. The lock screen appears. On the
+      laptop, pressing Tab repeatedly never leaves the lock card. The right code returns to
+      the same place with sync running.
+- [ ] **Updates wait.** Unlock, then deploy a new build and wait for "Update ready". Leave
+      the app for under a minute and return: still unlocked, no code. Leave it for more than
+      ten minutes and return: it reloads to the new build and asks for the code.
 - [ ] **Change code.** Change device code with a wrong current code (refused), then the
       right one. Reload: the old code fails, the new one opens the account.
 - [ ] **Forgot code.** On the lock screen, Forgot your device code? → Reset device vault.
