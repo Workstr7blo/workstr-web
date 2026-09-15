@@ -104,3 +104,12 @@ export function externalSignerMarkup(): string {
       <button id="pairing-cancel" class="button primary" type="button">Close</button>
     </div>`;
 }
+
+// Shown on the trusted device when its key is behind a locked device vault.
+export function lockedMarkup(): string {
+  return `<div class="page-title">Unlock Workstr first</div>
+    <p class="section-help">This device's identity is locked. Unlock Workstr with your device code, then add the other device.</p>
+    <div class="web-empty-actions">
+      <button id="pairing-cancel" class="button primary" type="button">Close</button>
+    </div>`;
+}

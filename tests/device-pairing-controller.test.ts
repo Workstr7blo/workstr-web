@@ -65,7 +65,7 @@ function harness(overrides: Partial<Parameters<typeof createDevicePairingControl
     closeModal: () => { closed.count += 1; },
     getSigner: async () => acct.signer,
     getLocalNsec: async () => acct.nsec,
-    adoptTransferredKey: async (nsec) => { adopted.push(nsec); },
+    adoptTransferredKey: async (nsec) => { adopted.push(nsec); return true; },
     ...overrides
   });
   return { root, controller, adopted, closed, acct };
@@ -173,6 +173,47 @@ describe('trusted device side', () => {
     const h = harness();
     h.controller.startScan();
     await vi.waitFor(() => expect(h.root.textContent).toContain('Transfer failed'));
+  });
+});
+
+describe('device vault', () => {
+  it('shows a QR carrying only its five public fields, and no device code', async () => {
+    const h = harness();
+    h.controller.startNewDevice();
+    await vi.waitFor(() => expect(h.root.querySelector('[data-pairing-uri]')).toBeTruthy());
+    const params = new URL(capturedUri(h.root).replace('workstr://', 'https://')).searchParams;
+    expect([...params.keys()].sort()).toEqual(['c', 'exp', 'id', 'pub', 'v']);
+  });
+
+  it('refuses to export from a locked trusted device, before the camera opens', async () => {
+    const { DeviceVaultError } = await import('../src/security/device-vault-types');
+    const { scanQr } = await import('../src/app/qr-scanner');
+    vi.mocked(scanQr).mockClear();
+    const h = harness({ getLocalNsec: async () => { throw new DeviceVaultError('locked'); } });
+    h.controller.startScan();
+    await vi.waitFor(() => expect(h.root.textContent).toContain('Unlock Workstr first'));
+    expect(scanQr).not.toHaveBeenCalled();
+    expect(published).toHaveLength(0);
+  });
+
+  it('shows no success when this device does not finish setting its own code', async () => {
+    const h = harness({ adoptTransferredKey: async () => false });
+    const { awaitPairingResponse } = await import('../src/nostr/device-pairing');
+    let delivered = false;
+    vi.mocked(awaitPairingResponse).mockImplementationOnce(async (_r, pairingId, onCandidate) => {
+      const payload = JSON.stringify({
+        version: 1, pairingId, challenge: capturedChallenge(h.root), accountPubkey: h.acct.pubkey,
+        nsec: h.acct.nsec, issuedAt: Math.floor(Date.now() / 1000), expiresAt: Math.floor(Date.now() / 1000) + 120
+      });
+      const event = finalizeEvent({ kind: 20078, created_at: Math.floor(Date.now() / 1000), content: nip44Encrypt(payload, getConversationKey(h.acct.secret, capturedPubkey(h.root))), tags: [] }, h.acct.secret) as unknown as SignedNostrEvent;
+      delivered = true;
+      return (await onCandidate(event)) ? event : null;
+    });
+
+    h.controller.startNewDevice();
+    await vi.waitFor(() => expect(delivered).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(h.root.textContent).not.toContain('Signed in');
   });
 });
 

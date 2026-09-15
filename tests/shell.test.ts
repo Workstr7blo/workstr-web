@@ -927,3 +927,82 @@ describe('boot migrates a pre-encryption recovery key', () => {
     await drainBoot(shell);
   });
 });
+
+describe('boot with a device vault', () => {
+  const PIN = '192837465';
+
+  async function bootShell(): Promise<{ root: HTMLElement; shell: ShellHandle }> {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await shell.ready;
+    return { root, shell };
+  }
+
+  it('keeps a local account closed, with no store and so no sync, until its code is entered', async () => {
+    const { deviceVault } = await import('../src/security/device-vault');
+    const { clearLocalKey, generateLocalAccount, saveLocalAccount } = await import('../src/signer/local-key');
+    localStorage.clear();
+    const account = generateLocalAccount();
+    await deviceVault.create(PIN);
+    await saveLocalAccount(account, deviceVault);
+    deviceVault.lock();
+    localStorage.setItem('workstr.currentPubkey', account.pubkey);
+    localStorage.setItem('workstr.signerType', 'local');
+
+    const { root, shell } = await bootShell();
+    const lock = root.querySelector('#vault-lock') as HTMLElement;
+    expect(lock.hidden).toBe(false);
+    expect(lock.textContent).toContain('Unlock Workstr');
+    expect(shell.state.store).toBeNull();
+    expect(shell.state.deviceVault).toBe('locked');
+
+    lock.querySelectorAll<HTMLInputElement>('.device-pin-group').forEach((box, index) => { box.value = PIN.slice(index * 3, index * 3 + 3); });
+    (lock.querySelector('#vault-unlock-form') as HTMLFormElement).requestSubmit();
+    await waitFor(() => Boolean(shell.state.store) && lock.hidden === true, 'the account to open after unlocking');
+    expect(shell.state.pubkey).toBe(account.pubkey);
+    expect(shell.state.deviceVault).toBe('unlocked');
+
+    await clearLocalKey(deviceVault);
+    await drainBoot(shell);
+    localStorage.clear();
+  });
+
+  it('asks an existing local account to protect the device before opening it', async () => {
+    localStorage.clear();
+    await clearLocalSecret();
+    const secret = 'cd'.repeat(32);
+    const { getPublicKey } = await import('nostr-tools/pure');
+    const { hexToBytes } = await import('@noble/hashes/utils.js');
+    const { saveLocalSecret } = await import('../src/signer/local-key-storage');
+    await saveLocalSecret(secret);
+    localStorage.setItem('workstr.currentPubkey', getPublicKey(hexToBytes(secret)));
+    localStorage.setItem('workstr.signerType', 'local');
+
+    const { root, shell } = await bootShell();
+    const lock = root.querySelector('#vault-lock') as HTMLElement;
+    expect(lock.hidden).toBe(false);
+    expect(lock.textContent).toContain('Protect this device');
+    expect(shell.state.store).toBeNull();
+    // The old record is untouched until the user creates a code.
+    expect(await loadLocalSecret()).toBe(secret);
+
+    await clearLocalSecret();
+    await drainBoot(shell);
+    localStorage.clear();
+  });
+
+  it('opens an extension-signer account with no vault and no prompt', async () => {
+    localStorage.clear();
+    localStorage.setItem('workstr.currentPubkey', 'e'.repeat(64));
+    localStorage.setItem('workstr.signerType', 'nip07');
+
+    const { root, shell } = await bootShell();
+    expect((root.querySelector('#vault-lock') as HTMLElement).hidden).toBe(true);
+    expect(shell.state.store).toBeTruthy();
+    expect(shell.state.deviceVault).toBe('absent');
+
+    await drainBoot(shell);
+    localStorage.clear();
+  });
+});

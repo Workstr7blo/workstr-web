@@ -232,6 +232,44 @@ copied, and refusing to try is itself a check below.
       Local Storage / Session Storage and a JSON export. No nsec, no pairing payload, and
       no `workstr://pair` URI is persisted anywhere.
 
+## 6e. Device code
+
+Needs a phone (one of them an iPhone), a laptop, the deployed site, and a local-key account
+whose recovery key you hold. Note the unlock time on each phone; more than about five seconds
+is a finding.
+
+- [ ] **Upgrade protects the device.** On a device that ran the previous release with a
+      local account, open the new build. Protect this device appears before any page, and
+      the app behind it is not reachable.
+- [ ] **Migration keeps the account.** Create and confirm a code. The same account opens,
+      with its training, and signing works (publish a summary or let sync settle).
+- [ ] **Reload locks.** Reload the page and cold-start the installed PWA. Both ask for the
+      code; the right code opens the account and sync resumes.
+- [ ] **No re-prompting.** After unlocking, move between every tab, background the PWA for
+      a minute, start and finish a workout, trigger Sync now. No code is asked for again.
+- [ ] **Keypad and masking.** On iPhone and Android the code boxes bring up a numeric keypad,
+      show dots rather than digits, and the password manager offers nothing.
+- [ ] **Wrong code.** A wrong code says only that it is incorrect. After three, the next
+      attempt waits and says so. The vault is still there afterwards.
+- [ ] **Create account.** Signed out: Create account, save the recovery key, create a code.
+      Close the app at the recovery-key screen once first and confirm no account was left
+      behind.
+- [ ] **Restore.** Signed out: restore with a recovery key, create a code, the account opens.
+- [ ] **Pairing.** Add a device by QR. The new device asks for its own code after the
+      transfer and before Signed in; the trusted device is not asked for its code.
+- [ ] **External signers unaffected.** Sign in with NIP-07 and with NIP-46 on a device with
+      no local key. No code is ever asked for.
+- [ ] **Lock.** Settings → Device security → Lock Workstr. The lock screen appears; the
+      right code returns to the same place with sync running.
+- [ ] **Change code.** Change device code with a wrong current code (refused), then the
+      right one. Reload: the old code fails, the new one opens the account.
+- [ ] **Forgot code.** On the lock screen, Forgot your device code? → Reset device vault.
+      The confirmation names the Nostr identity key. After reset, restore the same recovery
+      key with a new code: the same training data is there.
+- [ ] **Nothing leaks.** Inspect Local Storage, Session Storage, IndexedDB and a JSON export:
+      no code, no nsec, no hex secret. `workstr-device-vault-v1` holds only metadata and
+      ciphertext, and `workstr-secure-local-key-v1` is empty after migration.
+
 ## 7. Support surface (from v1.0)
 
 Support Workstr is a Monero address and QR code, and creator tipping is the Monero tips

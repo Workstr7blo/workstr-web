@@ -26,7 +26,9 @@ and patch it directly, which is also why a page render can leave it standing.
 | Boot and application coordination | `src/main.ts`, `src/app/shell.ts` | `src/app/state.ts`, `src/app/layout.ts` | `tests/shell.test.ts` |
 | Applying a shipped PWA update without interrupting anyone | `src/app/update-controller.ts` | `src/app/pwa.ts`, `public/sw.js` | production-build browser validation |
 | Identity, signer connection, and adoption | `src/app/identity-controller.ts` | `src/signer/types.ts`, `src/db/adopt.ts` | `tests/shell.test.ts`, `tests/adopt.test.ts`, browser verification |
-| Local account keys and where the secret lives | `src/signer/local-key.ts` | `src/signer/local-key-storage.ts` | `tests/local-key-signer.test.ts`, `tests/local-key-storage.test.ts` |
+| Local account keys and where the secret lives | `src/signer/local-key.ts` | `src/security/device-vault.ts`, `src/signer/local-key-storage.ts` (the pre-vault store, read only to migrate out of) | `tests/local-key-signer.test.ts`, `tests/local-key-migration.test.ts`, `tests/local-key-storage.test.ts` |
+| Device vault: storage, unlocked session, scopes, changing the code | `src/security/device-vault.ts` | `src/security/device-vault-crypto.ts`, `src/security/device-vault-kdf.ts`, `src/security/device-vault-types.ts`, `src/security/device-pin.ts`, `docs/device-vault-architecture.md` | `tests/device-vault.test.ts`, `tests/device-vault-kdf.test.ts` |
+| Device vault screens: unlock at launch, protect an existing account, device code prompts, lock, reset | `src/app/device-vault-controller.ts` | `src/app/device-vault-view.ts`, `src/app/device-pin-input.ts`, `src/app/shell.ts` (`boot`), `src/app/identity-controller.ts` | `tests/device-vault-controller.test.ts`, `tests/shell.test.ts` |
 | QR device pairing crypto and relay transport | `src/signer/pairing.ts` | `src/nostr/device-pairing.ts`, `relay/write-policy.mjs`, `docs/device-pairing-architecture.md` | `tests/pairing.test.ts`, `tests/pairing-relay.integration.test.ts` |
 | QR device pairing screens and camera | `src/app/device-pairing-controller.ts` | `src/features/identity/pairing-view.ts`, `src/app/qr-scanner.ts`, `src/app/identity-controller.ts` | `tests/device-pairing-controller.test.ts` |
 | Catalog/library actions and cache, and the library following the catalog | `src/app/catalog-controller.ts` | `src/nostr/canon.ts`, `src/nostr/library-updates.ts`, `src/nostr/programImport.ts`, `src/db/store.ts` | `tests/discover.test.ts`, `tests/library-updates.test.ts`, `tests/programImport.test.ts`, browser verification |
@@ -169,7 +171,15 @@ and patch it directly, which is also why a page render can leave it standing.
 - `src/app/catalog-controller.ts` owns catalog refresh/cache/profile loading and local
   library import, update, deletion, favorite, and detail actions.
 - `src/app/identity-controller.ts` owns signer connection, adoption choices, sign-out,
-  and the NIP-46 connection modal lifecycle.
+  and the NIP-46 connection modal lifecycle. A local key it creates, restores or receives by
+  pairing is handed to the device vault controller and signed in only once it is stored.
+- `src/app/device-vault-controller.ts` owns the device vault's user flows: `prepareBoot`
+  decides whether launch shows the lock screen, Protect this device, or nothing;
+  `protectLocalAccount` is the only route a local Nostr key takes into storage; and it binds
+  Settings → Device security. The lock screen is `#vault-lock`, a layer above the frame and
+  the modal written by `shellFrame`. While it is up the account is not opened, so no store,
+  local signer or sync exists. `src/security/device-vault.ts` holds the session; the
+  controller never keeps a code.
 - `src/app/preferences-controller.ts` owns settings persistence, body/history actions,
   backup controls, and Quick Workout/recovery handlers.
 - `src/app/monero-address-controller.ts` owns the current user's public NIP-A3 Monero
@@ -313,7 +323,10 @@ targets, or muscle metadata solely from the current exercise library.
 - `src/signer/types.ts` is the common signing/encryption contract.
 - `nip07.ts` wraps `window.nostr`; `nip46.ts` owns remote/bunker connections and cached
   connection metadata; `local-key.ts` owns device-managed NSEC signup/restore and keeps
-  that key local to this browser profile.
+  that key on this device, stored only in the device vault under `nostr.local-key`.
+- `src/security/` is the device vault: Argon2id from the device code wraps a random root
+  key, HKDF derives one AES-GCM key per scope, and the unlocked session is a non-extractable
+  WebCrypto key in memory. It knows no Nostr or Monero; modules name a scope.
 - `src/nostr/share.ts` builds and publishes public workout summaries, requiring actual
   relay acknowledgement/verification before reporting success.
 - `src/nostr/profile.ts` fetches kind-0 identity metadata across configured/default
@@ -375,6 +388,7 @@ targets, or muscle metadata solely from the current exercise library.
 - `docs/instruction.md`: broad product/protocol specification, including future phases.
 - `docs/plans/`: detailed plans for unshipped milestones.
 - `docs/RELEASE-QA.md`: real-device release checklist.
+- `docs/device-vault-architecture.md`: device code, vault format, security limits, recovery.
 - `relay/README.md`: relay-side write policy, its rationale, and how to deploy it.
 - `CHANGELOG.md`: shipped and unreleased user-visible behavior.
 

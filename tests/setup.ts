@@ -1,4 +1,23 @@
 import 'fake-indexeddb/auto';
+import { vi } from 'vitest';
+
+/**
+ * The device vault's Argon2id costs about a second per derivation at its real parameters,
+ * and a suite that creates, unlocks and rekeys vaults would spend minutes on it. Every file
+ * gets the same Argon2id at a trivial cost instead. The input checks are the real ones - a
+ * malformed code or parameters below the floor still reach the real function and throw - and
+ * `tests/device-vault-kdf.test.ts` exercises the real cost through `vi.importActual`.
+ */
+vi.mock('../src/security/device-vault-kdf', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/security/device-vault-kdf')>();
+  return {
+    ...actual,
+    deriveKeyEncryptionKey: async (pin: string, salt: Uint8Array, parameters: Parameters<typeof actual.deriveKeyEncryptionKey>[2]) => {
+      if (!/^[0-9]{9}$/.test(pin) || !actual.meetsKdfMinimum(parameters)) return actual.deriveKeyEncryptionKey(pin, salt, parameters);
+      return actual.argon2idKey(pin, salt, { memoryCost: 64, iterations: 1, parallelism: 1 });
+    }
+  };
+});
 
 /**
  * No test may open a real connection.
