@@ -155,6 +155,17 @@ export async function migrateLegacyLocalKey(expectedPubkey: string | null, vault
   return account.pubkey;
 }
 
+// Which account a pre-vault key belongs to, so the user can be told what it is. Null when there
+// is none or it cannot be read.
+export async function legacyLocalKeyPubkey(): Promise<string | null> {
+  try {
+    const stored = await loadLocalSecret();
+    return stored ? getPublicKey(normalizeSecretKey(stored)) : null;
+  } catch {
+    return null;
+  }
+}
+
 function createLocalKeySigner(secretKey: Uint8Array): Signer {
   const pubkey = getPublicKey(secretKey);
   return {

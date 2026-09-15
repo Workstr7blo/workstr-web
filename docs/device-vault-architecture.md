@@ -152,7 +152,9 @@ sync. Anonymous local training with no vault, and NIP-07 or NIP-46 accounts with
 open with no prompt.
 
 A vault holding no secrets is a setup that never finished. It is deleted at launch rather
-than asking for a code that protects nothing.
+than asking for a code that protects nothing - once it is more than 30 seconds old. A younger
+one may be another tab's setup about to write its secret, and deleting its metadata then
+would leave that secret under a root key nothing can unwrap.
 
 ## Accounts
 
@@ -195,7 +197,11 @@ An account found there, with no vault, gets **Protect this device** at launch:
 Any failure keeps the old record, removes the vault that attempt created, and says
 protection could not be enabled. Closing the app mid-way is safe: a vault with no secrets is
 removed at the next launch and the process starts again; a vault that already holds the
-matching key finishes by deleting the old record after its code is entered. No default code
+matching key finishes by deleting the old record after its code is entered. If that finish
+fails - most often because the old key belongs to a different account - the app says so once
+it opens, names the old key's identity, and offers to remove it behind a confirmation; left
+alone, the move is tried again at the next launch. The old key is never left behind silently.
+No default code
 is ever invented, and once the screen is shown the old automatically unlocked storage is not
 used to sign.
 

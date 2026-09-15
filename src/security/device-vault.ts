@@ -47,6 +47,8 @@ interface DeviceVaultDB extends DBSchema {
 export interface DeviceVault {
   /** True when this device has a vault, locked or not. */
   exists(): Promise<boolean>;
+  /** When the vault was created; null when there is none. */
+  createdAt(): Promise<number | null>;
   isUnlocked(): boolean;
   create(pin: string): Promise<void>;
   unlock(pin: string): Promise<void>;
@@ -166,6 +168,13 @@ export function createDeviceVault(options: { databaseName?: string } = {}): Devi
   return {
     async exists() {
       return Boolean(await readMetadata());
+    },
+
+    async createdAt() {
+      const stored = await readMetadata();
+      if (!stored) return null;
+      // No usable date reads as old, so an empty vault without one is still cleaned up.
+      return typeof stored.createdAt === 'number' ? stored.createdAt : 0;
     },
 
     isUnlocked: () => session !== null,
