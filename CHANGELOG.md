@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed Monero random wallet creation by no longer passing a restore height to `monero-ts`
+  unless a wallet is being restored from a seed.
 - Fixed encrypted sync being too quick to report a relay timeout when the Workstr relay is
   reachable but slow to complete a WebSocket query over the VPN-forwarded path.
 - Fixed Monero wallet creation hanging on "Creating wallet and dedicated creator subaddress…"

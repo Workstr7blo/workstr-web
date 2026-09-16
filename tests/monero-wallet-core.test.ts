@@ -70,7 +70,8 @@ describe('Monero wallet runtime config', () => {
     const { config, node, restoreHeight } = await moneroWalletConfig({ fetcher });
     expect(node.host).toBe('xmr.workstr.fit');
     expect(restoreHeight).toBe(3_000_123);
-    expect(config).toMatchObject({ networkType: 'mainnet', restoreHeight: 3_000_123, server: 'https://xmr.workstr.fit:43736/json_rpc', proxyToWorker: true });
+    expect(config).toMatchObject({ networkType: 'mainnet', server: 'https://xmr.workstr.fit:43736/json_rpc', proxyToWorker: true });
+    expect(config).not.toHaveProperty('restoreHeight');
   });
 
   it('rejects the wrong daemon network before wallet creation', async () => {
@@ -124,6 +125,7 @@ describe('Monero wallet core', () => {
     expect(snapshot.metadata.restoreHeight).toBe(3_763_261);
     expect(snapshot.metadata.creatorSubaddress).toBe('8CreatorSubaddress');
     expect(fake.configs[0]).toMatchObject({ networkType: 'mainnet' });
+    expect(fake.configs[0]).not.toHaveProperty('restoreHeight');
     expect(fake.configs[0]).not.toHaveProperty('seed');
     expect(JSON.stringify(writes)).not.toContain('nsec');
     expect(JSON.parse(writes[MONERO_WALLET_SCOPE]).seed).toBe('mock seed words');
