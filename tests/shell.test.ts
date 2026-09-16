@@ -106,14 +106,34 @@ async function cleanupExercises(shell: ShellHandle): Promise<void> {
 }
 
 describe('shell', () => {
-  it('keeps the bottom navigation focused on training views', async () => {
+  it('keeps training in the bottom navigation and ends it with the Tip Jar', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
     const shell = renderShell(root, { skipCatalogRefresh: true });
     await drainBoot(shell);
-    const navLabels = Array.from(root.querySelectorAll('.sidebar .nav-item span')).map((item) => item.textContent);
-    expect(navLabels).toEqual(['Exercises', 'Workouts', 'Statistics']);
+    const navViews = Array.from(root.querySelectorAll<HTMLElement>('.sidebar .nav-item')).map((item) => item.dataset.view);
+    expect(navViews).toEqual(['exercises', 'workouts', 'statistics', 'tipjar']);
+    expect(root.querySelector('.sidebar [data-view="tipjar"]')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Tip Jar, off');
     expect(root.querySelector('.sidebar [data-view="settings"]')).toBeNull();
+  });
+
+  it('opens a muted, still reachable Tip Jar while it is off and enables it from the page', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    const item = root.querySelector<HTMLElement>('.sidebar [data-view="tipjar"]')!;
+    expect(item.querySelector<HTMLElement>('.tip-jar-icon')?.dataset.tipJar).toBe('off');
+    item.click();
+    expect(shell.state.view).toBe('tipjar');
+    expect(item.classList.contains('active')).toBe(true);
+    expect(root.querySelector('#page-tipjar')?.textContent).toContain('Tip Jar is off.');
+    root.querySelector<HTMLButtonElement>('#tip-jar-enable')?.click();
+    await vi.waitFor(() => expect(document.documentElement.getAttribute('data-payment-mode')).toBe('monero'));
+    expect(shell.state.settings.paymentMode).toBe('monero');
+    expect(item.querySelector<HTMLElement>('.tip-jar-icon')?.dataset.tipJar).not.toBe('off');
+    expect(root.querySelector('#tip-jar-enable')).toBeNull();
+    document.documentElement.removeAttribute('data-payment-mode');
   });
 
   // The signed-out cold-start count lives in `tests/render-budget.test.ts`, which owns the
@@ -458,7 +478,7 @@ describe('shell', () => {
     expect(settings?.textContent).toContain('Data & Sync');
     expect(settings?.textContent).toContain('Training Preferences');
     expect(settings?.textContent).not.toContain('Support Workstr');
-    expect(settings?.textContent).not.toContain('Monero tips');
+    expect(settings?.textContent).not.toContain('Tip Jar');
     expect(settings?.querySelector('.advanced-settings:not([open])')).toBeTruthy();
     expect(settings?.querySelectorAll('.settings-category:not([open])')).toHaveLength(4);
     expect(settings?.querySelector('.account-card summary')?.textContent).toContain('Local only');
@@ -826,8 +846,8 @@ describe('shell', () => {
   it('marks the account pill once Monero tips are on, without changing its structure', () => {
     const chip = accountChip(shellMarkup(signedIn({ settings: { unit: 'kg', publicRelays: [], paymentMode: 'monero' } })));
 
-    expect(chip).toContain('class="connection-payment-mark" role="img" aria-label="Monero tips on"');
-    expect(chip).toContain('title="Monero tips on"');
+    expect(chip).toContain('class="connection-payment-mark" role="img" aria-label="Tip Jar on"');
+    expect(chip).toContain('title="Tip Jar on"');
     expect(chip).toContain('monero-mark');
     expect(chip).not.toContain('₿');
     // Informational only: the pill stays one button, so no nested control appears.

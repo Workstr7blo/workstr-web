@@ -8,7 +8,7 @@ import { renderSVG } from 'uqr';
 //
 // It lives here rather than with either surface that draws it because both the creator tip
 // sheet and the Monero support card need it, and features do not import each other.
-const MONERO_MARK = 'M4 7v10h3v-5.8l5 5 5-5V17h3V7l-8 8z';
+export const MONERO_MARK = 'M4 7v10h3v-5.8l5 5 5-5V17h3V7l-8 8z';
 
 // Share of the code's width the mark's plate covers. 22% of the width is 4.8% of the area,
 // against the 30% that error correction level H can lose, so the code still reads with the

@@ -80,6 +80,7 @@ export class MoneroWalletCore {
   private readonly fetcher?: typeof fetch;
   private readonly now: () => Date;
   private wallet: MoneroWalletRuntimeWallet | null = null;
+  private walletRuntime: MoneroWalletRuntime | null = null;
   // The account the open wallet belongs to; every write goes to that account's scopes.
   private walletPubkey: string | null = null;
   private bundle: MoneroWalletSecretBundle | null = null;
@@ -141,7 +142,7 @@ export class MoneroWalletCore {
     const { config, node, restoreHeight } = await moneroWalletConfig({ node: request.node ?? DEFAULT_MONERO_NODE, fetcher: this.fetcher });
     const wallet = await runtime.createWallet(config);
     const height = await walletRestoreHeight(wallet, request.restoreHeight ?? restoreHeight);
-    return this.persistNewWallet(wallet, node, height, request.now ?? this.now(), 'created', generation);
+    return this.persistNewWallet(runtime, wallet, node, height, request.now ?? this.now(), 'created', generation);
   }
 
   async restoreWallet(request: MoneroWalletRestoreRequest): Promise<MoneroWalletSnapshot> {
@@ -153,7 +154,7 @@ export class MoneroWalletCore {
     const runtime = this.runtime ?? await loadMoneroTsRuntime();
     const { config, node, restoreHeight } = await moneroWalletConfig({ node: request.node ?? DEFAULT_MONERO_NODE, seed, restoreHeight: request.restoreHeight, fetcher: this.fetcher });
     const wallet = await runtime.createWallet(config);
-    return this.persistNewWallet(wallet, node, restoreHeight, request.now ?? this.now(), 'restored', generation);
+    return this.persistNewWallet(runtime, wallet, node, restoreHeight, request.now ?? this.now(), 'restored', generation);
   }
 
   async createMockStagenetWallet(request: MoneroWalletCreateRequest = {}): Promise<MoneroWalletSnapshot> {
@@ -164,7 +165,7 @@ export class MoneroWalletCore {
     const node = normalizeMoneroNodeConfig({ ...(request.node ?? MOCK_STAGENET_NODE), mode: 'mock-stagenet' });
     const restoreHeight = request.restoreHeight ?? 2_800_000;
     const wallet = await this.runtime.createWallet({ password: '', networkType: 'stagenet', restoreHeight, server: 'mock-stagenet' });
-    return this.persistNewWallet(wallet, node, restoreHeight, request.now ?? this.now(), 'mock-stagenet', generation);
+    return this.persistNewWallet(this.runtime, wallet, node, restoreHeight, request.now ?? this.now(), 'mock-stagenet', generation);
   }
 
   async openWallet(): Promise<MoneroWalletSnapshot> {
@@ -182,15 +183,21 @@ export class MoneroWalletCore {
       throw new Error('The Monero wallet was closed while it was opening.');
     }
     this.wallet = wallet;
+    this.walletRuntime = runtime;
     this.walletPubkey = pubkey;
     this.bundle = bundle;
     this.data = data;
     return this.snapshot();
   }
 
-  async sync(): Promise<MoneroWalletSyncState> {
+  isOpen(): boolean {
+    return Boolean(this.wallet) && this.walletPubkey === this.account();
+  }
+
+  async sync(onProgress?: (fraction: number, remainingBlocks: number) => void): Promise<MoneroWalletSyncState> {
     const wallet = this.requireOpenWallet();
-    await wallet.sync();
+    const listener = onProgress ? this.walletRuntime?.syncListener?.(onProgress) : undefined;
+    await (listener ? wallet.sync(listener) : wallet.sync());
     const [height, daemonHeight] = await Promise.all([wallet.getHeight().catch(() => null), wallet.getDaemonHeight().catch(() => null)]);
     const sync: MoneroWalletSyncState = { height, daemonHeight, synchronized: height !== null && daemonHeight !== null && height >= daemonHeight, updatedAt: this.now().toISOString() };
     await this.saveData(wallet, { lastSync: sync }, true);
@@ -216,6 +223,7 @@ export class MoneroWalletCore {
     this.generation += 1;
     const wallet = this.wallet;
     this.wallet = null;
+    this.walletRuntime = null;
     this.walletPubkey = null;
     this.bundle = null;
     this.data = null;
@@ -252,7 +260,7 @@ export class MoneroWalletCore {
     };
   }
 
-  private async persistNewWallet(wallet: MoneroWalletRuntimeWallet, node: MoneroWalletMetadata['node'], restoreHeight: number, now: Date, source: MoneroWalletMetadata['source'], generation: number): Promise<MoneroWalletSnapshot> {
+  private async persistNewWallet(runtime: MoneroWalletRuntime, wallet: MoneroWalletRuntimeWallet, node: MoneroWalletMetadata['node'], restoreHeight: number, now: Date, source: MoneroWalletMetadata['source'], generation: number): Promise<MoneroWalletSnapshot> {
     try {
       const pubkey = this.pubkey();
       const scope = moneroWalletScope(pubkey);
@@ -286,6 +294,7 @@ export class MoneroWalletCore {
       const bundle: MoneroWalletSecretBundle = { version: 1, metadata, seed, privateSpendKey, privateViewKey };
       const snapshot = await saveMoneroWalletBundle(this.vault, bundle);
       this.wallet = wallet;
+      this.walletRuntime = runtime;
       this.walletPubkey = pubkey;
       this.bundle = bundle;
       this.data = null;

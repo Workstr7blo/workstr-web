@@ -120,7 +120,7 @@ describe('theme tokens', () => {
   });
 
   it('drives the theme from :root so the token override can win', () => {
-    const shell = readFileSync(resolve(root, 'src/app/shell.ts'), 'utf8');
+    const shell = readFileSync(resolve(root, 'src/app/tip-jar-controller.ts'), 'utf8');
     expect(shell).toContain("document.documentElement.setAttribute('data-payment-mode', 'monero')");
     expect(all).not.toMatch(/body\[data-payment-mode/);
   });

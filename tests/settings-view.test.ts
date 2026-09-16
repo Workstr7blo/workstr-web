@@ -121,6 +121,7 @@ describe('the Settings page', () => {
     expect(root.textContent).not.toContain('Payments');
     expect(root.textContent).not.toContain('Support Workstr');
     expect(root.textContent).not.toContain('Monero tips');
+    expect(root.textContent).not.toContain('Tip Jar');
     expect(root.textContent).not.toContain('Zap Wallet');
   });
 
@@ -155,8 +156,8 @@ describe('the Settings page', () => {
       expect(toggle.type).toBe('checkbox');
       expect(toggle.getAttribute('role')).toBe('switch');
       expect(toggle.checked).toBe(false);
-      expect(card.querySelector('#monero-tips-label')?.textContent).toBe('Monero tips');
-      expect(card.querySelector('#monero-tips-copy')?.textContent).toBe("Show a Tip button on creators' programs");
+      expect(card.querySelector('#monero-tips-label')?.textContent).toBe('Tip Jar');
+      expect(card.querySelector('#monero-tips-copy')?.textContent).toBe('Send and receive tips in Workstr.');
       expect(body(root).hidden).toBe(true);
       expect(card.closest('.settings-group')?.querySelector('.settings-group-copy small')?.textContent).toBe('Tip program creators with Monero');
     });
@@ -189,7 +190,7 @@ describe('the Settings page', () => {
     it('shows the wallet card as a locked vault surface until device security is open', () => {
       const locked = off({ deviceVault: 'locked', moneroWallet: { status: 'locked' } });
       const card = locked.querySelector('.monero-wallet-card') as HTMLElement;
-      expect(card.querySelector('summary strong')?.textContent).toBe('Monero wallet');
+      expect(card.querySelector('summary strong')?.textContent).toBe('Tip Jar wallet');
       expect(card.querySelector('summary .status-pill')?.textContent).toBe('LOCKED');
       expect(card.textContent).toContain('Wallet secrets stay in the device vault');
       expect(card.querySelector('#monero-wallet-create')).toBeNull();

@@ -14,7 +14,7 @@ function shortAddress(address: string): string {
   return address.length <= 18 ? address : `${address.slice(0, 8)}…${address.slice(-8)}`;
 }
 
-function xmrAmount(atomic: string | undefined): string {
+export function xmrAmount(atomic: string | undefined): string {
   if (!atomic) return '—';
   const value = BigInt(atomic);
   const whole = value / XMR_ATOMIC_UNITS;
@@ -58,7 +58,7 @@ function walletSummary(state: MoneroWalletUiState, snapshot: MoneroWalletSnapsho
     <button id="monero-wallet-use-address" class="button">Use for tips</button>
   </div>
   ${backup}
-  <p class="section-help">Use for tips copies the wallet's creator subaddress into the public Monero tips address field. Press Save address there to publish it to Nostr relays.</p>`;
+  <p class="section-help">Use for tips copies the wallet's creator subaddress into the public address field of the Tip Jar card. Press Save address there to publish it to Nostr relays.</p>`;
 }
 
 // An earlier Workstr kept one wallet for the whole device. It is never adopted silently:
@@ -93,7 +93,7 @@ function setupActions(state: MoneroWalletUiState): string {
     <div class="settings-row-actions">
       <button id="monero-wallet-create" class="button payment" ${busy ? 'disabled' : ''}>Create wallet</button>
     </div>
-    <p class="section-help">You can also publish an address from any other Monero wallet in the tips card above; a Workstr wallet is optional.</p>
+    <p class="section-help">You can also publish an address from any other Monero wallet in the Tip Jar card above; a Workstr wallet is optional.</p>
     <form id="monero-wallet-restore-form" class="monero-wallet-restore">
       <label><strong>Restore from seed</strong><textarea id="monero-wallet-seed" rows="3" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Monero recovery seed" ${busy ? 'disabled' : ''}></textarea></label>
       <label><span>Restore height</span><input id="monero-wallet-restore-height" type="number" min="0" step="1" inputmode="numeric" placeholder="blank scans from the start" ${busy ? 'disabled' : ''} /></label>
@@ -106,7 +106,7 @@ function setupActions(state: MoneroWalletUiState): string {
 export function moneroWalletCard(state: AppState): string {
   const wallet = state.moneroWallet ?? DEFAULT_STATE;
   const badge = pill(wallet, state.deviceVault);
-  const summary = `<summary><span class="settings-category-copy"><strong>Monero wallet</strong><small>Self-custodial wallet on this device</small></span><span class="status-pill ${badge.ok ? 'ok' : ''}">${badge.label}</span></summary>`;
+  const summary = `<summary><span class="settings-category-copy"><strong>Tip Jar wallet</strong><small>Advanced: recovery, restore and diagnostics</small></span><span class="status-pill ${badge.ok ? 'ok' : ''}">${badge.label}</span></summary>`;
   if (state.deviceVault !== 'unlocked') {
     return `<details class="settings-category monero-wallet-card" data-settings-section="monero-wallet">${summary}<div class="settings-category-body"><p class="section-help">Unlock Workstr to manage the encrypted Monero hot wallet. Wallet secrets stay in the device vault and never sync.</p></div></details>`;
   }

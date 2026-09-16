@@ -4,6 +4,12 @@ import { MoneroWalletCore, WALLET_ALREADY_STORED } from '../features/monero/wall
 import { moneroWalletBody, moneroWalletBusy } from '../features/monero/wallet-view';
 import type { MoneroWalletUiState } from '../features/monero/types';
 import type { AppState } from './state';
+import { tipJarOn } from '../features/monero/tip-jar-state';
+
+// Periodic re-sync while the Tip Jar is on, the vault is unlocked and the page is visible.
+export const TIP_JAR_RESYNC_MS = 120_000;
+// A background sync this far behind is shown as syncing rather than silently catching up.
+const VISIBLE_SYNC_BLOCKS = 10;
 
 export interface MoneroWalletControllerContext {
   root: HTMLElement;
@@ -11,6 +17,8 @@ export interface MoneroWalletControllerContext {
   render(): void;
   toast(message: string, kind?: 'ok' | 'bad'): void;
   repaintMoneroAddress(): void;
+  // Every wallet state change, so the Tip Jar nav badge and page follow it.
+  onChange?(): void;
   vault?: DeviceVault;
   core?: MoneroWalletCore;
 }
@@ -44,6 +52,10 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
   // Bumped whenever the wallet is closed or the account changes. An async action that started
   // under an older generation drops its result rather than painting it over the new state.
   let generation = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let syncing = false;
+  // The first sync after an open always shows progress: the saved state may be days behind.
+  let syncedThisSession = false;
 
   function current(): MoneroWalletUiState {
     return state.moneroWallet ?? { status: 'unknown' };
@@ -54,6 +66,7 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     const { stored, legacyAvailable, addresses } = current();
     state.moneroWallet = { stored, legacyAvailable, addresses, ...next };
     paint();
+    ctx.onChange?.();
     // The address section repaints only when its wallet label can change, so a draft being
     // typed there keeps its focus.
     if (String(addresses) !== String(state.moneroWallet.addresses)) ctx.repaintMoneroAddress();
@@ -163,14 +176,65 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     set({ status: current().status, legacyAvailable: false, message: 'The earlier wallet stays on this device, untouched.' });
   }
 
-  async function syncWallet(): Promise<void> {
+  // A foreground sync shows progress. A background one (the periodic re-sync of a wallet that
+  // was already synchronized) keeps the Tip Jar ready, unless it turns out to be far behind.
+  async function syncWallet(background = false): Promise<void> {
     const snapshot = current().snapshot;
     if (!snapshot) return openWallet();
-    await guarded({ ...current(), status: 'syncing', message: 'Syncing wallet…' }, async () => {
-      const sync = await core.sync();
+    if (syncing || moneroWalletBusy(current().status)) return;
+    syncing = true;
+    const started = generation;
+    if (!background) set({ ...current(), status: 'syncing', syncProgress: 0, message: 'Syncing wallet…' });
+    let painted = 0;
+    const onProgress = (fraction: number, remaining: number): void => {
+      if (started !== generation) return;
+      const shown = current();
+      if (shown.status === 'ready' && remaining > VISIBLE_SYNC_BLOCKS) state.moneroWallet = { ...shown, status: 'syncing', message: 'Syncing wallet…' };
+      else if (shown.status !== 'syncing') return;
+      // Progress reports arrive per batch of blocks; the badge needs a few updates a second at most.
+      const now = Date.now();
+      if (now - painted < 500 && fraction < 1) return;
+      painted = now;
+      state.moneroWallet = { ...current(), syncProgress: Math.min(1, Math.max(0, fraction || 0)) };
+      ctx.onChange?.();
+    };
+    try {
+      const sync = await core.sync(onProgress);
       const balance = await core.balance();
-      return { status: 'ready', snapshot: { ...snapshot, sync, balance }, message: sync.synchronized ? 'Wallet synced.' : 'Wallet sync updated.', messageKind: 'ok' };
-    }, (error) => ({ status: 'error', snapshot, message: `Could not sync wallet (${safeReason(error)}).`, messageKind: 'bad' }));
+      if (started === generation) set({ status: 'ready', snapshot: { ...snapshot, sync, balance }, backup: current().backup, message: sync.synchronized ? 'Wallet synced.' : 'Wallet sync updated.', messageKind: 'ok' });
+    } catch (error) {
+      if (started === generation) set({ status: 'error', snapshot, message: `Could not sync wallet (${safeReason(error)}).`, messageKind: 'bad' });
+    } finally {
+      syncing = false;
+    }
+  }
+
+  function clearTimer(): void {
+    if (timer) clearTimeout(timer);
+    timer = null;
+  }
+
+  function canAutoSync(): boolean {
+    return tipJarOn(state) && Boolean(state.pubkey) && state.deviceVault === 'unlocked' && vault.isUnlocked();
+  }
+
+  // The Tip Jar keeps itself current: find the account's wallet, open it, sync it, and come back
+  // later. Nothing here creates, restores or overwrites a wallet.
+  async function autoSync(): Promise<void> {
+    clearTimer();
+    if (!canAutoSync()) return;
+    const started = generation;
+    await refreshIfNeeded();
+    if (started !== generation || !canAutoSync()) return;
+    if (current().stored && !moneroWalletBusy(current().status)) {
+      if (!core.isOpen()) await openWallet();
+      if (started !== generation || !canAutoSync()) return;
+      if (core.isOpen() && current().snapshot) await syncWallet(current().status === 'ready' && Boolean(current().snapshot?.sync?.synchronized) && syncedThisSession);
+      syncedThisSession = syncedThisSession || current().snapshot?.sync?.synchronized === true;
+    }
+    if (started === generation && canAutoSync() && !(typeof document !== 'undefined' && document.visibilityState === 'hidden')) {
+      timer = setTimeout(() => { void autoSync(); }, TIP_JAR_RESYNC_MS);
+    }
   }
 
   async function refreshBalance(): Promise<void> {
@@ -206,37 +270,68 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
   }
 
   function bind(): void {
-    root.querySelector('#monero-wallet-create')?.addEventListener('click', () => { void createWallet(); });
-    root.querySelector('#monero-wallet-open')?.addEventListener('click', () => { void openWallet(); });
-    root.querySelector('#monero-wallet-restore-form')?.addEventListener('submit', (event) => { event.preventDefault(); void restoreWallet(); });
+    root.querySelector('#monero-wallet-create')?.addEventListener('click', () => { void createWallet().then(autoSync); });
+    root.querySelector('#monero-wallet-open')?.addEventListener('click', () => { void openWallet().then(autoSync); });
+    root.querySelector('#monero-wallet-restore-form')?.addEventListener('submit', (event) => { event.preventDefault(); void restoreWallet().then(autoSync); });
     root.querySelector('#monero-wallet-sync')?.addEventListener('click', () => { void syncWallet(); });
     root.querySelector('#monero-wallet-balance')?.addEventListener('click', () => { void refreshBalance(); });
     root.querySelector('#monero-wallet-show-backup')?.addEventListener('click', () => { void toggleBackupInfo(); });
     root.querySelector('#monero-wallet-use-address')?.addEventListener('click', () => { void useForTips(); });
-    root.querySelector('#monero-wallet-claim')?.addEventListener('click', () => { void claimLegacyWallet(); });
+    root.querySelector('#monero-wallet-claim')?.addEventListener('click', () => { void claimLegacyWallet().then(autoSync); });
     root.querySelector('#monero-wallet-claim-dismiss')?.addEventListener('click', dismissLegacyWallet);
     root.querySelector('#monero-wallet-recheck')?.addEventListener('click', () => { state.moneroWallet = { status: 'unknown' }; void refreshIfNeeded(); });
+  }
+
+  // A PWA can be suspended for hours. Coming back to the foreground resumes the sync at once;
+  // going to the background stops scheduling one.
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') clearTimer();
+      else if (canAutoSync()) void autoSync();
+    });
+  }
+
+  function stopAutoSync(): void {
+    clearTimer();
+    syncedThisSession = false;
   }
 
   return {
     bind,
     refreshIfNeeded,
+    autoSync,
+    // Tip Jar create from its own page; Settings offers the same action.
+    createWallet: () => createWallet().then(autoSync),
+    // Tip Jar switched off: nothing keeps talking to the Monero node.
+    async stop(): Promise<void> {
+      stopAutoSync();
+      generation += 1;
+      const was = current();
+      if (was.snapshot || core.isOpen()) state.moneroWallet = { status: 'stored', stored: true, addresses: was.addresses, message: 'Wallet closed while Tip Jar is off.', messageKind: 'ok' };
+      else if (moneroWalletBusy(was.status)) state.moneroWallet = { status: 'unknown' };
+      ctx.onChange?.();
+      await core.close();
+    },
     // Leaving Settings hides the recovery phrase; it is shown again only by another tap.
     hideBackup(): void {
       if (state.moneroWallet?.backup) state.moneroWallet = { ...state.moneroWallet, backup: null };
     },
     // Vault lock: the wallet stays this account's, so what is stored is still known.
     async close(): Promise<void> {
+      stopAutoSync();
       generation += 1;
       const was = current();
       if (was.snapshot) state.moneroWallet = { status: 'stored', stored: true, addresses: was.addresses, message: 'Wallet closed with the device vault.', messageKind: 'ok' };
       else if (moneroWalletBusy(was.status)) state.moneroWallet = { status: 'unknown' };
+      ctx.onChange?.();
       await core.close();
     },
     // Account switch or reset: nothing about the previous account's wallet carries over.
     reset(): void {
+      stopAutoSync();
       generation += 1;
       state.moneroWallet = { status: 'unknown' };
+      ctx.onChange?.();
       void core.close();
     }
   };
