@@ -28,10 +28,12 @@ export async function moneroWalletConfig(input: {
   const config: Record<string, unknown> = {
     password: '',
     networkType: node.network,
-    restoreHeight,
     server: moneroRpcUrl(node),
     proxyToWorker: true
   };
-  if (input.seed) config.seed = input.seed;
+  if (input.seed) {
+    config.seed = input.seed;
+    config.restoreHeight = restoreHeight;
+  }
   return { config, node, restoreHeight };
 }
