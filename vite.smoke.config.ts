@@ -10,6 +10,11 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(appVersion())
   },
+  resolve: {
+    alias: {
+      assert: resolve(import.meta.dirname, 'src/shims/node-assert.ts')
+    }
+  },
   build: {
     emptyOutDir: true,
     outDir: '.smoke-dist',

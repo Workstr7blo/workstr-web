@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   node configuration checks, mock stagenet wallet/vault-boundary tests, desktop headless
   verification, and an iOS Safari/PWA QA checklist before production wallet UI work.
 
+### Fixed
+
+- Fixed Monero wallet creation in browser builds by bundling a small callable `assert` shim for
+  `monero-ts` instead of Vite's non-callable Node builtin placeholder.
+
 ## [2.6.0] - 2026-09-15
 
 ### Security
