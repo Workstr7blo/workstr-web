@@ -13,6 +13,8 @@ export interface MoneroAddressControllerContext {
   state: AppState;
   toast(message: string, kind?: 'ok' | 'bad'): void;
   getSigner(): Promise<Signer | null>;
+  // Every address state change, so the Tip Jar page can say whether tips reach it.
+  onChange?(): void;
 }
 
 const INVALID_ADDRESS = 'That does not look like a Monero address. Mainnet addresses are 95 characters (106 when integrated) and start with 4 or 8.';
@@ -44,6 +46,7 @@ export function createMoneroAddressController(ctx: MoneroAddressControllerContex
   function set(next: Partial<MoneroAddressState>): void {
     state.monero = { ...state.monero, ...next };
     paint();
+    ctx.onChange?.();
   }
 
   // Repainted in place rather than through the shell render: a full render rebuilds the

@@ -1129,3 +1129,52 @@
   --payment-accent-strong: #ff8a2a;
   --on-payment: #111;
 }
+
+/* Tip Jar nav item. Two layers that never trade meaning: the piggy bank is the destination and
+   follows the nav colours (purple when selected, like every tab); the badge is Monero readiness
+   and is the only part that turns orange. */
+.tip-jar-icon { position: relative; display: block; width: 21px; height: 21px; flex-shrink: 0; }
+.nav-item .tip-jar-icon .tip-jar-piggy { width: 21px; height: 21px; display: block; }
+.nav-item .tip-jar-icon .tip-jar-badge { position: absolute; right: -10px; bottom: 0; width: 13px; height: 13px; overflow: visible; }
+.tip-jar-ring-track, .tip-jar-ring { fill: none; stroke-width: 2.6; }
+.tip-jar-ring-track { stroke: rgba(var(--payment-rgb), .22); }
+.tip-jar-ring { stroke: var(--payment-accent); stroke-linecap: round; transition: stroke-dashoffset .4s ease; }
+.tip-jar-badge-disc { fill: rgb(var(--surface-rgb)); stroke: var(--payment-accent); stroke-width: 1.6; }
+.tip-jar-badge-mark { fill: var(--payment-accent); }
+/* Off: muted and unbadged, still a working tab. */
+.nav-item:not(.active) .tip-jar-icon[data-tip-jar="off"] { opacity: .5; }
+.nav-item.tip-jar-nav:not(.active):has(.tip-jar-icon[data-tip-jar="off"]) > span:not(.sr-only) { opacity: .6; }
+.tip-jar-icon[data-tip-jar="off"] .tip-jar-badge { display: none; }
+/* Connecting: outlined badge, no ring yet. */
+.tip-jar-icon[data-tip-jar="connecting"] .tip-jar-ring,
+.tip-jar-icon[data-tip-jar="connecting"] .tip-jar-ring-track { opacity: 0; }
+/* Ready: the one solid orange state. */
+.tip-jar-icon[data-tip-jar="ready"] .tip-jar-badge-disc { fill: var(--payment-accent); }
+.tip-jar-icon[data-tip-jar="ready"] .tip-jar-badge-mark { fill: var(--on-payment); }
+.tip-jar-icon[data-tip-jar="ready"] .tip-jar-ring-track { opacity: 0; }
+/* Error: dashed and dim, so it cannot be mistaken for ready even without colour. */
+.tip-jar-icon[data-tip-jar="error"] .tip-jar-ring,
+.tip-jar-icon[data-tip-jar="error"] .tip-jar-ring-track { opacity: 0; }
+.tip-jar-icon[data-tip-jar="error"] .tip-jar-badge-disc { stroke: var(--dim); stroke-dasharray: 3 2; }
+.tip-jar-icon[data-tip-jar="error"] .tip-jar-badge-mark { fill: var(--dim); }
+@media (prefers-reduced-motion: reduce) { .tip-jar-ring { transition: none; } }
+
+/* Tip Jar page: a small utility, not a wallet dashboard. */
+.tip-jar-card { display: grid; gap: 12px; margin-bottom: 14px; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel); }
+.tip-jar-card .section-help { margin: 0; }
+.tip-jar-lead { margin: 0; font-size: 18px; font-weight: 800; }
+.tip-jar-empty .web-empty-actions { margin-top: 2px; }
+.tip-jar-balance { font: 800 clamp(30px, 8vw, 44px)/1 ui-monospace, monospace; letter-spacing: -.03em; }
+.tip-jar-status { justify-self: start; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.tip-jar-status[data-tip-jar="ready"] { border-color: rgba(var(--payment-rgb), .5); color: var(--payment-accent); }
+.tip-jar-status[data-tip-jar="error"] { border-style: dashed; }
+.tip-jar-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tip-jar-actions .button { justify-content: center; }
+.tip-jar-receive-body { display: grid; justify-items: center; gap: 10px; }
+.tip-jar-receive-body[hidden] { display: none; }
+.tip-jar-receive-body .section-help { text-align: center; }
+.tip-jar-rows { gap: 0; padding-top: 6px; padding-bottom: 6px; }
+.tip-jar-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.tip-jar-row:last-child { border-bottom: 0; }
+.tip-jar-row > span { color: var(--muted); }
+.tip-jar-row > small, .tip-jar-row > .button { grid-column: 1 / -1; justify-self: start; color: var(--dim); }

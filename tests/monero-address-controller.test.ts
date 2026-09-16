@@ -63,13 +63,14 @@ describe('Monero payment address settings', () => {
     expect(on).not.toContain('id="monero-tips-body" hidden');
     expect(on).toContain('role="switch" id="monero-tips-toggle"');
     expect(on).toContain('Monero payment address');
-    expect(on).toContain('NIP-A3 kind:10133');
+    expect(on).not.toContain('NIP-A3');
+    expect(on).not.toContain('kind:10133');
     expect(on).toContain('Use a fresh Monero subaddress.');
     expect(on).toContain('It is not stored in Workstr sync.');
     // A switch, not a disclosure: one control and nothing to collapse.
     expect(on).toContain('<section class="settings-category monero-tips-card" data-settings-section="monero-tips">');
     expect(on).not.toContain('<details');
-    expect(on).toContain('<strong id="monero-tips-label">Monero tips</strong>');
+    expect(on).toContain('<strong id="monero-tips-label">Tip Jar</strong>');
   });
 
   it('never calls it a wallet and offers no NWC action', () => {
@@ -262,6 +263,6 @@ describe('Monero payment address settings', () => {
 
     expect(publishMoneroPaymentTargetMock.mock.calls[0][1]).toBe('');
     expect(body()?.hidden).toBe(true);
-    expect(copy()).toBe("Show a Tip button on creators' programs");
+    expect(copy()).toBe('Send and receive tips in Workstr.');
   });
 });

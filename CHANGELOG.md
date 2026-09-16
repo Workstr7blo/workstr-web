@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the Tip Jar as the fourth bottom-navigation item: a piggy bank that is muted while the
+  Tip Jar is off, with a small Monero badge that shows connecting, a sync progress ring,
+  ready, or unavailable. The Tip Jar page shows the balance and status, a Receive code and
+  address, whether published tips reach it, and an Enable button while it is off.
+- Added automatic Tip Jar wallet sync: with the Tip Jar on and Workstr unlocked, the wallet
+  opens and syncs by itself, re-syncs every two minutes, and catches up when the app returns
+  to the foreground.
 - Added Monero wallet backup visibility in Settings: an opened wallet now shows its restore
   height and can reveal the recovery phrase only after an explicit vault-unlocked click.
 - Added the phase-3 Monero wallet Settings UI: signed-in users can see the vault-gated wallet
@@ -23,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verification, and an iOS Safari/PWA QA checklist before production wallet UI work.
 
 ### Changed
+
+- Renamed Monero tips to Tip Jar in Settings and the account chip, with simpler copy and no
+  protocol names in the main card. The wallet card is now "Tip Jar wallet", the advanced
+  place for recovery, restore and diagnostics.
 
 - Changed the Monero wallet to one wallet per Nostr account instead of one per device, so
   Workstr never links two identities through a shared wallet. A wallet saved by an earlier

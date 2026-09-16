@@ -7,7 +7,7 @@ import type { MoneroWalletUiState } from '../features/monero/types';
 import type { SyncStatus } from '../sync/engine';
 import type { DeviceVaultStatus } from '../security/device-vault-types';
 
-export type View = 'exercises' | 'workouts' | 'statistics' | 'settings';
+export type View = 'exercises' | 'workouts' | 'statistics' | 'tipjar' | 'settings';
 export type SubView = 'library' | 'discover' | 'programs' | 'history' | 'recovery' | 'training' | 'body';
 
 export interface SessionExercise {

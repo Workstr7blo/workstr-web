@@ -38,7 +38,7 @@ export function avatarFace(className: string, identity: AccountIdentity): string
 }
 
 // The badge on the avatar answers "is my identity connected"; the medallion answers "are
-// Monero tips on". Off, there is no payment to mark, so the chip carries no medallion at all.
+// the Tip Jar on". Off, there is no payment to mark, so the chip carries no medallion at all.
 // Signed out, tips are not actionable and the chip already carries a second line.
 function badge(identity: AccountIdentity): string {
   return identity.signedIn ? '<span class="connection-identity-status" role="img" aria-label="Signed in"></span>' : '';
@@ -46,7 +46,7 @@ function badge(identity: AccountIdentity): string {
 
 function paymentMark(identity: AccountIdentity): string {
   if (!identity.signedIn || !identity.monero) return '';
-  return `<span class="connection-payment-mark" role="img" aria-label="Monero tips on" title="Monero tips on">${moneroMark(13)}</span>`;
+  return `<span class="connection-payment-mark" role="img" aria-label="Tip Jar on" title="Tip Jar on">${moneroMark(13)}</span>`;
 }
 
 function chipStatus(identity: AccountIdentity): string {

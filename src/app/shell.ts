@@ -41,6 +41,8 @@ import { createBackupController } from './backup-controller';
 import { createMoneroAddressController } from './monero-address-controller';
 import { createMoneroWalletController } from './monero-wallet-controller';
 import { createMoneroTipController } from './monero-tip-controller';
+import { applyPaymentMode, createTipJarController } from './tip-jar-controller';
+import { updateTipJarNav } from '../features/monero/tip-jar-view';
 import { createProgramPublishController } from './program-publish-controller';
 import type { ShellHandle, ShellOptions } from './shell-types';
 export { launchSignerUri };
@@ -123,6 +125,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     state.store = await WorkstrStore.open(namespace);
     await state.store.retireLightningSettings();
     state.settings = await state.store.getSettings();
+    void moneroWallet.autoSync();
     // A saved kit is the useful default view; without one the option does not
     // exist yet and both grids stay on "All equipment".
     if (ownedEquipmentKeys(state.settings.ownedEquipment).length) {
@@ -158,30 +161,23 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   // Written once. The topbar, the navigation, the scroll pane, the live session overlay,
   // the modal host and the toast outlive every page after this.
   function mount(): void {
-    applyPaymentMode();
+    applyPaymentMode(state);
     root.innerHTML = shellFrame(state);
     bindFrame();
     render({ reason: 'boot-first-paint' });
   }
 
-  // Monero tips swap the payment tokens, and the tokens are declared on `:root`, so the flag
-  // has to land there too — an override on `body` cannot win against a `:root` declaration.
-  function applyPaymentMode(): void {
-    if (state.settings.paymentMode === 'monero') document.documentElement.setAttribute('data-payment-mode', 'monero');
-    else document.documentElement.removeAttribute('data-payment-mode');
-  }
-
   // `render` means the page: the host and the sheets that belong to it. `toTop` is a new
   // page to the reader, not a redraw; `reason` is for the trace alone.
   function render(options: RenderOptions = {}): void {
-    applyPaymentMode();
+    applyPaymentMode(state);
     rebuildRoot(root, () => {
       const host = root.querySelector('#page-host');
       if (host) host.innerHTML = appView(state);
       const overlays = root.querySelector('#page-overlays');
       if (overlays) overlays.innerHTML = pageOverlays(state);
       bind();
-      updateNavigation(root, state);
+      updateNavigation(root, state); updateTipJarNav(root, state);
       updateAccountIdentity(root, accountIdentity(state));
     }, { ...options, trace });
   }
@@ -246,6 +242,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     if (view === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
     if (view === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
     if (view === 'settings') { moneroAddress.refreshIfNeeded(); void moneroWallet.refreshIfNeeded(); }
+    if (view === 'tipjar') tipJar.open();
   }
 
   // Everything a page render replaces, rebound with it.
@@ -256,21 +253,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     }));
     identity.bindSettingsAuth(); vaultUi.bindSettings();
     root.querySelector('#unit-select')?.addEventListener('change', (event) => { void preferences.saveUnitPreference((event.target as HTMLSelectElement).value); });
-    root.querySelector('#monero-tips-toggle')?.addEventListener('change', (event) => {
-      const on = (event.target as HTMLInputElement).checked;
-      // Written in place, not rendered: the switch is already in the position the reader put
-      // it, and a page render would close every other card they have open. What the setting
-      // moves on this page is the payment tokens, the account chip's medallion, and the address
-      // section under the switch. Discover reads the setting when it is next drawn, and its
-      // authors only become worth asking about once tips are on.
-      void preferences.savePaymentMode(on ? 'monero' : 'off').then(() => {
-        applyPaymentMode();
-        updateAccountIdentity(root, accountIdentity(state));
-        moneroAddress.repaint();
-        moneroAddress.refreshIfNeeded();
-        void catalog.refreshAuthorPaymentTargets();
-      });
-    });
+    root.querySelector('#monero-tips-toggle')?.addEventListener('change', (event) => { void tipJar.setEnabled((event.target as HTMLInputElement).checked); });
     root.querySelectorAll('.equip-toggle').forEach((box) => box.addEventListener('change', () => { void preferences.saveOwnedEquipment(); }));
     bindBackupCard();
     root.querySelectorAll('#refresh-exercises').forEach((button) => button.addEventListener('click', () => { void catalog.refreshExercises(); }));
@@ -350,7 +333,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const sessionPersistence = createSessionPersistence(state);
   const vaultUi = createDeviceVaultController({
     root, state, render, toast, openModal, closeModal,
-    onUnlocked: async (reason) => { if (reason === 'relock') { void backup.resume(); state.moneroWallet = { status: 'unknown' }; void moneroWallet.refreshIfNeeded(); render(); return; } await openAccount(); if (!options.skipCatalogRefresh) await catalog.refreshExercises(); },
+    onUnlocked: async (reason) => { if (reason === 'relock') { void backup.resume(); state.moneroWallet = { status: 'unknown' }; void moneroWallet.autoSync(); render(); return; } await openAccount(); void moneroWallet.autoSync(); if (!options.skipCatalogRefresh) await catalog.refreshExercises(); },
     onLocked: () => { identity.dropActiveSigner(); backup.stop(); void moneroWallet.close(); },
     onReset: async () => { identity.dropActiveSigner(); backup.stop(); await moneroWallet.close(); await openAccount(); identity.startRestoreLocalAccount(); }
   });
@@ -362,8 +345,9 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     persistCanonCache: catalog.persistCanonCache, loadFinishedSessions: sessionPersistence.loadFinished, getActiveSigner: identity.getActiveSigner
   });
   const preferences = createPreferencesController({ root, state, render, toast, startTrainingSession: sessionRunner.startTrainingSession, loadFinishedSessions: sessionPersistence.loadFinished });
-  const moneroAddress = createMoneroAddressController({ root, state, toast, getSigner: identity.getActiveSigner });
-  const moneroWallet = createMoneroWalletController({ root, state, render, toast, repaintMoneroAddress: moneroAddress.repaint });
+  const moneroAddress = createMoneroAddressController({ root, state, toast, getSigner: identity.getActiveSigner, onChange: () => tipJar.repaint() });
+  const moneroWallet = createMoneroWalletController({ root, state, render, toast, repaintMoneroAddress: moneroAddress.repaint, onChange: () => tipJar.repaint() });
+  const tipJar = createTipJarController({ root, state, toast, savePaymentMode: preferences.savePaymentMode, refreshAuthorPaymentTargets: catalog.refreshAuthorPaymentTargets, moneroAddress, moneroWallet });
   const moneroTip = createMoneroTipController({ root, state, toast, openModal });
   const programList = createProgramList({
     root, state, render, toast,

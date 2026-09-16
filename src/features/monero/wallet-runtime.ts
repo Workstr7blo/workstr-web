@@ -5,8 +5,17 @@ export async function loadMoneroTsRuntime(): Promise<MoneroWalletRuntime> {
   const module = await import('monero-ts') as Record<string, unknown>;
   const createWalletFull = module.createWalletFull;
   const openWalletFull = module.openWalletFull;
+  const Listener = module.MoneroWalletListener as (new () => object) | undefined;
   if (typeof createWalletFull !== 'function') throw new Error('monero-ts createWalletFull is unavailable.');
   return {
+    // monero-ts only reports progress to an instance of its own listener class.
+    ...(typeof Listener === 'function' ? {
+      syncListener(onProgress: (fraction: number, remainingBlocks: number) => void): object {
+        const listener = new Listener() as { onSyncProgress?: (...args: unknown[]) => Promise<void> };
+        listener.onSyncProgress = async (height, _start, end, percentDone) => { onProgress(Number(percentDone), Math.max(0, Number(end) - Number(height))); };
+        return listener;
+      }
+    } : {}),
     async createWallet(config: Record<string, unknown>): Promise<MoneroWalletRuntimeWallet> {
       return await createWalletFull(config) as MoneroWalletRuntimeWallet;
     },

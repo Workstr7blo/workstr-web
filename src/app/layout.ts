@@ -11,12 +11,19 @@ import { quickWorkoutPanel, recoveryView } from '../features/recovery/views';
 import { programCard, sheetToProgram } from '../features/sheets/views';
 import { programActiveFilters, programFilterSheet, programMatcher, programToolbar, type ProgramBrowser } from '../features/sheets/program-browser';
 import { exerciseFilterSheet, exerciseSelectionBar } from './exercise-browser';
+import { tipJarNavIcon, tipJarView } from '../features/monero/tip-jar-view';
+import { tipJarStatus } from '../features/monero/tip-jar-state';
 
 const navItems: Array<{ view: View; label: string; icon: string }> = [
   { view: 'exercises', label: 'Exercises', icon: '<path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/>' },
   { view: 'workouts', label: 'Workouts', icon: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/>' },
   { view: 'statistics', label: 'Statistics', icon: '<path d="M18 20V10M12 20V4M6 20v-6"/>' }
 ];
+
+// Training destinations share one icon shape; the Tip Jar carries its own status badge.
+function navItem(state: AppState, item: { view: View; label: string; icon: string }): string {
+  return `<div class="nav-item ${state.view === item.view ? 'active' : ''}" data-view="${item.view}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${item.icon}</svg><span>${item.label}</span></div>`;
+}
 
 // The whole app as one string: the frame with the current page already written into it.
 // The running app mounts the frame once and writes pages into its host, so this is what the
@@ -48,7 +55,8 @@ export function shellFrame(state: AppState, page = '', overlays = ''): string {
     </header>
     <nav class="sidebar">
       <div class="nav-items">
-        ${navItems.map((item) => `<div class="nav-item ${state.view === item.view ? 'active' : ''}" data-view="${item.view}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${item.icon}</svg><span>${item.label}</span></div>`).join('')}
+        ${navItems.map((item) => navItem(state, item)).join('')}
+        <div class="nav-item tip-jar-nav ${state.view === 'tipjar' ? 'active' : ''}" data-view="tipjar">${tipJarNavIcon(tipJarStatus(state))}</div>
       </div>
     </nav>
     <main class="content">
@@ -108,6 +116,7 @@ export function updateNavigation(root: ParentNode, state: AppState): void {
 export function appView(state: AppState): string {
   if (state.view === 'workouts') return workoutsView(state);
   if (state.view === 'statistics') return statisticsView(state);
+  if (state.view === 'tipjar') return tipJarView(state);
   if (state.view === 'settings') return settingsView(state);
   return exercisesView(state);
 }

@@ -127,6 +127,8 @@ export interface MoneroWalletUiState {
   legacyAvailable?: boolean;
   // The stored wallet's public addresses, to tell whether the published tip address is its own.
   addresses?: string[];
+  // 0..1 while a sync runs, from the runtime's own progress reports.
+  syncProgress?: number;
   snapshot?: MoneroWalletSnapshot | null;
   backup?: MoneroWalletBackupInfo | null;
   message?: string;
@@ -164,4 +166,5 @@ export interface MoneroWalletRuntimeWallet {
 export interface MoneroWalletRuntime {
   createWallet(config: Record<string, unknown>): Promise<MoneroWalletRuntimeWallet>;
   openWallet?(config: Record<string, unknown>): Promise<MoneroWalletRuntimeWallet>;
+  syncListener?(onProgress: (fraction: number, remainingBlocks: number) => void): object;
 }
