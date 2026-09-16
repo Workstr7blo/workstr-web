@@ -94,6 +94,14 @@ export class MoneroWalletCore {
   async openWallet(): Promise<MoneroWalletSnapshot> {
     ensureUnlocked(this.vault);
     const bundle = await loadMoneroWalletBundle(this.vault);
+    const runtime = this.runtime ?? await loadMoneroTsRuntime();
+    const { config } = await moneroWalletConfig({
+      node: bundle.metadata.node,
+      seed: bundle.seed,
+      restoreHeight: bundle.metadata.restoreHeight,
+      fetcher: this.fetcher
+    });
+    this.wallet = await runtime.createWallet(config);
     this.bundle = bundle;
     return snapshotFromBundle(bundle);
   }

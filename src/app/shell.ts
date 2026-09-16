@@ -39,6 +39,7 @@ import { createIdentityController, launchSignerUri } from './identity-controller
 import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
 import { createMoneroAddressController } from './monero-address-controller';
+import { createMoneroWalletController } from './monero-wallet-controller';
 import { createMoneroTipController } from './monero-tip-controller';
 import { createProgramPublishController } from './program-publish-controller';
 import type { ShellHandle, ShellOptions } from './shell-types';
@@ -50,7 +51,7 @@ const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'off', publ
 function profileName(profile: RelayProfile | null): string | null { return profile?.name?.trim() || profile?.nip05?.trim() || null; }
 
 export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, monero: { status: 'idle', address: '' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', level: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, deviceVault: 'absent', expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, monero: { status: 'idle', address: '' }, moneroWallet: { status: 'unknown' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', level: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, deviceVault: 'absent', expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   const trace = createRenderTrace();
   async function boot(): Promise<void> {
@@ -118,6 +119,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     // The Monero address belongs to whoever is signed in, so it is dropped with the
     // namespace rather than carried into the next account's Settings.
     state.monero = { status: 'idle', address: '' };
+    state.moneroWallet = { status: 'unknown' };
     state.store = await WorkstrStore.open(namespace);
     await state.store.retireLightningSettings();
     state.settings = await state.store.getSettings();
@@ -243,7 +245,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     render({ toTop: true, reason });
     if (view === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
     if (view === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
-    if (view === 'settings') moneroAddress.refreshIfNeeded();
+    if (view === 'settings') { moneroAddress.refreshIfNeeded(); void moneroWallet.refreshIfNeeded(); }
   }
 
   // Everything a page render replaces, rebound with it.
@@ -300,7 +302,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       state.expandedSessionId = state.expandedSessionId === id ? null : id;
       render();
     }));
-    bindHistoryCalendar(); moneroAddress.bind();
+    bindHistoryCalendar(); moneroAddress.bind(); moneroWallet.bind();
     preferences.bindRecoveryControls();
     preferences.bindBodyControls();
   }
@@ -348,9 +350,9 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const sessionPersistence = createSessionPersistence(state);
   const vaultUi = createDeviceVaultController({
     root, state, render, toast, openModal, closeModal,
-    onUnlocked: async (reason) => { if (reason === 'relock') { void backup.resume(); render(); return; } await openAccount(); if (!options.skipCatalogRefresh) await catalog.refreshExercises(); },
-    onLocked: () => { identity.dropActiveSigner(); backup.stop(); },
-    onReset: async () => { identity.dropActiveSigner(); backup.stop(); await openAccount(); identity.startRestoreLocalAccount(); }
+    onUnlocked: async (reason) => { if (reason === 'relock') { void backup.resume(); state.moneroWallet = { status: 'unknown' }; void moneroWallet.refreshIfNeeded(); render(); return; } await openAccount(); if (!options.skipCatalogRefresh) await catalog.refreshExercises(); },
+    onLocked: () => { identity.dropActiveSigner(); backup.stop(); void moneroWallet.close(); },
+    onReset: async () => { identity.dropActiveSigner(); backup.stop(); await moneroWallet.close(); await openAccount(); identity.startRestoreLocalAccount(); }
   });
   const identity = createIdentityController({ root, state, render, openModal, closeModal, openLocal, openIdentity, vault: vaultUi });
   const programPublish = createProgramPublishController({ root, state, render, toast, openModal, getSigner: options.programPublish?.getSigner || identity.getActiveSigner, publishCreatorProgram: options.programPublish?.publishCreatorProgram, programPublishRelays: options.programPublish?.programPublishRelays, persistCanonCache: catalog.persistCanonCache });
@@ -361,6 +363,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   });
   const preferences = createPreferencesController({ root, state, render, toast, startTrainingSession: sessionRunner.startTrainingSession, loadFinishedSessions: sessionPersistence.loadFinished });
   const moneroAddress = createMoneroAddressController({ root, state, toast, getSigner: identity.getActiveSigner });
+  const moneroWallet = createMoneroWalletController({ root, state, render, toast, repaintMoneroAddress: moneroAddress.repaint });
   const moneroTip = createMoneroTipController({ root, state, toast, openModal });
   const programList = createProgramList({
     root, state, render, toast,
@@ -387,13 +390,11 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
 
   function closeModal(): void {
     identity.clearPending(); vaultUi.cancelPending();
-    // Whatever route the modal closed by - the X, the backdrop, a cancel button - the
-    // camera and the relay subscription stop with it. Release is idempotent.
+    // Release modal-owned resources no matter how it closed.
     identity.releasePairing();
     programBuilder.clear();
     root.querySelector('#modal')?.classList.remove('open');
   }
-
   const ready = boot();
   return { state, ready, renders: trace, publishProgram: programPublish.publishProgram };
 }

@@ -3,6 +3,7 @@ import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings } from '
 import type { RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import type { MoneroAddressState } from '../features/support/payment-mode-views';
+import type { MoneroWalletUiState } from '../features/monero/types';
 import type { SyncStatus } from '../sync/engine';
 import type { DeviceVaultStatus } from '../security/device-vault-types';
 
@@ -71,6 +72,7 @@ export interface AppState {
   // The user's public Monero payment target, shown under Monero tips in Settings. Session
   // state, not a setting: the relays own the address.
   monero: MoneroAddressState;
+  moneroWallet?: MoneroWalletUiState;
   signerType: 'nip07' | 'nip46' | 'local' | null;
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };

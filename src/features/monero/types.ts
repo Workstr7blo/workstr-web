@@ -101,6 +101,13 @@ export interface MoneroWalletSnapshot {
   sync: MoneroWalletSyncState | null;
 }
 
+export interface MoneroWalletUiState {
+  status: 'unknown' | 'checking' | 'missing' | 'stored' | 'locked' | 'ready' | 'creating' | 'restoring' | 'opening' | 'syncing' | 'error';
+  snapshot?: MoneroWalletSnapshot | null;
+  message?: string;
+  messageKind?: 'ok' | 'bad';
+}
+
 export interface MoneroWalletCreateRequest {
   node?: Partial<MoneroNodeConfig> | null;
   restoreHeight?: number;
