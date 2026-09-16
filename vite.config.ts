@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
 // Release builds get the tag from CI (APP_VERSION). Pages builds off main and
@@ -17,6 +18,11 @@ export default defineConfig({
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(appVersion())
+  },
+  resolve: {
+    alias: {
+      assert: resolve(import.meta.dirname, 'src/shims/node-assert.ts')
+    }
   },
   server: {
     host: '0.0.0.0',

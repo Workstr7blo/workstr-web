@@ -6,6 +6,11 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(process.env.APP_VERSION ?? 'monero-phase1')
   },
+  resolve: {
+    alias: {
+      assert: resolve(import.meta.dirname, 'src/shims/node-assert.ts')
+    }
+  },
   build: {
     emptyOutDir: true,
     outDir: '.monero-spike-dist',
