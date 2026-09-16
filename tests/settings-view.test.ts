@@ -195,13 +195,49 @@ describe('the Settings page', () => {
       expect(card.querySelector('#monero-wallet-create')).toBeNull();
     });
 
-    it('shows create, open, and restore controls only while the vault is unlocked', () => {
-      const root = off({ deviceVault: 'unlocked', moneroWallet: { status: 'missing' } });
+    it('offers create and restore only once the vault confirms this account has no wallet', () => {
+      const root = off({ deviceVault: 'unlocked', moneroWallet: { status: 'missing', stored: false } });
       const card = root.querySelector('.monero-wallet-card') as HTMLElement;
       expect(card.querySelector('#monero-wallet-create')).toBeTruthy();
-      expect(card.querySelector('#monero-wallet-open')).toBeTruthy();
       expect(card.querySelector('#monero-wallet-restore-form')).toBeTruthy();
+      expect(card.querySelector('#monero-wallet-open')).toBeNull();
       expect(card.textContent).toContain('Restore from seed');
+      expect(card.textContent).toContain('scan');
+    });
+
+    it('offers only Open for a stored wallet, including after a failed open', () => {
+      for (const moneroWallet of [{ status: 'stored' as const, stored: true }, { status: 'error' as const, stored: true, message: 'Could not open wallet (node down).' }]) {
+        const card = off({ deviceVault: 'unlocked', moneroWallet }).querySelector('.monero-wallet-card') as HTMLElement;
+        expect(card.querySelector('#monero-wallet-open')).toBeTruthy();
+        expect(card.querySelector('#monero-wallet-create')).toBeNull();
+        expect(card.querySelector('#monero-wallet-restore-form')).toBeNull();
+      }
+    });
+
+    it('offers nothing that writes a wallet before storage has been checked', () => {
+      for (const moneroWallet of [{ status: 'unknown' as const }, { status: 'checking' as const }, { status: 'error' as const, message: 'Could not check wallet storage.' }]) {
+        const card = off({ deviceVault: 'unlocked', moneroWallet }).querySelector('.monero-wallet-card') as HTMLElement;
+        expect(card.querySelector('#monero-wallet-create')).toBeNull();
+        expect(card.querySelector('#monero-wallet-restore-form')).toBeNull();
+      }
+      const failed = off({ deviceVault: 'unlocked', moneroWallet: { status: 'error', message: 'Could not check wallet storage.' } });
+      expect(failed.querySelector('#monero-wallet-recheck')).toBeTruthy();
+    });
+
+    it('asks before giving a legacy device wallet to this account', () => {
+      const card = off({ deviceVault: 'unlocked', moneroWallet: { status: 'missing', stored: false, legacyAvailable: true } }).querySelector('.monero-wallet-card') as HTMLElement;
+      expect(card.querySelector('#monero-wallet-claim')?.textContent).toBe('Use for this account');
+      expect(card.querySelector('#monero-wallet-claim-dismiss')).toBeTruthy();
+    });
+
+    it('labels whether the published address is this account\'s Workstr wallet or an external one', () => {
+      const address = `8${'D'.repeat(94)}`;
+      const own = off({ monero: { status: 'ready', address }, moneroWallet: { status: 'stored', stored: true, addresses: [address] } });
+      expect(own.querySelector('.monero-address-source')?.textContent).toBe('From your Workstr wallet.');
+      const external = off({ monero: { status: 'ready', address }, moneroWallet: { status: 'missing', stored: false, addresses: [] } });
+      expect(external.querySelector('.monero-address-source')?.textContent).toContain('External wallet');
+      const unchecked = off({ monero: { status: 'ready', address }, moneroWallet: { status: 'unknown' } });
+      expect(unchecked.querySelector('.monero-address-source')).toBeNull();
     });
 
     it('keeps an unsaved wallet subaddress visible in the public tips address section', () => {

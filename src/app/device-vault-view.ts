@@ -13,7 +13,11 @@ const SCOPE_NAMES: Record<string, string> = {
   'monero.hot-wallet': 'Monero hot wallet secret'
 };
 
-export const vaultScopeName = (scope: string): string => SCOPE_NAMES[scope] || `Protected secret (${scope})`;
+// Monero wallets are stored per account, so their scopes end in the account's pubkey.
+export const vaultScopeName = (scope: string): string => SCOPE_NAMES[scope]
+  || (scope.startsWith('monero.hot-wallet.') ? 'Monero hot wallet secret' : '')
+  || (scope.startsWith('monero.hot-wallet-data.') ? 'Monero wallet sync data' : '')
+  || `Protected secret (${scope})`;
 
 export const shortNpub = (pubkey: string): string => { const npub = nip19.npubEncode(pubkey); return `${npub.slice(0, 12)}…${npub.slice(-6)}`; };
 

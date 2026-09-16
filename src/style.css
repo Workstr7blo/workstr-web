@@ -46,6 +46,7 @@
 .monero-address-status { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .monero-address-status.ok { color: var(--payment-accent); }
 .monero-address-status.bad { color: #ffd6df; }
+.monero-address-source { margin: 0; color: var(--dim); font-size: 12px; line-height: 1.45; }
 .monero-address-section .settings-row-actions { justify-content: flex-start; }
 
 /* The tip sheet. Monero owns the mark, the QR frame and the paying action; the sheet around

@@ -7,12 +7,13 @@ Issue #246 phase 3 exposes the phase-2 wallet core through Settings without addi
 - A signed-in Settings card named **Monero wallet**.
 - The card stays locked while the Workstr device vault is locked.
 - Once unlocked, users can:
-  - create a local hot wallet;
-  - open an existing wallet stored under `monero.hot-wallet`;
-  - restore from a Monero recovery seed and optional restore height;
+  - create a local hot wallet, or restore one from a Monero recovery seed and optional restore height, only while the account has no stored wallet;
+  - open the account's wallet stored under `monero.hot-wallet.<account pubkey>` (a stored wallet offers only Open, also after a failed open);
+  - adopt a wallet saved under the legacy device-wide scope, only after an explicit "Use for this account";
   - sync the opened wallet;
   - refresh balance;
   - copy the wallet creator subaddress into the public Monero tips address field.
+- The public address section labels a published address as "From your Workstr wallet" or "External wallet", because any Monero wallet may supply it and other Nostr clients may change it.
 - Copying the creator subaddress does **not** publish it automatically. The user must still use the existing public address Save flow, which signs and publishes `kind:10133` with their Nostr signer.
 
 ## Boundaries intentionally preserved
@@ -21,7 +22,8 @@ Issue #246 phase 3 exposes the phase-2 wallet core through Settings without addi
 - No transaction construction or broadcast.
 - No automatic publish of a payment target.
 - No wallet seed/private material in Workstr settings, encrypted sync, JSON export, Nostr events, logs, or generic local storage.
-- The wallet runtime is closed when the Workstr vault locks or resets.
+- The wallet runtime is closed when the Workstr vault locks or resets, and when the account changes. A wallet action that finishes after either is discarded.
+- The recovery phrase is hidden again when the user leaves Settings.
 
 ## Files
 

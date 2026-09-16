@@ -59,7 +59,8 @@ export interface MoneroPhase1Report {
 export interface MoneroWalletMetadata {
   version: 1;
   id: string;
-  scope: 'monero.hot-wallet';
+  // `monero.hot-wallet.<account pubkey>`; plain `monero.hot-wallet` only on a legacy bundle.
+  scope: string;
   network: MoneroNetwork;
   node: MoneroNodeConfig;
   restoreHeight: number;
@@ -89,10 +90,21 @@ export interface MoneroWalletSecretBundle {
   seed: string;
   privateSpendKey?: string;
   privateViewKey?: string;
+  // Written only by wallets saved before the data record existed.
+  lastBalance?: MoneroWalletBalance;
+  lastSync?: MoneroWalletSyncState;
+}
+
+// The runtime's keys and scan cache, so an open resumes where the last sync stopped instead
+// of rescanning from the restore height. Tied to one wallet id; any other id is ignored.
+export interface MoneroWalletDataRecord {
+  version: 1;
+  walletId: string;
   keysDataBase64?: string;
   cacheDataBase64?: string;
   lastBalance?: MoneroWalletBalance;
   lastSync?: MoneroWalletSyncState;
+  savedAt: string;
 }
 
 export interface MoneroWalletSnapshot {
@@ -107,7 +119,14 @@ export interface MoneroWalletBackupInfo {
 }
 
 export interface MoneroWalletUiState {
-  status: 'unknown' | 'checking' | 'missing' | 'stored' | 'locked' | 'ready' | 'creating' | 'restoring' | 'opening' | 'syncing' | 'error';
+  status: 'unknown' | 'checking' | 'missing' | 'stored' | 'locked' | 'ready' | 'creating' | 'restoring' | 'opening' | 'syncing' | 'claiming' | 'error';
+  // Whether this account has a wallet in the vault. Create and restore are offered only when
+  // it does not, so a failed open can never lead to overwriting a stored seed.
+  stored?: boolean;
+  // A wallet saved under the old device-wide scope that this account has not adopted.
+  legacyAvailable?: boolean;
+  // The stored wallet's public addresses, to tell whether the published tip address is its own.
+  addresses?: string[];
   snapshot?: MoneroWalletSnapshot | null;
   backup?: MoneroWalletBackupInfo | null;
   message?: string;
@@ -137,9 +156,12 @@ export interface MoneroWalletRuntimeWallet {
   sync(listenerOrStartHeight?: unknown, startHeight?: number, allowConcurrentCalls?: boolean): Promise<unknown>;
   save(): Promise<void>;
   getPath?(): string | Promise<string>;
+  getData?(): Promise<ArrayLike<number>[]>;
+  getRestoreHeight?(): Promise<number>;
   close(save?: boolean): Promise<void>;
 }
 
 export interface MoneroWalletRuntime {
   createWallet(config: Record<string, unknown>): Promise<MoneroWalletRuntimeWallet>;
+  openWallet?(config: Record<string, unknown>): Promise<MoneroWalletRuntimeWallet>;
 }

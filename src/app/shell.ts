@@ -116,10 +116,10 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
 
   async function loadNamespace(namespace: string): Promise<void> {
     state.store?.close();
-    // The Monero address belongs to whoever is signed in, so it is dropped with the
+    // The Monero address and wallet belong to whoever is signed in, so they are dropped with the
     // namespace rather than carried into the next account's Settings.
     state.monero = { status: 'idle', address: '' };
-    state.moneroWallet = { status: 'unknown' };
+    moneroWallet.reset();
     state.store = await WorkstrStore.open(namespace);
     await state.store.retireLightningSettings();
     state.settings = await state.store.getSettings();
@@ -239,6 +239,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   }
 
   function openView(view: View, reason = 'navigate-view'): void {
+    if (view !== 'settings') moneroWallet.hideBackup();
     state.view = view;
     state.editingId = null;
     render({ toTop: true, reason });

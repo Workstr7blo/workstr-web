@@ -263,6 +263,8 @@ describe('forgotten code', () => {
     await vi.waitFor(() => expect(h.lock().textContent).toContain('Your code cannot be recovered.'));
     expect(h.lock().textContent).toContain(vaultScopeName(NOSTR_LOCAL_KEY_SCOPE));
     expect(vaultScopeName('monero.hot-wallet')).toBe('Monero hot wallet secret');
+    expect(vaultScopeName(`monero.hot-wallet.${'ab'.repeat(32)}`)).toBe('Monero hot wallet secret');
+    expect(vaultScopeName(`monero.hot-wallet-data.${'ab'.repeat(32)}`)).toBe('Monero wallet sync data');
 
     vi.stubGlobal('confirm', vi.fn(() => false));
     h.lock().querySelector<HTMLElement>('#vault-reset')!.click();
