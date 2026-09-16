@@ -55,6 +55,7 @@ describe('the Settings page', () => {
     expect(groupOf('.training-preferences-card')).toBe('Training');
     expect(groupOf('.beast-mode-card')).toBe('Training');
     expect(groupOf('.monero-tips-card')).toBe('Payments');
+    expect(groupOf('.monero-wallet-card')).toBe('Payments');
     expect(groupOf('.support-panel')).toBe('Support');
     expect(groupOf('.data-sync-card')).toBe('System & Data');
     expect(groupOf('.advanced-settings')).toBe('System & Data');
@@ -183,6 +184,31 @@ describe('the Settings page', () => {
       expect(offCard).toBeTruthy();
       expect(offCard).toBe(onCard);
       expect(supportPanel()).toContain('Private support with Monero');
+    });
+
+    it('shows the wallet card as a locked vault surface until device security is open', () => {
+      const locked = off({ deviceVault: 'locked', moneroWallet: { status: 'locked' } });
+      const card = locked.querySelector('.monero-wallet-card') as HTMLElement;
+      expect(card.querySelector('summary strong')?.textContent).toBe('Monero wallet');
+      expect(card.querySelector('summary .status-pill')?.textContent).toBe('LOCKED');
+      expect(card.textContent).toContain('Wallet secrets stay in the device vault');
+      expect(card.querySelector('#monero-wallet-create')).toBeNull();
+    });
+
+    it('shows create, open, and restore controls only while the vault is unlocked', () => {
+      const root = off({ deviceVault: 'unlocked', moneroWallet: { status: 'missing' } });
+      const card = root.querySelector('.monero-wallet-card') as HTMLElement;
+      expect(card.querySelector('#monero-wallet-create')).toBeTruthy();
+      expect(card.querySelector('#monero-wallet-open')).toBeTruthy();
+      expect(card.querySelector('#monero-wallet-restore-form')).toBeTruthy();
+      expect(card.textContent).toContain('Restore from seed');
+    });
+
+    it('keeps an unsaved wallet subaddress visible in the public tips address section', () => {
+      const root = off({ monero: { status: 'idle', address: '', draft: `8${'C'.repeat(94)}`, message: 'Wallet creator subaddress copied here.' } });
+      expect(body(root).hidden).toBe(false);
+      expect(root.querySelector<HTMLInputElement>('#monero-address')?.value).toBe(`8${'C'.repeat(94)}`);
+      expect(root.querySelector('#monero-address-save')).toBeTruthy();
     });
 
     it('leaves no Lightning surface anywhere in Settings', () => {

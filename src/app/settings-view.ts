@@ -5,6 +5,7 @@ import { APP_VERSION } from './version';
 import { countdownAudioState } from '../features/train/countdown-audio';
 import { supportPanel } from '../features/support/views';
 import { moneroTipsCard } from '../features/support/payment-mode-views';
+import { moneroWalletCard } from '../features/monero/wallet-view';
 import { isFreeEquipment, ownedEquipmentKeys } from '../core/equipment';
 import { normalizeWeightUnit } from '../core/units';
 import { hasNip07 } from '../signer/nip07';
@@ -166,7 +167,7 @@ export function settingsView(state: AppState): string {
     trainingPreferencesCard(state),
     signedIn ? beastModeSettingsCard(state) : ''
   ];
-  const paymentCards = signedIn ? [moneroTipsCard(state)] : [];
+  const paymentCards = signedIn ? [moneroTipsCard(state), moneroWalletCard(state)] : [];
   // Supporting Workstr is not creator tipping, so it does not follow the Monero tips switch.
   const supportCards = signedIn ? [supportPanel()] : [];
   return `<div class="page active settings-page">

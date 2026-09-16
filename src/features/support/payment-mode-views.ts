@@ -102,7 +102,7 @@ export function moneroTipsCopy(state: AppState): string {
 }
 
 export function moneroAddressVisible(state: AppState): boolean {
-  return moneroTipsOn(state) || Boolean(state.monero.address);
+  return moneroTipsOn(state) || Boolean(state.monero.address || state.monero.draft);
 }
 
 export function moneroTipsCard(state: AppState): string {

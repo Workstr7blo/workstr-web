@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the phase-3 Monero wallet Settings UI: signed-in users can see the vault-gated wallet
+  card, create/open/restore the local hot wallet, sync and refresh balance, and copy the wallet's
+  creator subaddress into the public tips address field without auto-publishing it.
 - Added the phase-2 Monero wallet core: lazy `monero-ts` runtime configuration, vault-scoped
   wallet storage under `monero.hot-wallet`, create/restore/open/sync/balance lifecycle APIs,
   dedicated creator subaddress metadata, and tests that keep Monero secrets out of Nostr and

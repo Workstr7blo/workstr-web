@@ -164,6 +164,18 @@ describe('Monero wallet core', () => {
     await expect(core.balance()).rejects.toThrow(/Open the Monero wallet/);
   });
 
+  it('opens a stored wallet by rebuilding the lazy runtime from the vault seed', async () => {
+    const { vault } = fakeVault(true);
+    const fake = runtime(new FakeWallet('stored seed words'));
+    const core = new MoneroWalletCore({ vault, runtime: fake.runtime, fetcher: nodeFetcher(), now: () => new Date('2026-09-15T00:00:00Z') });
+    await core.createWallet();
+    await core.close();
+    const reopened = await core.openWallet();
+    expect(reopened.metadata.creatorSubaddress).toBe('8CreatorSubaddress');
+    expect(fake.configs.at(-1)).toMatchObject({ seed: 'stored seed words', restoreHeight: 3_763_261 });
+    await expect(core.balance()).resolves.toEqual({ atomicBalance: '123456789', atomicUnlockedBalance: '120000000' });
+  });
+
   it('requires an unlocked Workstr vault before creating or opening the Monero wallet', async () => {
     const { vault } = fakeVault(false);
     const core = new MoneroWalletCore({ vault, runtime: runtime().runtime, fetcher: nodeFetcher() });
