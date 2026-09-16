@@ -126,6 +126,19 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     }
   }
 
+  async function toggleBackupInfo(): Promise<void> {
+    const current = state.moneroWallet;
+    if (!current?.snapshot) return;
+    if (current.backup) return set({ ...current, backup: null });
+    if (!vault.isUnlocked()) return set({ ...current, status: 'locked', message: 'Unlock Workstr before showing the Monero recovery phrase.', messageKind: 'bad' });
+    try {
+      const backup = await core.backupInfo();
+      set({ ...current, backup, message: 'Recovery phrase shown. Write it down offline and hide it when done.', messageKind: 'ok' });
+    } catch (error) {
+      set({ ...current, status: 'error', message: `Could not show recovery phrase (${safeReason(error)}).`, messageKind: 'bad' });
+    }
+  }
+
   async function useForTips(): Promise<void> {
     const address = state.moneroWallet?.snapshot?.metadata.creatorSubaddress;
     if (!address) return;
@@ -141,6 +154,7 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     root.querySelector('#monero-wallet-restore-form')?.addEventListener('submit', (event) => { event.preventDefault(); void restoreWallet(); });
     root.querySelector('#monero-wallet-sync')?.addEventListener('click', () => { void syncWallet(); });
     root.querySelector('#monero-wallet-balance')?.addEventListener('click', () => { void refreshBalance(); });
+    root.querySelector('#monero-wallet-show-backup')?.addEventListener('click', () => { void toggleBackupInfo(); });
     root.querySelector('#monero-wallet-use-address')?.addEventListener('click', () => { void useForTips(); });
   }
 

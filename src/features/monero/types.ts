@@ -101,9 +101,15 @@ export interface MoneroWalletSnapshot {
   sync: MoneroWalletSyncState | null;
 }
 
+export interface MoneroWalletBackupInfo {
+  seed: string;
+  restoreHeight: number;
+}
+
 export interface MoneroWalletUiState {
   status: 'unknown' | 'checking' | 'missing' | 'stored' | 'locked' | 'ready' | 'creating' | 'restoring' | 'opening' | 'syncing' | 'error';
   snapshot?: MoneroWalletSnapshot | null;
+  backup?: MoneroWalletBackupInfo | null;
   message?: string;
   messageKind?: 'ok' | 'bad';
 }

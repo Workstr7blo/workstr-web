@@ -180,6 +180,14 @@ describe('Monero wallet core', () => {
     await expect(core.balance()).resolves.toEqual({ atomicBalance: '123456789', atomicUnlockedBalance: '120000000' });
   });
 
+  it('returns recovery backup info only from the unlocked device vault', async () => {
+    const { vault } = fakeVault(true);
+    const fake = runtime(new FakeWallet('backup seed words'));
+    const core = new MoneroWalletCore({ vault, runtime: fake.runtime, fetcher: nodeFetcher(), now: () => new Date('2026-09-15T00:00:00Z') });
+    await core.createWallet();
+    await expect(core.backupInfo()).resolves.toEqual({ seed: 'backup seed words', restoreHeight: 3_763_261 });
+  });
+
   it('requires an unlocked Workstr vault before creating or opening the Monero wallet', async () => {
     const { vault } = fakeVault(false);
     const core = new MoneroWalletCore({ vault, runtime: runtime().runtime, fetcher: nodeFetcher() });

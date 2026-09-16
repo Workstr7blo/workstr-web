@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added Monero wallet backup visibility in Settings: an opened wallet now shows its restore
+  height and can reveal the recovery phrase only after an explicit vault-unlocked click.
 - Added the phase-3 Monero wallet Settings UI: signed-in users can see the vault-gated wallet
   card, create/open/restore the local hot wallet, sync and refresh balance, and copy the wallet's
   creator subaddress into the public tips address field without auto-publishing it.

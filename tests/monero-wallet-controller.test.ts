@@ -55,6 +55,7 @@ function app(overrides: Partial<AppState> = {}) {
     restoreWallet: vi.fn(async () => snapshot()),
     sync: vi.fn(async () => ({ height: 3763001, daemonHeight: 3763001, synchronized: true, updatedAt: '2026-09-15T00:01:00.000Z' })),
     balance: vi.fn(async () => ({ atomicBalance: '1000000000000', atomicUnlockedBalance: '1000000000000' })),
+    backupInfo: vi.fn(async () => ({ seed: 'seed words never logged', restoreHeight: 3763000 })),
     close: vi.fn(async () => undefined)
   } as unknown as MoneroWalletCore;
   const ctrl = createMoneroWalletController({ root, state: s, render: vi.fn(), toast: vi.fn(), repaintMoneroAddress: () => {
@@ -102,6 +103,19 @@ describe('Monero wallet controller', () => {
     expect(state.monero.draft).toBe(snapshot().metadata.creatorSubaddress);
     expect(state.monero.address).toBe('');
     expect(state.monero.message).toContain('Save address');
+  });
+
+  it('shows restore height and reveals the recovery phrase only after an explicit click', async () => {
+    const { root, state, core } = app({ moneroWallet: { status: 'ready', snapshot: snapshot() } });
+    expect(root.textContent).toContain('Restore height');
+    expect(root.textContent).toContain('3763000');
+    expect(root.textContent).not.toContain('seed words never logged');
+    root.querySelector<HTMLButtonElement>('#monero-wallet-show-backup')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(core.backupInfo).toHaveBeenCalledTimes(1);
+    expect(state.moneroWallet?.backup?.seed).toBe('seed words never logged');
+    expect(root.textContent).toContain('seed words never logged');
   });
 
   it('closes runtime state when the app locks the device vault', async () => {

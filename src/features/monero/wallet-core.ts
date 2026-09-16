@@ -5,6 +5,7 @@ import { loadMoneroTsRuntime, moneroWalletConfig } from './wallet-runtime';
 import { loadMoneroWalletBundle, saveMoneroWalletBundle, snapshotFromBundle } from './wallet-storage';
 import type {
   MoneroWalletBalance,
+  MoneroWalletBackupInfo,
   MoneroWalletCreateRequest,
   MoneroWalletMetadata,
   MoneroWalletRestoreRequest,
@@ -127,6 +128,12 @@ export class MoneroWalletCore {
     const lastBalance = { atomicBalance: balance.toString(), atomicUnlockedBalance: unlocked.toString() };
     await this.updateBundle({ lastBalance });
     return lastBalance;
+  }
+
+  async backupInfo(): Promise<MoneroWalletBackupInfo> {
+    ensureUnlocked(this.vault);
+    const bundle = this.bundle ?? await loadMoneroWalletBundle(this.vault);
+    return { seed: bundle.seed, restoreHeight: bundle.metadata.restoreHeight };
   }
 
   async close(): Promise<void> {

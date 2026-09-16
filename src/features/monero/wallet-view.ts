@@ -31,19 +31,26 @@ function statusMessage(state: MoneroWalletUiState): string {
   return state.message ? `<p class="monero-wallet-status ${state.messageKind === 'bad' ? 'bad' : state.messageKind === 'ok' ? 'ok' : ''}">${html(state.message)}</p>` : '';
 }
 
-function walletSummary(snapshot: MoneroWalletSnapshot): string {
+function walletSummary(state: MoneroWalletUiState, snapshot: MoneroWalletSnapshot): string {
   const balance = xmrAmount(snapshot.balance?.atomicBalance);
   const sync = snapshot.sync ? `${snapshot.sync.synchronized ? 'Synced' : 'Syncing'} · ${snapshot.sync.height ?? '—'}/${snapshot.sync.daemonHeight ?? '—'}` : 'Not synced yet';
+  const backup = state.backup ? `<div class="monero-wallet-backup">
+    <p class="section-help bad"><strong>Recovery phrase:</strong> anyone with these words can spend this wallet. Write them down offline and do not paste them into support chats.</p>
+    <code>${html(state.backup.seed)}</code>
+  </div>` : '';
   return `<div class="monero-wallet-summary">
     <div><strong>Receive</strong><code>${html(shortAddress(snapshot.metadata.creatorSubaddress))}</code></div>
     <div><strong>Balance</strong><span>${html(balance)}</span></div>
     <div><strong>Sync</strong><span>${html(sync)}</span></div>
+    <div><strong>Restore height</strong><span>${html(String(snapshot.metadata.restoreHeight))}</span></div>
   </div>
   <div class="settings-row-actions">
     <button id="monero-wallet-sync" class="button payment">Sync wallet</button>
     <button id="monero-wallet-balance" class="button">Refresh balance</button>
+    <button id="monero-wallet-show-backup" class="button">${state.backup ? 'Hide recovery phrase' : 'Show recovery phrase'}</button>
     <button id="monero-wallet-use-address" class="button">Use for tips</button>
   </div>
+  ${backup}
   <p class="section-help">Use for tips copies the wallet's creator subaddress into the public Monero tips address field. Press Save address there to publish it to Nostr relays.</p>`;
 }
 
@@ -69,12 +76,12 @@ export function moneroWalletCard(state: AppState): string {
   if (state.deviceVault !== 'unlocked') {
     return `<details class="settings-category monero-wallet-card" data-settings-section="monero-wallet">${summary}<div class="settings-category-body"><p class="section-help">Unlock Workstr to manage the encrypted Monero hot wallet. Wallet secrets stay in the device vault and never sync.</p></div></details>`;
   }
-  const body = wallet.snapshot ? walletSummary(wallet.snapshot) : setupActions(wallet);
+  const body = wallet.snapshot ? walletSummary(wallet, wallet.snapshot) : setupActions(wallet);
   return `<details class="settings-category monero-wallet-card" data-settings-section="monero-wallet">${summary}<div class="settings-category-body" id="monero-wallet-body">${statusMessage(wallet)}${body}</div></details>`;
 }
 
 export function moneroWalletBody(state: AppState): string {
   const wallet = state.moneroWallet ?? DEFAULT_STATE;
   if (state.deviceVault !== 'unlocked') return '<p class="section-help">Unlock Workstr to manage the encrypted Monero hot wallet.</p>';
-  return `${statusMessage(wallet)}${wallet.snapshot ? walletSummary(wallet.snapshot) : setupActions(wallet)}`;
+  return `${statusMessage(wallet)}${wallet.snapshot ? walletSummary(wallet, wallet.snapshot) : setupActions(wallet)}`;
 }
