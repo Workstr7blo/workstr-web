@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   node configuration checks, mock stagenet wallet/vault-boundary tests, desktop headless
   verification, and an iOS Safari/PWA QA checklist before production wallet UI work.
 
+### Changed
+
+- Moved Settings out of the primary bottom navigation and made the header identity chip's
+  Settings destination explicit with a neutral gear icon.
+
 ### Fixed
 
 - Fixed Monero wallet creation failing with `path is not set` by explicitly using an in-memory

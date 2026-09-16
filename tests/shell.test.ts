@@ -106,6 +106,16 @@ async function cleanupExercises(shell: ShellHandle): Promise<void> {
 }
 
 describe('shell', () => {
+  it('keeps the bottom navigation focused on training views', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.getElementById('app') as HTMLElement;
+    const shell = renderShell(root, { skipCatalogRefresh: true });
+    await drainBoot(shell);
+    const navLabels = Array.from(root.querySelectorAll('.sidebar .nav-item span')).map((item) => item.textContent);
+    expect(navLabels).toEqual(['Exercises', 'Workouts', 'Statistics']);
+    expect(root.querySelector('.sidebar [data-view="settings"]')).toBeNull();
+  });
+
   // The signed-out cold-start count lives in `tests/render-budget.test.ts`, which owns the
   // budget for #178. This one stays here because it is about what the chip does, not only
   // how many renders it costs.
@@ -152,9 +162,10 @@ describe('shell', () => {
     };
     const page = root.querySelector('#page-exercises');
 
-    for (const view of ['workouts', 'statistics', 'settings', 'exercises']) {
+    for (const view of ['workouts', 'statistics', 'exercises']) {
       root.querySelector<HTMLElement>(`.sidebar [data-view="${view}"]`)?.click();
     }
+    root.querySelector<HTMLElement>('#account-chip')?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(root.querySelector('.topbar')).toBe(frame.topbar);
@@ -192,7 +203,7 @@ describe('shell', () => {
     const root = document.getElementById('app') as HTMLElement;
     const shell = renderShell(root, { skipCatalogRefresh: true });
     await drainBoot(shell);
-    for (const view of ['workouts', 'statistics', 'settings', 'exercises', 'workouts']) {
+    for (const view of ['workouts', 'statistics', 'exercises', 'workouts']) {
       root.querySelector<HTMLElement>(`.sidebar [data-view="${view}"]`)?.click();
     }
     const rebuiltBefore = shell.renders.rebuilds;
@@ -211,6 +222,7 @@ describe('shell', () => {
     const shell = renderShell(root, { skipCatalogRefresh: true });
     await drainBoot(shell);
     root.querySelector<HTMLElement>('#account-chip')?.click();
+    root.querySelector<HTMLElement>('#sign-in-settings')?.click();
     await waitFor(() => root.querySelector('#modal')?.classList.contains('open') === true, 'the account modal');
     const modal = root.querySelector('#modal');
     const content = root.querySelector('#modal-content')?.innerHTML;
@@ -354,7 +366,7 @@ describe('shell', () => {
     // Boot renders while the catalog request is still out; the reader arrives on Settings
     // after that has settled, which is the state the relay answer lands into.
     await waitFor(() => shell.renders.recent.some((record) => record.reason === 'boot-account-open'), 'boot to settle');
-    root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
+    root.querySelector<HTMLElement>('#account-chip')?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     const page = root.querySelector('.settings-page');
     const rebuiltBefore = shell.renders.rebuilds;
@@ -400,7 +412,7 @@ describe('shell', () => {
     const root = document.getElementById('app') as HTMLElement;
     const shell = renderShell(root, { skipCatalogRefresh: true });
     await shell.ready;
-    root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
+    root.querySelector<HTMLElement>('#account-chip')?.click();
     // Opening Settings starts the funding fetch, which renders again when it answers. Let
     // that finish first, or the render being counted is that one and not the profile's.
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -431,11 +443,11 @@ describe('shell', () => {
     expect(root.querySelector('#sub-exercises-library')).toBeTruthy();
     expect(root.querySelector('#sub-exercises-discover')).toBeTruthy();
     // walk every nav view; each must render its page without throwing
-    for (const view of ['workouts', 'statistics', 'settings', 'exercises']) {
+    for (const view of ['workouts', 'statistics', 'exercises']) {
       root.querySelector<HTMLElement>(`[data-view="${view}"]`)?.click();
       expect(root.querySelector('.page.active'), view).toBeTruthy();
     }
-    root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
+    root.querySelector<HTMLElement>('#account-chip')?.click();
     const settings = root.querySelector('.settings-page') as HTMLElement;
     expect(settings?.textContent).toContain('Account');
     expect(settings?.textContent).not.toContain('Beast Mode');
@@ -474,7 +486,7 @@ describe('shell', () => {
     const root = document.getElementById('app') as HTMLElement;
     const shell = renderShell(root, { skipCatalogRefresh: true });
     await shell.ready;
-    root.querySelector<HTMLElement>('[data-view="settings"]')?.click();
+    root.querySelector<HTMLElement>('#account-chip')?.click();
 
     const toggle = () => root.querySelector<HTMLInputElement>('#monero-tips-toggle')!;
     const body = () => root.querySelector<HTMLElement>('#monero-tips-body')!;
@@ -669,6 +681,7 @@ describe('shell', () => {
     const shell = renderShell(root, { skipCatalogRefresh: true });
     await drainBoot(shell);
     root.querySelector<HTMLElement>('#account-chip')?.click();
+    root.querySelector<HTMLElement>('#sign-in-settings')?.click();
     await waitFor(() => root.querySelector('#modal')?.classList.contains('open') === true, 'the account modal');
     const content = root.querySelector('#modal-content')!;
     const markup = content.innerHTML;
@@ -690,12 +703,16 @@ describe('shell', () => {
   // One flow, not two tabs: creating an account and reaching one you already have are not
   // symmetrical choices, and the tabs presented them as if they were - which is also how
   // "use a signer" ended up filed under Create, where it never belonged.
-  it('opens one account flow from the signed-out chip', async () => {
+  it('opens Settings from the signed-out chip and keeps the account flow in Settings', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app') as HTMLElement;
     const shell = renderShell(root);
 
     root.querySelector<HTMLElement>('#account-chip')?.click();
+    expect(root.querySelector('.settings-page')).toBeTruthy();
+    expect(root.querySelector('#modal.open')).toBeNull();
+
+    root.querySelector<HTMLElement>('#sign-in-settings')?.click();
     const modal = root.querySelector('#modal.open') as HTMLElement;
     expect(modal).toBeTruthy();
     expect(modal.textContent).toContain('Workstr account');
@@ -815,8 +832,8 @@ describe('shell', () => {
     expect(chip).not.toContain('₿');
     // Informational only: the pill stays one button, so no nested control appears.
     expect(chip).not.toContain('<button');
-    // The medallion sits between the name and the chevron.
-    expect(chip.indexOf('connection-payment-mark')).toBeLessThan(chip.indexOf('connection-chip-chevron'));
+    // The medallion sits between the name and the Settings gear.
+    expect(chip.indexOf('connection-payment-mark')).toBeLessThan(chip.indexOf('connection-chip-settings'));
     // Same component, same identity badge — only the rail changed.
     expect(chip).toContain('connection-identity-status');
     expect(chip).toContain('class="connection-avatar-wrap"');

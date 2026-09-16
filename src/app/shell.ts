@@ -230,7 +230,6 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       openView(parent as View, 'navigate-subtab');
     });
     root.querySelector('#account-chip')?.addEventListener('click', () => {
-      if (!state.pubkey) return identity.startAccountChoice();
       openView('settings', 'navigate-account-chip');
     });
     // The close button belongs to the modal card, which is part of the frame. It used to be

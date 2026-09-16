@@ -110,7 +110,7 @@ describe('the render budget', () => {
   it('draws the address lookup without rendering the page', async () => {
     localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     const { root, shell } = await boot();
-    root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
+    root.querySelector<HTMLElement>('#account-chip')?.click();
     const before = shell.renders.rebuilds;
     await waitFor(() => addressSettled(shell), 'the address lookup');
 
@@ -128,7 +128,7 @@ describe('the render budget', () => {
     // points at Account instead.
     localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     const { root, shell } = await boot();
-    root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
+    root.querySelector<HTMLElement>('#account-chip')?.click();
     await waitFor(() => addressSettled(shell), 'the address lookup');
     const card = root.querySelector<HTMLDetailsElement>('.data-sync-card')!;
     card.open = true;
@@ -163,7 +163,7 @@ describe('the render budget', () => {
     await store.saveSettings({ unit: 'kg', paymentMode: 'off', publicRelays: [], ownedEquipment: [] });
     store.close();
     const { root, shell } = await boot();
-    root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
+    root.querySelector<HTMLElement>('#account-chip')?.click();
     return { root, shell };
   }
 
@@ -267,7 +267,7 @@ describe('what a background answer must not replace', () => {
   it('leaves an open Settings category open while the address lookup lands', async () => {
     localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     const { root, shell } = await boot();
-    root.querySelector<HTMLElement>('.sidebar [data-view="settings"]')?.click();
+    root.querySelector<HTMLElement>('#account-chip')?.click();
     const account = root.querySelector<HTMLDetailsElement>('.account-card')!;
     account.open = true;
     const support = root.querySelector<HTMLDetailsElement>('.support-panel')!;
@@ -285,6 +285,7 @@ describe('what a background answer must not replace', () => {
     const { root, shell } = await boot();
     root.querySelector<HTMLElement>('[data-parent="exercises"][data-subtab="discover"]')?.click();
     root.querySelector<HTMLElement>('#account-chip')?.click();
+    root.querySelector<HTMLElement>('#sign-in-settings')?.click();
     await waitFor(() => root.querySelector('#modal')?.classList.contains('open') === true, 'the account modal');
     const content = root.querySelector('#modal-content')!;
     const markup = content.innerHTML;

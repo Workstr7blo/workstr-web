@@ -102,6 +102,15 @@ describe('the account chip', () => {
     expect(root.querySelector('.connection-avatar.fallback')?.textContent).toBe('W');
   });
 
+  it('uses the identity pill as the Settings affordance', () => {
+    const root = mount(accountIdentity(state()));
+    const chip = root.querySelector<HTMLButtonElement>('#account-chip')!;
+    expect(chip.getAttribute('aria-label')).toBe('Open settings');
+    expect(chip.querySelector('.connection-chip-settings')).toBeTruthy();
+    expect(chip.querySelector('.connection-chip-chevron')).toBeNull();
+    expect(chip.querySelector('.connection-chip-settings button')).toBeNull();
+  });
+
   // Off has nothing to mark, so the medallion is added and removed rather than swapped.
   it('adds and removes the Monero medallion with the switch', () => {
     const root = mount(accountIdentity(state()));

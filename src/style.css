@@ -205,8 +205,8 @@
 .connection-chip-label { font-size: 12px; font-weight: 850; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .connection-chip-status { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--dim); }
 .connection-chip-text { font-size: 10px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; letter-spacing: .06em; }
-.connection-chip-chevron { width: 16px; height: 16px; flex: 0 0 auto; color: var(--dim); }
-.connection-chip:hover .connection-chip-chevron { color: var(--purple-2); }
+.connection-chip-settings { width: 16px; height: 16px; flex: 0 0 auto; color: var(--dim); }
+.connection-chip:hover .connection-chip-settings { color: var(--purple-2); }
 .connection-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--dim); box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04); }
 .connection-chip.warn .connection-dot { background: var(--bitcoin-gold); box-shadow: 0 0 0 3px rgba(247, 147, 26, 0.16); }
 .connection-chip.error .connection-dot { background: var(--danger-red); box-shadow: 0 0 0 3px rgba(255, 56, 100, 0.16); }

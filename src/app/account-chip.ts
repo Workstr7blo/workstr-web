@@ -55,6 +55,10 @@ function chipStatus(identity: AccountIdentity): string {
     : '<span class="connection-chip-status"><span class="connection-dot"></span><span class="connection-chip-text">Local</span></span>';
 }
 
+function settingsGlyph(): string {
+  return '<svg class="connection-chip-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V22a2 2 0 01-4 0v-.09A1.65 1.65 0 009 20.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 16a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.17a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 3.6a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09A1.65 1.65 0 0015 3.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 10c.28.62.9 1 1.58 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>';
+}
+
 export function accountChip(identity: AccountIdentity): string {
   return `<button class="connection-chip ${identity.signedIn ? 'ok' : ''}" id="account-chip" type="button" title="Open settings" aria-label="Open settings">
           <span class="connection-avatar-wrap">${avatarFace('connection-avatar', identity)}${badge(identity)}</span>
@@ -63,7 +67,7 @@ export function accountChip(identity: AccountIdentity): string {
             ${chipStatus(identity)}
           </span>
           ${paymentMark(identity)}
-          <svg class="connection-chip-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+          ${settingsGlyph()}
         </button>`;
 }
 
@@ -121,7 +125,7 @@ function patchChipExtras(chip: HTMLElement, identity: AccountIdentity): void {
   const wanted = paymentMark(identity);
   if (!wanted) mark?.remove();
   else if (mark) mark.outerHTML = wanted;
-  else chip.querySelector('.connection-chip-chevron')?.insertAdjacentHTML('beforebegin', wanted);
+  else chip.querySelector('.connection-chip-settings')?.insertAdjacentHTML('beforebegin', wanted);
 }
 
 // The Settings Account card shows the same name and picture. It is a page away from the
