@@ -130,6 +130,7 @@ export interface MoneroWalletRuntimeWallet {
   getDaemonHeight(): Promise<number>;
   sync(listenerOrStartHeight?: unknown, startHeight?: number, allowConcurrentCalls?: boolean): Promise<unknown>;
   save(): Promise<void>;
+  getPath?(): string | Promise<string>;
   close(save?: boolean): Promise<void>;
 }
 

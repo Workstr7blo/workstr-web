@@ -26,6 +26,7 @@ export async function moneroWalletConfig(input: {
   const restoreHeight = input.restoreHeight ?? status.height ?? 0;
   if (!Number.isInteger(restoreHeight) || restoreHeight < 0) throw new Error('Monero restore height must be a non-negative integer.');
   const config: Record<string, unknown> = {
+    path: '',
     password: '',
     networkType: node.network,
     server: moneroRpcUrl(node),

@@ -46,6 +46,7 @@ class FakeWallet implements MoneroWalletRuntimeWallet {
   async getHeight() { return this.height; }
   async getDaemonHeight() { return this.height; }
   async sync() { return {}; }
+  getPath() { return ''; }
   async save() { this.saved += 1; }
   async close() { this.closed = true; }
 }
@@ -70,7 +71,7 @@ describe('Monero wallet runtime config', () => {
     const { config, node, restoreHeight } = await moneroWalletConfig({ fetcher });
     expect(node.host).toBe('xmr.workstr.fit');
     expect(restoreHeight).toBe(3_000_123);
-    expect(config).toMatchObject({ networkType: 'mainnet', server: 'https://xmr.workstr.fit:43736/json_rpc', proxyToWorker: true });
+    expect(config).toMatchObject({ path: '', networkType: 'mainnet', server: 'https://xmr.workstr.fit:43736/json_rpc', proxyToWorker: true });
     expect(config).not.toHaveProperty('restoreHeight');
   });
 
@@ -124,7 +125,8 @@ describe('Monero wallet core', () => {
     expect(snapshot.metadata.scope).toBe(MONERO_WALLET_SCOPE);
     expect(snapshot.metadata.restoreHeight).toBe(3_763_261);
     expect(snapshot.metadata.creatorSubaddress).toBe('8CreatorSubaddress');
-    expect(fake.configs[0]).toMatchObject({ networkType: 'mainnet' });
+    expect(fake.configs[0]).toMatchObject({ path: '', networkType: 'mainnet' });
+    expect(fake.wallet.saved).toBe(0);
     expect(fake.configs[0]).not.toHaveProperty('restoreHeight');
     expect(fake.configs[0]).not.toHaveProperty('seed');
     expect(JSON.stringify(writes)).not.toContain('nsec');

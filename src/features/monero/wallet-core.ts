@@ -38,6 +38,11 @@ async function optionalSecret(read: (() => Promise<string>) | undefined): Promis
   return value || undefined;
 }
 
+async function saveWalletIfPersistent(wallet: MoneroWalletRuntimeWallet): Promise<void> {
+  const path = await wallet.getPath?.();
+  if (path) await wallet.save();
+}
+
 export interface MoneroWalletCoreOptions {
   vault: Pick<DeviceVault, 'isUnlocked' | 'hasSecret' | 'putSecret' | 'getSecret'>;
   runtime?: MoneroWalletRuntime;
@@ -111,7 +116,7 @@ export class MoneroWalletCore {
     await wallet.sync();
     const [height, daemonHeight] = await Promise.all([wallet.getHeight().catch(() => null), wallet.getDaemonHeight().catch(() => null)]);
     const sync: MoneroWalletSyncState = { height, daemonHeight, synchronized: height !== null && daemonHeight !== null && height >= daemonHeight, updatedAt: this.now().toISOString() };
-    await wallet.save();
+    await saveWalletIfPersistent(wallet);
     await this.updateBundle({ lastSync: sync });
     return sync;
   }
@@ -128,7 +133,7 @@ export class MoneroWalletCore {
     const wallet = this.wallet;
     this.wallet = null;
     this.bundle = null;
-    if (wallet) await wallet.close(true).catch(() => undefined);
+    if (wallet) await wallet.close(false).catch(() => undefined);
   }
 
   private async persistNewWallet(wallet: MoneroWalletRuntimeWallet, node: MoneroWalletMetadata['node'], restoreHeight: number, now: Date, source: MoneroWalletMetadata['source']): Promise<MoneroWalletSnapshot> {
@@ -158,7 +163,7 @@ export class MoneroWalletCore {
     };
     const bundle: MoneroWalletSecretBundle = { version: 1, metadata, seed, privateSpendKey, privateViewKey };
     this.bundle = bundle;
-    await wallet.save();
+    await saveWalletIfPersistent(wallet);
     try {
       return await saveMoneroWalletBundle(this.vault, bundle);
     } catch (error) {

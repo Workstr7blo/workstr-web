@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed Monero wallet creation failing with `path is not set` by explicitly using an in-memory
+  `monero-ts` wallet path and skipping file saves for browser-only wallets.
 - Fixed Monero random wallet creation by no longer passing a restore height to `monero-ts`
   unless a wallet is being restored from a seed.
 - Fixed encrypted sync being too quick to report a relay timeout when the Workstr relay is
