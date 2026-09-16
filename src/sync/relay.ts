@@ -3,8 +3,8 @@ import type { SignedNostrEvent, Signer } from '../signer/types';
 import { PRIVATE_RECORD_KIND, encodePrivateRecord, type PrivateRecord, type RecordCipher } from '../nostr/codecs30078';
 import { BACKUP_KEY_ADDRESS, KEY_FINGERPRINT_TAG } from '../nostr/backup-key';
 
-export const PUBLISH_TIMEOUT_MS = 10000;
-export const FETCH_TIMEOUT_MS = 15000;
+export const PUBLISH_TIMEOUT_MS = 30000;
+export const FETCH_TIMEOUT_MS = 30000;
 
 // A policy rejection, a dead network and an unresponsive signer need different user copy
 // and different retry behaviour: the first will never succeed unchanged, the second
