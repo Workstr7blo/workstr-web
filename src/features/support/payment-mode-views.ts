@@ -50,13 +50,22 @@ function statusLine(monero: MoneroAddressState): string {
   return '';
 }
 
+// Where the published address comes from. Other Nostr clients can change it, so Settings says
+// whether tips to it reach this account's Workstr wallet. Unknown until the wallet check answers.
+export function moneroAddressSource(address: string, walletAddresses?: string[]): string {
+  if (!address || !walletAddresses) return '';
+  return walletAddresses.includes(address)
+    ? '<p class="monero-address-source">From your Workstr wallet.</p>'
+    : '<p class="monero-address-source">External wallet. Tips to it do not arrive in a Workstr wallet on this device.</p>';
+}
+
 /**
  * The body of the Monero address section, so the controller can repaint it in place.
  *
  * A full shell render would collapse the Settings category the section lives in, which is
  * exactly the card the user is reading a publish result in.
  */
-export function moneroAddressBody(monero: MoneroAddressState = IDLE, signedIn = false): string {
+export function moneroAddressBody(monero: MoneroAddressState = IDLE, signedIn = false, walletAddresses?: string[]): string {
   const badge = pill(monero, signedIn);
   const heading = `<div class="settings-inline-heading">
       <span><strong>Monero payment address</strong><small>Published as a public Nostr payment target using NIP-A3 kind:10133.</small></span>
@@ -73,6 +82,7 @@ export function moneroAddressBody(monero: MoneroAddressState = IDLE, signedIn = 
     <input id="monero-address" class="monero-address-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
       aria-label="Monero payment address" placeholder="Monero address starting with 8 or 4" value="${html(value)}" ${busy ? 'disabled' : ''} />
     ${statusLine(monero)}
+    ${moneroAddressSource(monero.address, walletAddresses)}
     <p class="section-help">Use a fresh Monero subaddress. This address is public and replicated across relays. It is not stored in Workstr sync.</p>
     <div class="settings-row-actions">
       <button id="monero-address-save" class="button payment" ${busy ? 'disabled' : ''}>${clearing ? 'Remove address' : 'Save address'}</button>
@@ -80,8 +90,8 @@ export function moneroAddressBody(monero: MoneroAddressState = IDLE, signedIn = 
     </div>`;
 }
 
-export function moneroAddressSection(monero: MoneroAddressState = IDLE, signedIn = false): string {
-  return `<div class="settings-inline-section monero-address-section" id="monero-address-section">${moneroAddressBody(monero, signedIn)}</div>`;
+export function moneroAddressSection(monero: MoneroAddressState = IDLE, signedIn = false, walletAddresses?: string[]): string {
+  return `<div class="settings-inline-section monero-address-section" id="monero-address-section">${moneroAddressBody(monero, signedIn, walletAddresses)}</div>`;
 }
 
 // Monero tips is a switch rather than a choice between rails: it is the only rail, and off is
@@ -112,6 +122,6 @@ export function moneroTipsCard(state: AppState): string {
       <span class="settings-category-copy"><strong id="monero-tips-label">Monero tips</strong><small id="monero-tips-copy">${html(moneroTipsCopy(state))}</small></span>
       <input type="checkbox" role="switch" id="monero-tips-toggle" class="settings-toggle" aria-labelledby="monero-tips-label" aria-describedby="monero-tips-copy"${on ? ' checked' : ''} />
     </div>
-    <div class="settings-category-body monero-tips-body" id="monero-tips-body"${moneroAddressVisible(state) ? '' : ' hidden'}>${moneroAddressSection(state.monero, Boolean(state.pubkey))}</div>
+    <div class="settings-category-body monero-tips-body" id="monero-tips-body"${moneroAddressVisible(state) ? '' : ' hidden'}>${moneroAddressSection(state.monero, Boolean(state.pubkey), state.moneroWallet?.addresses)}</div>
   </section>`;
 }

@@ -187,7 +187,7 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
 
   async function showForgot(reason: UnlockReason): Promise<void> {
     const scopes = await vault.listScopes().catch(() => []);
-    const names = scopes.map(vaultScopeName);
+    const names = [...new Set(scopes.map(vaultScopeName))];
     const host = showLock(forgotScreenMarkup(names));
     host?.querySelector('#vault-reset-cancel')?.addEventListener('click', () => showUnlock(reason));
     host?.querySelector('#vault-reset')?.addEventListener('click', () => {

@@ -59,7 +59,7 @@ export function createMoneroAddressController(ctx: MoneroAddressControllerContex
     if (copy) copy.textContent = moneroTipsCopy(state);
     const host = root.querySelector('#monero-address-section');
     if (!host) return;
-    host.innerHTML = moneroAddressBody(state.monero, Boolean(state.pubkey));
+    host.innerHTML = moneroAddressBody(state.monero, Boolean(state.pubkey), state.moneroWallet?.addresses);
     bind();
   }
 

@@ -1,12 +1,22 @@
 import type { DeviceVault } from '../../security/device-vault';
-import { MONERO_WALLET_SCOPE } from './mock-stagenet-wallet';
+import { base64ToBytes, bytesToBase64 } from '../../nostr/envelope';
 import { DEFAULT_MONERO_NODE, MOCK_STAGENET_NODE, normalizeMoneroNodeConfig } from './wallet-node';
 import { loadMoneroTsRuntime, moneroWalletConfig } from './wallet-runtime';
-import { loadMoneroWalletBundle, saveMoneroWalletBundle, snapshotFromBundle } from './wallet-storage';
+import {
+  LEGACY_MONERO_WALLET_SCOPE,
+  loadMoneroWalletBundle,
+  loadMoneroWalletData,
+  moneroWalletDataScope,
+  moneroWalletScope,
+  saveMoneroWalletBundle,
+  saveMoneroWalletData,
+  snapshotFromBundle
+} from './wallet-storage';
 import type {
   MoneroWalletBalance,
   MoneroWalletBackupInfo,
   MoneroWalletCreateRequest,
+  MoneroWalletDataRecord,
   MoneroWalletMetadata,
   MoneroWalletRestoreRequest,
   MoneroWalletRuntime,
@@ -15,6 +25,10 @@ import type {
   MoneroWalletSnapshot,
   MoneroWalletSyncState
 } from './types';
+
+type WalletVault = Pick<DeviceVault, 'isUnlocked' | 'hasSecret' | 'putSecret' | 'getSecret' | 'deleteSecret'>;
+
+export const WALLET_ALREADY_STORED = 'A Monero wallet is already stored for this account. Open it instead.';
 
 function walletId(): string {
   const bytes = new Uint8Array(12);
@@ -39,159 +53,280 @@ async function optionalSecret(read: (() => Promise<string>) | undefined): Promis
   return value || undefined;
 }
 
-async function saveWalletIfPersistent(wallet: MoneroWalletRuntimeWallet): Promise<void> {
-  const path = await wallet.getPath?.();
-  if (path) await wallet.save();
+function copyBytes(value: ArrayLike<number> | ArrayBufferView): Uint8Array<ArrayBuffer> {
+  if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer);
+  return new Uint8Array(value);
+}
+
+// Lower is always safe for a restore height: it only costs scan time, never payments.
+async function walletRestoreHeight(wallet: MoneroWalletRuntimeWallet, probed: number): Promise<number> {
+  const reported = await wallet.getRestoreHeight?.().catch(() => undefined);
+  return Number.isInteger(reported) && (reported as number) >= 0 ? Math.min(reported as number, probed) : probed;
 }
 
 export interface MoneroWalletCoreOptions {
-  vault: Pick<DeviceVault, 'isUnlocked' | 'hasSecret' | 'putSecret' | 'getSecret'>;
+  vault: WalletVault;
+  // The signed-in Nostr account. Each account has its own wallet scope.
+  account: () => string | null;
   runtime?: MoneroWalletRuntime;
   fetcher?: typeof fetch;
   now?: () => Date;
 }
 
 export class MoneroWalletCore {
-  private readonly vault: Pick<DeviceVault, 'isUnlocked' | 'hasSecret' | 'putSecret' | 'getSecret'>;
+  private readonly vault: WalletVault;
+  private readonly account: () => string | null;
   private readonly runtime?: MoneroWalletRuntime;
   private readonly fetcher?: typeof fetch;
   private readonly now: () => Date;
   private wallet: MoneroWalletRuntimeWallet | null = null;
+  // The account the open wallet belongs to; every write goes to that account's scopes.
+  private walletPubkey: string | null = null;
   private bundle: MoneroWalletSecretBundle | null = null;
+  private data: MoneroWalletDataRecord | null = null;
+  // Bumped by close(), so an open or create that finishes after a lock or an account switch
+  // closes what it produced instead of installing it.
+  private generation = 0;
 
   constructor(options: MoneroWalletCoreOptions) {
     this.vault = options.vault;
+    this.account = options.account;
     this.runtime = options.runtime;
     this.fetcher = options.fetcher;
     this.now = options.now ?? (() => new Date());
   }
 
+  private pubkey(): string {
+    const pubkey = this.account();
+    if (!pubkey) throw new Error('Sign in before using the Monero wallet.');
+    return pubkey;
+  }
+
+  private scope(): string {
+    return moneroWalletScope(this.pubkey());
+  }
+
   async hasWallet(): Promise<boolean> {
-    return this.vault.hasSecret(MONERO_WALLET_SCOPE);
+    return this.vault.hasSecret(this.scope());
+  }
+
+  async hasLegacyWallet(): Promise<boolean> {
+    return this.vault.hasSecret(LEGACY_MONERO_WALLET_SCOPE);
+  }
+
+  // Public addresses only, so Settings can tell whether the published tip address is this wallet's.
+  async storedAddresses(): Promise<string[]> {
+    if (!await this.hasWallet()) return [];
+    const bundle = await loadMoneroWalletBundle(this.vault, this.scope());
+    return [bundle.metadata.creatorSubaddress, bundle.metadata.primaryAddress].filter(Boolean);
+  }
+
+  // Moves a wallet saved under the old device-wide scope to this account. The legacy copy is
+  // removed only after the account copy has been written and read back.
+  async claimLegacyWallet(): Promise<MoneroWalletSnapshot> {
+    ensureUnlocked(this.vault);
+    const scope = this.scope();
+    if (await this.vault.hasSecret(scope)) throw new Error(WALLET_ALREADY_STORED);
+    const legacy = await loadMoneroWalletBundle(this.vault, LEGACY_MONERO_WALLET_SCOPE);
+    const snapshot = await saveMoneroWalletBundle(this.vault, { ...legacy, metadata: { ...legacy.metadata, scope, updatedAt: this.now().toISOString() } });
+    await this.vault.deleteSecret(LEGACY_MONERO_WALLET_SCOPE);
+    return snapshot;
   }
 
   async createWallet(request: MoneroWalletCreateRequest = {}): Promise<MoneroWalletSnapshot> {
     ensureUnlocked(this.vault);
+    await this.assertNoWallet();
+    const generation = this.generation;
     const runtime = this.runtime ?? await loadMoneroTsRuntime();
-    const { config, node, restoreHeight } = await moneroWalletConfig({ node: request.node ?? DEFAULT_MONERO_NODE, restoreHeight: request.restoreHeight, fetcher: this.fetcher });
+    const { config, node, restoreHeight } = await moneroWalletConfig({ node: request.node ?? DEFAULT_MONERO_NODE, fetcher: this.fetcher });
     const wallet = await runtime.createWallet(config);
-    return this.persistNewWallet(wallet, node, restoreHeight, request.now ?? this.now(), 'created');
+    const height = await walletRestoreHeight(wallet, request.restoreHeight ?? restoreHeight);
+    return this.persistNewWallet(wallet, node, height, request.now ?? this.now(), 'created', generation);
   }
 
   async restoreWallet(request: MoneroWalletRestoreRequest): Promise<MoneroWalletSnapshot> {
     ensureUnlocked(this.vault);
     const seed = request.seed.trim();
     if (!seed) throw new Error('Monero recovery seed is required.');
+    await this.assertNoWallet();
+    const generation = this.generation;
     const runtime = this.runtime ?? await loadMoneroTsRuntime();
     const { config, node, restoreHeight } = await moneroWalletConfig({ node: request.node ?? DEFAULT_MONERO_NODE, seed, restoreHeight: request.restoreHeight, fetcher: this.fetcher });
     const wallet = await runtime.createWallet(config);
-    return this.persistNewWallet(wallet, node, restoreHeight, request.now ?? this.now(), 'restored');
+    return this.persistNewWallet(wallet, node, restoreHeight, request.now ?? this.now(), 'restored', generation);
   }
 
   async createMockStagenetWallet(request: MoneroWalletCreateRequest = {}): Promise<MoneroWalletSnapshot> {
     ensureUnlocked(this.vault);
     if (!this.runtime) throw new Error('A mock Monero runtime is required for mock stagenet wallet creation.');
+    await this.assertNoWallet();
+    const generation = this.generation;
     const node = normalizeMoneroNodeConfig({ ...(request.node ?? MOCK_STAGENET_NODE), mode: 'mock-stagenet' });
     const restoreHeight = request.restoreHeight ?? 2_800_000;
     const wallet = await this.runtime.createWallet({ password: '', networkType: 'stagenet', restoreHeight, server: 'mock-stagenet' });
-    return this.persistNewWallet(wallet, node, restoreHeight, request.now ?? this.now(), 'mock-stagenet');
+    return this.persistNewWallet(wallet, node, restoreHeight, request.now ?? this.now(), 'mock-stagenet', generation);
   }
 
   async openWallet(): Promise<MoneroWalletSnapshot> {
     ensureUnlocked(this.vault);
-    const bundle = await loadMoneroWalletBundle(this.vault);
+    await this.close();
+    const generation = this.generation;
+    const pubkey = this.pubkey();
+    const scope = moneroWalletScope(pubkey);
+    const bundle = await loadMoneroWalletBundle(this.vault, scope);
+    const data = await loadMoneroWalletData(this.vault, moneroWalletDataScope(pubkey), bundle.metadata.id);
     const runtime = this.runtime ?? await loadMoneroTsRuntime();
-    const { config } = await moneroWalletConfig({
-      node: bundle.metadata.node,
-      seed: bundle.seed,
-      restoreHeight: bundle.metadata.restoreHeight,
-      fetcher: this.fetcher
-    });
-    this.wallet = await runtime.createWallet(config);
+    const wallet = await this.openRuntimeWallet(runtime, bundle, data);
+    if (generation !== this.generation || scope !== this.scope()) {
+      await wallet.close(false).catch(() => undefined);
+      throw new Error('The Monero wallet was closed while it was opening.');
+    }
+    this.wallet = wallet;
+    this.walletPubkey = pubkey;
     this.bundle = bundle;
-    return snapshotFromBundle(bundle);
+    this.data = data;
+    return this.snapshot();
   }
 
   async sync(): Promise<MoneroWalletSyncState> {
-    const wallet = await this.requireOpenWallet();
+    const wallet = this.requireOpenWallet();
     await wallet.sync();
     const [height, daemonHeight] = await Promise.all([wallet.getHeight().catch(() => null), wallet.getDaemonHeight().catch(() => null)]);
     const sync: MoneroWalletSyncState = { height, daemonHeight, synchronized: height !== null && daemonHeight !== null && height >= daemonHeight, updatedAt: this.now().toISOString() };
-    await saveWalletIfPersistent(wallet);
-    await this.updateBundle({ lastSync: sync });
+    await this.saveData(wallet, { lastSync: sync }, true);
     return sync;
   }
 
   async balance(): Promise<MoneroWalletBalance> {
-    const wallet = await this.requireOpenWallet();
+    const wallet = this.requireOpenWallet();
     const [balance, unlocked] = await Promise.all([wallet.getBalance(), wallet.getUnlockedBalance()]);
     const lastBalance = { atomicBalance: balance.toString(), atomicUnlockedBalance: unlocked.toString() };
-    await this.updateBundle({ lastBalance });
+    await this.saveData(wallet, { lastBalance }, false);
     return lastBalance;
   }
 
   async backupInfo(): Promise<MoneroWalletBackupInfo> {
     ensureUnlocked(this.vault);
-    const bundle = this.bundle ?? await loadMoneroWalletBundle(this.vault);
+    const scope = this.scope();
+    const bundle = this.bundle?.metadata.scope === scope ? this.bundle : await loadMoneroWalletBundle(this.vault, scope);
     return { seed: bundle.seed, restoreHeight: bundle.metadata.restoreHeight };
   }
 
   async close(): Promise<void> {
+    this.generation += 1;
     const wallet = this.wallet;
     this.wallet = null;
+    this.walletPubkey = null;
     this.bundle = null;
+    this.data = null;
     if (wallet) await wallet.close(false).catch(() => undefined);
   }
 
-  private async persistNewWallet(wallet: MoneroWalletRuntimeWallet, node: MoneroWalletMetadata['node'], restoreHeight: number, now: Date, source: MoneroWalletMetadata['source']): Promise<MoneroWalletSnapshot> {
-    this.wallet = wallet;
-    const [seed, primaryAddress, creator, privateSpendKey, privateViewKey] = await Promise.all([
-      wallet.getSeed(),
-      wallet.getPrimaryAddress(),
-      wallet.createSubaddress(0, 'Workstr creator support'),
-      optionalSecret(wallet.getPrivateSpendKey?.bind(wallet)),
-      optionalSecret(wallet.getPrivateViewKey?.bind(wallet))
-    ]);
-    const creatorSubaddress = readSubaddressAddress(creator);
-    const timestamp = now.toISOString();
-    const metadata: MoneroWalletMetadata = {
-      version: 1,
-      id: walletId(),
-      scope: MONERO_WALLET_SCOPE,
-      network: node.network,
-      node,
-      restoreHeight,
-      primaryAddress,
-      creatorSubaddress: creatorSubaddress.address,
-      creatorSubaddressIndex: creatorSubaddress.index,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      source
+  private async assertNoWallet(): Promise<void> {
+    if (await this.vault.hasSecret(this.scope())) throw new Error(WALLET_ALREADY_STORED);
+  }
+
+  // Saved keys and cache resume the last sync. Anything wrong with them falls back to the seed,
+  // which is always sufficient on its own.
+  private async openRuntimeWallet(runtime: MoneroWalletRuntime, bundle: MoneroWalletSecretBundle, data: MoneroWalletDataRecord | null): Promise<MoneroWalletRuntimeWallet> {
+    const keysData = data?.keysDataBase64 ? base64ToBytes(data.keysDataBase64) : null;
+    if (keysData && runtime.openWallet) {
+      try {
+        const cacheData = data?.cacheDataBase64 ? base64ToBytes(data.cacheDataBase64) ?? undefined : undefined;
+        const { config } = await moneroWalletConfig({ node: bundle.metadata.node, keysData, cacheData, fetcher: this.fetcher });
+        return await runtime.openWallet(config);
+      } catch (error) {
+        if (error instanceof Error && /^Monero node/.test(error.message)) throw error;
+      }
+    }
+    const { config } = await moneroWalletConfig({ node: bundle.metadata.node, seed: bundle.seed, restoreHeight: bundle.metadata.restoreHeight, fetcher: this.fetcher });
+    return runtime.createWallet(config);
+  }
+
+  private snapshot(): MoneroWalletSnapshot {
+    const snapshot = snapshotFromBundle(this.bundle as MoneroWalletSecretBundle);
+    return {
+      ...snapshot,
+      balance: this.data?.lastBalance ? { ...this.data.lastBalance } : snapshot.balance,
+      sync: this.data?.lastSync ? { ...this.data.lastSync } : snapshot.sync
     };
-    const bundle: MoneroWalletSecretBundle = { version: 1, metadata, seed, privateSpendKey, privateViewKey };
-    this.bundle = bundle;
-    await saveWalletIfPersistent(wallet);
+  }
+
+  private async persistNewWallet(wallet: MoneroWalletRuntimeWallet, node: MoneroWalletMetadata['node'], restoreHeight: number, now: Date, source: MoneroWalletMetadata['source'], generation: number): Promise<MoneroWalletSnapshot> {
     try {
-      return await saveMoneroWalletBundle(this.vault, bundle);
+      const pubkey = this.pubkey();
+      const scope = moneroWalletScope(pubkey);
+      const [seed, primaryAddress, creator, privateSpendKey, privateViewKey] = await Promise.all([
+        wallet.getSeed(),
+        wallet.getPrimaryAddress(),
+        wallet.createSubaddress(0, 'Workstr creator support'),
+        optionalSecret(wallet.getPrivateSpendKey?.bind(wallet)),
+        optionalSecret(wallet.getPrivateViewKey?.bind(wallet))
+      ]);
+      const creatorSubaddress = readSubaddressAddress(creator);
+      // Checked again after the slow runtime work: a second tap, another tab, a lock or an
+      // account switch may have happened meanwhile, and none of them may be overwritten.
+      if (generation !== this.generation || pubkey !== this.account()) throw new Error('The Monero wallet was closed while it was being set up.');
+      await this.assertNoWallet();
+      const timestamp = now.toISOString();
+      const metadata: MoneroWalletMetadata = {
+        version: 1,
+        id: walletId(),
+        scope,
+        network: node.network,
+        node,
+        restoreHeight,
+        primaryAddress,
+        creatorSubaddress: creatorSubaddress.address,
+        creatorSubaddressIndex: creatorSubaddress.index,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        source
+      };
+      const bundle: MoneroWalletSecretBundle = { version: 1, metadata, seed, privateSpendKey, privateViewKey };
+      const snapshot = await saveMoneroWalletBundle(this.vault, bundle);
+      this.wallet = wallet;
+      this.walletPubkey = pubkey;
+      this.bundle = bundle;
+      this.data = null;
+      await this.saveData(wallet, {}, true).catch(() => undefined);
+      return snapshot;
     } catch (error) {
-      this.wallet = null;
-      this.bundle = null;
+      if (this.wallet === wallet) {
+        this.wallet = null;
+        this.walletPubkey = null;
+        this.bundle = null;
+      }
       await wallet.close(false).catch(() => undefined);
       throw error;
     }
   }
 
-  private async requireOpenWallet(): Promise<MoneroWalletRuntimeWallet> {
+  private requireOpenWallet(): MoneroWalletRuntimeWallet {
     ensureUnlocked(this.vault);
-    if (!this.wallet) throw new Error('Open the Monero wallet before using it.');
+    if (!this.wallet || this.walletPubkey !== this.account()) throw new Error('Open the Monero wallet before using it.');
     return this.wallet;
   }
 
-  private async updateBundle(update: Partial<Pick<MoneroWalletSecretBundle, 'lastBalance' | 'lastSync'>>): Promise<void> {
-    ensureUnlocked(this.vault);
-    const current = this.bundle ?? await loadMoneroWalletBundle(this.vault);
-    const next: MoneroWalletSecretBundle = { ...current, ...update, metadata: { ...current.metadata, updatedAt: this.now().toISOString() } };
-    this.bundle = next;
-    await saveMoneroWalletBundle(this.vault, next);
+  // Writes the data record, never the seed bundle. With `exportData` the runtime's current keys
+  // and scan cache are included, so the next open resumes from this point.
+  private async saveData(wallet: MoneroWalletRuntimeWallet, update: Pick<MoneroWalletDataRecord, 'lastBalance' | 'lastSync'>, exportData: boolean): Promise<void> {
+    const bundle = this.bundle;
+    const pubkey = this.walletPubkey;
+    if (!bundle || !pubkey) return;
+    const exported = exportData ? await wallet.getData?.().catch(() => null) : null;
+    const next: MoneroWalletDataRecord = {
+      ...(this.data ?? {}),
+      ...update,
+      version: 1,
+      walletId: bundle.metadata.id,
+      savedAt: this.now().toISOString()
+    };
+    if (exported && exported.length >= 2) {
+      next.keysDataBase64 = bytesToBase64(copyBytes(exported[0]));
+      next.cacheDataBase64 = bytesToBase64(copyBytes(exported[1]));
+    }
+    await saveMoneroWalletData(this.vault, moneroWalletDataScope(pubkey), next);
+    if (this.bundle === bundle) this.data = next;
   }
 }

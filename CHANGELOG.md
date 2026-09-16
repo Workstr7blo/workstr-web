@@ -24,11 +24,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed the Monero wallet to one wallet per Nostr account instead of one per device, so
+  Workstr never links two identities through a shared wallet. A wallet saved by an earlier
+  build is moved to an account only after "Use for this account". Settings now labels the
+  published tip address as coming from your Workstr wallet or an external wallet.
+- Changed opening the Monero wallet to resume from its last sync instead of rescanning from
+  the restore height every time.
+- Pinned `monero-ts` to the exact version whose worker ships in `public/`.
 - Moved Settings out of the primary bottom navigation and made the header identity chip's
   Settings destination explicit with a neutral gear icon.
 
 ### Fixed
 
+- Fixed Create and Restore in the Monero wallet card being able to overwrite a stored wallet's
+  seed, for example after opening it failed.
+- Fixed restoring a Monero wallet without a restore height scanning only from the current
+  block, which missed every earlier payment. A blank height now scans from the start.
+- Fixed the Monero wallet staying open after switching accounts, double taps starting repeated
+  syncs, a vault lock during a sync breaking the card, and the recovery phrase still showing
+  after leaving and returning to Settings.
 - Fixed Monero wallet creation failing with `path is not set` by explicitly using an in-memory
   `monero-ts` wallet path and skipping file saves for browser-only wallets.
 - Fixed Monero random wallet creation by no longer passing a restore height to `monero-ts`
