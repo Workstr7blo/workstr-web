@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed Monero wallet creation hanging on "Creating wallet and dedicated creator subaddress…"
+  by shipping the `monero-ts` worker file that browser wallet creation expects.
 - Fixed Monero wallet creation in browser builds by bundling a small callable `assert` shim for
   `monero-ts` instead of Vite's non-callable Node builtin placeholder.
 
