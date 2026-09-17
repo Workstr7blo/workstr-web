@@ -17,6 +17,14 @@ export interface TipJarStatus {
 }
 
 // The Settings switch, the nav item, the page and wallet activation all read this one setting.
+// What the bottom-nav item is called right now. The nav says three things only - the Tip Jar
+// exists, it is catching up, it cannot be reached - so the five wallet states collapse to three
+// words. The page keeps the finer `word` above.
+export function tipJarNavLabel(visual: TipJarVisualState): string {
+  if (visual === 'connecting' || visual === 'syncing') return 'Syncing';
+  return visual === 'error' ? 'Offline' : 'Tip Jar';
+}
+
 export function tipJarOn(state: AppState): boolean {
   return normalizePaymentMode(state.settings.paymentMode) === 'monero';
 }

@@ -510,6 +510,8 @@ describe('shell', () => {
 
     const toggle = () => root.querySelector<HTMLInputElement>('#monero-tips-toggle')!;
     const body = () => root.querySelector<HTMLElement>('#monero-tips-body')!;
+    // #260: the Tip Jar no longer marks the header, so the nav item is the surface to watch.
+    const navLabel = () => root.querySelector('.sidebar [data-view="tipjar"] .tip-jar-label')?.textContent;
     const chipMark = () => root.querySelector('#account-chip .connection-payment-mark');
     const flip = (on: boolean) => {
       toggle().checked = on;
@@ -521,6 +523,7 @@ describe('shell', () => {
     expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false);
     expect(body().hidden).toBe(true);
     expect(chipMark()).toBeNull();
+    expect(navLabel()).toBe('Tip Jar');
     const card = root.querySelector('.monero-tips-card');
     const before = shell.renders.rebuilds;
 
@@ -529,13 +532,15 @@ describe('shell', () => {
     expect(shell.state.settings.paymentMode).toBe('monero');
     expect(body().hidden).toBe(false);
     expect(root.querySelector('#monero-tips-body #monero-address-section')).toBeTruthy();
-    expect(chipMark()).toBeTruthy();
+    expect(chipMark()).toBeNull();
+    expect(navLabel()).toBe('Syncing');
 
     flip(false);
     await vi.waitFor(() => expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false));
     expect(shell.state.settings.paymentMode).toBe('off');
     expect(body().hidden).toBe(true);
     expect(chipMark()).toBeNull();
+    expect(navLabel()).toBe('Tip Jar');
 
     expect(root.querySelector('.monero-tips-card')).toBe(card);
     expect(shell.renders.rebuilds).toBe(before);
@@ -843,20 +848,19 @@ describe('shell', () => {
     expect(chip).toContain('connection-identity-status');
   });
 
-  it('marks the account pill once Monero tips are on, without changing its structure', () => {
-    const chip = accountChip(shellMarkup(signedIn({ settings: { unit: 'kg', publicRelays: [], paymentMode: 'monero' } })));
+  // #260: the header is Workstr identity only. Turning the Tip Jar on must not change a
+  // single byte of the chip - that is what makes the Tip Jar a Workstr feature rather than a
+  // Monero subsystem the whole app is branded for.
+  it('renders the same account pill whether the Tip Jar is on or off', () => {
+    const off = accountChip(shellMarkup(signedIn()));
+    const on = accountChip(shellMarkup(signedIn({ settings: { unit: 'kg', publicRelays: [], paymentMode: 'monero' } })));
 
-    expect(chip).toContain('class="connection-payment-mark" role="img" aria-label="Tip Jar on"');
-    expect(chip).toContain('title="Tip Jar on"');
-    expect(chip).toContain('monero-mark');
-    expect(chip).not.toContain('₿');
-    // Informational only: the pill stays one button, so no nested control appears.
-    expect(chip).not.toContain('<button');
-    // The medallion sits between the name and the Settings gear.
-    expect(chip.indexOf('connection-payment-mark')).toBeLessThan(chip.indexOf('connection-chip-settings'));
-    // Same component, same identity badge — only the rail changed.
-    expect(chip).toContain('connection-identity-status');
-    expect(chip).toContain('class="connection-avatar-wrap"');
+    expect(on).toBe(off);
+    expect(on).not.toContain('connection-payment-mark');
+    expect(on).not.toContain('monero-mark');
+    expect(on).not.toContain('₿');
+    expect(on).toContain('connection-identity-status');
+    expect(on).toContain('class="connection-avatar-wrap"');
   });
 
   it('leaves a local account unbadged and without a payment rail', () => {

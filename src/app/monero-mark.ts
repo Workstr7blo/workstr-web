@@ -7,17 +7,15 @@ import { renderSVG } from 'uqr';
 // app. It identifies the payment mechanism only — never Workstr itself.
 //
 // It lives here rather than with either surface that draws it because both the creator tip
-// sheet and the Monero support card need it, and features do not import each other.
+// sheet and the Monero support card need it, and features do not import each other. Nothing
+// draws it bare any more: the account chip's medallion was the only caller of a standalone
+// mark, and #260 took persistent payment branding out of the header.
 export const MONERO_MARK = 'M4 7v10h3v-5.8l5 5 5-5V17h3V7l-8 8z';
 
 // Share of the code's width the mark's plate covers. 22% of the width is 4.8% of the area,
 // against the 30% that error correction level H can lose, so the code still reads with the
 // centre knocked out. Raising this trades scanning margin for a bigger mark; do not.
 const MARK_PLATE_RATIO = 0.22;
-
-export function moneroMark(size = 16): string {
-  return `<svg class="monero-mark" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="${MONERO_MARK}"/></svg>`;
-}
 
 export function moneroBadge(size = 56): string {
   return `<svg class="monero-badge" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">

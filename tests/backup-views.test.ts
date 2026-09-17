@@ -45,7 +45,7 @@ describe('status pill', () => {
     // Not the pill's words. It used to return `statusPill().label` unchanged, so the card
     // printed the same state twice on one line and told the reader nothing about the card.
     expect(backupSummary(panelState({ signedIn: false, enabled: false }))).toBe('Manual backup for this device');
-    expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).toBe('Back up, sync, and move your training data');
+    expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).toBe('Back up, sync, and move your Workstr data');
     expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).not.toBe(statusPill(panelState({ sync: { state: 'idle', pending: 3 } })).label);
   });
 

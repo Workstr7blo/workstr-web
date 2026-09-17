@@ -8,6 +8,10 @@ export interface BackupPanelState {
   enabled: boolean;
   sync: SyncStatus;
   backup?: BackupSettings;
+  // The Tip Jar backup section, rendered by the Monero feature and passed in by the app layer.
+  // Training backup and wallet backup are neighbours in this card and nowhere else: the JSON
+  // export must never carry a wallet seed, so the two features do not share code, only a card.
+  tipJarBackup?: string;
 }
 
 // Minutes, then hours, then the date. Nobody needs "backed up 4 days and 3 hours ago" —
@@ -50,7 +54,7 @@ export function statusPill(state: BackupPanelState): { label: string; ok: boolea
 // the state is read from.
 export function backupSummary(state: BackupPanelState): string {
   return state.signedIn
-    ? 'Back up, sync, and move your training data'
+    ? 'Back up, sync, and move your Workstr data'
     : 'Manual backup for this device';
 }
 
@@ -103,12 +107,13 @@ function progressMarkup(progress: SyncProgress | undefined): string {
 // The card is written twice: as markup by `backupPanel`, and patched in place by
 // `updateBackupStatus` when a status arrives. Both read the panel's inputs through here, or
 // a patched card would drift from the rendered one.
-export function backupPanelState(state: AppState): BackupPanelState {
+export function backupPanelState(state: AppState, tipJarBackup = ''): BackupPanelState {
   return {
     signedIn: Boolean(state.pubkey),
     enabled: Boolean(state.settings.backup?.enabled),
     sync: state.backup,
-    backup: state.settings.backup
+    backup: state.settings.backup,
+    tipJarBackup
   };
 }
 
@@ -126,15 +131,17 @@ export function backupPanel(state: BackupPanelState): string {
 // reader had the card expanded - is not part of this.
 export function backupCardBody(state: BackupPanelState): string {
   const localOnly = state.backup?.localOnlyHistoryCount ?? 0;
-  const manualBackup = `
+  // Said only where the Tip Jar backup is actually below it. Signed out there is no wallet and
+  // no section, and a line pointing at nothing is worse than no line.
+  const manual = (jarNote: boolean): string => `
       <section class="settings-control-group manual-backup-group" aria-label="Manual backup">
-        <div class="settings-control-heading"><span><strong>Manual backup</strong><small>A portable archive for this device.</small></span></div>
+        <div class="settings-control-heading"><span><strong>Manual backup</strong><small>A portable archive of this device's training.</small></span></div>
         <div class="settings-row-main manual-backup-row">
-          <div><strong>Export or import</strong><small>JSON includes all local training data.</small></div>
+          <div><strong>Export or import</strong><small>JSON holds all local training data.${jarNote ? ' Your Tip Jar is backed up separately below.' : ''}</small></div>
           <div class="settings-row-actions"><button id="export-data" class="button">Export JSON</button><button id="import-data" class="button">Import JSON…</button><input id="import-file" type="file" accept="application/json,.json" hidden /></div>
         </div>
       </section>`;
-  if (!state.signedIn) return manualBackup;
+  if (!state.signedIn) return manual(false);
   const eraLine = state.enabled && localOnly > 0
     ? `<div class="settings-subtle-row"><span>Local-only older workouts</span><strong>${localOnly}</strong></div>`
     : '';
@@ -152,12 +159,13 @@ export function backupCardBody(state: BackupPanelState): string {
     : '';
   return `
       <section class="settings-control-group sync-control-group" aria-label="Sync">
-        <div class="settings-control-heading"><span><strong>Sync</strong><small>${html(syncCopy)}</small></span></div>
+        <div class="settings-control-heading"><span><strong>Training sync</strong><small>${html(syncCopy)}</small></span></div>
         <div class="settings-row-main sync-control-row"><div><strong>Auto-sync</strong><small>${state.enabled ? 'Keep this device current automatically.' : 'Turn on encrypted backup.'}</small></div><div class="settings-row-actions">${syncAction}</div></div>
         ${live}
         ${olderNote}
       </section>
-      ${manualBackup}`;
+      ${manual(Boolean(state.tipJarBackup))}
+      ${state.tipJarBackup ?? ''}`;
 }
 
 // Turning sync on or off changes which controls the card has, not only what they say, so

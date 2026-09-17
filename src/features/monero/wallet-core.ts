@@ -12,6 +12,7 @@ import {
   saveMoneroWalletData,
   snapshotFromBundle
 } from './wallet-storage';
+import { tipJarBackupPayload, type TipJarBackupPayload } from './wallet-backup';
 import type {
   MoneroWalletBalance,
   MoneroWalletBackupInfo,
@@ -149,12 +150,16 @@ export class MoneroWalletCore {
     ensureUnlocked(this.vault);
     const seed = request.seed.trim();
     if (!seed) throw new Error('Monero recovery seed is required.');
-    await this.assertNoWallet();
+    const replace = request.replace === true;
+    // Replacing ends the stored wallet's life on this device, so the open one is closed before
+    // anything is written: nothing should still be syncing against a seed being thrown away.
+    if (replace) await this.close();
+    else await this.assertNoWallet();
     const generation = this.generation;
     const runtime = this.runtime ?? await loadMoneroTsRuntime();
     const { config, node, restoreHeight } = await moneroWalletConfig({ node: request.node ?? DEFAULT_MONERO_NODE, seed, restoreHeight: request.restoreHeight, fetcher: this.fetcher });
     const wallet = await runtime.createWallet(config);
-    return this.persistNewWallet(runtime, wallet, node, restoreHeight, request.now ?? this.now(), 'restored', generation);
+    return this.persistNewWallet(runtime, wallet, node, restoreHeight, request.now ?? this.now(), 'restored', generation, replace);
   }
 
   async createMockStagenetWallet(request: MoneroWalletCreateRequest = {}): Promise<MoneroWalletSnapshot> {
@@ -213,10 +218,20 @@ export class MoneroWalletCore {
   }
 
   async backupInfo(): Promise<MoneroWalletBackupInfo> {
+    const bundle = await this.storedBundle();
+    return { seed: bundle.seed, restoreHeight: bundle.metadata.restoreHeight };
+  }
+
+  // Everything a restore on another device needs, and nothing that is only true of this one.
+  // The caller seals it; the seed never leaves this process unencrypted.
+  async backupPayload(): Promise<TipJarBackupPayload> {
+    return tipJarBackupPayload(await this.storedBundle());
+  }
+
+  private async storedBundle(): Promise<MoneroWalletSecretBundle> {
     ensureUnlocked(this.vault);
     const scope = this.scope();
-    const bundle = this.bundle?.metadata.scope === scope ? this.bundle : await loadMoneroWalletBundle(this.vault, scope);
-    return { seed: bundle.seed, restoreHeight: bundle.metadata.restoreHeight };
+    return this.bundle?.metadata.scope === scope ? this.bundle : loadMoneroWalletBundle(this.vault, scope);
   }
 
   async close(): Promise<void> {
@@ -260,7 +275,7 @@ export class MoneroWalletCore {
     };
   }
 
-  private async persistNewWallet(runtime: MoneroWalletRuntime, wallet: MoneroWalletRuntimeWallet, node: MoneroWalletMetadata['node'], restoreHeight: number, now: Date, source: MoneroWalletMetadata['source'], generation: number): Promise<MoneroWalletSnapshot> {
+  private async persistNewWallet(runtime: MoneroWalletRuntime, wallet: MoneroWalletRuntimeWallet, node: MoneroWalletMetadata['node'], restoreHeight: number, now: Date, source: MoneroWalletMetadata['source'], generation: number, replace = false): Promise<MoneroWalletSnapshot> {
     try {
       const pubkey = this.pubkey();
       const scope = moneroWalletScope(pubkey);
@@ -275,7 +290,10 @@ export class MoneroWalletCore {
       // Checked again after the slow runtime work: a second tap, another tab, a lock or an
       // account switch may have happened meanwhile, and none of them may be overwritten.
       if (generation !== this.generation || pubkey !== this.account()) throw new Error('The Monero wallet was closed while it was being set up.');
-      await this.assertNoWallet();
+      // Skipped only for a deliberate replace, which the caller has already confirmed with the
+      // user. The stored wallet's keys and scan cache are keyed by wallet id, so the new id
+      // leaves them unreadable rather than half-applied to the restored wallet.
+      if (!replace) await this.assertNoWallet();
       const timestamp = now.toISOString();
       const metadata: MoneroWalletMetadata = {
         version: 1,

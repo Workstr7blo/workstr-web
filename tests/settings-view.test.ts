@@ -196,14 +196,16 @@ describe('the Settings page', () => {
       expect(card.querySelector('#monero-wallet-create')).toBeNull();
     });
 
-    it('offers create and restore only once the vault confirms this account has no wallet', () => {
+    // #261: creating is the only setup action left here. Restoring moved to Data & Sync, where
+    // it sits beside the training backup and behind a password rather than a raw seed box.
+    it('offers only Create once the vault confirms this account has no wallet', () => {
       const root = off({ deviceVault: 'unlocked', moneroWallet: { status: 'missing', stored: false } });
       const card = root.querySelector('.monero-wallet-card') as HTMLElement;
-      expect(card.querySelector('#monero-wallet-create')).toBeTruthy();
-      expect(card.querySelector('#monero-wallet-restore-form')).toBeTruthy();
+      expect(card.querySelector('#monero-wallet-create')?.textContent).toBe('Create Tip Jar');
+      expect(card.querySelector('#monero-wallet-restore-form')).toBeNull();
+      expect(card.querySelector('#monero-wallet-seed')).toBeNull();
       expect(card.querySelector('#monero-wallet-open')).toBeNull();
-      expect(card.textContent).toContain('Restore from seed');
-      expect(card.textContent).toContain('scan');
+      expect(card.textContent).toContain('Data & Sync');
     });
 
     it('offers only Open for a stored wallet, including after a failed open', () => {

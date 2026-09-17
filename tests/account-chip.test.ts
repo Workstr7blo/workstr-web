@@ -111,15 +111,16 @@ describe('the account chip', () => {
     expect(chip.querySelector('.connection-chip-settings button')).toBeNull();
   });
 
-  // Off has nothing to mark, so the medallion is added and removed rather than swapped.
-  it('adds and removes the Monero medallion with the switch', () => {
+  // #260: the Tip Jar is the bottom navigation's to report. Turning it on must leave the
+  // header exactly as it was - no medallion, no Monero mark, no second status element.
+  it('carries no Tip Jar mark whether the Tip Jar is on or off', () => {
     const root = mount(accountIdentity(state()));
+    const before = root.querySelector('#account-chip')!.innerHTML;
     expect(root.querySelector('.connection-payment-mark')).toBeNull();
     updateAccountIdentity(root, accountIdentity(state({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>)));
-    expect(root.querySelector('.connection-payment-mark')?.querySelector('.monero-mark')).toBeTruthy();
-    expect(root.querySelector('.connection-payment-mark')?.getAttribute('aria-label')).toBe('Tip Jar on');
-    updateAccountIdentity(root, accountIdentity(state()));
     expect(root.querySelector('.connection-payment-mark')).toBeNull();
+    expect(root.querySelector('.monero-mark')).toBeNull();
+    expect(root.querySelector('#account-chip')!.innerHTML).toBe(before);
   });
 
   // Every view except Settings has no Account card, and the chip itself is gone while the

@@ -1,5 +1,3 @@
-import { normalizePaymentMode } from '../core/types';
-import { moneroMark } from './monero-mark';
 import { displayIdentity, html } from './format';
 import type { AppState } from './state';
 
@@ -14,7 +12,6 @@ export interface AccountIdentity {
   label: string;
   initial: string;
   picture: string | null;
-  monero: boolean;
 }
 
 export function accountIdentity(state: AppState): AccountIdentity {
@@ -23,8 +20,7 @@ export function accountIdentity(state: AppState): AccountIdentity {
     signedIn: Boolean(state.pubkey),
     label,
     initial: label.trim().slice(0, 1).toUpperCase() || 'W',
-    picture: state.pubkey ? state.profilePicture || null : null,
-    monero: normalizePaymentMode(state.settings.paymentMode) === 'monero'
+    picture: state.pubkey ? state.profilePicture || null : null
   };
 }
 
@@ -37,16 +33,11 @@ export function avatarFace(className: string, identity: AccountIdentity): string
   return `<img class="${className}" src="${html(identity.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="${className} fallback" hidden>${html(identity.initial)}</span>`;
 }
 
-// The badge on the avatar answers "is my identity connected"; the medallion answers "are
-// the Tip Jar on". Off, there is no payment to mark, so the chip carries no medallion at all.
-// Signed out, tips are not actionable and the chip already carries a second line.
+// The badge on the avatar answers "is my identity connected", and that is the only state the
+// chip carries. Whether the Tip Jar is on is the bottom navigation's to say (#260): a second
+// permanent mark up here made the app read as a Monero product rather than a Workstr one.
 function badge(identity: AccountIdentity): string {
   return identity.signedIn ? '<span class="connection-identity-status" role="img" aria-label="Signed in"></span>' : '';
-}
-
-function paymentMark(identity: AccountIdentity): string {
-  if (!identity.signedIn || !identity.monero) return '';
-  return `<span class="connection-payment-mark" role="img" aria-label="Tip Jar on" title="Tip Jar on">${moneroMark(13)}</span>`;
 }
 
 function chipStatus(identity: AccountIdentity): string {
@@ -66,7 +57,6 @@ export function accountChip(identity: AccountIdentity): string {
             <span class="connection-chip-label">${identity.signedIn ? html(identity.label) : 'Account'}</span>
             ${chipStatus(identity)}
           </span>
-          ${paymentMark(identity)}
           ${settingsGlyph()}
         </button>`;
 }
@@ -121,11 +111,6 @@ function patchChipExtras(chip: HTMLElement, identity: AccountIdentity): void {
   const main = chip.querySelector('.connection-chip-main');
   if (identity.signedIn && status) status.remove();
   else if (!identity.signedIn && !status && main) main.insertAdjacentHTML('beforeend', chipStatus(identity));
-  const mark = chip.querySelector('.connection-payment-mark');
-  const wanted = paymentMark(identity);
-  if (!wanted) mark?.remove();
-  else if (mark) mark.outerHTML = wanted;
-  else chip.querySelector('.connection-chip-settings')?.insertAdjacentHTML('beforebegin', wanted);
 }
 
 // The Settings Account card shows the same name and picture. It is a page away from the

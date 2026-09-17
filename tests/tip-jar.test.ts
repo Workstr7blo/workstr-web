@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { syncFraction, tipJarStatus } from '../src/features/monero/tip-jar-state';
+import { syncFraction, tipJarNavLabel, tipJarStatus } from '../src/features/monero/tip-jar-state';
 import { tipJarNavIcon, tipJarPhase, tipJarView, updateTipJarNav, updateTipJarPage } from '../src/features/monero/tip-jar-view';
 import { shellFrame } from '../src/app/layout';
 import { createMoneroWalletController, TIP_JAR_RESYNC_MS } from '../src/app/monero-wallet-controller';
@@ -86,18 +88,56 @@ describe('Tip Jar navigation', () => {
     expect(tipJar.classList.contains('active')).toBe(false);
   });
 
-  it('keeps selection on the nav item and readiness on the badge', () => {
-    document.body.innerHTML = shellFrame(state({}, { status: 'ready', snapshot: snapshot(synced) }));
-    const tipJar = document.querySelector<HTMLElement>('.sidebar [data-view="tipjar"]')!;
-    expect(tipJar.classList.contains('active')).toBe(true);
-    expect(tipJar.querySelector<HTMLElement>('.tip-jar-icon')?.dataset.tipJar).toBe('ready');
-    expect(tipJar.querySelector('.tip-jar-ring')?.getAttribute('stroke-dashoffset')).toBe('0');
+  // #260: the piggy bank is the whole icon. A second permanent Monero mark in the navigation
+  // said "this app is Monero" every time anyone looked at the bottom of the screen.
+  it('carries no Monero badge in any state', () => {
+    for (const wallet of [
+      { status: 'unknown' as const },
+      { status: 'syncing' as const, syncProgress: 0.4 },
+      { status: 'ready' as const, snapshot: snapshot(synced) },
+      { status: 'error' as const, message: 'offline' }
+    ]) {
+      document.body.innerHTML = shellFrame(state({}, wallet));
+      const tipJar = document.querySelector<HTMLElement>('.sidebar [data-view="tipjar"]')!;
+      expect(tipJar.querySelector('.tip-jar-badge, .tip-jar-badge-disc, .tip-jar-badge-mark')).toBeNull();
+      expect(tipJar.innerHTML).not.toContain('monero');
+      expect(tipJar.querySelector('.tip-jar-piggy')).toBeTruthy();
+    }
   });
 
-  it('patches only the badge state, ring and spoken label as a sync advances', () => {
+  it('names the nav item after the state it is in', () => {
+    expect(tipJarNavLabel('off')).toBe('Tip Jar');
+    expect(tipJarNavLabel('connecting')).toBe('Syncing');
+    expect(tipJarNavLabel('syncing')).toBe('Syncing');
+    expect(tipJarNavLabel('ready')).toBe('Tip Jar');
+    expect(tipJarNavLabel('error')).toBe('Offline');
+  });
+
+  // The ring exists to show a sync running. Ready and error both stop the sync, so both stop
+  // the ring: a full orange circle would be decoration, and a frozen arc would be a lie.
+  it('rings the piggy bank only while a sync is running', () => {
+    const ringHidden = (visual: string) => `.tip-jar-icon[data-tip-jar="${visual}"] .tip-jar-progress`;
+    const css = readFileSync(resolve(__dirname, '../src/style.css'), 'utf8');
+    for (const visual of ['off', 'ready', 'error']) expect(css).toContain(ringHidden(visual));
+    expect(css).toContain('.tip-jar-icon[data-tip-jar="connecting"] .tip-jar-ring { opacity: 0; }');
+
+    document.body.innerHTML = shellFrame(state({}, { status: 'ready', snapshot: snapshot(synced) }));
+    const ready = document.querySelector<HTMLElement>('.sidebar [data-view="tipjar"]')!;
+    expect(ready.classList.contains('active')).toBe(true);
+    expect(ready.querySelector<HTMLElement>('.tip-jar-icon')?.dataset.tipJar).toBe('ready');
+    expect(ready.querySelector('.tip-jar-label')?.textContent).toBe('Tip Jar');
+  });
+
+  // The ring starts at twelve o'clock and fills clockwise, and its offset is the only thing a
+  // sync tick writes into the SVG.
+  it('patches state, ring offset, label and spoken text as a sync advances', () => {
     const s = state({}, { status: 'syncing', syncProgress: 0.1 });
     document.body.innerHTML = `<nav class="sidebar"><div class="nav-item" data-view="tipjar">${tipJarNavIcon(tipJarStatus(s))}</div></nav>`;
     const piggy = document.querySelector('.tip-jar-piggy');
+    const ring = document.querySelector('.tip-jar-ring')!;
+    expect(ring.getAttribute('transform')).toBe('rotate(-90 14 14)');
+    expect(ring.getAttribute('stroke-dashoffset')).toBe('90');
+    expect(document.querySelector('.tip-jar-label')?.textContent).toBe('Syncing');
     s.moneroWallet = { status: 'syncing', syncProgress: 0.6 };
     updateTipJarNav(document, s);
     expect(document.querySelector('.tip-jar-ring')?.getAttribute('stroke-dashoffset')).toBe('40');
@@ -105,6 +145,7 @@ describe('Tip Jar navigation', () => {
     s.moneroWallet = { status: 'error', message: 'offline' };
     updateTipJarNav(document, s);
     expect(document.querySelector<HTMLElement>('.tip-jar-icon')?.dataset.tipJar).toBe('error');
+    expect(document.querySelector('.tip-jar-label')?.textContent).toBe('Offline');
     expect(document.querySelector('.tip-jar-spoken')?.textContent).toBe(', unavailable');
     expect(document.querySelector('.tip-jar-piggy')).toBe(piggy);
   });
@@ -197,7 +238,7 @@ describe('Tip Jar automatic sync', () => {
     } as unknown as MoneroWalletCore;
     const onChange = vi.fn();
     const vault = { isUnlocked: () => s.deviceVault === 'unlocked' } as DeviceVault;
-    const ctrl = createMoneroWalletController({ root, state: s, render: vi.fn(), toast: vi.fn(), repaintMoneroAddress: vi.fn(), onChange, vault, core });
+    const ctrl = createMoneroWalletController({ root, state: s, toast: vi.fn(), repaintMoneroAddress: vi.fn(), onChange, vault, core });
     return { s, core, ctrl, onChange };
   }
 

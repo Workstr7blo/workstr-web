@@ -55,14 +55,16 @@ function app(overrides: Partial<AppState> = {}) {
     claimLegacyWallet: vi.fn(async () => snapshot()),
     createWallet: vi.fn(async () => snapshot()),
     openWallet: vi.fn(async () => snapshot()),
+    isOpen: vi.fn(() => true),
     restoreWallet: vi.fn(async () => snapshot()),
     sync: vi.fn(async () => ({ height: 3763001, daemonHeight: 3763001, synchronized: true, updatedAt: '2026-09-15T00:01:00.000Z' })),
     balance: vi.fn(async () => ({ atomicBalance: '1000000000000', atomicUnlockedBalance: '1000000000000' })),
     backupInfo: vi.fn(async () => ({ seed: 'seed words never logged', restoreHeight: 3763000 })),
+    backupPayload: vi.fn(async () => ({ network: 'mainnet' as const, seed: 'seed words never logged', restoreHeight: 3763000, creatorSubaddressIndex: 1, creatorSubaddress: `8${'A'.repeat(94)}`, primaryAddress: '4PrimaryAddress', createdAt: '2026-09-15T00:00:00.000Z' })),
     close: vi.fn(async () => undefined)
   } as unknown as MoneroWalletCore;
   const toast = vi.fn();
-  const ctrl = createMoneroWalletController({ root, state: s, render: vi.fn(), toast, repaintMoneroAddress: () => {
+  const ctrl = createMoneroWalletController({ root, state: s, toast, repaintMoneroAddress: () => {
     const body = root.querySelector('#monero-tips-body');
     if (body) body.innerHTML = moneroTipsCard(s).match(/<div class="settings-category-body monero-tips-body"[^>]*>([\s\S]*)<\/div>\s*<\/section>/)?.[1] || body.innerHTML;
   }, vault, core });
@@ -130,13 +132,15 @@ describe('Monero wallet controller', () => {
     expect(core.close).toHaveBeenCalled();
   });
 
+  // Syncing is automatic now (#261): there is no Sync wallet button to press, so the lock lands
+  // in the middle of the Tip Jar's own periodic sync.
   it('survives the vault locking in the middle of a sync', async () => {
-    const { root, state, core, ctrl } = app({ moneroWallet: { status: 'ready', stored: true, snapshot: snapshot() } });
+    const { state, core, ctrl } = app({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] }, moneroWallet: { status: 'ready', stored: true, snapshot: snapshot() } } as Partial<AppState>);
     let fail: (error: Error) => void = () => undefined;
     vi.mocked(core.sync).mockImplementation(() => new Promise((_, reject) => { fail = reject; }));
-    root.querySelector<HTMLButtonElement>('#monero-wallet-sync')?.click();
+    void ctrl.autoSync();
     await vi.waitFor(() => expect(core.sync).toHaveBeenCalled());
-    expect(root.querySelector<HTMLButtonElement>('#monero-wallet-sync')?.disabled).toBe(true);
+    expect(state.moneroWallet?.status).toBe('syncing');
     await ctrl.close();
     fail(new Error('Wallet is closed'));
     await Promise.resolve();
@@ -169,52 +173,45 @@ describe('Monero wallet controller', () => {
     await Promise.resolve();
     expect(core.createWallet).toHaveBeenCalledTimes(1);
     expect(state.moneroWallet?.status).toBe('ready');
-    expect(root.querySelector('#monero-wallet-sync')).toBeTruthy();
+    // What an opened wallet shows in Settings is diagnostics, not operations (#261).
+    expect(root.querySelector('.monero-wallet-diagnostics')).toBeTruthy();
+    expect(root.querySelector('#monero-wallet-sync, #monero-wallet-balance, #monero-wallet-use-address')).toBeNull();
   });
 
-  it('passes restore seed to the core and clears the textarea after success', async () => {
-    const { root, core } = app({ moneroWallet: { status: 'missing' } });
-    const seed = root.querySelector<HTMLTextAreaElement>('#monero-wallet-seed')!;
-    seed.value = 'seed words';
-    root.querySelector<HTMLFormElement>('#monero-wallet-restore-form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(core.restoreWallet).toHaveBeenCalledWith({ seed: 'seed words', restoreHeight: undefined });
-    expect(root.querySelector<HTMLTextAreaElement>('#monero-wallet-seed')).toBeNull();
+  // The seed and the height now arrive from Data & Sync - a decrypted backup file, or a phrase
+  // typed into Advanced recovery - so the controller takes them as an argument rather than
+  // reading a textarea that no longer exists in Settings.
+  it('passes a restore request straight to the core', async () => {
+    const { core, ctrl } = app({ moneroWallet: { status: 'missing', stored: false } });
+    await expect(ctrl.restore({ seed: 'seed words', restoreHeight: 3763000 })).resolves.toBe(true);
+    expect(core.restoreWallet).toHaveBeenCalledWith({ seed: 'seed words', restoreHeight: 3763000 });
   });
 
-  it('rejects a malformed restore height without losing the pasted seed', () => {
-    const { root, core, toast } = app({ moneroWallet: { status: 'missing' } });
-    root.querySelector<HTMLTextAreaElement>('#monero-wallet-seed')!.value = 'seed words';
-    root.querySelector<HTMLInputElement>('#monero-wallet-restore-height')!.value = '-5';
-    root.querySelector<HTMLFormElement>('#monero-wallet-restore-form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    expect(core.restoreWallet).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith(expect.stringContaining('Restore height'), 'bad');
-    expect(root.querySelector<HTMLTextAreaElement>('#monero-wallet-seed')?.value).toBe('seed words');
+  it('reports a failed restore without claiming a wallet is stored', async () => {
+    const { state, core, ctrl } = app({ moneroWallet: { status: 'missing', stored: false } });
+    vi.mocked(core.restoreWallet).mockRejectedValue(new Error('Monero recovery seed is required.'));
+    await expect(ctrl.restore({ seed: 'nonsense' })).resolves.toBe(false);
+    expect(state.moneroWallet?.status).toBe('error');
+    expect(state.moneroWallet?.stored).not.toBe(true);
   });
 
-  it('copies the creator subaddress into the public Monero tips draft without marking it published', async () => {
-    const { root, state } = app({ moneroWallet: { status: 'ready', snapshot: snapshot() } });
-    root.querySelector<HTMLButtonElement>('#monero-wallet-use-address')?.click();
-    await Promise.resolve();
-    expect(state.monero.draft).toBe(snapshot().metadata.creatorSubaddress);
-    expect(state.monero.address).toBe('');
-    expect(state.monero.message).toContain('Save address');
-  });
-
-  it('shows restore height and reveals the recovery phrase only after an explicit click', async () => {
+  it('keeps raw block heights and the recovery phrase out of the Settings wallet card', async () => {
     const { root, state, core, ctrl } = app({ moneroWallet: { status: 'ready', snapshot: snapshot() } });
-    expect(root.textContent).toContain('Restore height');
-    expect(root.textContent).toContain('3763000');
+    expect(root.textContent).not.toContain('Restore height');
     expect(root.textContent).not.toContain('seed words never logged');
-    root.querySelector<HTMLButtonElement>('#monero-wallet-show-backup')?.click();
-    await Promise.resolve();
-    await Promise.resolve();
+    // Revealing is one deliberate action, and it is driven from Advanced recovery in Data & Sync.
+    await ctrl.toggleRecoveryPhrase();
     expect(core.backupInfo).toHaveBeenCalledTimes(1);
     expect(state.moneroWallet?.backup?.seed).toBe('seed words never logged');
-    expect(root.textContent).toContain('seed words never logged');
+    expect(root.textContent).not.toContain('seed words never logged');
     ctrl.hideBackup();
     expect(state.moneroWallet?.backup).toBeNull();
+  });
+
+  it('hands the sealed-backup payload out without touching the seed itself', async () => {
+    const { core, ctrl } = app({ moneroWallet: { status: 'ready', snapshot: snapshot() } });
+    await expect(ctrl.backupPayload()).resolves.toMatchObject({ restoreHeight: 3763000, network: 'mainnet' });
+    expect(core.backupPayload).toHaveBeenCalledTimes(1);
   });
 
   it('closes runtime state when the app locks the device vault', async () => {
