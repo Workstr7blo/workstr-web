@@ -127,3 +127,33 @@ describe('exportFilename', () => {
     expect(exportFilename(new Date('2026-07-21T12:00:00Z'))).toBe('workstr-export-2026-07-21.json');
   });
 });
+
+describe('Tip Jar secrets stay out of the training export', () => {
+  // A hard security boundary: the training JSON is the user's portable app data, while the
+  // wallet seed carries spend authority and only ever leaves through its own encrypted
+  // backup. Adding a wallet store to KEYED_STORES/KV_STORES would silently break that.
+  const SEED = 'jaded aztec inbound karate gambit avatar tuxedo hydrogen jubilee molten spout fossil';
+
+  it('exports no store that could carry wallet secrets', async () => {
+    const ns = 'export-no-wallet-secrets';
+    await seed(ns);
+
+    const db = await openWorkstrDB(ns);
+    // Settings is the one free-form store in the export, so prove a wallet secret cannot be
+    // smuggled through it either: the seed lives in the device vault, never in app settings.
+    await db.put('settings', { unit: 'kg', paymentMode: 'monero' } as never, 'workstr');
+    const dump = await exportDatabase(db, ns);
+    db.close();
+
+    const serialised = JSON.stringify(dump);
+    expect(serialised).not.toContain(SEED);
+    for (const secret of ['seed', 'privateSpendKey', 'privateViewKey', 'mnemonic', 'recoveryPhrase']) {
+      expect(serialised).not.toContain(secret);
+    }
+    for (const store of Object.keys(dump.stores)) {
+      expect(store).not.toMatch(/wallet|monero|tip.?jar/i);
+    }
+
+    await wipe(ns);
+  });
+});
