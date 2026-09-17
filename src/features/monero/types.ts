@@ -135,6 +135,24 @@ export interface MoneroWalletUiState {
   messageKind?: 'ok' | 'bad';
 }
 
+// The Tip Jar backup controls inside Data & Sync. Which panel is open, and whether Advanced
+// recovery is expanded, are kept here rather than read back off the DOM: the section is
+// rewritten in place whenever the wallet moves, and a reader halfway through typing a backup
+// password should not lose the form to a sync tick.
+export interface TipJarBackupUiState {
+  panel: 'idle' | 'export' | 'restore';
+  advanced: boolean;
+  busy: boolean;
+  // The chosen file's name and contents, held only until the restore runs.
+  fileName?: string;
+  fileText?: string;
+  message?: string;
+  messageKind?: 'ok' | 'bad';
+  // When this device last wrote a backup file. Device-local: Workstr cannot know whether the
+  // user still has the file, so the copy says when, never "protected".
+  exportedAt?: string;
+}
+
 export interface MoneroWalletCreateRequest {
   node?: Partial<MoneroNodeConfig> | null;
   restoreHeight?: number;
@@ -143,6 +161,9 @@ export interface MoneroWalletCreateRequest {
 
 export interface MoneroWalletRestoreRequest extends MoneroWalletCreateRequest {
   seed: string;
+  // Replaces the wallet already stored for this account. Off by default: a restore that
+  // silently overwrote a stored seed would destroy the only copy of someone's money.
+  replace?: boolean;
 }
 
 export interface MoneroWalletRuntimeWallet {

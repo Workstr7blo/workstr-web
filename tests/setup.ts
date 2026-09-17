@@ -7,14 +7,26 @@ import { vi } from 'vitest';
  * gets the same Argon2id at a trivial cost instead. The input checks are the real ones - a
  * malformed code or parameters below the floor still reach the real function and throw - and
  * `tests/device-vault-kdf.test.ts` exercises the real cost through `vi.importActual`.
+ *
+ * `argon2idKey` is cheapened for the same reason and on the same terms. The Tip Jar backup
+ * derives its file key through it, so a suite that exports and restores backups paid a real
+ * second per case - enough that an export inside `vi.waitFor` lost to its one-second default
+ * and failed as "no file written". The key still depends on the password and the salt, so a
+ * wrong password and an edited file fail exactly as they do in the browser; only the cost is
+ * gone, and parameters below the OWASP floor are still refused by the real function.
  */
 vi.mock('../src/security/device-vault-kdf', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/security/device-vault-kdf')>();
+  const cheap = { memoryCost: 64, iterations: 1, parallelism: 1 };
   return {
     ...actual,
     deriveKeyEncryptionKey: async (pin: string, salt: Uint8Array, parameters: Parameters<typeof actual.deriveKeyEncryptionKey>[2]) => {
       if (!/^[0-9]{9}$/.test(pin) || !actual.meetsKdfMinimum(parameters)) return actual.deriveKeyEncryptionKey(pin, salt, parameters);
-      return actual.argon2idKey(pin, salt, { memoryCost: 64, iterations: 1, parallelism: 1 });
+      return actual.argon2idKey(pin, salt, cheap);
+    },
+    argon2idKey: async (password: string, salt: Uint8Array, parameters: Parameters<typeof actual.argon2idKey>[2]) => {
+      if (!actual.meetsKdfMinimum(parameters)) return actual.argon2idKey(password, salt, parameters);
+      return actual.argon2idKey(password, salt, cheap);
     }
   };
 });

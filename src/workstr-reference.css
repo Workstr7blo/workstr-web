@@ -54,7 +54,6 @@
   --payment-accent: rgb(var(--payment-rgb));
   --payment-accent-strong: var(--accent-soft); /* second stop of the payment CTA gradient */
   --payment-glow: rgba(var(--payment-rgb), 0.3);
-  --on-payment: var(--on-accent);    /* foreground on a payment fill */
 
   --void: #040208;
   --panel: rgba(var(--surface-rgb), 0.78);

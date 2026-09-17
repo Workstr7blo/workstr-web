@@ -1,8 +1,9 @@
 import { deviceVault as defaultVault, type DeviceVault } from '../security/device-vault';
-import { moneroAddressVisible } from '../features/support/payment-mode-views';
 import { MoneroWalletCore, WALLET_ALREADY_STORED } from '../features/monero/wallet-core';
+import { updateTipJarBackupSection } from '../features/monero/wallet-backup-view';
 import { moneroWalletBody, moneroWalletBusy } from '../features/monero/wallet-view';
-import type { MoneroWalletUiState } from '../features/monero/types';
+import type { MoneroWalletRestoreRequest, MoneroWalletUiState } from '../features/monero/types';
+import type { TipJarBackupPayload } from '../features/monero/wallet-backup';
 import type { AppState } from './state';
 import { tipJarOn } from '../features/monero/tip-jar-state';
 
@@ -14,7 +15,6 @@ const VISIBLE_SYNC_BLOCKS = 10;
 export interface MoneroWalletControllerContext {
   root: HTMLElement;
   state: AppState;
-  render(): void;
   toast(message: string, kind?: 'ok' | 'bad'): void;
   repaintMoneroAddress(): void;
   // Every wallet state change, so the Tip Jar nav badge and page follow it.
@@ -34,15 +34,6 @@ function safeReason(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error ?? '');
   const line = raw.split('\n')[0].trim();
   return line ? line.slice(0, 140) : 'try again';
-}
-
-// Blank means "scan from the start"; anything else must be a whole non-negative number, so a
-// typo is reported instead of silently becoming a different height.
-function restoreHeight(root: ParentNode): number | undefined | null {
-  const raw = root.querySelector<HTMLInputElement>('#monero-wallet-restore-height')?.value.trim();
-  if (!raw) return undefined;
-  const value = Number(raw);
-  return Number.isInteger(value) && value >= 0 ? value : null;
 }
 
 export function createMoneroWalletController(ctx: MoneroWalletControllerContext) {
@@ -75,6 +66,9 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
   function paint(): void {
     const body = root.querySelector<HTMLElement>('#monero-wallet-body');
     if (body) body.innerHTML = moneroWalletBody(state);
+    // The Tip Jar backup controls in Data & Sync read the same wallet state: whether there is
+    // anything to export, and the recovery phrase once it has been revealed.
+    updateTipJarBackupSection(root, state);
     const card = root.querySelector<HTMLElement>('.monero-wallet-card');
     const pill = card?.querySelector<HTMLElement>('summary .status-pill');
     if (pill) {
@@ -146,21 +140,22 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     }, (error) => ({ status: 'error', message: `Could not open wallet (${safeReason(error)}).`, messageKind: 'bad' }));
   }
 
-  async function restoreWallet(): Promise<void> {
-    if (!unlockedOr('Unlock Workstr before restoring a Monero wallet.')) return;
-    const seed = root.querySelector<HTMLTextAreaElement>('#monero-wallet-seed')?.value.trim() || '';
-    if (!seed) return set({ status: current().status, message: 'Paste a Monero recovery seed to restore.', messageKind: 'bad' });
-    const height = restoreHeight(root);
-    // A toast rather than a repaint, which would wipe the seed the user just pasted.
-    if (height === null) return toast('Restore height must be a whole block number, or blank', 'bad');
+  // The seed and height are the caller's to supply, whether they came from an encrypted backup
+  // file or from a recovery phrase typed into Advanced recovery. `replace` is only ever true
+  // after the user has confirmed replacing the wallet already on this device.
+  async function restoreWallet(request: MoneroWalletRestoreRequest): Promise<boolean> {
+    if (!unlockedOr('Unlock Workstr before restoring a Monero wallet.')) return false;
+    let restored = false;
     await guarded({ status: 'restoring', message: 'Restoring wallet into the device vault…' }, async () => {
-      const snapshot = await core.restoreWallet({ seed, restoreHeight: height });
-      toast('Monero wallet restored');
-      return { status: 'ready', stored: true, legacyAvailable: false, addresses: [snapshot.metadata.creatorSubaddress, snapshot.metadata.primaryAddress], snapshot, message: 'Wallet restored and saved in the device vault.', messageKind: 'ok' };
+      const snapshot = await core.restoreWallet(request);
+      restored = true;
+      toast('Tip Jar restored');
+      return { status: 'ready', stored: true, legacyAvailable: false, addresses: [snapshot.metadata.creatorSubaddress, snapshot.metadata.primaryAddress], snapshot, backup: null, message: 'Tip Jar restored and saved in the device vault.', messageKind: 'ok' };
     }, (error) => {
-      toast('Could not restore Monero wallet', 'bad');
+      toast('Could not restore the Tip Jar', 'bad');
       return alreadyStored(error) ?? { status: 'error', message: `Could not restore wallet (${safeReason(error)}).`, messageKind: 'bad' };
     });
+    return restored;
   }
 
   async function claimLegacyWallet(): Promise<void> {
@@ -237,15 +232,6 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     }
   }
 
-  async function refreshBalance(): Promise<void> {
-    const snapshot = current().snapshot;
-    if (!snapshot) return openWallet();
-    await guarded({ ...current(), status: 'syncing', message: 'Refreshing balance…' }, async () => {
-      const balance = await core.balance();
-      return { status: 'ready', snapshot: { ...snapshot, balance }, message: 'Balance refreshed.', messageKind: 'ok' };
-    }, (error) => ({ status: 'error', snapshot, message: `Could not refresh balance (${safeReason(error)}).`, messageKind: 'bad' }));
-  }
-
   async function toggleBackupInfo(): Promise<void> {
     const shown = current();
     if (!shown.snapshot || moneroWalletBusy(shown.status)) return;
@@ -260,23 +246,9 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     }
   }
 
-  async function useForTips(): Promise<void> {
-    const address = current().snapshot?.metadata.creatorSubaddress;
-    if (!address) return;
-    state.monero = { ...state.monero, draft: address, message: 'Wallet creator subaddress copied here. Save address to publish it.', messageKind: 'ok' };
-    ctx.repaintMoneroAddress();
-    if (!moneroAddressVisible(state)) ctx.render();
-    toast('Creator subaddress ready to publish');
-  }
-
   function bind(): void {
     root.querySelector('#monero-wallet-create')?.addEventListener('click', () => { void createWallet().then(autoSync); });
     root.querySelector('#monero-wallet-open')?.addEventListener('click', () => { void openWallet().then(autoSync); });
-    root.querySelector('#monero-wallet-restore-form')?.addEventListener('submit', (event) => { event.preventDefault(); void restoreWallet().then(autoSync); });
-    root.querySelector('#monero-wallet-sync')?.addEventListener('click', () => { void syncWallet(); });
-    root.querySelector('#monero-wallet-balance')?.addEventListener('click', () => { void refreshBalance(); });
-    root.querySelector('#monero-wallet-show-backup')?.addEventListener('click', () => { void toggleBackupInfo(); });
-    root.querySelector('#monero-wallet-use-address')?.addEventListener('click', () => { void useForTips(); });
     root.querySelector('#monero-wallet-claim')?.addEventListener('click', () => { void claimLegacyWallet().then(autoSync); });
     root.querySelector('#monero-wallet-claim-dismiss')?.addEventListener('click', dismissLegacyWallet);
     root.querySelector('#monero-wallet-recheck')?.addEventListener('click', () => { state.moneroWallet = { status: 'unknown' }; void refreshIfNeeded(); });
@@ -302,6 +274,11 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     autoSync,
     // Tip Jar create from its own page; Settings offers the same action.
     createWallet: () => createWallet().then(autoSync),
+    // Restoring and revealing the recovery phrase are driven from Data & Sync, but the wallet
+    // lifecycle stays here so there is one place that decides what `state.moneroWallet` says.
+    restore: (request: MoneroWalletRestoreRequest) => restoreWallet(request).then(async (ok) => { if (ok) await autoSync(); return ok; }),
+    toggleRecoveryPhrase: toggleBackupInfo,
+    backupPayload: (): Promise<TipJarBackupPayload> => core.backupPayload(),
     // Tip Jar switched off: nothing keeps talking to the Monero node.
     async stop(): Promise<void> {
       stopAutoSync();

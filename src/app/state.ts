@@ -3,7 +3,7 @@ import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings } from '
 import type { RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import type { MoneroAddressState } from '../features/support/payment-mode-views';
-import type { MoneroWalletUiState } from '../features/monero/types';
+import type { MoneroWalletUiState, TipJarBackupUiState } from '../features/monero/types';
 import type { SyncStatus } from '../sync/engine';
 import type { DeviceVaultStatus } from '../security/device-vault-types';
 
@@ -73,6 +73,8 @@ export interface AppState {
   // state, not a setting: the relays own the address.
   monero: MoneroAddressState;
   moneroWallet?: MoneroWalletUiState;
+  // The Tip Jar backup controls in Data & Sync. Absent until Settings has been opened.
+  tipJarBackup?: TipJarBackupUiState;
   signerType: 'nip07' | 'nip46' | 'local' | null;
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };

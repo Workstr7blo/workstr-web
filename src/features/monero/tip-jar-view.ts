@@ -1,7 +1,7 @@
 import { html } from '../../app/format';
-import { MONERO_MARK, moneroQr } from '../../app/monero-mark';
+import { moneroQr } from '../../app/monero-mark';
 import type { AppState } from '../../app/state';
-import { tipJarOn, tipJarStatus, type TipJarStatus } from './tip-jar-state';
+import { tipJarNavLabel, tipJarOn, tipJarStatus, type TipJarStatus } from './tip-jar-state';
 import { xmrAmount } from './wallet-view';
 
 // Outline piggy bank in the nav icon language: 24px box, stroke drawn in currentColor.
@@ -12,22 +12,22 @@ function ringOffset(progress: number): string {
   return (100 - Math.round(progress * 100)).toString();
 }
 
-// Two layers that never share meaning: the piggy bank is the feature and takes the nav colour
-// (purple when selected, muted when off); the badge is Monero readiness and takes the payment
-// colour. Only the ring's offset changes while syncing, so updates never rebuild the SVG.
+// The piggy bank is the Tip Jar, and the ring around it is live synchronization - nothing else.
+// There is no Monero badge: a permanent payment mark in the navigation made the Tip Jar read as
+// a Monero subsystem bolted onto Workstr rather than a part of it (#260). The ring is drawn
+// behind the piggy bank, starts at twelve o'clock and fills clockwise, and is hidden by CSS
+// once the wallet is ready, so only its offset changes while a sync runs.
 export function tipJarNavIcon(status: TipJarStatus): string {
   return `<span class="tip-jar-icon" data-tip-jar="${status.visual}">
-    <svg class="tip-jar-piggy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PIGGY_BANK}</svg>
-    <svg class="tip-jar-badge" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <circle class="tip-jar-ring-track" cx="12" cy="12" r="10.5"/>
-      <circle class="tip-jar-ring" cx="12" cy="12" r="10.5" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${ringOffset(status.progress)}" transform="rotate(-90 12 12)"/>
-      <circle class="tip-jar-badge-disc" cx="12" cy="12" r="7.5"/>
-      <path class="tip-jar-badge-mark" transform="translate(12 12) scale(.5) translate(-12 -12)" d="${MONERO_MARK}"/>
+    <svg class="tip-jar-progress" viewBox="0 0 28 28" fill="none" aria-hidden="true" focusable="false">
+      <circle class="tip-jar-ring-track" cx="14" cy="14" r="12.6"/>
+      <circle class="tip-jar-ring" cx="14" cy="14" r="12.6" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${ringOffset(status.progress)}" transform="rotate(-90 14 14)"/>
     </svg>
-  </span><span>Tip Jar</span><span class="sr-only tip-jar-spoken">, ${html(status.spoken)}</span>`;
+    <svg class="tip-jar-piggy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PIGGY_BANK}</svg>
+  </span><span class="tip-jar-label">${html(tipJarNavLabel(status.visual))}</span><span class="sr-only tip-jar-spoken">, ${html(status.spoken)}</span>`;
 }
 
-// Patched in place as the wallet moves, so a sync tick costs three attribute writes.
+// Patched in place as the wallet moves, so a sync tick costs four attribute writes.
 export function updateTipJarNav(root: ParentNode, state: AppState): void {
   const item = root.querySelector<HTMLElement>('.sidebar [data-view="tipjar"]');
   if (!item) return;
@@ -37,6 +37,9 @@ export function updateTipJarNav(root: ParentNode, state: AppState): void {
   const ring = item.querySelector('.tip-jar-ring');
   const offset = ringOffset(status.progress);
   if (ring && ring.getAttribute('stroke-dashoffset') !== offset) ring.setAttribute('stroke-dashoffset', offset);
+  const label = item.querySelector('.tip-jar-label');
+  const word = tipJarNavLabel(status.visual);
+  if (label && label.textContent !== word) label.textContent = word;
   const spoken = item.querySelector('.tip-jar-spoken');
   const text = `, ${status.spoken}`;
   if (spoken && spoken.textContent !== text) spoken.textContent = text;

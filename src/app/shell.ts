@@ -40,6 +40,9 @@ import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
 import { createMoneroAddressController } from './monero-address-controller';
 import { createMoneroWalletController } from './monero-wallet-controller';
+import { createTipJarBackupController } from './tip-jar-backup-controller';
+import { MoneroWalletCore } from '../features/monero/wallet-core';
+import { deviceVault } from '../security/device-vault';
 import { createMoneroTipController } from './monero-tip-controller';
 import { applyPaymentMode, createTipJarController } from './tip-jar-controller';
 import { updateTipJarNav } from '../features/monero/tip-jar-view';
@@ -235,13 +238,13 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   }
 
   function openView(view: View, reason = 'navigate-view'): void {
-    if (view !== 'settings') moneroWallet.hideBackup();
+    if (view !== 'settings') { moneroWallet.hideBackup(); tipJarBackup.reset(); }
     state.view = view;
     state.editingId = null;
     render({ toTop: true, reason });
     if (view === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
     if (view === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
-    if (view === 'settings') { moneroAddress.refreshIfNeeded(); void moneroWallet.refreshIfNeeded(); }
+    if (view === 'settings') { moneroAddress.refreshIfNeeded(); tipJarBackup.refresh(); void moneroWallet.refreshIfNeeded(); }
     if (view === 'tipjar') tipJar.open();
   }
 
@@ -346,7 +349,11 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   });
   const preferences = createPreferencesController({ root, state, render, toast, startTrainingSession: sessionRunner.startTrainingSession, loadFinishedSessions: sessionPersistence.loadFinished });
   const moneroAddress = createMoneroAddressController({ root, state, toast, getSigner: identity.getActiveSigner, onChange: () => tipJar.repaint() });
-  const moneroWallet = createMoneroWalletController({ root, state, render, toast, repaintMoneroAddress: moneroAddress.repaint, onChange: () => tipJar.repaint() });
+  // One wallet core, shared by the controller that owns the wallet's life and the one that
+  // owns its backup file. Two cores would be two open wallets fighting over the same vault.
+  const walletCore = new MoneroWalletCore({ vault: deviceVault, account: () => state.pubkey });
+  const moneroWallet = createMoneroWalletController({ root, state, toast, repaintMoneroAddress: moneroAddress.repaint, onChange: () => tipJar.repaint(), core: walletCore });
+  const tipJarBackup = createTipJarBackupController({ root, state, toast, wallet: moneroWallet });
   const tipJar = createTipJarController({ root, state, toast, savePaymentMode: preferences.savePaymentMode, refreshAuthorPaymentTargets: catalog.refreshAuthorPaymentTargets, moneroAddress, moneroWallet });
   const moneroTip = createMoneroTipController({ root, state, toast, openModal });
   const programList = createProgramList({

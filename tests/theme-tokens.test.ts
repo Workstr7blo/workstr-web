@@ -74,7 +74,7 @@ describe('theme tokens', () => {
 
     // Fewer overrides are better here: the smaller this block, the more of Workstr survives
     // the mode switch intact.
-    const allowed = new Set(['--payment-rgb', '--payment-accent', '--payment-accent-strong', '--on-payment']);
+    const allowed = new Set(['--payment-rgb', '--payment-accent', '--payment-accent-strong']);
     for (const token of overridden) {
       expect(allowed.has(token), `${token} should not be overridden by Monero Mode`).toBe(true);
     }

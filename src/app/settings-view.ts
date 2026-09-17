@@ -11,6 +11,7 @@ import { normalizeWeightUnit } from '../core/units';
 import { hasNip07 } from '../signer/nip07';
 import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { backupPanel, backupPanelState } from '../features/backup/views';
+import { tipJarBackupSection } from '../features/monero/wallet-backup-view';
 import { deviceSecurityCard } from './device-vault-view';
 
 // Settings is read top to bottom by someone who is not thinking in features: who I am, how I
@@ -177,6 +178,6 @@ export function settingsView(state: AppState): string {
     ${settingsGroup({ id: 'training', label: 'Training', blurb: 'Configure your training experience', icon: GROUP_ICONS.training, cards: trainingCards })}
     ${settingsGroup({ id: 'payments', label: 'Payments', blurb: 'Tip program creators with Monero', icon: GROUP_ICONS.payments, cards: paymentCards })}
     ${settingsGroup({ id: 'support', label: 'Support', blurb: 'Help keep Workstr independent', icon: GROUP_ICONS.support, cards: supportCards, variant: 'support' })}
-    ${settingsGroup({ id: 'system', label: 'System & Data', blurb: 'Manage your data and advanced settings', icon: GROUP_ICONS.system, cards: [backupPanel(backupPanelState(state)), advancedCard(state)] })}
+    ${settingsGroup({ id: 'system', label: 'System & Data', blurb: 'Manage your data and advanced settings', icon: GROUP_ICONS.system, cards: [backupPanel(backupPanelState(state, tipJarBackupSection(state))), advancedCard(state)] })}
   </div>`;
 }

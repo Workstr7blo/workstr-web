@@ -2,6 +2,7 @@ import type { RenderOptions } from './root-rebuild';
 import type { AppState } from './state';
 import type { Signer } from '../signer/types';
 import { backupPanelState, updateBackupCard, updateBackupStatus } from '../features/backup/views';
+import { tipJarBackupSection } from '../features/monero/wallet-backup-view';
 import { createSyncEngine, type SyncEngine, type SyncStatus } from '../sync/engine';
 
 // Survives the sign-in round trip, including a NIP-46 hop out to a signer app and back.
@@ -70,7 +71,7 @@ export function createBackupController(ctx: BackupControllerContext): BackupCont
   // instead, and a
   // reader who is not on Settings gets nothing written and keeps the state.
   function writeCard(reason: string): void {
-    if (updateBackupCard(ctx.root, backupPanelState(ctx.state))) ctx.bindCard();
+    if (updateBackupCard(ctx.root, backupPanelState(ctx.state, tipJarBackupSection(ctx.state)))) ctx.bindCard();
     else ctx.render({ reason });
   }
 

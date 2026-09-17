@@ -77,7 +77,8 @@ and patch it directly, which is also why a page render can leave it standing.
 | NIP-A3 Monero payment targets (`kind:10133`) | `src/nostr/payment-targets.ts` | `src/nostr/pool.ts`, `src/signer/types.ts` | `tests/payment-targets.test.ts` |
 | Monero wallet phase-1 spike, phase-2 wallet core, and Settings wallet UI (#246): runtime import, node reachability, lazy wallet runtime, per-account vault storage (`monero.hot-wallet.<pubkey>` seed bundle, `monero.hot-wallet-data.<pubkey>` keys/scan cache, adopting the legacy device-wide `monero.hot-wallet` only on request), mock stagenet wallet, and QA evidence | `src/features/monero/wallet-node.ts`, `src/features/monero/wallet-runtime.ts`, `src/features/monero/wallet-core.ts`, `src/features/monero/wallet-storage.ts`, `src/features/monero/wallet-view.ts`, `src/features/monero/wallet-spike.ts`, `src/features/monero/mock-stagenet-wallet.ts`, `src/features/monero/phase1-report.ts`, `src/features/monero/types.ts` | `src/app/monero-wallet-controller.ts`, `src/app/settings-view.ts`, `src/app/shell.ts`, `src/monero-spike.ts`, `monero-spike.html`, `vite.monero-spike.config.ts`, `scripts/monero-spike-browser.mjs`, `docs/monero-wallet-phase1.md`, `docs/monero-wallet-phase2-core.md`, `docs/monero-wallet-phase3-settings-ui.md`, `docs/monero-ios-qa-checklist.md`, `docs/monero-rpc-browser-bridge.md`, `src/security/device-vault.ts`, `src/shims/node-assert.ts` | `tests/monero-wallet-spike.test.ts`, `tests/monero-wallet-core.test.ts`, `tests/monero-wallet-controller.test.ts`, `tests/monero-worker-asset.test.ts`, `tests/browser-assert-shim.test.ts`, `tests/settings-view.test.ts`, `npm run spike:monero:browser` |
 | Monero Tip on Discover program cards | `src/features/sheets/monero-tip-view.ts`, `src/app/monero-tip-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/catalog-controller.ts`, `src/features/sheets/views.ts` | `tests/monero-tip-controller.test.ts`, `tests/discover.test.ts` |
-| Tip Jar (#257): the bottom-nav piggy bank and its Monero status badge, the Tip Jar page, the on/off switch shared by Settings and the page, and automatic wallet sync | `src/features/monero/tip-jar-state.ts` (`tipJarStatus`, the one wallet-state-to-visual mapping), `src/features/monero/tip-jar-view.ts`, `src/app/tip-jar-controller.ts` | `src/app/layout.ts` (nav item, `appView`), `src/app/monero-wallet-controller.ts` (`autoSync`, `stop`), `src/app/shell.ts`, `src/style.css` | `tests/tip-jar.test.ts`, `tests/tip-jar-controller.test.ts`, `tests/shell.test.ts` |
+| Tip Jar (#257, #260): the bottom-nav piggy bank with its live sync ring and state label, the Tip Jar page, the on/off switch shared by Settings and the page, and automatic wallet sync | `src/features/monero/tip-jar-state.ts` (`tipJarStatus`, the one wallet-state-to-visual mapping, and `tipJarNavLabel`), `src/features/monero/tip-jar-view.ts`, `src/app/tip-jar-controller.ts` | `src/app/layout.ts` (nav item, `appView`), `src/app/monero-wallet-controller.ts` (`autoSync`, `stop`), `src/app/shell.ts`, `src/app/account-chip.ts` (carries no payment mark), `src/style.css` | `tests/tip-jar.test.ts`, `tests/tip-jar-controller.test.ts`, `tests/account-chip.test.ts`, `tests/shell.test.ts` |
+| Tip Jar backup (#261): the encrypted `.wstrwallet` file, its export/restore controls in Data & Sync, and Advanced recovery (recovery phrase, restore height, seed restore) | `src/features/monero/wallet-backup.ts` (format, Argon2id + AES-GCM, validation), `src/features/monero/wallet-backup-view.ts`, `src/app/tip-jar-backup-controller.ts` | `src/features/backup/views.ts` (hosts the section), `src/app/backup-controller.ts`, `src/app/settings-view.ts`, `src/app/shell.ts`, `src/app/monero-wallet-controller.ts` (`backupPayload`, `restore`), `src/security/device-vault-kdf.ts`, `src/style.css` | `tests/tip-jar-backup.test.ts`, `tests/backup-views.test.ts`, `tests/settings-view.test.ts` |
 | The Tip Jar switch in Settings and the user's public Monero address | `src/features/support/payment-mode-views.ts`, `src/app/monero-address-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/settings-view.ts`, `src/app/tip-jar-controller.ts` (the switch handler) | `tests/monero-address-controller.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts` |
 | Support Workstr | `src/features/support/views.ts` | `src/core/funding.ts`, `src/app/monero-mark.ts`, `src/nostr/payment-targets.ts`, `src/app/settings-view.ts` | `tests/support-views.test.ts`, `tests/settings-view.test.ts` |
 | IndexedDB schema | `src/db/schema.ts` | `src/core/types.ts`, `src/db/store.ts` | `tests/store.test.ts`, `tests/export.test.ts`, `tests/adopt.test.ts` |
@@ -206,11 +207,26 @@ and patch it directly, which is also why a page render can leave it standing.
 - `src/features/monero/tip-jar-state.ts` is the single answer to "what state is the Tip
   Jar in": off, connecting, syncing (with progress), ready, or error. The nav badge, the page
   status word and the spoken label all read it. "Tip Jar" is the user-facing name only; the
-  setting stays `paymentMode` and the code keeps its `monero` names. `tip-jar-view.ts` draws
-  the nav icon (a piggy bank taking the nav colour, and a Monero badge with a sync ring taking
-  the payment colour) and the page, and patches both in place (`updateTipJarNav`,
-  `updateTipJarPage`) so a sync tick never renders the page. Raw block heights stay in the
-  Settings wallet card.
+  setting stays `paymentMode` and the code keeps its `monero` names. `tipJarNavLabel` collapses
+  those five states to the three words the nav can say: Tip Jar, Syncing, Offline.
+  `tip-jar-view.ts` draws the nav icon and the page, and patches both in place
+  (`updateTipJarNav`, `updateTipJarPage`) so a sync tick never renders the page. The icon is a
+  piggy bank taking the nav colour with a progress ring drawn behind it, and nothing else:
+  #260 removed the Monero badge here and the payment medallion from the account chip, so the
+  ring is the only orange in the app shell and only while a sync runs. Raw block heights stay
+  in the Settings wallet card's diagnostics.
+- `src/features/monero/wallet-backup.ts` owns the Tip Jar's portable backup and nothing else:
+  it turns a stored wallet bundle into the fields a restore needs, seals them under the user's
+  password (Argon2id at the device-vault parameters, then AES-GCM with the type, version and
+  network as authenticated data), and validates a file before a password is ever asked for. It
+  touches no network, vault or DOM. The private spend and view keys, the node configuration and
+  the vault scope are deliberately left out: they describe the device, not the wallet. This is
+  a separate artifact from `src/db/export.ts` on purpose - the JSON export carries training
+  data and is handed around freely, this file carries spend authority.
+  `wallet-backup-view.ts` renders the Data & Sync section and Advanced recovery, and
+  `src/app/tip-jar-backup-controller.ts` owns the export, restore and reveal flows, patching
+  the section in place. The recovery phrase is not in the document until it is revealed, and a
+  restore that would replace a stored wallet is confirmed first.
 - `src/app/tip-jar-controller.ts` owns turning the Tip Jar on and off from either surface,
   the page's delegated actions, and `applyPaymentMode`. `monero-wallet-controller.ts` owns
   `autoSync`: while the Tip Jar is on, signed in and unlocked it opens the account's stored
