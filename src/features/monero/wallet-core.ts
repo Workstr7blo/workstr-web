@@ -26,6 +26,7 @@ import type {
   MoneroWalletSecretBundle,
   MoneroWalletSnapshot,
   MoneroWalletSyncState,
+  MoneroPreparedTransfer,
   TipJarWalletTx
 } from './types';
 
@@ -219,13 +220,37 @@ export class MoneroWalletCore {
     return lastBalance;
   }
 
-  // The wallet's own transaction list, the source of truth for Tip Jar activity. A runtime
-  // that cannot list transactions reports none rather than failing the sync around it.
+  // The source of truth for Tip Jar activity; none from a runtime that cannot list them.
   async transactions(): Promise<TipJarWalletTx[]> {
     const wallet = this.requireOpenWallet();
     if (!wallet.getTxs) return [];
     const txs = await wallet.getTxs();
     return txs.map(walletTxFromRuntime).filter((tx): tx is TipJarWalletTx => tx !== null);
+  }
+
+  // Signs a transfer on this device without broadcasting it: the node sees nothing until
+  // relayTransfer, so the user can read the real fee and still walk away.
+  async prepareTransfer(request: { address: string; amountAtomic: string }): Promise<MoneroPreparedTransfer> {
+    const wallet = this.requireOpenWallet();
+    if (!wallet.createTx || !wallet.relayTx) throw new Error('This Monero wallet cannot send.');
+    const amount = BigInt(request.amountAtomic);
+    if (amount <= 0n) throw new Error('Enter an amount above zero.');
+    const tx = await wallet.createTx({ accountIndex: 0, address: request.address.trim(), amount, relay: false });
+    const metadata = tx.getMetadata?.();
+    const fee = tx.getFee?.();
+    if (!metadata || fee === undefined) throw new Error('The wallet did not return a signed transaction.');
+    return { address: request.address.trim(), amountAtomic: amount.toString(), feeAtomic: fee.toString(), metadata };
+  }
+
+  // Broadcasts a prepared transfer and returns its txid. Keys and scan cache are saved at once,
+  // so a restart does not offer the spent outputs again.
+  async relayTransfer(prepared: MoneroPreparedTransfer): Promise<string> {
+    const wallet = this.requireOpenWallet();
+    if (!wallet.relayTx) throw new Error('This Monero wallet cannot send.');
+    const txid = await wallet.relayTx(prepared.metadata);
+    if (!txid) throw new Error('The node did not return a transaction id.');
+    await this.saveData(wallet, {}, true).catch(() => undefined);
+    return txid;
   }
 
   // The stored wallet's id, which Tip Jar activity is kept against, whether or not it is open.

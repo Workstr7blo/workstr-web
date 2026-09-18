@@ -46,6 +46,7 @@ import { deviceVault } from '../security/device-vault';
 import { createMoneroTipController } from './monero-tip-controller';
 import { applyPaymentMode, createTipJarController } from './tip-jar-controller';
 import { createTipJarActivityController } from './tip-jar-activity-controller';
+import { createMoneroSendController } from './monero-send-controller';
 import { updateTipJarNav } from '../features/monero/tip-jar-view';
 import { createProgramPublishController } from './program-publish-controller';
 import type { ShellHandle, ShellOptions } from './shell-types';
@@ -356,15 +357,12 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const walletCore = new MoneroWalletCore({ vault: deviceVault, account: () => state.pubkey });
   const tipJarActivity = createTipJarActivityController({ state, fetchProfile, onChange: () => tipJar.repaint() });
   const moneroWallet = createMoneroWalletController({ root, state, toast, repaintMoneroAddress: moneroAddress.repaint, onChange: () => tipJar.repaint(), onActivity: (walletId, txs) => { void tipJarActivity.walletActivity(walletId, txs); }, core: walletCore });
-  // The backup file carries the wallet and what Workstr knows about its outgoing tips; a restore
-  // hands that knowledge back once the wallet is in place.
-  const tipJarBackup = createTipJarBackupController({ root, state, toast, wallet: {
-    restore: moneroWallet.restore,
-    toggleRecoveryPhrase: moneroWallet.toggleRecoveryPhrase,
-    backupPayload: async () => ({ ...await moneroWallet.backupPayload(), activity: await tipJarActivity.backupRecords(await walletCore.storedWalletId()) })
-  }, activity: tipJarActivity });
-  const tipJar = createTipJarController({ root, state, toast, savePaymentMode: preferences.savePaymentMode, refreshAuthorPaymentTargets: catalog.refreshAuthorPaymentTargets, moneroAddress, moneroWallet, activity: tipJarActivity });
-  const moneroTip = createMoneroTipController({ root, state, toast, openModal });
+  // The backup file carries the wallet plus what Workstr knows about its outgoing tips.
+  const tipJarBackup = createTipJarBackupController({ root, state, toast, activity: tipJarActivity, wallet: { restore: moneroWallet.restore, toggleRecoveryPhrase: moneroWallet.toggleRecoveryPhrase, backupPayload: async () => ({ ...await moneroWallet.backupPayload(), activity: await tipJarActivity.backupRecords(await walletCore.storedWalletId()) }) } });
+  // A send needs only an open wallet, so it uses the shared core; afterSend re-syncs the Tip Jar.
+  const moneroSend = createMoneroSendController({ root, state, toast, openModal, closeModal, wallet: walletCore, activity: tipJarActivity, afterSend: () => { void moneroWallet.autoSync(); } });
+  const tipJar = createTipJarController({ root, state, toast, savePaymentMode: preferences.savePaymentMode, refreshAuthorPaymentTargets: catalog.refreshAuthorPaymentTargets, moneroAddress, moneroWallet, activity: tipJarActivity, send: moneroSend });
+  const moneroTip = createMoneroTipController({ root, state, toast, openModal, sendTip: moneroSend.openTip });
   const programList = createProgramList({
     root, state, render, toast,
     startTraining: (program) => { void sessionRunner.startTrainingSession(program); },

@@ -3,6 +3,7 @@ import { moneroQr } from '../../app/monero-mark';
 import type { AppState } from '../../app/state';
 import { PIGGY_BANK, tipJarActivityCard, updateTipJarActivity } from './tip-jar-history-view';
 import { tipJarNavLabel, tipJarOn, tipJarStatus, type TipJarStatus } from './tip-jar-state';
+import { sendReadiness } from './wallet-send';
 import { xmrAmount } from './wallet-view';
 
 // The ring circumference is normalised with pathLength, so progress is a plain 0..100 offset.
@@ -80,7 +81,7 @@ function walletBody(state: AppState, status: TipJarStatus): string {
     <div class="tip-jar-status" id="tip-jar-status" data-tip-jar="${status.visual}">${html(status.word)}</div>
     <div class="tip-jar-actions">
       <button id="tip-jar-receive" class="button payment" type="button" aria-expanded="false" aria-controls="tip-jar-receive-panel"${address ? '' : ' disabled'}>Receive</button>
-      <button id="tip-jar-send" class="button" type="button" disabled>Send</button>
+      <button id="tip-jar-send" class="button payment" type="button"${sendReadiness(state).ok ? '' : ' disabled'}>Send</button>
     </div>
     ${receive}
   </div>
@@ -137,5 +138,8 @@ export function updateTipJarPage(root: ParentNode, state: AppState): void {
   if (balanceEl && balanceEl.textContent !== balance) balanceEl.textContent = balance;
   const statusEl = body.querySelector<HTMLElement>('#tip-jar-status');
   if (statusEl && statusEl.textContent !== status.word) { statusEl.textContent = status.word; statusEl.dataset.tipJar = status.visual; }
+  const send = body.querySelector<HTMLButtonElement>('#tip-jar-send');
+  const canSend = sendReadiness(state).ok;
+  if (send && send.disabled === canSend) send.disabled = !canSend;
   updateTipJarActivity(body, state);
 }

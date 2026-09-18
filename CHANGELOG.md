@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added sending from the Tip Jar. Tip on a program card now opens a tip sheet in Workstr:
+  pick 0.001, 0.005 or 0.01 XMR or type an amount, review the amount, network fee and total,
+  and confirm. The transfer is signed on your device and broadcast through the Monero node;
+  your recovery phrase and spend key never leave the device. The Tip Jar page's Send button
+  sends to any Monero address the same way. Sending is available once the Tip Jar is synced
+  and holds spendable XMR; until then Tip still shows the creator's address and QR to pay from
+  another wallet, which also stays one tap away inside the tip sheet. A send whose broadcast
+  cannot be confirmed says so and does not offer to send again, so a tip is never paid twice.
+
 - Added Recent activity to the Tip Jar page: the five newest transactions, newest first, with an
   up-right arrow for money sent and a down-left arrow for money received, the amount, and a
   compact day and time. A tip shows the creator's current Nostr name and picture, falling back
@@ -46,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The Tip Jar page no longer shows the Receiving tips and Backup card or the note under the
-  disabled Send button; both settings stay in Settings.
+  Send button; both settings stay in Settings.
 - Changed the Tip Jar's status to show in one place. The Monero logo and the orange tint are
   gone from the header identity chip, and the navigation no longer carries a permanent Monero
   badge: the piggy bank is the Tip Jar, and the ring around it appears only while it is

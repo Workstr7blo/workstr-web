@@ -35,9 +35,9 @@ export interface MoneroTipDetails {
 }
 
 /**
- * Creator, address, QR and the two actions. There is deliberately no amount, no total and
- * no status: a Monero transfer leaves no trace Workstr can read, so anything this screen
- * claimed about one would be invented. It hands over an address and gets out of the way.
+ * The hand-off, for when the Tip Jar cannot send (off, not set up, or still syncing): creator,
+ * address, QR and the two actions. No amount, total or status: a transfer from another wallet
+ * leaves no trace Workstr can read. It hands over an address and gets out of the way.
  */
 export function moneroTipModal(details: MoneroTipDetails): string {
   const address = details.address.trim();
@@ -52,7 +52,7 @@ export function moneroTipModal(details: MoneroTipDetails): string {
       <button id="monero-tip-copy" class="button payment" type="button">Copy address</button>
       <a id="monero-tip-open" class="button" href="${html(uri)}">Open wallet</a>
     </div>
-    <p class="section-help">Paid directly from your wallet to the creator. Workstr holds no Monero keys or funds, sees no payment, and records nothing about it.</p>
+    <p class="section-help">Paid from your own wallet straight to the creator. Workstr does not see a payment made this way and records nothing about it.</p>
   </div>`;
 }
 
