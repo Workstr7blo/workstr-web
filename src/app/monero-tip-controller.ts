@@ -1,4 +1,5 @@
 import type { RelayProgram } from '../nostr/canon';
+import type { MoneroSendRecipient } from '../features/monero/types';
 import { moneroTipAddress, moneroTipCreator, moneroTipModal } from '../features/sheets/monero-tip-view';
 import type { AppState } from './state';
 
@@ -7,14 +8,16 @@ export interface MoneroTipControllerContext {
   state: AppState;
   toast(message: string, kind?: 'ok' | 'bad'): void;
   openModal(content: string): void;
+  // Opens the Tip Jar's own tip sheet, or returns false when the Tip Jar cannot send yet.
+  sendTip?(recipient: MoneroSendRecipient): boolean;
 }
 
 /**
  * Tipping a program's creator in Monero.
  *
- * Everything this controller does is local: it shows an address the relays already
- * published, copies it, or hands it to a wallet. It signs nothing and publishes nothing: a
- * Monero transfer leaves no event behind, and nothing here pretends otherwise.
+ * With a Tip Jar that can send, the tip is paid from Workstr through the send sheet. Otherwise
+ * this shows the address the relays published, copies it, or hands it to another wallet. It
+ * publishes nothing either way: a Monero transfer leaves no event behind.
  */
 export function createMoneroTipController(ctx: MoneroTipControllerContext) {
   const { root, state, toast, openModal } = ctx;
@@ -29,6 +32,15 @@ export function createMoneroTipController(ctx: MoneroTipControllerContext) {
     // The button only exists when there is an address, so this is a stale card being
     // clicked after a refresh dropped the target rather than something to explain at length.
     if (!program || !target) { toast('This creator has no public Monero address', 'bad'); return; }
+    const recipient: MoneroSendRecipient = {
+      address: target,
+      pubkey: program.pubkey,
+      name: moneroTipCreator(program, state),
+      picture: program.pubkey ? state.authorProfiles?.[program.pubkey]?.picture : undefined,
+      programAddress: program.address,
+      programName: program.name
+    };
+    if (ctx.sendTip?.(recipient)) return;
     openModal(moneroTipModal({
       address: target,
       creator: moneroTipCreator(program, state),

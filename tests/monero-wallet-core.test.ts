@@ -305,6 +305,38 @@ describe('Monero wallet core', () => {
     await expect(walletCore.transactions()).rejects.toThrow(/Open the Monero wallet/);
   });
 
+  it('signs a transfer without broadcasting it, then relays exactly that transaction', async () => {
+    const { vault, puts } = fakeVault(true);
+    const fake = runtime();
+    const walletCore = core(vault, fake);
+    await walletCore.createWallet();
+    const created: unknown[] = [];
+    const relayed: string[] = [];
+    Object.assign(fake.wallet, {
+      createTx: async (config: unknown) => { created.push(config); return { getHash: () => 'tx-1', getFee: () => 30_720_000n, getMetadata: () => 'signed-blob' }; },
+      relayTx: async (metadata: string) => { relayed.push(metadata); return 'tx-1'; }
+    });
+    const prepared = await walletCore.prepareTransfer({ address: ` ${'8'.repeat(95)} `, amountAtomic: '5000000000' });
+    expect(created).toEqual([{ accountIndex: 0, address: '8'.repeat(95), amount: 5_000_000_000n, relay: false }]);
+    expect(prepared).toEqual({ address: '8'.repeat(95), amountAtomic: '5000000000', feeAtomic: '30720000', metadata: 'signed-blob' });
+    expect(relayed).toEqual([]);
+    const dataWrites = puts.filter((scope) => scope.startsWith('monero.hot-wallet-data.')).length;
+    await expect(walletCore.relayTransfer(prepared)).resolves.toBe('tx-1');
+    expect(relayed).toEqual(['signed-blob']);
+    // The spent outputs are saved at once, so a restart does not offer them again.
+    expect(puts.filter((scope) => scope.startsWith('monero.hot-wallet-data.')).length).toBe(dataWrites + 1);
+    await expect(walletCore.prepareTransfer({ address: '8'.repeat(95), amountAtomic: '0' })).rejects.toThrow(/above zero/);
+    await walletCore.close();
+    await expect(walletCore.relayTransfer(prepared)).rejects.toThrow(/Open the Monero wallet/);
+  });
+
+  it('refuses to send from a runtime that cannot create transactions', async () => {
+    const { vault } = fakeVault(true);
+    const walletCore = core(vault, runtime());
+    await walletCore.createWallet();
+    await expect(walletCore.prepareTransfer({ address: '8'.repeat(95), amountAtomic: '1' })).rejects.toThrow(/cannot send/);
+  });
+
   it('closes the runtime wallet if vault verification fails during create', async () => {
     const fake = runtime();
     const vault = {

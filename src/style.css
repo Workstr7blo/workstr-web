@@ -65,6 +65,44 @@
 .monero-tip-actions,
 .support-monero-actions { width: 100%; justify-content: center; }
 
+/* The Tip Jar send sheet: amount, review, result. Orange stays on the payment actions and the
+   total; the rest is the ordinary modal. */
+.monero-send { display: grid; gap: 14px; }
+.monero-send-title { margin: 0; }
+.monero-send-recipient { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.monero-send-avatar { display: grid; flex: none; width: 44px; height: 44px; place-items: center; overflow: hidden; border-radius: 50%; background: rgba(var(--accent-rgb), .14); font-weight: 800; }
+.monero-send-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.monero-send-recipient-copy { display: grid; min-width: 0; gap: 2px; }
+.monero-send-recipient-copy strong, .monero-send-recipient-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.monero-send-recipient-copy small { color: var(--muted); font-size: 12px; }
+.monero-send-form { display: grid; gap: 12px; }
+.monero-send-available { margin: 0; color: var(--muted); font-size: 13px; }
+.monero-send-available strong { color: var(--text); font: 700 13px ui-monospace, monospace; }
+.monero-send-field { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.monero-send-field textarea { resize: none; font: 500 13px/1.45 ui-monospace, monospace; word-break: break-all; }
+.monero-send-amount { position: relative; display: block; }
+.monero-send-amount input { padding-right: 56px; font: 700 18px ui-monospace, monospace; }
+.monero-send-amount > span { position: absolute; top: 50%; right: 14px; color: var(--muted); font: 700 13px ui-monospace, monospace; transform: translateY(-50%); pointer-events: none; }
+.monero-send-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.monero-send-presets .button { justify-content: center; min-width: 0; padding-inline: 6px; font: 700 14px ui-monospace, monospace; white-space: nowrap; }
+.monero-send-presets .button[aria-pressed="true"] { border-color: rgba(var(--payment-rgb), .6); color: var(--payment-accent); }
+.monero-send-error { margin: 0; color: rgb(var(--danger-rgb)); font-size: 13px; }
+.monero-send-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.monero-send-actions .button { justify-content: center; min-width: 0; padding-inline: 10px; white-space: nowrap; }
+.monero-send-actions .button:only-child { grid-column: 1 / -1; }
+.monero-send-review { display: grid; margin: 0; }
+.monero-send-review > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.monero-send-review dt { color: var(--muted); font-size: 13px; }
+.monero-send-review dd { margin: 0; min-width: 0; overflow-wrap: anywhere; text-align: right; font: 700 13px ui-monospace, monospace; }
+.monero-send-review .monero-send-total { border-bottom: 0; }
+.monero-send-review .monero-send-total dd { color: var(--payment-accent); font-size: 15px; }
+.monero-send-result { margin: 0; font-size: 16px; font-weight: 700; }
+.monero-send-txid { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; }
+.monero-send-txid code { color: var(--text); }
+.monero-send-other { border-top: 1px solid var(--border); padding-top: 10px; }
+.monero-send-other summary { color: var(--muted); font-size: 13px; cursor: pointer; }
+.monero-send-other-body { display: grid; justify-items: center; gap: 10px; padding-top: 12px; }
+
 @media (max-width: 760px) {
   .monero-tips-row { min-height: 64px; padding: 13px 14px; }
   .monero-address-section .settings-row-actions .button { flex: 1; }

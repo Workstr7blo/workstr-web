@@ -182,6 +182,10 @@ export interface MoneroWalletRuntimeWallet {
   getData?(): Promise<ArrayLike<number>[]>;
   getRestoreHeight?(): Promise<number>;
   getTxs?(): Promise<MoneroWalletRuntimeTx[]>;
+  // Builds and signs a transfer without broadcasting it (`relay: false`), so the fee can be
+  // shown before anything leaves the wallet.
+  createTx?(config: { accountIndex: number; address: string; amount: bigint; relay: false }): Promise<MoneroWalletRuntimeCreatedTx>;
+  relayTx?(metadata: string): Promise<string>;
   close(save?: boolean): Promise<void>;
 }
 
@@ -253,4 +257,45 @@ export interface MoneroWalletRuntimeTx {
   getNumConfirmations?(): number | undefined;
   getReceivedTimestamp?(): number | undefined;
   getBlock?(): { getTimestamp?(): number | undefined } | undefined;
+}
+
+// What `createTx` returns, as far as a send reads it. The metadata is the signed transaction,
+// not a secret: it is what gets relayed.
+export interface MoneroWalletRuntimeCreatedTx {
+  getHash?(): string | undefined;
+  getFee?(): bigint | undefined;
+  getMetadata?(): string | undefined;
+}
+
+// A transfer signed on this device and not yet broadcast.
+export interface MoneroPreparedTransfer {
+  address: string;
+  amountAtomic: string;
+  feeAtomic: string;
+  metadata: string;
+}
+
+// Who a send is for. A creator tip carries the creator's pubkey and program; a plain send is
+// only an address the user typed.
+export interface MoneroSendRecipient {
+  address: string;
+  pubkey?: string;
+  name?: string;
+  picture?: string;
+  programAddress?: string;
+  programName?: string;
+}
+
+// One send sheet, from amount to result. `uncertain` marks a broadcast whose outcome is not
+// known: the node may have accepted it, so the sheet never offers to send it again.
+export interface MoneroSendState {
+  id: number;
+  step: 'amount' | 'preparing' | 'review' | 'sending' | 'sent' | 'failed';
+  recipient: MoneroSendRecipient | null;
+  amountText: string;
+  addressText: string;
+  prepared?: MoneroPreparedTransfer;
+  txid?: string;
+  error?: string;
+  uncertain?: boolean;
 }

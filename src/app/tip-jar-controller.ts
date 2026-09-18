@@ -12,6 +12,7 @@ export interface TipJarControllerContext {
   moneroAddress: { repaint(): void; refreshIfNeeded(): void };
   moneroWallet: { autoSync(): Promise<void>; stop(): Promise<void>; createWallet(): Promise<void> };
   activity?: { resolveProfiles(): Promise<void> };
+  send?: { openSend(): boolean };
 }
 
 // The Tip Jar setting repaints the payment tokens, and the tokens are declared on `:root`, so
@@ -58,6 +59,7 @@ export function createTipJarController(ctx: TipJarControllerContext) {
       panel.hidden = !panel.hidden;
       target.setAttribute('aria-expanded', String(!panel.hidden));
     }
+    else if (target.id === 'tip-jar-send') ctx.send?.openSend();
     else if (target.id === 'tip-jar-copy') {
       void navigator.clipboard.writeText(target.dataset.address || '').then(() => toast('Copied'), () => toast('Could not copy', 'bad'));
     }

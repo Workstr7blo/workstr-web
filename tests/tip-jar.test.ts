@@ -169,7 +169,8 @@ describe('Tip Jar page', () => {
     expect(root.querySelector('#tip-jar-balance')?.textContent).toBe('0.024 XMR');
     expect(root.querySelector('#tip-jar-status')?.textContent).toBe('Ready');
     expect(root.querySelector('#tip-jar-receive')).toBeTruthy();
-    expect(root.querySelector<HTMLButtonElement>('#tip-jar-send')?.disabled).toBe(true);
+    // Synchronized with spendable XMR: Send is live.
+    expect(root.querySelector<HTMLButtonElement>('#tip-jar-send')?.disabled).toBe(false);
     expect(root.textContent).not.toContain('3763000');
     expect(root.textContent).not.toMatch(/restore height|daemon/i);
   });

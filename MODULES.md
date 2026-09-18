@@ -78,6 +78,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | Monero wallet phase-1 spike, phase-2 wallet core, and Settings wallet UI (#246): runtime import, node reachability, lazy wallet runtime, per-account vault storage (`monero.hot-wallet.<pubkey>` seed bundle, `monero.hot-wallet-data.<pubkey>` keys/scan cache, adopting the legacy device-wide `monero.hot-wallet` only on request), mock stagenet wallet, and QA evidence | `src/features/monero/wallet-node.ts`, `src/features/monero/wallet-runtime.ts`, `src/features/monero/wallet-core.ts`, `src/features/monero/wallet-storage.ts`, `src/features/monero/wallet-view.ts`, `src/features/monero/wallet-spike.ts`, `src/features/monero/mock-stagenet-wallet.ts`, `src/features/monero/phase1-report.ts`, `src/features/monero/types.ts` | `src/app/monero-wallet-controller.ts`, `src/app/settings-view.ts`, `src/app/shell.ts`, `src/monero-spike.ts`, `monero-spike.html`, `vite.monero-spike.config.ts`, `scripts/monero-spike-browser.mjs`, `docs/monero-wallet-phase1.md`, `docs/monero-wallet-phase2-core.md`, `docs/monero-wallet-phase3-settings-ui.md`, `docs/monero-ios-qa-checklist.md`, `docs/monero-rpc-browser-bridge.md`, `src/security/device-vault.ts`, `src/shims/node-assert.ts` | `tests/monero-wallet-spike.test.ts`, `tests/monero-wallet-core.test.ts`, `tests/monero-wallet-controller.test.ts`, `tests/monero-worker-asset.test.ts`, `tests/browser-assert-shim.test.ts`, `tests/settings-view.test.ts`, `npm run spike:monero:browser` |
 | Monero Tip on Discover program cards | `src/features/sheets/monero-tip-view.ts`, `src/app/monero-tip-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/catalog-controller.ts`, `src/features/sheets/views.ts` | `tests/monero-tip-controller.test.ts`, `tests/discover.test.ts` |
 | Tip Jar (#257, #260): the bottom-nav piggy bank with its live sync ring and state label, the Tip Jar page, the on/off switch shared by Settings and the page, and automatic wallet sync | `src/features/monero/tip-jar-state.ts` (`tipJarStatus`, the one wallet-state-to-visual mapping, and `tipJarNavLabel`), `src/features/monero/tip-jar-view.ts`, `src/app/tip-jar-controller.ts` | `src/app/layout.ts` (nav item, `appView`), `src/app/monero-wallet-controller.ts` (`autoSync`, `stop`), `src/app/shell.ts`, `src/app/account-chip.ts` (carries no payment mark), `src/style.css` | `tests/tip-jar.test.ts`, `tests/tip-jar-controller.test.ts`, `tests/account-chip.test.ts`, `tests/shell.test.ts` |
+| Sending from the Tip Jar (#246 phase 5): the send sheet (amount, review with fee and total, explicit confirm, result), creator tips from program cards, and plain sends from the Tip Jar page | `src/features/monero/wallet-send.ts` (readiness, amount parsing, network address check, error wording), `src/features/monero/send-view.ts`, `src/app/monero-send-controller.ts` | `src/features/monero/wallet-core.ts` (`prepareTransfer`, `relayTransfer`), `src/app/monero-tip-controller.ts` (`sendTip`), `src/app/tip-jar-controller.ts` (`#tip-jar-send`), `src/features/monero/tip-jar-view.ts`, `src/app/tip-jar-activity-controller.ts` (`recordOutgoing`), `src/app/shell.ts`, `src/style.css` | `tests/monero-send.test.ts`, `tests/monero-wallet-core.test.ts`, `tests/tip-jar.test.ts` |
 | Tip Jar activity (#263): the Recent activity card, outgoing-tip metadata joined to wallet transactions by txid, creator name and picture resolution, and its vault storage (`monero.tip-jar-activity.<pubkey>`) | `src/features/monero/tip-jar-history.ts` (model, txid join, resolution, storage), `src/features/monero/tip-jar-history-view.ts`, `src/app/tip-jar-activity-controller.ts` | `src/features/monero/wallet-core.ts` (`transactions`, `storedWalletId`), `src/app/monero-wallet-controller.ts` (`onActivity`), `src/features/monero/wallet-backup.ts` (`activity`), `src/app/tip-jar-backup-controller.ts`, `src/app/shell.ts`, `src/style.css` | `tests/tip-jar-activity.test.ts`, `tests/tip-jar.test.ts`, `tests/monero-wallet-core.test.ts` |
 | Tip Jar backup (#261): the encrypted `.wstrwallet` file, its export/restore controls in Data & Sync, and Advanced recovery (recovery phrase, restore height, seed restore) | `src/features/monero/wallet-backup.ts` (format, Argon2id + AES-GCM, validation), `src/features/monero/wallet-backup-view.ts`, `src/app/tip-jar-backup-controller.ts` | `src/features/backup/views.ts` (hosts the section), `src/app/backup-controller.ts`, `src/app/settings-view.ts`, `src/app/shell.ts`, `src/app/monero-wallet-controller.ts` (`backupPayload`, `restore`), `src/security/device-vault-kdf.ts`, `src/style.css` | `tests/tip-jar-backup.test.ts`, `tests/backup-views.test.ts`, `tests/settings-view.test.ts` |
 | The Tip Jar switch in Settings and the user's public Monero address | `src/features/support/payment-mode-views.ts`, `src/app/monero-address-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/settings-view.ts`, `src/app/tip-jar-controller.ts` (the switch handler) | `tests/monero-address-controller.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts` |
@@ -203,8 +204,17 @@ and patch it directly, which is also why a page render can leave it standing.
   be tipped at all, the card action, and the tip sheet's markup. `moneroMode(state)` is the
   single answer to "are Monero tips on" for the sheets feature. It renders no total and no status, because a Monero transfer leaves
   nothing Workstr can read.
-- `src/app/monero-tip-controller.ts` owns opening that sheet, copying the address, and the
-  `monero:` wallet hand-off. It signs and publishes nothing.
+- `src/app/monero-tip-controller.ts` owns the program-card Tip. With a Tip Jar that can send it
+  opens the send sheet (`sendTip`); otherwise it opens the address hand-off - copy, QR and
+  `monero:` link - that works with any other wallet. It publishes nothing either way.
+- `src/features/monero/wallet-send.ts` decides whether a send may start (`sendReadiness`: Tip
+  Jar on, signed in, unlocked, wallet open and synchronized, spendable XMR) and turns amounts
+  into atomic units without floating point. `src/app/monero-send-controller.ts` drives the send
+  sheet drawn by `send-view.ts`: `prepareTransfer` signs on this device with `relay: false` so
+  the real fee is shown, and only an explicit confirm calls `relayTransfer`. There is no
+  automatic retry: a broadcast that fails with an unknown outcome ends in a "not confirmed"
+  state with no way to resend, because the node may already have taken it. After a broadcast
+  the txid, creator pubkey and program go to `recordOutgoing` for Recent activity.
 - `src/features/monero/tip-jar-state.ts` is the single answer to "what state is the Tip
   Jar in": off, connecting, syncing (with progress), ready, or error. The nav badge, the page
   status word and the spoken label all read it. "Tip Jar" is the user-facing name only; the
@@ -227,8 +237,8 @@ and patch it directly, which is also why a page render can leave it standing.
   training JSON export cannot see them; outgoing metadata travels only inside the encrypted
   `.wstrwallet` backup. `tip-jar-history-view.ts` renders the card and patches it in place, and
   `src/app/tip-jar-activity-controller.ts` loads, joins, records and fetches missing creator
-  profiles. Workstr has no send flow yet, so `recordOutgoing` has no caller: it is the hook a
-  send must call after broadcast.
+  profiles. `recordOutgoing` is called by the send controller once a broadcast has returned
+  its txid, never before.
 - `src/features/monero/wallet-backup.ts` owns the Tip Jar's portable backup and nothing else:
   it turns a stored wallet bundle into the fields a restore needs, seals them under the user's
   password (Argon2id at the device-vault parameters, then AES-GCM with the type, version and
