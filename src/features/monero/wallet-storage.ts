@@ -10,6 +10,7 @@ export const MONERO_WALLET_SECRET_VERSION = 1;
 export const LEGACY_MONERO_WALLET_SCOPE = MONERO_WALLET_SCOPE;
 const WALLET_SCOPE_PREFIX = `${MONERO_WALLET_SCOPE}.`;
 const DATA_SCOPE_PREFIX = 'monero.hot-wallet-data.';
+const ACTIVITY_SCOPE_PREFIX = 'monero.tip-jar-activity.';
 
 function accountKey(pubkey: string): string {
   const key = pubkey.trim().toLowerCase();
@@ -25,6 +26,12 @@ export function moneroWalletScope(pubkey: string): string {
 // every sync, and the seed bundle should only be rewritten when it genuinely changes.
 export function moneroWalletDataScope(pubkey: string): string {
   return `${DATA_SCOPE_PREFIX}${accountKey(pubkey)}`;
+}
+
+// Tip Jar activity metadata: who a tip was for, and a copy of what the wallet last reported.
+// Its own scope so it never rides along with the seed or the scan cache.
+export function tipJarActivityScope(pubkey: string): string {
+  return `${ACTIVITY_SCOPE_PREFIX}${accountKey(pubkey)}`;
 }
 
 export function isMoneroWalletScope(scope: string): boolean {

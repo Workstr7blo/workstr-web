@@ -59,6 +59,7 @@ function app(overrides: Partial<AppState> = {}) {
     restoreWallet: vi.fn(async () => snapshot()),
     sync: vi.fn(async () => ({ height: 3763001, daemonHeight: 3763001, synchronized: true, updatedAt: '2026-09-15T00:01:00.000Z' })),
     balance: vi.fn(async () => ({ atomicBalance: '1000000000000', atomicUnlockedBalance: '1000000000000' })),
+    transactions: vi.fn(async () => []),
     backupInfo: vi.fn(async () => ({ seed: 'seed words never logged', restoreHeight: 3763000 })),
     backupPayload: vi.fn(async () => ({ network: 'mainnet' as const, seed: 'seed words never logged', restoreHeight: 3763000, creatorSubaddressIndex: 1, creatorSubaddress: `8${'A'.repeat(94)}`, primaryAddress: '4PrimaryAddress', createdAt: '2026-09-15T00:00:00.000Z' })),
     close: vi.fn(async () => undefined)

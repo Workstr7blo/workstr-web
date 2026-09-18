@@ -181,6 +181,7 @@ export interface MoneroWalletRuntimeWallet {
   getPath?(): string | Promise<string>;
   getData?(): Promise<ArrayLike<number>[]>;
   getRestoreHeight?(): Promise<number>;
+  getTxs?(): Promise<MoneroWalletRuntimeTx[]>;
   close(save?: boolean): Promise<void>;
 }
 
@@ -188,4 +189,68 @@ export interface MoneroWalletRuntime {
   createWallet(config: Record<string, unknown>): Promise<MoneroWalletRuntimeWallet>;
   openWallet?(config: Record<string, unknown>): Promise<MoneroWalletRuntimeWallet>;
   syncListener?(onProgress: (fraction: number, remainingBlocks: number) => void): object;
+}
+
+// Tip Jar activity (#263). Monero provides the transaction, Workstr remembers who a tip was
+// for, and Nostr provides the name and picture shown later. The wallet stays the source of
+// truth for amount, confirmation and failure; Workstr's own fields only add context.
+export type TipJarTransactionState = 'submitted' | 'confirmed' | 'failed';
+
+interface TipJarActivityBase {
+  // The txid. One record per transaction, which is also the join key with the wallet.
+  id: string;
+  txid: string;
+  amountAtomic: string;
+  createdAt: string;
+  state: TipJarTransactionState;
+  confirmations?: number;
+}
+
+// A creator tip carries the recipient's Nostr pubkey, the durable identity; the name and
+// picture snapshots are only a fallback for when no current profile is at hand. A generic
+// send (or an outgoing transfer Workstr did not make) has no pubkey.
+export interface TipJarOutgoingRecord extends TipJarActivityBase {
+  direction: 'out';
+  kind: 'tip' | 'send';
+  recipientPubkey?: string;
+  recipientAddress?: string;
+  feeAtomic?: string;
+  programAddress?: string;
+  programName?: string;
+  nameSnapshot?: string;
+  pictureSnapshot?: string;
+}
+
+// Monero does not say who sent it, so an incoming record has no sender fields at all.
+export interface TipJarIncomingRecord extends TipJarActivityBase {
+  direction: 'in';
+}
+
+export type TipJarActivity = TipJarOutgoingRecord | TipJarIncomingRecord;
+
+// One transaction as the wallet reports it, before any Workstr metadata is joined to it.
+export interface TipJarWalletTx {
+  txid: string;
+  direction: 'in' | 'out';
+  amountAtomic: string;
+  feeAtomic?: string;
+  // Absent when the wallet gives no time (an unconfirmed transfer from some runtimes).
+  timestamp?: string;
+  state: TipJarTransactionState;
+  confirmations?: number;
+}
+
+// The subset of monero-ts `MoneroTxWallet` the activity import reads.
+export interface MoneroWalletRuntimeTx {
+  getHash(): string | undefined;
+  getIsIncoming?(): boolean | undefined;
+  getIsOutgoing?(): boolean | undefined;
+  getIncomingAmount?(): bigint | undefined;
+  getOutgoingAmount?(): bigint | undefined;
+  getFee?(): bigint | undefined;
+  getIsConfirmed?(): boolean | undefined;
+  getIsFailed?(): boolean | undefined;
+  getNumConfirmations?(): number | undefined;
+  getReceivedTimestamp?(): number | undefined;
+  getBlock?(): { getTimestamp?(): number | undefined } | undefined;
 }

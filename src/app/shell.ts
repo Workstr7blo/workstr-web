@@ -45,6 +45,7 @@ import { MoneroWalletCore } from '../features/monero/wallet-core';
 import { deviceVault } from '../security/device-vault';
 import { createMoneroTipController } from './monero-tip-controller';
 import { applyPaymentMode, createTipJarController } from './tip-jar-controller';
+import { createTipJarActivityController } from './tip-jar-activity-controller';
 import { updateTipJarNav } from '../features/monero/tip-jar-view';
 import { createProgramPublishController } from './program-publish-controller';
 import type { ShellHandle, ShellOptions } from './shell-types';
@@ -125,6 +126,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     // namespace rather than carried into the next account's Settings.
     state.monero = { status: 'idle', address: '' };
     moneroWallet.reset();
+    tipJarActivity.reset();
     state.store = await WorkstrStore.open(namespace);
     await state.store.retireLightningSettings();
     state.settings = await state.store.getSettings();
@@ -337,7 +339,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const vaultUi = createDeviceVaultController({
     root, state, render, toast, openModal, closeModal,
     onUnlocked: async (reason) => { if (reason === 'relock') { void backup.resume(); state.moneroWallet = { status: 'unknown' }; void moneroWallet.autoSync(); render(); return; } await openAccount(); void moneroWallet.autoSync(); if (!options.skipCatalogRefresh) await catalog.refreshExercises(); },
-    onLocked: () => { identity.dropActiveSigner(); backup.stop(); void moneroWallet.close(); },
+    onLocked: () => { identity.dropActiveSigner(); backup.stop(); void moneroWallet.close(); tipJarActivity.reset(); },
     onReset: async () => { identity.dropActiveSigner(); backup.stop(); await moneroWallet.close(); await openAccount(); identity.startRestoreLocalAccount(); }
   });
   const identity = createIdentityController({ root, state, render, openModal, closeModal, openLocal, openIdentity, vault: vaultUi });
@@ -352,9 +354,16 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   // One wallet core, shared by the controller that owns the wallet's life and the one that
   // owns its backup file. Two cores would be two open wallets fighting over the same vault.
   const walletCore = new MoneroWalletCore({ vault: deviceVault, account: () => state.pubkey });
-  const moneroWallet = createMoneroWalletController({ root, state, toast, repaintMoneroAddress: moneroAddress.repaint, onChange: () => tipJar.repaint(), core: walletCore });
-  const tipJarBackup = createTipJarBackupController({ root, state, toast, wallet: moneroWallet });
-  const tipJar = createTipJarController({ root, state, toast, savePaymentMode: preferences.savePaymentMode, refreshAuthorPaymentTargets: catalog.refreshAuthorPaymentTargets, moneroAddress, moneroWallet });
+  const tipJarActivity = createTipJarActivityController({ state, fetchProfile, onChange: () => tipJar.repaint() });
+  const moneroWallet = createMoneroWalletController({ root, state, toast, repaintMoneroAddress: moneroAddress.repaint, onChange: () => tipJar.repaint(), onActivity: (walletId, txs) => { void tipJarActivity.walletActivity(walletId, txs); }, core: walletCore });
+  // The backup file carries the wallet and what Workstr knows about its outgoing tips; a restore
+  // hands that knowledge back once the wallet is in place.
+  const tipJarBackup = createTipJarBackupController({ root, state, toast, wallet: {
+    restore: moneroWallet.restore,
+    toggleRecoveryPhrase: moneroWallet.toggleRecoveryPhrase,
+    backupPayload: async () => ({ ...await moneroWallet.backupPayload(), activity: await tipJarActivity.backupRecords(await walletCore.storedWalletId()) })
+  }, activity: tipJarActivity });
+  const tipJar = createTipJarController({ root, state, toast, savePaymentMode: preferences.savePaymentMode, refreshAuthorPaymentTargets: catalog.refreshAuthorPaymentTargets, moneroAddress, moneroWallet, activity: tipJarActivity });
   const moneroTip = createMoneroTipController({ root, state, toast, openModal });
   const programList = createProgramList({
     root, state, render, toast,

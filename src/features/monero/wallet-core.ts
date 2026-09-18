@@ -13,6 +13,7 @@ import {
   snapshotFromBundle
 } from './wallet-storage';
 import { tipJarBackupPayload, type TipJarBackupPayload } from './wallet-backup';
+import { walletTxFromRuntime } from './tip-jar-history';
 import type {
   MoneroWalletBalance,
   MoneroWalletBackupInfo,
@@ -24,7 +25,8 @@ import type {
   MoneroWalletRuntimeWallet,
   MoneroWalletSecretBundle,
   MoneroWalletSnapshot,
-  MoneroWalletSyncState
+  MoneroWalletSyncState,
+  TipJarWalletTx
 } from './types';
 
 type WalletVault = Pick<DeviceVault, 'isUnlocked' | 'hasSecret' | 'putSecret' | 'getSecret' | 'deleteSecret'>;
@@ -215,6 +217,20 @@ export class MoneroWalletCore {
     const lastBalance = { atomicBalance: balance.toString(), atomicUnlockedBalance: unlocked.toString() };
     await this.saveData(wallet, { lastBalance }, false);
     return lastBalance;
+  }
+
+  // The wallet's own transaction list, the source of truth for Tip Jar activity. A runtime
+  // that cannot list transactions reports none rather than failing the sync around it.
+  async transactions(): Promise<TipJarWalletTx[]> {
+    const wallet = this.requireOpenWallet();
+    if (!wallet.getTxs) return [];
+    const txs = await wallet.getTxs();
+    return txs.map(walletTxFromRuntime).filter((tx): tx is TipJarWalletTx => tx !== null);
+  }
+
+  // The stored wallet's id, which Tip Jar activity is kept against, whether or not it is open.
+  async storedWalletId(): Promise<string> {
+    return (await this.storedBundle()).metadata.id;
   }
 
   async backupInfo(): Promise<MoneroWalletBackupInfo> {
