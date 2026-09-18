@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added Recent activity to the Tip Jar page: the five newest transactions, newest first, with an
+  up-right arrow for money sent and a down-left arrow for money received, the amount, and a
+  compact day and time. A tip shows the creator's current Nostr name and picture, falling back
+  to the ones saved when it was sent, and the program it was for. A received payment says
+  Received and nothing more, because Monero does not reveal who sent it. The history is kept
+  encrypted on this device, is never published, is not in the training JSON export, and the
+  creator details for your tips travel inside the encrypted Tip Jar backup.
+
 - Added Tip Jar backup to Settings, under Data & Sync: export an encrypted `.wstrwallet` file
   under a password you choose, and restore it on another device. The file remembers the restore
   height, so a restored Tip Jar picks up where it left off instead of rescanning the chain, and
@@ -37,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The Tip Jar page no longer shows the Receiving tips and Backup card or the note under the
+  disabled Send button; both settings stay in Settings.
 - Changed the Tip Jar's status to show in one place. The Monero logo and the orange tint are
   gone from the header identity chip, and the navigation no longer carries a permanent Monero
   badge: the piggy bank is the Tip Jar, and the ring around it appears only while it is

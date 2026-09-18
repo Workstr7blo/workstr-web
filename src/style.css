@@ -1174,8 +1174,36 @@
 .tip-jar-receive-body { display: grid; justify-items: center; gap: 10px; }
 .tip-jar-receive-body[hidden] { display: none; }
 .tip-jar-receive-body .section-help { text-align: center; }
-.tip-jar-rows { gap: 0; padding-top: 6px; padding-bottom: 6px; }
-.tip-jar-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
-.tip-jar-row:last-child { border-bottom: 0; }
-.tip-jar-row > span { color: var(--muted); }
-.tip-jar-row > small, .tip-jar-row > .button { grid-column: 1 / -1; justify-self: start; color: var(--dim); }
+/* Recent activity: arrow, avatar, who/amount/context, then when. The arrow carries direction for
+   sighted readers only; each row also reads as one sentence. */
+.tip-jar-activity { gap: 4px; padding-bottom: 8px; }
+.tip-jar-activity-title { margin: 0 0 4px; font-size: 15px; font-weight: 800; }
+.tip-jar-activity-empty { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.tip-jar-activity-list { margin: 0; padding: 0; list-style: none; }
+.tip-jar-activity-row { display: grid; grid-template-columns: 18px 36px minmax(0, 1fr) auto; align-items: start; gap: 0 10px; padding: 12px 0; border-top: 1px solid var(--border); }
+.tip-jar-activity-row:first-child { border-top: 0; }
+.tip-jar-activity-arrow { display: flex; height: 36px; align-items: center; color: var(--muted); }
+.tip-jar-activity-row[data-direction="in"] .tip-jar-activity-arrow { color: var(--payment-accent); }
+.tip-jar-activity-arrow-icon { width: 18px; height: 18px; }
+.tip-jar-activity-avatar { display: grid; width: 36px; height: 36px; place-items: center; overflow: hidden; border-radius: 50%; background: rgba(var(--accent-rgb), .14); }
+.tip-jar-activity-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.tip-jar-activity-avatar-fallback { color: var(--text); font-size: 14px; font-weight: 800; }
+.tip-jar-activity-avatar.is-jar { background: rgba(var(--payment-rgb), .12); color: var(--payment-accent); }
+.tip-jar-activity-avatar.is-generic { border: 1px solid var(--border); background: transparent; color: var(--dim); }
+.tip-jar-activity-glyph { width: 20px; height: 20px; }
+.tip-jar-activity-main { display: grid; min-width: 0; gap: 2px; }
+.tip-jar-activity-name, .tip-jar-activity-context { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tip-jar-activity-name { font-size: 14px; font-weight: 700; }
+.tip-jar-activity-amount { font: 700 13px/1.35 ui-monospace, monospace; white-space: nowrap; }
+.tip-jar-activity-context { color: var(--muted); font-size: 12px; }
+.tip-jar-activity-when { display: grid; justify-items: end; gap: 2px; color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tip-jar-activity-state { color: var(--muted); font-weight: 700; }
+.tip-jar-activity-row[data-state="failed"] .tip-jar-activity-state { color: rgb(var(--danger-rgb)); }
+.tip-jar-activity-row[data-state="failed"] .tip-jar-activity-amount { color: var(--dim); text-decoration: line-through; }
+/* The narrowest phones: a smaller avatar and tighter gaps keep a six-decimal amount on one line. */
+@media (max-width: 360px) {
+  .tip-jar-activity-row { grid-template-columns: 16px 32px minmax(0, 1fr) auto; gap: 0 8px; }
+  .tip-jar-activity-arrow { height: 32px; }
+  .tip-jar-activity-avatar { width: 32px; height: 32px; }
+  .tip-jar-activity-when { font-size: 11px; }
+}

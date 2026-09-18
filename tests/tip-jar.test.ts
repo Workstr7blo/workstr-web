@@ -181,13 +181,13 @@ describe('Tip Jar page', () => {
     expect(root.querySelector('#tip-jar-receive-panel code')?.textContent).toBe(ADDRESS);
   });
 
-  it('says whether published tips reach this Tip Jar, and never offers to replace another wallet', () => {
-    const wallet: MoneroWalletUiState = { status: 'ready', stored: true, snapshot: snapshot(synced) };
-    expect(page(state({ monero: { status: 'ready', address: ADDRESS } } as Partial<AppState>, wallet)).textContent).toContain('Enabled');
-    const other = page(state({ monero: { status: 'ready', address: `8${'X'.repeat(94)}` } } as Partial<AppState>, wallet));
-    expect(other.textContent).toContain('Another wallet');
-    expect(other.querySelector('#tip-jar-publish')).toBeNull();
-    expect(page(state({ monero: { status: 'ready', address: '' } } as Partial<AppState>, wallet)).querySelector('#tip-jar-publish')).toBeTruthy();
+  it('keeps the page to balance, actions and recent activity', () => {
+    const root = page(state({ monero: { status: 'ready', address: '' } } as Partial<AppState>, { status: 'ready', stored: true, snapshot: snapshot(synced) }));
+    expect(root.querySelector('#tip-jar-activity .tip-jar-activity-title')?.textContent).toBe('Recent activity');
+    expect(root.querySelector('#tip-jar-publish')).toBeNull();
+    expect(root.querySelector('[data-view="settings"]')).toBeNull();
+    expect(root.textContent).not.toMatch(/Receiving tips|Recovery phrase|not available yet/);
+    expect(root.querySelector('#tip-jar-send')?.hasAttribute('aria-describedby')).toBe(false);
   });
 
   it('asks to set up a wallet only when the account has none', () => {
@@ -234,12 +234,14 @@ describe('Tip Jar automatic sync', () => {
         return { ...synced, updatedAt: 'x' };
       }),
       balance: vi.fn(async () => ({ atomicBalance: '5', atomicUnlockedBalance: '5' })),
+      transactions: vi.fn(async () => []),
       close: vi.fn(async () => { open = false; })
     } as unknown as MoneroWalletCore;
     const onChange = vi.fn();
+    const onActivity = vi.fn();
     const vault = { isUnlocked: () => s.deviceVault === 'unlocked' } as DeviceVault;
-    const ctrl = createMoneroWalletController({ root, state: s, toast: vi.fn(), repaintMoneroAddress: vi.fn(), onChange, vault, core });
-    return { s, core, ctrl, onChange };
+    const ctrl = createMoneroWalletController({ root, state: s, toast: vi.fn(), repaintMoneroAddress: vi.fn(), onChange, onActivity, vault, core });
+    return { s, core, ctrl, onChange, onActivity };
   }
 
   it('does nothing while the Tip Jar is off, signed out or locked', async () => {
@@ -266,6 +268,24 @@ describe('Tip Jar automatic sync', () => {
     expect(tipJarStatus(s).visual).toBe('ready');
     expect(s.moneroWallet?.snapshot?.balance?.atomicBalance).toBe('5');
     ctrl.reset();
+  });
+
+  it('hands each sync\'s transactions to Tip Jar activity, and a failed listing does not fail the sync', async () => {
+    const { s, core, ctrl, onActivity } = controller();
+    const txs = [{ txid: 'in-1', direction: 'in' as const, amountAtomic: '5', state: 'confirmed' as const }];
+    vi.mocked(core.transactions).mockResolvedValueOnce(txs);
+    await ctrl.autoSync();
+    expect(onActivity).toHaveBeenCalledWith('wallet-1', null);
+    expect(onActivity).toHaveBeenLastCalledWith('wallet-1', txs);
+    ctrl.reset();
+
+    const second = controller();
+    vi.mocked(second.core.transactions).mockRejectedValueOnce(new Error('no listing'));
+    await second.ctrl.autoSync();
+    expect(tipJarStatus(second.s).visual).toBe('ready');
+    expect(second.onActivity).toHaveBeenLastCalledWith('wallet-1', null);
+    second.ctrl.reset();
+    expect(s.moneroWallet?.status).toBe('unknown');
   });
 
   it('never creates a wallet on its own', async () => {

@@ -2,7 +2,7 @@ import { deviceVault as defaultVault, type DeviceVault } from '../security/devic
 import { MoneroWalletCore, WALLET_ALREADY_STORED } from '../features/monero/wallet-core';
 import { updateTipJarBackupSection } from '../features/monero/wallet-backup-view';
 import { moneroWalletBody, moneroWalletBusy } from '../features/monero/wallet-view';
-import type { MoneroWalletRestoreRequest, MoneroWalletUiState } from '../features/monero/types';
+import type { MoneroWalletRestoreRequest, MoneroWalletUiState, TipJarWalletTx } from '../features/monero/types';
 import type { TipJarBackupPayload } from '../features/monero/wallet-backup';
 import type { AppState } from './state';
 import { tipJarOn } from '../features/monero/tip-jar-state';
@@ -19,6 +19,9 @@ export interface MoneroWalletControllerContext {
   repaintMoneroAddress(): void;
   // Every wallet state change, so the Tip Jar nav badge and page follow it.
   onChange?(): void;
+  // The open wallet's id and, after a sync, its transaction list (null when only opened, or
+  // when the runtime could not list them). Tip Jar activity is joined onto it.
+  onActivity?(walletId: string, txs: TipJarWalletTx[] | null): void;
   vault?: DeviceVault;
   core?: MoneroWalletCore;
 }
@@ -136,6 +139,7 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     if (!unlockedOr('Unlock Workstr before opening the Monero wallet.')) return;
     await guarded({ status: 'opening', message: 'Opening wallet from the device vault…' }, async () => {
       const snapshot = await core.openWallet();
+      ctx.onActivity?.(snapshot.metadata.id, null);
       return { status: 'ready', stored: true, snapshot, message: 'Wallet opened. Sync before checking the balance.', messageKind: 'ok' };
     }, (error) => ({ status: 'error', message: `Could not open wallet (${safeReason(error)}).`, messageKind: 'bad' }));
   }
@@ -196,7 +200,13 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     try {
       const sync = await core.sync(onProgress);
       const balance = await core.balance();
-      if (started === generation) set({ status: 'ready', snapshot: { ...snapshot, sync, balance }, backup: current().backup, message: sync.synchronized ? 'Wallet synced.' : 'Wallet sync updated.', messageKind: 'ok' });
+      // Activity is a view on top of the sync; a runtime that cannot list transactions must not
+      // turn a good sync into an error.
+      const txs = await core.transactions().catch(() => null);
+      if (started === generation) {
+        set({ status: 'ready', snapshot: { ...snapshot, sync, balance }, backup: current().backup, message: sync.synchronized ? 'Wallet synced.' : 'Wallet sync updated.', messageKind: 'ok' });
+        ctx.onActivity?.(snapshot.metadata.id, txs);
+      }
     } catch (error) {
       if (started === generation) set({ status: 'error', snapshot, message: `Could not sync wallet (${safeReason(error)}).`, messageKind: 'bad' });
     } finally {

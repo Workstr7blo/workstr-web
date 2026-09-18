@@ -1,11 +1,9 @@
 import { html } from '../../app/format';
 import { moneroQr } from '../../app/monero-mark';
 import type { AppState } from '../../app/state';
+import { PIGGY_BANK, tipJarActivityCard, updateTipJarActivity } from './tip-jar-history-view';
 import { tipJarNavLabel, tipJarOn, tipJarStatus, type TipJarStatus } from './tip-jar-state';
 import { xmrAmount } from './wallet-view';
-
-// Outline piggy bank in the nav icon language: 24px box, stroke drawn in currentColor.
-const PIGGY_BANK = '<path d="M19 11.5c0-3.6-3.1-6.5-7-6.5-1.1 0-2.1.2-3 .6L6.5 4v3.3A6.2 6.2 0 0 0 5.1 10H3v3.5h2.2c.5 1.1 1.3 2.1 2.3 2.8V19.5h3v-1.8h2.8v1.8h3v-3.2c1.7-1.2 2.7-3 2.7-4.8z"/><path d="M10 8h3.5"/><path d="M15.5 10.5h.01"/>';
 
 // The ring circumference is normalised with pathLength, so progress is a plain 0..100 offset.
 function ringOffset(progress: number): string {
@@ -50,10 +48,6 @@ function balanceText(state: AppState): string {
   return atomic ? xmrAmount(atomic) : '— XMR';
 }
 
-function row(label: string, value: string, extra = ''): string {
-  return `<div class="tip-jar-row"><span>${html(label)}</span><strong>${value}</strong>${extra}</div>`;
-}
-
 function offBody(): string {
   return `<div class="tip-jar-card tip-jar-empty">
     <p class="tip-jar-lead">Tip Jar is off.</p>
@@ -68,16 +62,6 @@ function notice(lead: string, help: string, actions = ''): string {
     <p class="section-help">${html(help)}</p>
     ${actions ? `<div class="web-empty-actions">${actions}</div>` : ''}
   </div>`;
-}
-
-// Whether tips published for this account arrive in this Tip Jar.
-function receivingRow(state: AppState, walletAddress: string): string {
-  const published = state.monero.address;
-  if (state.monero.status === 'idle' || state.monero.status === 'loading') return row('Receiving tips', 'Checking…');
-  if (state.monero.status === 'saving') return row('Receiving tips', 'Publishing…');
-  if (published && published === walletAddress) return row('Receiving tips', 'Enabled');
-  if (published) return row('Receiving tips', 'Another wallet', '<small>Tips go to an address from another wallet. Change it in Settings.</small>');
-  return row('Receiving tips', 'Off', `<button id="tip-jar-publish" class="button payment" type="button">Receive tips here</button>`);
 }
 
 function walletBody(state: AppState, status: TipJarStatus): string {
@@ -96,15 +80,11 @@ function walletBody(state: AppState, status: TipJarStatus): string {
     <div class="tip-jar-status" id="tip-jar-status" data-tip-jar="${status.visual}">${html(status.word)}</div>
     <div class="tip-jar-actions">
       <button id="tip-jar-receive" class="button payment" type="button" aria-expanded="false" aria-controls="tip-jar-receive-panel"${address ? '' : ' disabled'}>Receive</button>
-      <button id="tip-jar-send" class="button" type="button" disabled aria-describedby="tip-jar-send-note">Send</button>
+      <button id="tip-jar-send" class="button" type="button" disabled>Send</button>
     </div>
-    <p class="section-help" id="tip-jar-send-note">Sending XMR from the Tip Jar is not available yet.</p>
     ${receive}
   </div>
-  <div class="tip-jar-card tip-jar-rows">
-    ${receivingRow(state, address)}
-    ${row('Backup', 'Recovery phrase', '<button class="button" type="button" data-view="settings">Open Settings</button>')}
-  </div>`;
+  ${tipJarActivityCard(state)}`;
 }
 
 // Which layout the page has. A repaint within the same phase only patches text, so an open
@@ -115,7 +95,7 @@ export function tipJarPhase(state: AppState): string {
   if (state.deviceVault !== 'unlocked') return 'locked';
   const wallet = state.moneroWallet;
   if (wallet?.status === 'missing' || (wallet?.stored === false && !wallet.snapshot)) return 'missing';
-  if (wallet?.stored || wallet?.snapshot) return `wallet:${wallet.snapshot?.metadata.creatorSubaddress || wallet.addresses?.[0] || ''}:${state.monero.status}:${state.monero.address}`;
+  if (wallet?.stored || wallet?.snapshot) return `wallet:${wallet.snapshot?.metadata.creatorSubaddress || wallet.addresses?.[0] || ''}`;
   return 'checking';
 }
 
@@ -141,7 +121,7 @@ export function tipJarView(state: AppState): string {
   </div>`;
 }
 
-// In-place patch for the parts that move with a sync: balance and status word.
+// In-place patch for the parts that move with a sync: balance, status word and activity.
 export function updateTipJarPage(root: ParentNode, state: AppState): void {
   const body = root.querySelector<HTMLElement>('#tip-jar-body');
   if (!body) return;
@@ -157,4 +137,5 @@ export function updateTipJarPage(root: ParentNode, state: AppState): void {
   if (balanceEl && balanceEl.textContent !== balance) balanceEl.textContent = balance;
   const statusEl = body.querySelector<HTMLElement>('#tip-jar-status');
   if (statusEl && statusEl.textContent !== status.word) { statusEl.textContent = status.word; statusEl.dataset.tipJar = status.visual; }
+  updateTipJarActivity(body, state);
 }

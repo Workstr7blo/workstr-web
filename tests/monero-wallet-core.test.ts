@@ -9,7 +9,7 @@ import {
   saveMoneroWalletBundle
 } from '../src/features/monero/wallet-storage';
 import { moneroWalletConfig } from '../src/features/monero/wallet-runtime';
-import type { MoneroWalletRuntime, MoneroWalletRuntimeWallet } from '../src/features/monero/types';
+import type { MoneroWalletRuntime, MoneroWalletRuntimeTx, MoneroWalletRuntimeWallet } from '../src/features/monero/types';
 
 function response(payload: unknown, ok = true): Response {
   return { ok, status: ok ? 200 : 500, json: async () => payload } as Response;
@@ -286,6 +286,23 @@ describe('Monero wallet core', () => {
     await walletCore.close();
     expect(fake.wallet.closed).toBe(true);
     await expect(walletCore.balance()).rejects.toThrow(/Open the Monero wallet/);
+  });
+
+  it('lists the open wallet\'s transactions for Tip Jar activity, and none from a runtime that cannot', async () => {
+    const { vault } = fakeVault(true);
+    const fake = runtime();
+    const walletCore = core(vault, fake);
+    await walletCore.createWallet();
+    await expect(walletCore.transactions()).resolves.toEqual([]);
+    const txs: MoneroWalletRuntimeTx[] = [
+      { getHash: () => 'in-1', getIsIncoming: () => true, getIncomingAmount: () => 42n, getIsConfirmed: () => true },
+      { getHash: () => undefined, getIsIncoming: () => true }
+    ];
+    Object.assign(fake.wallet, { getTxs: async () => txs });
+    await expect(walletCore.transactions()).resolves.toEqual([{ txid: 'in-1', direction: 'in', amountAtomic: '42', state: 'confirmed' }]);
+    await expect(walletCore.storedWalletId()).resolves.toMatch(/^monero-/);
+    await walletCore.close();
+    await expect(walletCore.transactions()).rejects.toThrow(/Open the Monero wallet/);
   });
 
   it('closes the runtime wallet if vault verification fails during create', async () => {

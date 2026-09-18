@@ -23,7 +23,7 @@ function setup(overrides: Partial<AppState> = {}) {
   document.body.innerHTML = `<div id="app"><div id="page-host">${moneroTipsCard(s)}${tipJarView(s)}</div></div>`;
   const root = document.getElementById('app') as HTMLElement;
   const savePaymentMode = vi.fn(async (mode: 'monero' | 'off') => { s.settings = { ...s.settings, paymentMode: mode }; });
-  const moneroAddress = { repaint: vi.fn(), refreshIfNeeded: vi.fn(), save: vi.fn(async () => { s.monero = { ...s.monero, address: s.monero.draft ?? '', draft: undefined }; }) };
+  const moneroAddress = { repaint: vi.fn(), refreshIfNeeded: vi.fn() };
   const moneroWallet = { autoSync: vi.fn(async () => undefined), stop: vi.fn(async () => undefined), createWallet: vi.fn(async () => undefined) };
   const ctrl = createTipJarController({ root, state: s, toast: vi.fn(), savePaymentMode, refreshAuthorPaymentTargets: vi.fn(async () => undefined), moneroAddress, moneroWallet });
   return { s, root, ctrl, savePaymentMode, moneroAddress, moneroWallet };
@@ -50,13 +50,6 @@ describe('Tip Jar controller', () => {
     expect(moneroWallet.autoSync).not.toHaveBeenCalled();
     applyPaymentMode(s);
     expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false);
-  });
-
-  it('publishes the Tip Jar address only when no address is published', async () => {
-    const { s, root, moneroAddress } = setup({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>);
-    root.querySelector<HTMLButtonElement>('#tip-jar-publish')?.click();
-    await vi.waitFor(() => expect(moneroAddress.save).toHaveBeenCalledTimes(1));
-    expect(s.monero.address).toBe(ADDRESS);
   });
 
   it('toggles the receive panel in place', () => {

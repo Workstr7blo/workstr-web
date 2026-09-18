@@ -9,8 +9,9 @@ export interface TipJarControllerContext {
   toast(message: string, kind?: 'ok' | 'bad'): void;
   savePaymentMode(mode: 'monero' | 'off'): Promise<void>;
   refreshAuthorPaymentTargets(): Promise<void>;
-  moneroAddress: { repaint(): void; refreshIfNeeded(): void; save(): Promise<void> };
+  moneroAddress: { repaint(): void; refreshIfNeeded(): void };
   moneroWallet: { autoSync(): Promise<void>; stop(): Promise<void>; createWallet(): Promise<void> };
+  activity?: { resolveProfiles(): Promise<void> };
 }
 
 // The Tip Jar setting repaints the payment tokens, and the tokens are declared on `:root`, so
@@ -45,23 +46,12 @@ export function createTipJarController(ctx: TipJarControllerContext) {
     else void moneroWallet.stop();
   }
 
-  // Publishes this Tip Jar's receive address as the account's public tip target. Offered only
-  // when no address is published, so it never replaces an address from another wallet.
-  async function receiveHere(): Promise<void> {
-    const address = state.moneroWallet?.snapshot?.metadata.creatorSubaddress || state.moneroWallet?.addresses?.[0];
-    if (!address || state.monero.address) return;
-    state.monero = { ...state.monero, draft: address };
-    await moneroAddress.save();
-    repaint();
-  }
-
   // Delegated once: the page body is rebuilt in place, so per-render binding would miss it.
   root.addEventListener('click', (event) => {
     const target = (event.target as HTMLElement).closest<HTMLElement>('#tip-jar-body button');
     if (!target) return;
     if (target.id === 'tip-jar-enable') void setEnabled(true);
     else if (target.id === 'tip-jar-create') void moneroWallet.createWallet();
-    else if (target.id === 'tip-jar-publish') void receiveHere();
     else if (target.id === 'tip-jar-receive') {
       const panel = root.querySelector<HTMLElement>('#tip-jar-receive-panel');
       if (!panel) return;
@@ -76,11 +66,13 @@ export function createTipJarController(ctx: TipJarControllerContext) {
   return {
     repaint,
     setEnabled,
-    // Opening the page checks the published address and brings the wallet up to date.
+    // Opening the page checks the published address, brings the wallet up to date, and asks for
+    // any creator profile the activity list is still missing.
     open(): void {
       if (!tipJarOn(state)) return;
       moneroAddress.refreshIfNeeded();
       void moneroWallet.autoSync();
+      void ctx.activity?.resolveProfiles();
     }
   };
 }

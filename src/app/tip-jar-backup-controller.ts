@@ -24,6 +24,8 @@ export interface TipJarBackupControllerContext {
     toggleRecoveryPhrase(): Promise<void>;
     backupPayload(): Promise<TipJarBackupPayload>;
   };
+  // Hands a restored backup's creator context back to Tip Jar activity.
+  activity?: { restoreFromBackup(records: TipJarBackupPayload['activity']): Promise<void> };
   // Replacing a wallet that already holds money is never a side effect of picking a file.
   confirmReplace?(): boolean;
   now?(): Date;
@@ -124,14 +126,16 @@ export function createTipJarBackupController(ctx: TipJarBackupControllerContext)
     const replacing = Boolean(state.moneroWallet?.stored || state.moneroWallet?.snapshot);
     set({ busy: true, message: 'Opening your backup…', messageKind: undefined });
     let restore: MoneroWalletRestoreRequest;
+    let activity: TipJarBackupPayload['activity'];
     try {
       const payload = await decryptTipJarBackup(ui.fileText, password);
       restore = { seed: payload.seed, restoreHeight: payload.restoreHeight, replace: replacing };
+      activity = payload.activity;
     } catch (error) {
       return set({ busy: false, message: reason(error), messageKind: 'bad' });
     }
     if (replacing && !confirmReplace()) return set({ busy: false, message: 'Restore cancelled. The Tip Jar on this device is unchanged.' });
-    await applyRestore(restore, 'Tip Jar restored.');
+    if (await applyRestore(restore, 'Tip Jar restored.')) await ctx.activity?.restoreFromBackup(activity).catch(() => undefined);
   }
 
   // Blank means "scan from the start"; anything else must be a whole non-negative block number,
@@ -155,7 +159,7 @@ export function createTipJarBackupController(ctx: TipJarBackupControllerContext)
     await applyRestore({ seed, restoreHeight: height, replace: replacing }, 'Tip Jar restored from your recovery phrase.');
   }
 
-  async function applyRestore(request: MoneroWalletRestoreRequest, done: string): Promise<void> {
+  async function applyRestore(request: MoneroWalletRestoreRequest, done: string): Promise<boolean> {
     const ok = await ctx.wallet.restore(request);
     set({
       panel: 'idle',
@@ -165,6 +169,7 @@ export function createTipJarBackupController(ctx: TipJarBackupControllerContext)
       message: ok ? done : state.moneroWallet?.message || 'The Tip Jar could not be restored.',
       messageKind: ok ? 'ok' : 'bad'
     });
+    return ok;
   }
 
   // Delegated from the root once. The section is rewritten in place on every wallet change, so

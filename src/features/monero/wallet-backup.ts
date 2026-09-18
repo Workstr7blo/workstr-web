@@ -12,7 +12,8 @@
 import { base64ToBytes, bytesToBase64 } from '../../nostr/envelope';
 import { argon2idKey, meetsKdfMinimum, DEVICE_VAULT_KDF_PARAMETERS } from '../../security/device-vault-kdf';
 import type { DeviceVaultKdfParameters } from '../../security/device-vault-types';
-import type { MoneroNetwork, MoneroWalletSecretBundle } from './types';
+import { parseActivityRecords } from './tip-jar-history';
+import type { MoneroNetwork, MoneroWalletSecretBundle, TipJarOutgoingRecord } from './types';
 
 export const TIP_JAR_BACKUP_TYPE = 'workstr-tipjar-backup';
 export const TIP_JAR_BACKUP_VERSION = 1;
@@ -37,6 +38,9 @@ export interface TipJarBackupPayload {
   creatorSubaddress: string;
   primaryAddress: string;
   createdAt: string;
+  // Who each outgoing tip was for, which the chain cannot say. Optional, so files written before
+  // Tip Jar activity existed still restore, and files written now still open in those versions.
+  activity?: TipJarOutgoingRecord[];
 }
 
 export interface TipJarBackupFile {
@@ -182,6 +186,7 @@ function assertBackupPayload(json: string, network: MoneroNetwork): TipJarBackup
     creatorSubaddressIndex: typeof payload.creatorSubaddressIndex === 'number' ? payload.creatorSubaddressIndex : 1,
     creatorSubaddress: typeof payload.creatorSubaddress === 'string' ? payload.creatorSubaddress : '',
     primaryAddress: typeof payload.primaryAddress === 'string' ? payload.primaryAddress : '',
-    createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : ''
+    createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : '',
+    activity: parseActivityRecords(payload.activity).filter((record): record is TipJarOutgoingRecord => record.direction === 'out')
   };
 }
