@@ -15,19 +15,9 @@ import {
 import { tipJarBackupPayload, type TipJarBackupPayload } from './wallet-backup';
 import { walletTxFromRuntime } from './tip-jar-history';
 import type {
-  MoneroWalletBalance,
-  MoneroWalletBackupInfo,
-  MoneroWalletCreateRequest,
-  MoneroWalletDataRecord,
-  MoneroWalletMetadata,
-  MoneroWalletRestoreRequest,
-  MoneroWalletRuntime,
-  MoneroWalletRuntimeWallet,
-  MoneroWalletSecretBundle,
-  MoneroWalletSnapshot,
-  MoneroWalletSyncState,
-  MoneroPreparedTransfer,
-  TipJarWalletTx
+  MoneroPreparedTransfer, MoneroSyncProgress, MoneroWalletBackupInfo, MoneroWalletBalance, MoneroWalletCreateRequest,
+  MoneroWalletDataRecord, MoneroWalletMetadata, MoneroWalletRestoreRequest, MoneroWalletRuntime, MoneroWalletRuntimeWallet,
+  MoneroWalletSecretBundle, MoneroWalletSnapshot, MoneroWalletSyncState, TipJarWalletTx
 } from './types';
 
 type WalletVault = Pick<DeviceVault, 'isUnlocked' | 'hasSecret' | 'putSecret' | 'getSecret' | 'deleteSecret'>;
@@ -202,7 +192,7 @@ export class MoneroWalletCore {
     return Boolean(this.wallet) && this.walletPubkey === this.account();
   }
 
-  async sync(onProgress?: (fraction: number, remainingBlocks: number) => void): Promise<MoneroWalletSyncState> {
+  async sync(onProgress?: (progress: MoneroSyncProgress) => void): Promise<MoneroWalletSyncState> {
     const wallet = this.requireOpenWallet();
     const listener = onProgress ? this.walletRuntime?.syncListener?.(onProgress) : undefined;
     await (listener ? wallet.sync(listener) : wallet.sync());

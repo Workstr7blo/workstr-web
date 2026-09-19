@@ -82,6 +82,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed the Tip Jar's sync ring sitting empty for most of a catch-up and only moving at the very
+  end. It now measures the blocks of the sync actually running - from where the wallet left off
+  to the chain tip it is heading for - so it starts near empty, fills steadily as blocks are
+  scanned, reaches full, and then disappears when the Tip Jar is ready. While Workstr is still
+  opening the wallet the ring is a faint empty track rather than a bright nought per cent, which
+  looked stalled, and a sync that fails leaves no half-finished ring behind.
 - Fixed Create and Restore in the Monero wallet card being able to overwrite a stored wallet's
   seed, for example after opening it failed.
 - Fixed restoring a Monero wallet without a restore height scanning only from the current

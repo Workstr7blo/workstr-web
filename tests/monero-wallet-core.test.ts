@@ -8,8 +8,16 @@ import {
   moneroWalletScope,
   saveMoneroWalletBundle
 } from '../src/features/monero/wallet-storage';
-import { moneroWalletConfig } from '../src/features/monero/wallet-runtime';
-import type { MoneroWalletRuntime, MoneroWalletRuntimeTx, MoneroWalletRuntimeWallet } from '../src/features/monero/types';
+import { loadMoneroTsRuntime, moneroWalletConfig } from '../src/features/monero/wallet-runtime';
+import type { MoneroSyncProgress, MoneroWalletRuntime, MoneroWalletRuntimeTx, MoneroWalletRuntimeWallet } from '../src/features/monero/types';
+
+// The real package loads WebAssembly and a worker; this stands in for it, because what is under
+// test is the adapter around its listener, not the wallet behind it.
+vi.mock('monero-ts', () => ({
+  createWalletFull: async () => ({}),
+  openWalletFull: async () => ({}),
+  MoneroWalletListener: class {}
+}));
 
 function response(payload: unknown, ok = true): Response {
   return { ok, status: ok ? 200 : 500, json: async () => payload } as Response;
@@ -137,6 +145,19 @@ describe('Monero wallet runtime config', () => {
 
   it('rejects the wrong daemon network before wallet creation', async () => {
     await expect(moneroWalletConfig({ fetcher: nodeFetcher('stagenet') })).rejects.toThrow(/expected mainnet|not ready/);
+  });
+});
+
+describe('Monero wallet runtime listener', () => {
+  // The Tip Jar ring is drawn from these heights, so the adapter keeps all of them: forwarding
+  // only the runtime's percentage left the ring with nothing to measure a catch-up with (#266).
+  it('passes every height monero-ts reports on, not only its percentage', async () => {
+    const runtime = await loadMoneroTsRuntime();
+    const reports: MoneroSyncProgress[] = [];
+    const listener = runtime.syncListener?.((report) => { reports.push(report); }) as { onSyncProgress(height: unknown, start: unknown, end: unknown, percentDone: unknown): Promise<void> };
+    // monero-ts reports heights as BigInt.
+    await listener.onSyncProgress(3_763_250n, 3_763_000n, 3_764_000n, 0.9997);
+    expect(reports).toEqual([{ currentHeight: 3_763_250, startHeight: 3_763_000, targetHeight: 3_764_000, fraction: 0.9997, remainingBlocks: 750 }]);
   });
 });
 

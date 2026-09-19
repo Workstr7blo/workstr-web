@@ -2,10 +2,10 @@ import { deviceVault as defaultVault, type DeviceVault } from '../security/devic
 import { MoneroWalletCore, WALLET_ALREADY_STORED } from '../features/monero/wallet-core';
 import { updateTipJarBackupSection } from '../features/monero/wallet-backup-view';
 import { moneroWalletBody, moneroWalletBusy } from '../features/monero/wallet-view';
-import type { MoneroWalletRestoreRequest, MoneroWalletUiState, TipJarWalletTx } from '../features/monero/types';
+import type { MoneroSyncProgress, MoneroWalletRestoreRequest, MoneroWalletUiState, TipJarWalletTx } from '../features/monero/types';
 import type { TipJarBackupPayload } from '../features/monero/wallet-backup';
 import type { AppState } from './state';
-import { tipJarOn } from '../features/monero/tip-jar-state';
+import { blockSyncFraction, tipJarOn } from '../features/monero/tip-jar-state';
 
 // Periodic re-sync while the Tip Jar is on, the vault is unlocked and the page is visible.
 export const TIP_JAR_RESYNC_MS = 120_000;
@@ -50,6 +50,9 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
   let syncing = false;
   // The first sync after an open always shows progress: the saved state may be days behind.
   let syncedThisSession = false;
+  // The catch-up session the ring is measuring: the heights the first progress report of this
+  // sync named. Runtime-only, and never carried into the next sync.
+  let syncSession: { startHeight: number; targetHeight: number } | null = null;
 
   function current(): MoneroWalletUiState {
     return state.moneroWallet ?? { status: 'unknown' };
@@ -175,6 +178,18 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     set({ status: current().status, legacyAvailable: false, message: 'The earlier wallet stays on this device, untouched.' });
   }
 
+  // What the ring should show for one progress report: how far this catch-up session has come,
+  // which only the block heights can say, and the runtime's own percentage when they cannot.
+  function sessionProgress(progress: MoneroSyncProgress): number {
+    if (!syncSession && blockSyncFraction(progress.currentHeight, progress.startHeight, progress.targetHeight) !== null) {
+      // Fixed for the rest of the sync, so a daemon that finds new blocks meanwhile cannot drag
+      // the ring backwards.
+      syncSession = { startHeight: progress.startHeight, targetHeight: progress.targetHeight };
+    }
+    const fromBlocks = syncSession ? blockSyncFraction(progress.currentHeight, syncSession.startHeight, syncSession.targetHeight) : null;
+    return fromBlocks ?? Math.min(1, Math.max(0, progress.fraction || 0));
+  }
+
   // A foreground sync shows progress. A background one (the periodic re-sync of a wallet that
   // was already synchronized) keeps the Tip Jar ready, unless it turns out to be far behind.
   async function syncWallet(background = false): Promise<void> {
@@ -183,18 +198,23 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     if (syncing || moneroWalletBusy(current().status)) return;
     syncing = true;
     const started = generation;
-    if (!background) set({ ...current(), status: 'syncing', syncProgress: 0, message: 'Syncing wallet…' });
+    syncSession = null;
+    // Opening and preparing is not scanning yet, so no live progress is claimed for it: the ring
+    // stays a faint track and the Tip Jar falls back to the saved sync position, rather than
+    // being forced to a nought per cent it may be nowhere near (#266).
+    if (!background) set({ ...current(), status: 'syncing', syncProgress: undefined, syncLive: false, message: 'Syncing wallet…' });
     let painted = 0;
-    const onProgress = (fraction: number, remaining: number): void => {
+    const onProgress = (progress: MoneroSyncProgress): void => {
       if (started !== generation) return;
       const shown = current();
-      if (shown.status === 'ready' && remaining > VISIBLE_SYNC_BLOCKS) state.moneroWallet = { ...shown, status: 'syncing', message: 'Syncing wallet…' };
+      if (shown.status === 'ready' && progress.remainingBlocks > VISIBLE_SYNC_BLOCKS) state.moneroWallet = { ...shown, status: 'syncing', message: 'Syncing wallet…' };
       else if (shown.status !== 'syncing') return;
+      const fraction = sessionProgress(progress);
       // Progress reports arrive per batch of blocks; the badge needs a few updates a second at most.
       const now = Date.now();
       if (now - painted < 500 && fraction < 1) return;
       painted = now;
-      state.moneroWallet = { ...current(), syncProgress: Math.min(1, Math.max(0, fraction || 0)) };
+      state.moneroWallet = { ...current(), syncProgress: fraction, syncLive: true };
       ctx.onChange?.();
     };
     try {

@@ -127,8 +127,12 @@ export interface MoneroWalletUiState {
   legacyAvailable?: boolean;
   // The stored wallet's public addresses, to tell whether the published tip address is its own.
   addresses?: string[];
-  // 0..1 while a sync runs, from the runtime's own progress reports.
+  // 0..1 while a sync runs: how far this catch-up session has come, from the block heights the
+  // runtime reports, else its own percentage, else the saved sync position as an opening hint.
   syncProgress?: number;
+  // Whether `syncProgress` is live scanning progress rather than that opening hint. The nav ring
+  // stays a faint track until it is, because an arc that cannot move yet reads as stalled.
+  syncLive?: boolean;
   snapshot?: MoneroWalletSnapshot | null;
   backup?: MoneroWalletBackupInfo | null;
   message?: string;
@@ -189,10 +193,22 @@ export interface MoneroWalletRuntimeWallet {
   close(save?: boolean): Promise<void>;
 }
 
+// One scanning report from the runtime. The three heights describe the catch-up session the
+// wallet is in - where it started, where it is, and the daemon height it is heading for - and
+// they are what the Tip Jar ring measures. `fraction` is the runtime's own percentage, kept as
+// a fallback for a runtime that reports no useful heights (#266).
+export interface MoneroSyncProgress {
+  currentHeight: number;
+  startHeight: number;
+  targetHeight: number;
+  fraction: number;
+  remainingBlocks: number;
+}
+
 export interface MoneroWalletRuntime {
   createWallet(config: Record<string, unknown>): Promise<MoneroWalletRuntimeWallet>;
   openWallet?(config: Record<string, unknown>): Promise<MoneroWalletRuntimeWallet>;
-  syncListener?(onProgress: (fraction: number, remainingBlocks: number) => void): object;
+  syncListener?(onProgress: (progress: MoneroSyncProgress) => void): object;
 }
 
 // Tip Jar activity (#263). Monero provides the transaction, Workstr remembers who a tip was
