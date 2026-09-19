@@ -61,4 +61,19 @@ describe('Tip Jar controller', () => {
     expect(panel.hidden).toBe(false);
     expect(button.getAttribute('aria-expanded')).toBe('true');
   });
+
+  // The row shows a shortened address (#268); what either control puts on the clipboard is the
+  // whole one, or a reader pastes a truncated address into a wallet.
+  it('copies the whole address from the row glyph and from Copy address alike', async () => {
+    const writeText = vi.fn(async (_address: string) => undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { root } = setup({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] } } as Partial<AppState>);
+
+    root.querySelector<HTMLButtonElement>('.tip-jar-address-copy')!.click();
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(ADDRESS));
+    root.querySelector<HTMLButtonElement>('#tip-jar-copy')!.click();
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+    expect(writeText.mock.calls.map(([value]) => value)).toEqual([ADDRESS, ADDRESS]);
+    expect(root.querySelector('.tip-jar-address')?.textContent).not.toBe(ADDRESS);
+  });
 });

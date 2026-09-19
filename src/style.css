@@ -385,7 +385,7 @@
 .workout-card-header .workout-card-meta { margin-top: 5px; }
 .workout-card-summary { margin-top: 4px; color: var(--purple-2); font: 700 11px/1.3 ui-monospace, monospace; }
 .workout-card-status { margin-top: 5px; color: var(--accent-soft); font: 700 11px/1 ui-monospace, monospace; }
-.monero-tip-cta .monero-badge { display: block; flex: none; filter: drop-shadow(0 0 7px rgba(var(--payment-rgb), .45)); }
+.monero-tip-cta .tip-piggy-icon { display: block; flex: none; filter: drop-shadow(0 0 7px rgba(var(--payment-rgb), .45)); }
 .monero-tip-cta .monero-tip-label { display: inline-block; line-height: 1; letter-spacing: .01em; }
 .program-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .program-tags .tag-pill { padding: 4px 8px; font-size: 10px; }
@@ -1210,9 +1210,21 @@
 .tip-jar-status[data-tip-jar="error"] { border-style: dashed; }
 .tip-jar-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .tip-jar-actions .button { justify-content: center; }
-.tip-jar-receive-body { display: grid; justify-items: center; gap: 10px; }
+/* Receive: the code is the subject, and everything under it is support. A smaller code, a thin
+   payment edge instead of an orange frame, and one line of address instead of a block of it keep
+   Recent activity within reach of the actions above (#268). */
+.tip-jar-receive-body { display: grid; justify-items: center; gap: 8px; }
 .tip-jar-receive-body[hidden] { display: none; }
+.tip-jar-receive-body .support-monero-qr { width: 182px; padding: 10px; border-color: rgba(var(--payment-rgb), .22); box-shadow: 0 0 18px rgba(var(--payment-rgb), .1); }
+.tip-jar-address-row { display: flex; align-items: center; gap: 6px; width: 100%; box-sizing: border-box; padding: 4px 4px 4px 12px; border: 1px solid var(--border); border-radius: 10px; background: rgba(var(--payment-rgb), .05); }
+.tip-jar-address { flex: 1; min-width: 0; overflow: hidden; color: var(--muted); font: 500 12px/1.6 ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.tip-jar-address-copy { display: flex; flex: none; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.tip-jar-address-copy svg { width: 17px; height: 17px; }
+.tip-jar-address-copy:hover { color: var(--payment-accent); background: rgba(var(--payment-rgb), .1); }
+.tip-jar-receive-body .web-empty-actions { margin-top: 2px; }
 .tip-jar-receive-body .section-help { text-align: center; }
+/* After the shared phone rule above, so the receive code keeps its own smaller size there. */
+@media (max-width: 700px) { .tip-jar-receive-body .support-monero-qr { width: 158px; } }
 /* Recent activity: arrow, avatar, who/amount/context, then when. The arrow carries direction for
    sighted readers only; each row also reads as one sentence. */
 .tip-jar-activity { gap: 4px; padding-bottom: 8px; }

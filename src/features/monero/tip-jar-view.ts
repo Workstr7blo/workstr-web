@@ -1,10 +1,14 @@
-import { html } from '../../app/format';
+import { html, shortMoneroAddress } from '../../app/format';
 import { moneroQr } from '../../app/monero-mark';
 import type { AppState } from '../../app/state';
-import { PIGGY_BANK, tipJarActivityCard, updateTipJarActivity } from './tip-jar-history-view';
+import { PIGGY_BANK } from '../../app/piggy-bank';
+import { tipJarActivityCard, updateTipJarActivity } from './tip-jar-history-view';
 import { tipJarNavLabel, tipJarOn, tipJarStatus, type TipJarStatus } from './tip-jar-state';
 import { sendReadiness } from './wallet-send';
 import { xmrAmount } from './wallet-view';
+
+// Two stacked sheets: the copy glyph the address row carries, beside the shortened address.
+const COPY_GLYPH = '<rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15.5 6.2A2.2 2.2 0 0 0 13.4 4.5H6.7A2.2 2.2 0 0 0 4.5 6.7v6.7c0 1 .7 1.9 1.7 2.1"/>';
 
 // The ring circumference is normalised with pathLength, so progress is a plain 0..100 offset.
 function ringOffset(progress: number): string {
@@ -73,11 +77,19 @@ function walletBody(state: AppState, status: TipJarStatus): string {
   const snapshot = wallet?.snapshot;
   const address = snapshot?.metadata.creatorSubaddress || wallet?.addresses?.[0] || '';
   const uri = `monero:${address}`;
+  // The code is the subject here, so the address underneath is one quiet line with its own copy
+  // glyph, and both copy controls hand over the same full address (#268).
   const receive = address ? `<div class="tip-jar-receive-body" id="tip-jar-receive-panel" hidden>
         <div class="support-monero-qr" role="img" aria-label="QR code for your Tip Jar address">${moneroQr(uri)}</div>
-        <code class="support-monero-address">${html(address)}</code>
-        <div class="web-empty-actions"><button id="tip-jar-copy" class="button payment" type="button" data-address="${html(address)}">Copy address</button></div>
-        <p class="section-help">Receive XMR to this address. Scan it with any Monero wallet.</p>
+        <div class="tip-jar-address-row">
+          <code class="tip-jar-address" aria-hidden="true">${html(shortMoneroAddress(address))}</code>
+          <span class="sr-only">Your Tip Jar address: ${html(address)}</span>
+          <button class="tip-jar-address-copy" type="button" data-tip-jar-copy data-address="${html(address)}" aria-label="Copy your full Tip Jar address">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${COPY_GLYPH}</svg>
+          </button>
+        </div>
+        <div class="web-empty-actions"><button id="tip-jar-copy" class="button payment" type="button" data-tip-jar-copy data-address="${html(address)}">Copy address</button></div>
+        <p class="section-help">Scan with any Monero wallet.</p>
       </div>` : '';
   return `<div class="tip-jar-card">
     <div class="tip-jar-balance" id="tip-jar-balance">${html(balanceText(state))}</div>

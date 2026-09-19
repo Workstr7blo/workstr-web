@@ -2,6 +2,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMoneroTipController } from '../src/app/monero-tip-controller';
 import { moneroTipAddress, moneroTipButton } from '../src/features/sheets/monero-tip-view';
+import { PIGGY_BANK, tipPiggyIcon } from '../src/app/piggy-bank';
+import { MONERO_MARK } from '../src/app/monero-mark';
 import { programCard } from '../src/features/sheets/views';
 import { shellMarkup } from '../src/app/layout';
 import type { AppState } from '../src/app/state';
@@ -99,8 +101,33 @@ describe('Monero Tip on program cards', () => {
     const byline = card.slice(card.indexOf('workout-card-byline'), card.indexOf('workout-card-meta'));
     expect(byline).toContain('monero-tip-cta');
     expect(card).not.toContain('workout-card-media');
-    expect(card).toMatch(/aria-label="Tip [^"]+ with Monero"/);
+    expect(card).toMatch(/aria-label="Tip [^"]+"/);
     expect(programCard(program, state(), { showPayment: false })).not.toContain('monero-tip-cta');
+  });
+
+  // #267: the card says what the button does - add to this creator's Tip Jar - and not which
+  // rail carries it. A Monero mark on every card made the network the subject of the card.
+  it('marks the Tip with the Tip Jar piggy bank and a plus, never the Monero mark', () => {
+    const card = programCard(program, state(), { showPayment: true });
+    const cta = card.slice(card.indexOf('monero-tip-cta'), card.indexOf('</button>'));
+
+    expect(cta).toContain('tip-piggy-icon');
+    expect(cta).toContain(PIGGY_BANK);
+    expect(cta).toContain(tipPiggyIcon(18));
+    // The plus: attached to the pig, and a third of it at most.
+    expect(cta).toMatch(/<circle cx="19.3" cy="4.7" r="3.2"\/>/);
+    expect(cta).toContain('>Tip</span>');
+    // Still the same orange payment control it was; only the icon changed.
+    expect(card).toContain('class="button payment small monero-tip-cta"');
+
+    // No Monero mark, badge or wording, and nothing for a screen reader to read twice: the
+    // icon is decorative and the accessible name is the action.
+    expect(cta).not.toContain(MONERO_MARK);
+    expect(cta).not.toContain('monero-badge');
+    expect(cta).not.toContain('sr-only');
+    expect(cta).toContain('aria-hidden="true"');
+    expect(card).not.toContain('with Monero');
+    expect(card.match(/aria-label="(Tip [^"]*)"/)?.[1]).not.toMatch(/monero|xmr|piggy|plus/i);
   });
 
   it('ignores a target that is not a Monero address', () => {

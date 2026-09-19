@@ -4,6 +4,7 @@ import { looksLikeMoneroAddress } from '../../nostr/payment-targets';
 import type { AppState } from '../../app/state';
 import { displayPubkey, html } from '../../app/format';
 import { moneroBadge } from '../../app/monero-mark';
+import { tipPiggyIcon } from '../../app/piggy-bank';
 import { normalizePaymentMode } from '../../core/types';
 
 export function moneroMode(state: AppState): boolean {
@@ -23,9 +24,17 @@ export function moneroTipAddress(program: RelayProgram, state: AppState): string
   return address && looksLikeMoneroAddress(address) ? address : '';
 }
 
+/**
+ * The card's Tip: a piggy bank with a plus, and the word Tip.
+ *
+ * The icon says what the button does - add to this creator's Tip Jar - rather than which rail
+ * carries it. A Monero mark here made every card advertise the network, and the reader has
+ * already been told once, in Settings, that tips are Monero (#267). Monero branding stays on
+ * the surfaces where the payment itself happens: the tip sheet and the receive codes.
+ */
 export function moneroTipButton(program: RelayProgram, state: AppState): string {
   if (!moneroTipAddress(program, state)) return '';
-  return `<button class="button payment small monero-tip-cta" type="button" data-monero-tip="${html(program.address)}" aria-label="Tip ${html(moneroTipCreator(program, state))} with Monero">${moneroBadge(18)}<span class="monero-tip-label">Tip</span></button>`;
+  return `<button class="button payment small monero-tip-cta" type="button" data-monero-tip="${html(program.address)}" aria-label="Tip ${html(moneroTipCreator(program, state))}">${tipPiggyIcon(18)}<span class="monero-tip-label">Tip</span></button>`;
 }
 
 export interface MoneroTipDetails {
