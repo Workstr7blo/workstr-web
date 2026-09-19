@@ -357,11 +357,14 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const walletCore = new MoneroWalletCore({ vault: deviceVault, account: () => state.pubkey });
   const tipJarActivity = createTipJarActivityController({ state, fetchProfile, onChange: () => tipJar.repaint() });
   const moneroWallet = createMoneroWalletController({ root, state, toast, repaintMoneroAddress: moneroAddress.repaint, onChange: () => tipJar.repaint(), onActivity: (walletId, txs) => { void tipJarActivity.walletActivity(walletId, txs); }, core: walletCore });
-  // The backup file carries the wallet plus what Workstr knows about its outgoing tips.
   const tipJarBackup = createTipJarBackupController({ root, state, toast, activity: tipJarActivity, wallet: { restore: moneroWallet.restore, toggleRecoveryPhrase: moneroWallet.toggleRecoveryPhrase, backupPayload: async () => ({ ...await moneroWallet.backupPayload(), activity: await tipJarActivity.backupRecords(await walletCore.storedWalletId()) }) } });
-  // A send needs only an open wallet, so it uses the shared core; afterSend re-syncs the Tip Jar.
-  const moneroSend = createMoneroSendController({ root, state, toast, openModal, closeModal, wallet: walletCore, activity: tipJarActivity, afterSend: () => { void moneroWallet.autoSync(); } });
-  const tipJar = createTipJarController({ root, state, toast, savePaymentMode: preferences.savePaymentMode, refreshAuthorPaymentTargets: catalog.refreshAuthorPaymentTargets, moneroAddress, moneroWallet, activity: tipJarActivity, send: moneroSend });
+  let tipJar: ReturnType<typeof createTipJarController>;
+  const openTipJarPage = (mode?: 'receive') => { state.view = 'tipjar'; render(); tipJar.open(); if (mode === 'receive') root.querySelector<HTMLButtonElement>('#tip-jar-receive')?.click(); };
+  const moneroSend = createMoneroSendController({
+    root, state, toast, openModal, closeModal, wallet: walletCore, activity: tipJarActivity, afterSend: () => { void moneroWallet.autoSync(); },
+    tipJar: { enable: () => tipJar.setEnabled(true), create: () => moneroWallet.createWallet(), openPage: openTipJarPage, openSettings: () => { state.view = 'settings'; render(); } }
+  });
+  tipJar = createTipJarController({ root, state, toast, savePaymentMode: preferences.savePaymentMode, refreshAuthorPaymentTargets: catalog.refreshAuthorPaymentTargets, moneroAddress, moneroWallet, activity: tipJarActivity, send: moneroSend });
   const moneroTip = createMoneroTipController({ root, state, toast, openModal, sendTip: moneroSend.openTip });
   const programList = createProgramList({
     root, state, render, toast,
@@ -374,9 +377,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const backup = createBackupController({ root, state, render, toast, getSigner: identity.getActiveSigner, onSignerStalled: identity.dropActiveSigner, onRestored: () => { void refreshFromStore(); }, requestSignIn: () => { identity.startAccountChoice(); }, bindCard: bindBackupCard });
 
   function unitLabel(): string { return normalizeWeightUnit(state.settings.unit); }
-
   function wDisplay(weight: number | null | undefined): number | null { return displayWeightKg(weight, normalizeWeightUnit(state.settings.unit)); }
-
   function wFmt(weight: number | null | undefined): string { return weight == null ? '—' : formatWeightKg(weight, normalizeWeightUnit(state.settings.unit)); }
 
   function openModal(content: string): void {

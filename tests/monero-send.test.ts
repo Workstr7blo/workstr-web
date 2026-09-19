@@ -207,11 +207,14 @@ describe('the send sheet', () => {
     expect(walletApi.prepareTransfer).toHaveBeenCalledWith({ address: OTHER_ADDRESS, amountAtomic: '1000000000' });
   });
 
-  it('does not open while the Tip Jar cannot send, and says why for a plain send', () => {
+  it('opens a native Tip Jar state when a creator tip cannot send yet, and says why for a plain send', () => {
     const { ctrl, toast } = setup({}, undefined);
     const syncing = setup();
     syncing.s.moneroWallet!.snapshot!.sync!.synchronized = false;
-    expect(syncing.ctrl.openTip(creator)).toBe(false);
+    expect(syncing.ctrl.openTip(creator)).toBe(true);
+    expect(syncing.root.querySelector('#monero-tip-start')?.textContent).toContain('Getting your Tip Jar ready');
+    expect(syncing.root.innerHTML).not.toContain('Open wallet');
+    expect(syncing.root.innerHTML).not.toContain(`monero:${CREATOR_ADDRESS}`);
     expect(syncing.ctrl.openSend()).toBe(false);
     expect(syncing.toast).toHaveBeenCalledWith(expect.stringMatching(/syncing/), 'bad');
     expect(ctrl.openSend()).toBe(true);
@@ -232,11 +235,16 @@ describe('the program-card tip', () => {
     expect(openModal).not.toHaveBeenCalled();
   });
 
-  it('falls back to the address hand-off when it cannot', () => {
-    const s = state({ programs: [program], authorPaymentTargets: { [CREATOR]: CREATOR_ADDRESS } } as unknown as Partial<AppState>);
-    const openModal = vi.fn();
-    createMoneroTipController({ root: document.body, state: s, toast: vi.fn(), openModal, sendTip: () => false }).show(program.address);
-    expect(openModal).toHaveBeenCalledWith(expect.stringContaining(CREATOR_ADDRESS));
+  it('opens a native Tip Jar state when it cannot send instead of handing off to another wallet', () => {
+    const s = state({ programs: [program], authorPaymentTargets: { [CREATOR]: CREATOR_ADDRESS }, settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] } } as unknown as Partial<AppState>);
+    const openModal = vi.fn((content: string) => { document.body.innerHTML = content; });
+    createMoneroTipController({ root: document.body, state: s, toast: vi.fn(), openModal, sendTip: () => {
+      openModal('<section id="monero-tip-start">Turn on your Tip Jar to send tips in Workstr.<button data-tip-start-action="enable">Enable Tip Jar</button></section>');
+      return true;
+    } }).show(program.address);
+    expect(openModal).toHaveBeenCalledWith(expect.stringContaining('Turn on your Tip Jar'));
+    expect(document.body.textContent).not.toContain('Open wallet');
+    expect(document.body.innerHTML).not.toContain(`monero:${CREATOR_ADDRESS}`);
   });
 });
 

@@ -1,6 +1,5 @@
 import { html } from '../../app/format';
-import { moneroQr } from '../../app/monero-mark';
-import type { MoneroSendState } from './types';
+import type { MoneroSendRecipient, MoneroSendState } from './types';
 import { shortAddress, shortTxid, TIP_PRESETS, xmrExact, xmrInputText } from './wallet-send';
 import { xmrAmount } from './wallet-view';
 
@@ -30,20 +29,15 @@ function recipientBlock(state: MoneroSendState): string {
   </div>`;
 }
 
-// A creator tip can still be paid from any other wallet: the address, its QR and the hand-off,
-// tucked away because the Tip Jar is the way in.
-function otherWallet(state: MoneroSendState): string {
-  const address = state.recipient?.address;
-  if (!address || !isTip(state)) return '';
-  const uri = `monero:${address}`;
-  return `<details class="monero-send-other">
-    <summary>Pay from another wallet</summary>
-    <div class="monero-send-other-body">
-      <div class="support-monero-qr" role="img" aria-label="QR code for ${html(recipientName(state))}'s Monero address">${moneroQr(uri)}</div>
-      <code class="support-monero-address">${html(address)}</code>
-      <div class="web-empty-actions"><button id="monero-send-copy" class="button" type="button" data-address="${html(address)}">Copy address</button><a class="button" href="${html(uri)}">Open wallet</a></div>
-    </div>
-  </details>`;
+export interface MoneroTipStartView {
+  id: number;
+  recipient: MoneroSendRecipient;
+  title: string;
+  lead: string;
+  help: string;
+  detail?: string;
+  primary?: { label: string; action: 'enable' | 'setup' | 'add-funds' | 'settings' | 'retry' };
+  secondary?: { label: string; action: 'tipjar' | 'settings' | 'retry' };
 }
 
 function errorLine(state: MoneroSendState): string {
@@ -71,8 +65,7 @@ function amountStep(state: MoneroSendState, availableAtomic: string): string {
       <button class="button" type="button" data-send-action="close"${busy ? ' disabled' : ''}>Cancel</button>
       <button class="button payment" type="submit"${busy ? ' disabled' : ''}>${busy ? 'Calculating fee…' : 'Review'}</button>
     </div>
-  </form>
-  ${otherWallet(state)}`;
+  </form>`;
 }
 
 function reviewRows(state: MoneroSendState): string {
@@ -141,4 +134,22 @@ export function moneroSendBody(state: MoneroSendState, availableAtomic: string):
 
 export function moneroSendSheet(state: MoneroSendState, availableAtomic: string): string {
   return `<section class="monero-send" id="monero-send" data-send-id="${state.id}" aria-labelledby="monero-send-title">${moneroSendBody(state, availableAtomic)}</section>`;
+}
+
+function tipStartActions(view: MoneroTipStartView): string {
+  const actions = [view.secondary, view.primary].filter(Boolean) as NonNullable<MoneroTipStartView['primary']>[];
+  if (!actions.length) return '';
+  return `<div class="monero-send-actions">${actions.map((action, index) => `<button class="button${index === actions.length - 1 ? ' payment' : ''}" type="button" data-tip-start-action="${action.action}">${html(action.label)}</button>`).join('')}</div>`;
+}
+
+export function moneroTipStartSheet(view: MoneroTipStartView): string {
+  const headerState: MoneroSendState = { id: view.id, step: 'amount', recipient: view.recipient, amountText: '', addressText: '' };
+  return `<section class="monero-send monero-tip-start" id="monero-tip-start" data-tip-start-id="${view.id}" aria-labelledby="monero-tip-start-title">
+    <h2 class="page-title monero-send-title" id="monero-tip-start-title">${html(view.title)}</h2>
+    ${recipientBlock(headerState)}
+    <p class="monero-send-result" role="status">${html(view.lead)}</p>
+    <p class="section-help">${html(view.help)}</p>
+    ${view.detail ? `<p class="monero-send-available">${html(view.detail)}</p>` : ''}
+    ${tipStartActions(view)}
+  </section>`;
 }

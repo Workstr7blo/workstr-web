@@ -73,10 +73,14 @@ function harness(overrides: Partial<AppState> = {}) {
   const openModal = vi.fn((content: string) => {
     (root.querySelector('#modal-content') as HTMLElement).innerHTML = content;
   });
-  const controller = createMoneroTipController({ root, state: app, toast, openModal });
+  const sendTip = vi.fn((recipient) => {
+    openModal(`<section id="monero-tip-start">Tip ${recipient.name || 'this creator'}<button data-tip-start-action="enable">Enable Tip Jar</button></section>`);
+    return true;
+  });
+  const controller = createMoneroTipController({ root, state: app, toast, openModal, sendTip });
   controller.bind();
   const modal = () => root.querySelector('#modal-content') as HTMLElement;
-  return { root, cards, state: app, toast, openModal, controller, modal };
+  return { root, cards, state: app, toast, openModal, sendTip, controller, modal };
 }
 
 describe('Monero Tip on program cards', () => {
@@ -164,18 +168,19 @@ describe('Monero Tip on program cards', () => {
   });
 });
 
-describe('the Monero tip sheet', () => {
-  it('opens with the creator, the address, a QR and both actions', () => {
+describe('the Monero tip flow', () => {
+  it('starts the Workstr Tip Jar flow without exposing a creator wallet hand-off', () => {
     const app = harness({ profileNames: { [AUTHOR]: 'Alice' } });
     app.cards.querySelector<HTMLElement>('[data-monero-tip]')!.click();
 
     const text = app.modal().textContent || '';
     expect(app.openModal).toHaveBeenCalledTimes(1);
-    expect(text).toContain('Tip with Monero');
-    expect(text).toContain('Alice');
-    expect(text).toContain(ADDRESS);
-    expect(app.modal().querySelector('.monero-tip-qr svg')).toBeTruthy();
-    expect(app.modal().querySelector<HTMLAnchorElement>('#monero-tip-open')?.getAttribute('href')).toBe(`monero:${ADDRESS}`);
+    expect(text).toContain('Tip Alice');
+    expect(text).toContain('Enable Tip Jar');
+    expect(text).not.toContain(ADDRESS);
+    expect(text).not.toContain('Open wallet');
+    expect(app.modal().querySelector('.monero-tip-qr svg')).toBeNull();
+    expect(app.modal().querySelector<HTMLAnchorElement>('#monero-tip-open')).toBeNull();
   });
 
   // A Monero transfer is not a NIP-57 zap. Borrowing the zap plumbing would ask a wallet
@@ -193,18 +198,13 @@ describe('the Monero tip sheet', () => {
     expect(app.modal().textContent).not.toContain('sats');
   });
 
-  it('copies the address to the clipboard', async () => {
-    const writeText = vi.fn(async () => {});
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+  it('hands the creator address to Workstr internally as the send destination', () => {
     const app = harness();
     app.cards.querySelector<HTMLElement>('[data-monero-tip]')!.click();
 
-    const copy = app.modal().querySelector<HTMLButtonElement>('#monero-tip-copy')!;
-    copy.click();
-    await Promise.resolve();
-
-    expect(writeText).toHaveBeenCalledWith(ADDRESS);
-    expect(copy.textContent).toBe('Copied');
+    expect(app.sendTip).toHaveBeenCalledWith(expect.objectContaining({ address: ADDRESS, pubkey: AUTHOR, programAddress: program.address, programName: program.name }));
+    expect(app.openModal).toHaveBeenCalled();
+    expect(app.modal().textContent).toContain('Tip');
   });
 
   it('says so rather than opening an empty sheet when the target has gone', () => {
