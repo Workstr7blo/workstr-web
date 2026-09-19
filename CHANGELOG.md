@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and confirm. The transfer is signed on your device and broadcast through the Monero node;
   your recovery phrase and spend key never leave the device. The Tip Jar page's Send button
   sends to any Monero address the same way. Sending is available once the Tip Jar is synced
-  and holds spendable XMR; until then Tip still shows the creator's address and QR to pay from
-  another wallet, which also stays one tap away inside the tip sheet. A send whose broadcast
+  and holds spendable XMR. If it is off, locked, syncing, missing a wallet or empty, the Tip
+  flow stays inside Workstr with the native Tip Jar setup, unlock, sync or Add funds step
+  instead of showing a creator address, QR or external wallet link. A send whose broadcast
   cannot be confirmed says so and does not offer to send again, so a tip is never paid twice.
 
 - Added Recent activity to the Tip Jar page: the five newest transactions, newest first, with an

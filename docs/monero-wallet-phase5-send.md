@@ -24,9 +24,14 @@ from the Tip Jar page go through the same sheet, and no external wallet is neede
 
 `sendReadiness` in `src/features/monero/wallet-send.ts`: the Tip Jar is on, the user is signed
 in, the device vault is unlocked, the wallet is open and synchronized, and it holds spendable
-(unlocked) XMR. Received XMR is spendable after 10 confirmations, and the sheet says so. While
-any of these is missing, a program card's Tip falls back to the address hand-off (copy, QR,
-`monero:` link), and the Tip Jar page's Send button stays disabled.
+(unlocked) XMR. Received XMR is spendable after 10 confirmations, and the sheet says so.
+
+A program card's Tip never falls back to a creator address, QR or `monero:` link. If the Tip
+Jar is not ready, Workstr shows the native Tip Jar state instead: enable Tip Jar, open Settings
+to sign in or unlock, set up the Tip Jar, wait for sync, or add funds to the user's own Receive
+code. The creator's public NIP-A3 address is still the internal transaction destination once the
+Tip Jar is ready. The Tip Jar page's generic Send button stays disabled until the same readiness
+check passes.
 
 ## Failure handling
 

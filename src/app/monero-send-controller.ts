@@ -1,7 +1,8 @@
-import { moneroSendBody, moneroSendSheet } from '../features/monero/send-view';
+import { moneroSendBody, moneroSendSheet, moneroTipStartSheet, type MoneroTipStartView } from '../features/monero/send-view';
 import type { OutgoingTipInput } from '../features/monero/tip-jar-history';
 import type { MoneroPreparedTransfer, MoneroSendRecipient, MoneroSendState } from '../features/monero/types';
 import { moneroAddressFitsNetwork, parseXmrAmount, sendErrorMessage, sendReadiness, xmrExact } from '../features/monero/wallet-send';
+import { tipJarOn } from '../features/monero/tip-jar-state';
 import type { AppState } from './state';
 
 export interface MoneroSendControllerContext {
@@ -17,6 +18,12 @@ export interface MoneroSendControllerContext {
   activity: { recordOutgoing(input: Omit<OutgoingTipInput, 'now'>): Promise<void> };
   // A send changed the balance and the transaction list: bring the Tip Jar up to date.
   afterSend(): void;
+  tipJar?: {
+    enable(): Promise<void> | void;
+    create(): Promise<void> | void;
+    openPage(mode?: 'receive'): void;
+    openSettings(): void;
+  };
 }
 
 const UNCERTAIN = 'Workstr could not confirm that the node accepted this transfer. It may still go through: check Recent activity after the next sync before sending again.';
@@ -30,6 +37,7 @@ const UNCERTAIN = 'Workstr could not confirm that the node accepted this transfe
 export function createMoneroSendController(ctx: MoneroSendControllerContext) {
   const { root, state, toast } = ctx;
   let current: MoneroSendState | null = null;
+  let pendingTip: MoneroSendRecipient | null = null;
   let nextId = 1;
 
   function available(): string {
@@ -56,6 +64,67 @@ export function createMoneroSendController(ctx: MoneroSendControllerContext) {
   function focusField(): void {
     const field = root.querySelector<HTMLElement>('#monero-send-address') ?? root.querySelector<HTMLElement>('#monero-send-amount');
     field?.focus();
+  }
+
+  function tipTitle(recipient: MoneroSendRecipient): string {
+    return `Tip ${recipient.name || 'this creator'}`;
+  }
+
+  function tipStartView(recipient: MoneroSendRecipient): MoneroTipStartView {
+    const wallet = state.moneroWallet;
+    const snapshot = wallet?.snapshot;
+    const title = tipTitle(recipient);
+    if (!tipJarOn(state)) {
+      return { id: nextId++, recipient, title, lead: 'Turn on your Tip Jar to send tips in Workstr.', help: 'Workstr keeps creator tips inside your Tip Jar flow instead of handing you another wallet address.', primary: { label: 'Enable Tip Jar', action: 'enable' } };
+    }
+    if (!state.pubkey) {
+      return { id: nextId++, recipient, title, lead: 'Sign in to use your Tip Jar.', help: 'Your Tip Jar belongs to your Nostr account.', primary: { label: 'Open Settings', action: 'settings' } };
+    }
+    if (state.deviceVault !== 'unlocked' || wallet?.status === 'locked') {
+      return { id: nextId++, recipient, title, lead: 'Unlock Workstr to use your Tip Jar.', help: 'Your Tip Jar is protected by this device\'s vault. Unlock Workstr, then continue the tip.', primary: { label: 'Open Settings', action: 'settings' } };
+    }
+    if (wallet?.status === 'missing' || (wallet?.stored === false && !snapshot)) {
+      return { id: nextId++, recipient, title: 'Set up your Tip Jar', lead: 'Workstr will create your Tip Jar on this device.', help: 'After setup, you can come back to this creator tip without choosing an external wallet.', primary: { label: 'Continue', action: 'setup' }, secondary: { label: 'Open Settings', action: 'settings' } };
+    }
+    if (wallet?.status === 'syncing' || (snapshot && !snapshot.sync?.synchronized)) {
+      const progress = wallet?.syncProgress !== undefined ? `Sync progress ${Math.round((wallet.syncProgress || 0) * 100)}%.` : undefined;
+      return { id: nextId++, recipient, title, lead: 'Getting your Tip Jar ready…', help: 'Sending will be available when the Tip Jar has caught up.', detail: progress, primary: { label: 'Continue when ready', action: 'retry' }, secondary: { label: 'Open Tip Jar', action: 'tipjar' } };
+    }
+    if (snapshot && BigInt(snapshot.balance?.atomicUnlockedBalance ?? '0') <= 0n) {
+      const detail = `Balance ${xmrExact(snapshot.balance?.atomicUnlockedBalance ?? '0')}`;
+      return { id: nextId++, recipient, title, lead: 'Your Tip Jar needs funds before you can send a tip.', help: 'Add XMR to your own Tip Jar, then return here to review and confirm the creator tip.', detail, primary: { label: 'Add funds', action: 'add-funds' }, secondary: { label: 'Try again', action: 'retry' } };
+    }
+    return { id: nextId++, recipient, title, lead: 'Tip Jar is temporarily unavailable.', help: state.moneroWallet?.message || 'Try again in a moment, or open the Tip Jar to check its status.', primary: { label: 'Try again', action: 'retry' }, secondary: { label: 'Open Tip Jar', action: 'tipjar' } };
+  }
+
+  function openTipStart(recipient: MoneroSendRecipient): boolean {
+    pendingTip = recipient;
+    current = null;
+    ctx.openModal(moneroTipStartSheet(tipStartView(recipient)));
+    return true;
+  }
+
+  async function handleTipStartAction(action: string): Promise<void> {
+    const recipient = pendingTip;
+    if (!recipient) return;
+    if (action === 'enable') {
+      await ctx.tipJar?.enable();
+      openTip(recipient);
+    } else if (action === 'setup') {
+      await ctx.tipJar?.create();
+      openTip(recipient);
+    } else if (action === 'add-funds') {
+      ctx.closeModal();
+      ctx.tipJar?.openPage('receive');
+    } else if (action === 'settings') {
+      ctx.closeModal();
+      ctx.tipJar?.openSettings();
+    } else if (action === 'tipjar') {
+      ctx.closeModal();
+      ctx.tipJar?.openPage();
+    } else if (action === 'retry') {
+      openTip(recipient);
+    }
   }
 
   function open(recipient: MoneroSendRecipient | null): boolean {
@@ -150,6 +219,13 @@ export function createMoneroSendController(ctx: MoneroSendControllerContext) {
     ctx.closeModal();
   }
 
+  function openTip(recipient: MoneroSendRecipient): boolean {
+    const ready = sendReadiness(state);
+    if (!ready.ok) return openTipStart(recipient);
+    pendingTip = recipient;
+    return open(recipient);
+  }
+
   root.addEventListener('submit', (event) => {
     if ((event.target as HTMLElement).id !== 'monero-send-form') return;
     event.preventDefault();
@@ -157,6 +233,11 @@ export function createMoneroSendController(ctx: MoneroSendControllerContext) {
   });
 
   root.addEventListener('click', (event) => {
+    const tipAction = (event.target as HTMLElement).closest<HTMLButtonElement>('#monero-tip-start button[data-tip-start-action]');
+    if (tipAction) {
+      void handleTipStartAction(tipAction.dataset.tipStartAction || '');
+      return;
+    }
     const target = (event.target as HTMLElement).closest<HTMLElement>('#monero-send button');
     if (!target) return;
     const preset = target.dataset.sendPreset;
@@ -192,12 +273,10 @@ export function createMoneroSendController(ctx: MoneroSendControllerContext) {
       if (!ready.ok) { toast(ready.reason, 'bad'); return false; }
       return open(null);
     },
-    // A creator tip from a program card. Returns false when the Tip Jar cannot send, so the
-    // caller can offer the address to pay from another wallet instead.
-    openTip(recipient: MoneroSendRecipient): boolean {
-      if (!sendReadiness(state).ok) return false;
-      return open(recipient);
-    },
+    // A creator tip from a program card. It either opens the send sheet or a Workstr-native
+    // Tip Jar state (enable, setup, unlock, sync or add funds). It never falls back to an
+    // external creator wallet hand-off.
+    openTip,
     current: (): MoneroSendState | null => current
   };
 }

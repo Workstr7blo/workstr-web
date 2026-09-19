@@ -210,13 +210,15 @@ and patch it directly, which is also why a page render can leave it standing.
   so a code draws offline and small enough that Vite inlines it (#268). A receive code is the one
   surface where the reader is looking at a Monero destination, so the network's own mark belongs
   there and nowhere else in the shell.
-- `src/features/sheets/monero-tip-view.ts` owns the program-card Tip: whether an author can
-  be tipped at all, the card action, and the tip sheet's markup. `moneroMode(state)` is the
-  single answer to "are Monero tips on" for the sheets feature. It renders no total and no status, because a Monero transfer leaves
-  nothing Workstr can read.
-- `src/app/monero-tip-controller.ts` owns the program-card Tip. With a Tip Jar that can send it
-  opens the send sheet (`sendTip`); otherwise it opens the address hand-off - copy, QR and
-  `monero:` link - that works with any other wallet. It publishes nothing either way.
+- `src/features/sheets/monero-tip-view.ts` owns the program-card Tip button, whether an author can
+  be tipped at all, and the creator-address helper. `moneroMode(state)` is the single answer to
+  "are Monero tips on" for the sheets feature. It renders no total and no status, because a
+  Monero transfer leaves nothing Workstr can read.
+- `src/app/monero-tip-controller.ts` owns the program-card Tip. It resolves the creator's NIP-A3
+  address and always starts the Workstr Tip Jar flow through `sendTip`: ready wallets open the
+  amount sheet, while not-ready wallets show native enable, setup, unlock, sync or Add funds
+  states. It never shows a creator QR, copy-address action or `monero:` external-wallet link.
+  The address is consumed internally as the transaction destination.
 - `src/features/monero/wallet-send.ts` decides whether a send may start (`sendReadiness`: Tip
   Jar on, signed in, unlocked, wallet open and synchronized, spendable XMR) and turns amounts
   into atomic units without floating point. `src/app/monero-send-controller.ts` drives the send

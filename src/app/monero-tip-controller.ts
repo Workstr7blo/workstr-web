@@ -1,26 +1,25 @@
 import type { RelayProgram } from '../nostr/canon';
 import type { MoneroSendRecipient } from '../features/monero/types';
-import { moneroTipAddress, moneroTipCreator, moneroTipModal } from '../features/sheets/monero-tip-view';
+import { moneroTipAddress, moneroTipCreator } from '../features/sheets/monero-tip-view';
 import type { AppState } from './state';
 
 export interface MoneroTipControllerContext {
   root: HTMLElement;
   state: AppState;
   toast(message: string, kind?: 'ok' | 'bad'): void;
-  openModal(content: string): void;
-  // Opens the Tip Jar's own tip sheet, or returns false when the Tip Jar cannot send yet.
+  openModal?(content: string): void;
+  // Starts the Workstr Tip Jar flow for this creator. It owns every native not-ready state.
   sendTip?(recipient: MoneroSendRecipient): boolean;
 }
 
 /**
- * Tipping a program's creator in Monero.
+ * Tipping a program's creator always starts the Workstr Tip Jar flow.
  *
- * With a Tip Jar that can send, the tip is paid from Workstr through the send sheet. Otherwise
- * this shows the address the relays published, copies it, or hands it to another wallet. It
- * publishes nothing either way: a Monero transfer leaves no event behind.
+ * The creator's public NIP-A3 Monero address remains the internal destination for a Workstr
+ * Tip Jar send, but a failed readiness check never becomes an external-wallet hand-off.
  */
 export function createMoneroTipController(ctx: MoneroTipControllerContext) {
-  const { root, state, toast, openModal } = ctx;
+  const { root, state, toast } = ctx;
 
   function findProgram(address: string): RelayProgram | undefined {
     return state.programs.find((program) => program.address === address);
@@ -40,25 +39,7 @@ export function createMoneroTipController(ctx: MoneroTipControllerContext) {
       programAddress: program.address,
       programName: program.name
     };
-    if (ctx.sendTip?.(recipient)) return;
-    openModal(moneroTipModal({
-      address: target,
-      creator: moneroTipCreator(program, state),
-      programName: program.name
-    }));
-    bindModal(target);
-  }
-
-  function bindModal(address: string): void {
-    const copy = root.querySelector<HTMLButtonElement>('#monero-tip-copy');
-    copy?.addEventListener('click', () => {
-      // Clipboard access can be refused outright (an insecure context, a permission
-      // policy). The address stays on screen either way, so a failure only has to say so.
-      navigator.clipboard?.writeText(address).then(
-        () => { copy.textContent = 'Copied'; },
-        () => { toast('Could not copy — select the address instead', 'bad'); }
-      );
-    });
+    if (!ctx.sendTip?.(recipient)) toast('Tip Jar is temporarily unavailable. Try again in a moment.', 'bad');
   }
 
   // Scoped so a program list rewritten by a filter can rebind its own cards without the

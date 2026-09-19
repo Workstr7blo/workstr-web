@@ -48,21 +48,9 @@
 .monero-address-status.bad { color: #ffd6df; }
 .monero-address-source { margin: 0; color: var(--dim); font-size: 12px; line-height: 1.45; }
 .monero-address-section .settings-row-actions { justify-content: flex-start; }
-
-/* The tip sheet. Monero owns the mark, the QR frame and the paying action; the sheet around
-   them is the ordinary Workstr modal. There is no amount and no total here by design —
-   Workstr cannot see a Monero payment, so it has nothing true to say about one. */
-.monero-tip { display: grid; justify-items: center; gap: 12px; text-align: center; }
-.monero-tip .page-title { margin: 0; }
-.monero-tip-mark { color: var(--payment-accent); line-height: 0; filter: drop-shadow(0 0 18px rgba(var(--payment-rgb), .32)); }
-.monero-tip-creator { margin: -6px 0 0; color: var(--text); font-weight: 700; }
-.monero-tip-qr,
 .support-monero-qr { width: 210px; max-width: 100%; padding: 12px; border: 1px solid rgba(var(--payment-rgb), .45); border-radius: 12px; background: #fff; box-shadow: 0 0 26px rgba(var(--payment-rgb), .18); }
-.monero-tip-qr svg,
 .support-monero-qr svg { display: block; width: 100%; height: auto; }
-.monero-tip-address,
 .support-monero-address { display: block; width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid rgba(var(--payment-rgb), .3); border-radius: 10px; background: rgba(var(--payment-rgb), .07); color: var(--text); font: 500 12px/1.5 ui-monospace, monospace; word-break: break-all; user-select: all; }
-.monero-tip-actions,
 .support-monero-actions { width: 100%; justify-content: center; }
 
 /* The Tip Jar send sheet: amount, review, result. Orange stays on the payment actions and the
@@ -99,9 +87,6 @@
 .monero-send-result { margin: 0; font-size: 16px; font-weight: 700; }
 .monero-send-txid { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; }
 .monero-send-txid code { color: var(--text); }
-.monero-send-other { border-top: 1px solid var(--border); padding-top: 10px; }
-.monero-send-other summary { color: var(--muted); font-size: 13px; cursor: pointer; }
-.monero-send-other-body { display: grid; justify-items: center; gap: 10px; padding-top: 12px; }
 
 @media (max-width: 760px) {
   .monero-tips-row { min-height: 64px; padding: 13px 14px; }
@@ -847,7 +832,6 @@
   .workout-card-map.has-map { width: 92px; height: 92px; padding: 4px; }
   .workout-card-header { gap: 11px; padding: 12px; }
   .workout-card-byline .monero-tip-cta { padding: 0 10px; font-size: 14px; }
-  .monero-tip-qr,
   .support-monero-qr { width: 180px; }
   .workout-card-name { font-size: 15px; }
   .workout-card-meta { font-size: 11px; }
