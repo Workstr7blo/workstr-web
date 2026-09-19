@@ -15,9 +15,10 @@ function ringOffset(progress: number): string {
 // There is no Monero badge: a permanent payment mark in the navigation made the Tip Jar read as
 // a Monero subsystem bolted onto Workstr rather than a part of it (#260). The ring is drawn
 // behind the piggy bank, starts at twelve o'clock and fills clockwise, and is hidden by CSS
-// once the wallet is ready, so only its offset changes while a sync runs.
+// once the wallet is ready, so only its offset changes while a sync runs. `data-live` says
+// whether the arc is showing real scanning progress; until it is, CSS leaves the faint track.
 export function tipJarNavIcon(status: TipJarStatus): string {
-  return `<span class="tip-jar-icon" data-tip-jar="${status.visual}">
+  return `<span class="tip-jar-icon" data-tip-jar="${status.visual}" data-live="${status.live ? 'on' : 'off'}">
     <svg class="tip-jar-progress" viewBox="0 0 28 28" fill="none" aria-hidden="true" focusable="false">
       <circle class="tip-jar-ring-track" cx="14" cy="14" r="12.6"/>
       <circle class="tip-jar-ring" cx="14" cy="14" r="12.6" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${ringOffset(status.progress)}" transform="rotate(-90 14 14)"/>
@@ -33,6 +34,8 @@ export function updateTipJarNav(root: ParentNode, state: AppState): void {
   const status = tipJarStatus(state);
   const icon = item.querySelector<HTMLElement>('.tip-jar-icon');
   if (icon && icon.dataset.tipJar !== status.visual) icon.dataset.tipJar = status.visual;
+  const live = status.live ? 'on' : 'off';
+  if (icon && icon.dataset.live !== live) icon.dataset.live = live;
   const ring = item.querySelector('.tip-jar-ring');
   const offset = ringOffset(status.progress);
   if (ring && ring.getAttribute('stroke-dashoffset') !== offset) ring.setAttribute('stroke-dashoffset', offset);

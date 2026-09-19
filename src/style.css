@@ -1165,8 +1165,9 @@
 /* Off: muted, no ring at all, still a working tab. */
 .nav-item.tip-jar-nav:not(.active):has(.tip-jar-icon[data-tip-jar="off"]) > span:not(.sr-only) { opacity: .6; }
 .tip-jar-icon[data-tip-jar="off"] .tip-jar-progress { display: none; }
-/* Connecting: a faint empty track, never a bright orange nought per cent. */
-.tip-jar-icon[data-tip-jar="connecting"] .tip-jar-ring { opacity: 0; }
+/* Not scanning blocks yet - connecting, or a sync still opening the wallet - is a faint empty
+   track, never a bright orange nought per cent, which would read as a stalled sync. */
+.tip-jar-icon[data-live="off"] .tip-jar-ring { opacity: 0; }
 /* Ready and error: no ring. A finished circle would say "decorated", and a stalled arc would
    say "still going". */
 .tip-jar-icon[data-tip-jar="ready"] .tip-jar-progress,

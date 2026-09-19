@@ -2,13 +2,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { syncFraction, tipJarNavLabel, tipJarStatus } from '../src/features/monero/tip-jar-state';
+import { blockSyncFraction, syncFraction, tipJarNavLabel, tipJarStatus } from '../src/features/monero/tip-jar-state';
 import { tipJarNavIcon, tipJarPhase, tipJarView, updateTipJarNav, updateTipJarPage } from '../src/features/monero/tip-jar-view';
 import { shellFrame } from '../src/app/layout';
 import { createMoneroWalletController, TIP_JAR_RESYNC_MS } from '../src/app/monero-wallet-controller';
 import type { AppState } from '../src/app/state';
 import type { MoneroWalletCore } from '../src/features/monero/wallet-core';
-import type { MoneroWalletUiState } from '../src/features/monero/types';
+import type { MoneroSyncProgress, MoneroWalletUiState } from '../src/features/monero/types';
 import type { DeviceVault } from '../src/security/device-vault';
 
 const PUBKEY = 'ab'.repeat(32);
@@ -44,6 +44,13 @@ function state(overrides: Partial<AppState> = {}, wallet: MoneroWalletUiState = 
 
 const synced = { height: 3_763_000, daemonHeight: 3_763_000, synchronized: true };
 
+// One scanning report. The default is a wallet catching up from the height its last sync
+// reached (3,700,000) to the daemon's tip (3,763,000), halfway through those 63,000 blocks -
+// a wallet that is 99.2% of the way along the chain and 50% of the way through its own sync.
+function progress(overrides: Partial<MoneroSyncProgress> = {}): MoneroSyncProgress {
+  return { currentHeight: 3_731_500, startHeight: 3_700_000, targetHeight: 3_763_000, fraction: 0.9915, remainingBlocks: 31_500, ...overrides };
+}
+
 describe('Tip Jar status', () => {
   it('derives progress safely from missing, zero, stale and overshooting heights', () => {
     expect(syncFraction(null)).toBe(0);
@@ -65,14 +72,35 @@ describe('Tip Jar status', () => {
     // Ready means opened and synchronized, not merely opened.
     expect(tipJarStatus(state({}, { status: 'ready', snapshot: snapshot(null) })).visual).toBe('connecting');
     expect(tipJarStatus(state({}, { status: 'ready', snapshot: snapshot({ height: 90, daemonHeight: 100, synchronized: false }) })).visual).toBe('connecting');
-    expect(tipJarStatus(state({}, { status: 'ready', snapshot: snapshot(synced) }))).toEqual({ visual: 'ready', word: 'Ready', spoken: 'ready', progress: 1 });
+    expect(tipJarStatus(state({}, { status: 'ready', snapshot: snapshot(synced) }))).toEqual({ visual: 'ready', word: 'Ready', spoken: 'ready', progress: 1, live: false });
+  });
+
+  // A wallet a thousand blocks behind is at 99.97% of the chain and at 0% of its own catch-up,
+  // which is why the ring measures the session and not the chain (#266).
+  it('measures a catch-up session from where it started, not from the genesis block', () => {
+    expect(blockSyncFraction(3_763_250, 3_763_000, 3_764_000)).toBeCloseTo(0.25);
+    expect(blockSyncFraction(3_763_500, 3_763_000, 3_764_000)).toBeCloseTo(0.5);
+    expect(blockSyncFraction(3_763_750, 3_763_000, 3_764_000)).toBeCloseTo(0.75);
+    expect(blockSyncFraction(3_764_000, 3_763_000, 3_764_000)).toBe(1);
+    // Clamped both ways: a reorg below the start, or a daemon reading the wallet has passed.
+    expect(blockSyncFraction(3_762_000, 3_763_000, 3_764_000)).toBe(0);
+    expect(blockSyncFraction(3_765_000, 3_763_000, 3_764_000)).toBe(1);
+    // No session to measure: the caller falls back rather than showing a false nought.
+    expect(blockSyncFraction(3_763_000, 3_763_000, 3_763_000)).toBeNull();
+    expect(blockSyncFraction(3_763_000, 3_764_000, 3_763_000)).toBeNull();
+    expect(blockSyncFraction(Number.NaN, 3_763_000, 3_764_000)).toBeNull();
+    expect(blockSyncFraction(3_763_250, Number.NaN, 3_764_000)).toBeNull();
+    expect(blockSyncFraction(3_763_250, 3_763_000, Number.POSITIVE_INFINITY)).toBeNull();
   });
 
   it('prefers live sync progress and speaks it as a percentage', () => {
-    const status = tipJarStatus(state({}, { status: 'syncing', syncProgress: 0.724, snapshot: snapshot(synced) }));
-    expect(status).toMatchObject({ visual: 'syncing', progress: 0.724, spoken: 'syncing, 72 percent' });
+    const status = tipJarStatus(state({}, { status: 'syncing', syncProgress: 0.724, syncLive: true, snapshot: snapshot(synced) }));
+    expect(status).toMatchObject({ visual: 'syncing', progress: 0.724, spoken: 'syncing, 72 percent', live: true });
     expect(tipJarStatus(state({}, { status: 'syncing', snapshot: snapshot({ height: 25, daemonHeight: 100, synchronized: false }) })).progress).toBe(0.25);
     expect(tipJarStatus(state({}, { status: 'syncing', syncProgress: Number.NaN })).progress).toBe(0);
+    // Syncing but not scanning yet: the saved position is only a hint, so it is neither called
+    // live nor read out as a percentage of a sync that has not started.
+    expect(tipJarStatus(state({}, { status: 'syncing', snapshot: snapshot(synced) }))).toMatchObject({ live: false, progress: 1, spoken: 'syncing' });
   });
 });
 
@@ -119,7 +147,10 @@ describe('Tip Jar navigation', () => {
     const ringHidden = (visual: string) => `.tip-jar-icon[data-tip-jar="${visual}"] .tip-jar-progress`;
     const css = readFileSync(resolve(__dirname, '../src/style.css'), 'utf8');
     for (const visual of ['off', 'ready', 'error']) expect(css).toContain(ringHidden(visual));
-    expect(css).toContain('.tip-jar-icon[data-tip-jar="connecting"] .tip-jar-ring { opacity: 0; }');
+    // Connecting, and a sync that is still opening the wallet, both stop at the faint track.
+    expect(css).toContain('.tip-jar-icon[data-live="off"] .tip-jar-ring { opacity: 0; }');
+    expect(tipJarNavIcon(tipJarStatus(state({}, { status: 'syncing', snapshot: snapshot(synced) })))).toContain('data-live="off"');
+    expect(tipJarNavIcon(tipJarStatus(state({}, { status: 'syncing', syncProgress: 0.4, syncLive: true })))).toContain('data-live="on"');
 
     document.body.innerHTML = shellFrame(state({}, { status: 'ready', snapshot: snapshot(synced) }));
     const ready = document.querySelector<HTMLElement>('.sidebar [data-view="tipjar"]')!;
@@ -131,20 +162,22 @@ describe('Tip Jar navigation', () => {
   // The ring starts at twelve o'clock and fills clockwise, and its offset is the only thing a
   // sync tick writes into the SVG.
   it('patches state, ring offset, label and spoken text as a sync advances', () => {
-    const s = state({}, { status: 'syncing', syncProgress: 0.1 });
+    const s = state({}, { status: 'syncing', syncProgress: 0.1, syncLive: true });
     document.body.innerHTML = `<nav class="sidebar"><div class="nav-item" data-view="tipjar">${tipJarNavIcon(tipJarStatus(s))}</div></nav>`;
     const piggy = document.querySelector('.tip-jar-piggy');
     const ring = document.querySelector('.tip-jar-ring')!;
     expect(ring.getAttribute('transform')).toBe('rotate(-90 14 14)');
     expect(ring.getAttribute('stroke-dashoffset')).toBe('90');
+    expect(document.querySelector<HTMLElement>('.tip-jar-icon')?.dataset.live).toBe('on');
     expect(document.querySelector('.tip-jar-label')?.textContent).toBe('Syncing');
-    s.moneroWallet = { status: 'syncing', syncProgress: 0.6 };
+    s.moneroWallet = { status: 'syncing', syncProgress: 0.6, syncLive: true };
     updateTipJarNav(document, s);
     expect(document.querySelector('.tip-jar-ring')?.getAttribute('stroke-dashoffset')).toBe('40');
     expect(document.querySelector('.tip-jar-spoken')?.textContent).toBe(', syncing, 60 percent');
     s.moneroWallet = { status: 'error', message: 'offline' };
     updateTipJarNav(document, s);
     expect(document.querySelector<HTMLElement>('.tip-jar-icon')?.dataset.tipJar).toBe('error');
+    expect(document.querySelector<HTMLElement>('.tip-jar-icon')?.dataset.live).toBe('off');
     expect(document.querySelector('.tip-jar-label')?.textContent).toBe('Offline');
     expect(document.querySelector('.tip-jar-spoken')?.textContent).toBe(', unavailable');
     expect(document.querySelector('.tip-jar-piggy')).toBe(piggy);
@@ -176,7 +209,7 @@ describe('Tip Jar page', () => {
   });
 
   it('keeps receiving available while the wallet is still syncing', () => {
-    const root = page(state({}, { status: 'syncing', stored: true, addresses: [ADDRESS, '4Primary'], syncProgress: 0.3 }));
+    const root = page(state({}, { status: 'syncing', stored: true, addresses: [ADDRESS, '4Primary'], syncProgress: 0.3, syncLive: true }));
     expect(root.querySelector('#tip-jar-status')?.textContent).toBe('Syncing');
     expect(root.querySelector<HTMLButtonElement>('#tip-jar-receive')?.disabled).toBe(false);
     expect(root.querySelector('#tip-jar-receive-panel code')?.textContent).toBe(ADDRESS);
@@ -230,8 +263,8 @@ describe('Tip Jar automatic sync', () => {
       storedAddresses: vi.fn(async () => [ADDRESS, '4Primary']),
       isOpen: vi.fn(() => open),
       openWallet: vi.fn(async () => { open = true; return snapshot({ height: 3_700_000, daemonHeight: 3_763_000, synchronized: true }); }),
-      sync: vi.fn(async (onProgress?: (fraction: number, remaining: number) => void) => {
-        onProgress?.(0.5, 30_000);
+      sync: vi.fn(async (onProgress?: (report: MoneroSyncProgress) => void) => {
+        onProgress?.(progress());
         return { ...synced, updatedAt: 'x' };
       }),
       balance: vi.fn(async () => ({ atomicBalance: '5', atomicUnlockedBalance: '5' })),
@@ -304,8 +337,8 @@ describe('Tip Jar automatic sync', () => {
     const { s, core, ctrl, onChange } = controller();
     await ctrl.autoSync();
     expect(tipJarStatus(s).visual).toBe('ready');
-    vi.mocked(core.sync).mockImplementation(async (onProgress?: (fraction: number, remaining: number) => void) => {
-      onProgress?.(0.2, 3);
+    vi.mocked(core.sync).mockImplementation(async (onProgress?: (report: MoneroSyncProgress) => void) => {
+      onProgress?.(progress({ currentHeight: 3_762_997, startHeight: 3_762_997, fraction: 0.2, remainingBlocks: 3 }));
       return { ...synced, updatedAt: 'y' };
     });
     const seen: string[] = [];
@@ -325,8 +358,8 @@ describe('Tip Jar automatic sync', () => {
     const { s, core, ctrl, onChange } = controller();
     await ctrl.autoSync();
     let during = '';
-    vi.mocked(core.sync).mockImplementation(async (onProgress?: (fraction: number, remaining: number) => void) => {
-      onProgress?.(0.1, 5_000);
+    vi.mocked(core.sync).mockImplementation(async (onProgress?: (report: MoneroSyncProgress) => void) => {
+      onProgress?.(progress({ currentHeight: 3_758_000, startHeight: 3_758_000, fraction: 0.1, remainingBlocks: 5_000 }));
       during = tipJarStatus(s).visual;
       return { ...synced, updatedAt: 'z' };
     });
@@ -340,12 +373,80 @@ describe('Tip Jar automatic sync', () => {
   it('shows an offline Tip Jar when sync fails, and retries later', async () => {
     vi.useFakeTimers();
     const { s, core, ctrl } = controller();
-    vi.mocked(core.sync).mockRejectedValue(new Error('Failed to fetch'));
+    vi.mocked(core.sync).mockImplementation(async (onProgress?: (report: MoneroSyncProgress) => void) => {
+      onProgress?.(progress());
+      throw new Error('Failed to fetch');
+    });
     await ctrl.autoSync();
     expect(tipJarStatus(s).visual).toBe('error');
+    // A ring frozen where the sync died would say the wallet is still catching up.
+    expect(s.moneroWallet?.syncProgress).toBeUndefined();
+    expect(s.moneroWallet?.syncLive).toBeUndefined();
     vi.mocked(core.sync).mockResolvedValue({ ...synced, updatedAt: 'later' });
     await vi.advanceTimersByTimeAsync(TIP_JAR_RESYNC_MS);
     expect(tipJarStatus(s).visual).toBe('ready');
+    ctrl.reset();
+  });
+
+  // #266: the ring is this catch-up session, not the wallet's place on a three-million block
+  // chain. Taking the runtime's own percentage left it empty until the sync was nearly over.
+  it('fills the ring from the blocks of this catch-up session', async () => {
+    vi.useFakeTimers();
+    const { s, core, ctrl, onChange } = controller();
+    const seen: { progress: number; live: boolean }[] = [];
+    onChange.mockImplementation(() => {
+      const status = tipJarStatus(s);
+      if (status.visual === 'syncing') seen.push({ progress: status.progress, live: status.live });
+    });
+    vi.mocked(core.sync).mockImplementation(async (onProgress?: (report: MoneroSyncProgress) => void) => {
+      onProgress?.(progress({ currentHeight: 3_715_750, remainingBlocks: 47_250 }));
+      vi.advanceTimersByTime(600);
+      onProgress?.(progress());
+      vi.advanceTimersByTime(600);
+      onProgress?.(progress({ currentHeight: 3_763_000, fraction: 1, remainingBlocks: 0 }));
+      return { ...synced, updatedAt: 'ring' };
+    });
+    await ctrl.autoSync();
+    // Opening is not scanning: the saved position is shown as a hint, not as live progress, and
+    // never as a forced nought per cent.
+    expect(seen[0].live).toBe(false);
+    expect(seen[0].progress).toBeCloseTo(3_700_000 / 3_763_000, 5);
+    expect(seen.slice(1)).toEqual([{ progress: 0.25, live: true }, { progress: 0.5, live: true }, { progress: 1, live: true }]);
+    ctrl.reset();
+  });
+
+  it('falls back to the runtime percentage when the heights describe no session', async () => {
+    const { s, core, ctrl } = controller();
+    let during: ReturnType<typeof tipJarStatus> | null = null;
+    vi.mocked(core.sync).mockImplementation(async (onProgress?: (report: MoneroSyncProgress) => void) => {
+      onProgress?.(progress({ currentHeight: 3_763_000, startHeight: 3_763_000, targetHeight: 3_763_000, fraction: 0.42, remainingBlocks: 0 }));
+      during = tipJarStatus(s);
+      return { ...synced, updatedAt: 'fallback' };
+    });
+    await ctrl.autoSync();
+    expect(during).toMatchObject({ visual: 'syncing', progress: 0.42, live: true });
+    ctrl.reset();
+  });
+
+  it('paints a few times a second at most, and always lands on a full ring', async () => {
+    vi.useFakeTimers();
+    const { s, core, ctrl, onChange } = controller();
+    const painted: number[] = [];
+    onChange.mockImplementation(() => { if (s.moneroWallet?.syncLive) painted.push(tipJarStatus(s).progress); });
+    vi.mocked(core.sync).mockImplementation(async (onProgress?: (report: MoneroSyncProgress) => void) => {
+      onProgress?.(progress({ currentHeight: 3_715_750, remainingBlocks: 47_250 }));
+      // Same instant: a report every batch of blocks must not become a repaint every batch.
+      onProgress?.(progress());
+      // Completion is never throttled away, so the ring is full before the Tip Jar goes ready.
+      onProgress?.(progress({ currentHeight: 3_763_000, fraction: 1, remainingBlocks: 0 }));
+      return { ...synced, updatedAt: 'throttled' };
+    });
+    await ctrl.autoSync();
+    expect(painted).toEqual([0.25, 1]);
+    expect(tipJarStatus(s).visual).toBe('ready');
+    // Nothing of this session is left to leak into the next one.
+    expect(s.moneroWallet?.syncProgress).toBeUndefined();
+    expect(s.moneroWallet?.syncLive).toBeUndefined();
     ctrl.reset();
   });
 

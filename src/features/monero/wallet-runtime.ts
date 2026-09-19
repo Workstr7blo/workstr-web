@@ -1,5 +1,5 @@
 import { moneroRpcUrl, normalizeMoneroNodeConfig, probeMoneroDaemon } from './wallet-node';
-import type { MoneroNodeConfig, MoneroWalletRuntime, MoneroWalletRuntimeWallet } from './types';
+import type { MoneroNodeConfig, MoneroSyncProgress, MoneroWalletRuntime, MoneroWalletRuntimeWallet } from './types';
 
 export async function loadMoneroTsRuntime(): Promise<MoneroWalletRuntime> {
   const module = await import('monero-ts') as Record<string, unknown>;
@@ -10,9 +10,19 @@ export async function loadMoneroTsRuntime(): Promise<MoneroWalletRuntime> {
   return {
     // monero-ts only reports progress to an instance of its own listener class.
     ...(typeof Listener === 'function' ? {
-      syncListener(onProgress: (fraction: number, remainingBlocks: number) => void): object {
+      syncListener(onProgress: (progress: MoneroSyncProgress) => void): object {
         const listener = new Listener() as { onSyncProgress?: (...args: unknown[]) => Promise<void> };
-        listener.onSyncProgress = async (height, _start, end, percentDone) => { onProgress(Number(percentDone), Math.max(0, Number(end) - Number(height))); };
+        // Every value monero-ts reports is passed on. The heights are what the Tip Jar ring
+        // measures; keeping only the percentage left the ring waiting on the runtime (#266).
+        listener.onSyncProgress = async (height, start, end, percentDone) => {
+          onProgress({
+            currentHeight: Number(height),
+            startHeight: Number(start),
+            targetHeight: Number(end),
+            fraction: Number(percentDone),
+            remainingBlocks: Math.max(0, Number(end) - Number(height))
+          });
+        };
         return listener;
       }
     } : {}),
