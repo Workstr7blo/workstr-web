@@ -1,13 +1,12 @@
 import { html } from '../../app/format';
+import { PIGGY_BANK } from '../../app/piggy-bank';
 import type { AppState } from '../../app/state';
 import { recentActivity, tipJarCreatorName, tipJarCreatorPicture } from './tip-jar-history';
 import type { TipJarActivity } from './types';
 import { xmrAmount } from './wallet-view';
 
-// Outline piggy bank in the nav icon language: 24px box, stroke drawn in currentColor. The nav
-// item draws it, and an incoming row uses it as its avatar: the money went into the Tip Jar,
-// which is all Workstr can honestly say about where it came from.
-export const PIGGY_BANK = '<path d="M19 11.5c0-3.6-3.1-6.5-7-6.5-1.1 0-2.1.2-3 .6L6.5 4v3.3A6.2 6.2 0 0 0 5.1 10H3v3.5h2.2c.5 1.1 1.3 2.1 2.3 2.8V19.5h3v-1.8h2.8v1.8h3v-3.2c1.7-1.2 2.7-3 2.7-4.8z"/><path d="M10 8h3.5"/><path d="M15.5 10.5h.01"/>';
+// An incoming row uses the piggy bank as its avatar: the money went into the Tip Jar, which is
+// all Workstr can honestly say about where it came from.
 
 // Plain directional arrows: out of the Tip Jar leans up and right, into it down and left.
 const ARROW_OUT = '<path d="M7 17 17 7"/><path d="M8.5 7H17v8.5"/>';

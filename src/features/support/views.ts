@@ -1,19 +1,13 @@
 import { OPERATOR_MONERO_ADDRESS } from '../../core/funding';
 import { looksLikeMoneroAddress } from '../../nostr/payment-targets';
 import { moneroQr } from '../../app/monero-mark';
-import { html } from '../../app/format';
+import { html, shortMoneroAddress } from '../../app/format';
 
 function supportCard(summary: string, body: string): string {
   return `<details class="settings-category support-panel compact-support support-panel-monero" data-settings-section="support">
     <summary><span class="settings-category-copy"><strong>Support Workstr</strong><small>${html(summary)}</small></span><span class="settings-category-meta">XMR</span></summary>
     <div class="settings-category-body">${body}</div>
   </details>`;
-}
-
-// First 12 characters and last 9, the same shape the address is quoted in elsewhere. Only
-// ever a display: every control copies, encodes and announces the whole address.
-export function shortMoneroAddress(address: string): string {
-  return address.length > 24 ? `${address.slice(0, 12)}...${address.slice(-9)}` : address;
 }
 
 /**

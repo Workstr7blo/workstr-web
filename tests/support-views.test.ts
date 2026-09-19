@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { encode } from 'uqr';
-import { shortMoneroAddress, supportPanel } from '../src/features/support/views';
+import { supportPanel } from '../src/features/support/views';
+import { shortMoneroAddress } from '../src/app/format';
 import { OPERATOR_MONERO_ADDRESS } from '../src/core/funding';
 import { looksLikeMoneroAddress } from '../src/nostr/payment-targets';
-import { moneroQr } from '../src/app/monero-mark';
+import { MONERO_MARK, moneroQr } from '../src/app/monero-mark';
 
 describe('the Support Workstr card', () => {
   const markup = supportPanel();
@@ -22,7 +23,7 @@ describe('the Support Workstr card', () => {
     expect(markup).not.toContain('tx_amount');
   });
 
-  it('draws the mark inside the code, on a plate small enough for level H to survive', () => {
+  it('draws the official Monero symbol inside the code, on a plate small enough for level H to survive', () => {
     const uri = `monero:${OPERATOR_MONERO_ADDRESS}`;
     const code = moneroQr(uri);
 
@@ -40,9 +41,19 @@ describe('the Support Workstr card', () => {
     // centred, so the knockout stays away from the three finder patterns
     expect(x).toBe(Math.round((codeSize - width) / 2));
     expect(y).toBe(x);
-    // painted from the payment token: `currentColor` would inherit the page text colour
-    // and disappear against the white plate
-    expect(code).toContain('fill="var(--payment-accent)"');
+
+    // The Monero project's own symbol from its press kit, bundled with the app, sized inside
+    // the plate so the knockout keeps a white margin around it. Workstr's monochrome mark is
+    // not used here: this is a Monero payment destination, and the network's mark is the
+    // honest label for it (#268).
+    const symbol = code.match(/<image href="([^"]+)" x="([\d.]+)" y="([\d.]+)" width="(\d+)" height="(\d+)"/);
+    expect(symbol).not.toBeNull();
+    const [, href, markX, , markWidth] = symbol!;
+    expect(href).toMatch(/monero-symbol.*\.png|^data:image\/png/);
+    expect(href).not.toMatch(/^https?:/);
+    expect(Number(markWidth)).toBeLessThan(width);
+    expect(Number(markX)).toBe((codeSize - Number(markWidth)) / 2);
+    expect(code).not.toContain(MONERO_MARK);
   });
 
   it('no longer repeats the mark above the code', () => {

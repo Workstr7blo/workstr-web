@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { blockSyncFraction, syncFraction, tipJarNavLabel, tipJarStatus } from '../src/features/monero/tip-jar-state';
 import { tipJarNavIcon, tipJarPhase, tipJarView, updateTipJarNav, updateTipJarPage } from '../src/features/monero/tip-jar-view';
 import { shellFrame } from '../src/app/layout';
+import { shortMoneroAddress } from '../src/app/format';
+import { MONERO_MARK, moneroQr } from '../src/app/monero-mark';
 import { createMoneroWalletController, TIP_JAR_RESYNC_MS } from '../src/app/monero-wallet-controller';
 import type { AppState } from '../src/app/state';
 import type { MoneroWalletCore } from '../src/features/monero/wallet-core';
@@ -212,7 +214,37 @@ describe('Tip Jar page', () => {
     const root = page(state({}, { status: 'syncing', stored: true, addresses: [ADDRESS, '4Primary'], syncProgress: 0.3, syncLive: true }));
     expect(root.querySelector('#tip-jar-status')?.textContent).toBe('Syncing');
     expect(root.querySelector<HTMLButtonElement>('#tip-jar-receive')?.disabled).toBe(false);
-    expect(root.querySelector('#tip-jar-receive-panel code')?.textContent).toBe(ADDRESS);
+    expect(root.querySelector('#tip-jar-receive-panel code')?.textContent).toBe(shortMoneroAddress(ADDRESS));
+  });
+
+  // #268: the code is the subject of Receive. The address under it is a landmark, so it is one
+  // shortened line - but nothing that hands the address over may hand over less than all of it.
+  it('shows the address as one quiet line and still copies every character of it', () => {
+    const s = state({}, { status: 'ready', stored: true, snapshot: snapshot(synced) });
+    const root = page(s);
+    const panel = root.querySelector<HTMLElement>('#tip-jar-receive-panel')!;
+
+    const shown = panel.querySelector('.tip-jar-address')!;
+    expect(shown.textContent).toBe(shortMoneroAddress(ADDRESS));
+    expect(shown.getAttribute('aria-hidden')).toBe('true');
+    expect(panel.querySelector('.sr-only')?.textContent).toBe(`Your Tip Jar address: ${ADDRESS}`);
+
+    // Both the row's glyph and the button carry the whole address, and both are the same action.
+    const copies = [...panel.querySelectorAll<HTMLElement>('[data-tip-jar-copy]')];
+    expect(copies).toHaveLength(2);
+    for (const button of copies) expect(button.dataset.address).toBe(ADDRESS);
+    expect(panel.querySelector('#tip-jar-copy')?.textContent).toBe('Copy address');
+    expect(panel.querySelector('.tip-jar-address-copy')?.getAttribute('aria-label')).toBe('Copy your full Tip Jar address');
+
+    // The code still encodes the whole URI, with the official symbol on its plate.
+    const code = panel.querySelector('.support-monero-qr')!;
+    expect(code.getAttribute('aria-label')).toBe('QR code for your Tip Jar address');
+    expect(tipJarView(s)).toContain(moneroQr(`monero:${ADDRESS}`));
+    expect(code.querySelector('image')).toBeTruthy();
+    expect(code.innerHTML).not.toContain(MONERO_MARK);
+
+    // One line of help, not two sentences of it.
+    expect(panel.querySelector('.section-help')?.textContent).toBe('Scan with any Monero wallet.');
   });
 
   it('keeps the page to balance, actions and recent activity', () => {

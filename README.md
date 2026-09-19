@@ -36,6 +36,13 @@ loopback origin. Its mock signer, mock publisher, and empty relay list prevent f
 actions from reaching public Nostr transport; the command also verifies that the normal
 production build does not emit the smoke entrypoint.
 
+## Third-party assets
+
+`src/assets/monero-symbol.png` is the official Monero symbol from the Monero project's
+[press kit](https://www.getmonero.org/press-kit/). It is bundled rather than hot-linked, and the
+only changes to it are a resize and a palette reduction - the geometry and colours are the
+project's own. It is drawn in the centre of Monero receive codes and nowhere else.
+
 ## Phase 0 target
 
 - PWA shell

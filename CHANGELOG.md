@@ -54,6 +54,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed the Tip on a program card to a piggy bank with a small plus, in place of the Monero
+  mark. The button still says Tip and is still the same orange control: what changed is that the
+  icon now says what it does, add to this creator's Tip Jar, rather than naming the network
+  behind it. Monero's own mark stays where the payment actually happens - the tip sheet and the
+  receive codes.
+- Changed the Tip Jar's Receive panel to the official Monero symbol from the Monero project's
+  press kit, bundled with Workstr so it draws offline, in place of Workstr's own drawn M. The
+  code is a little smaller with a quieter edge, the address underneath is now one shortened line
+  with a copy button beside it, and the help under it is a single line - so Recent activity stays
+  within reach while Receive is open. Copy address, and the new button in the address row, both
+  copy the whole address exactly as before, and the full address is still read out in full by a
+  screen reader.
 - The Tip Jar page no longer shows the Receiving tips and Backup card or the note under the
   Send button; both settings stay in Settings.
 - Changed the Tip Jar's status to show in one place. The Monero logo and the orange tint are

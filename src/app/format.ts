@@ -20,6 +20,13 @@ export function shortNpub(pubkey: string): string {
   return `${npub.slice(0, 12)}...${npub.slice(-8)}`;
 }
 
+// First 12 characters of a Monero address and its last 9, the same shape it is quoted in
+// everywhere it is shown. Only ever a display: every control copies, encodes and announces the
+// whole address.
+export function shortMoneroAddress(address: string): string {
+  return address.length > 24 ? `${address.slice(0, 12)}...${address.slice(-9)}` : address;
+}
+
 export function displayNpub(pubkey: string): string {
   return shortNpub(pubkey);
 }
