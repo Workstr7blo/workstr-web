@@ -50,12 +50,12 @@ export interface SyncStatus {
 export interface SyncEngineContext {
   store: WorkstrStore;
   relayUrl?: string;
-  // Null when signed out or a NIP-46 connection has died. Sync goes quiet rather than
+  // Null when signed out or the local Workstr account key is unavailable. Sync goes quiet rather than
   // erroring loudly: the user is training, not administering a backup.
   getSigner(): Promise<Signer | null>;
   onStatus(status: SyncStatus): void;
   // Called when a signer stops answering, so the caller can discard the connection it
-  // handed over. Without it a dead NIP-46 subscription is retried until the page reloads.
+  // handed over. Without it a stalled signer is retried until the page reloads.
   onSignerStalled?(): void;
   // Called when a pull actually changed the database, so the caller can re-read what it
   // is showing. Restoring into IndexedDB is not enough on its own: the screen renders

@@ -41,7 +41,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | Redrawing the page: what made it happen, and keeping the reader's place | `src/app/root-rebuild.ts`, `src/app/scroll.ts` | `src/app/shell.ts` (`render`), the `.content` pane in `src/app/layout.ts` | `tests/root-rebuild.test.ts`, `tests/scroll.test.ts`, `tests/render-budget.test.ts` |
 | How much the app redraws, and what a background answer may never replace | `tests/render-budget.test.ts` | every surface writer below | `tests/render-budget.test.ts` |
 | Writing a grid of cards without rebuilding the ones that did not change | `src/app/card-grid.ts` | `src/app/catalog-surfaces.ts`, `src/app/browse-surfaces.ts`, `src/features/discover/views.ts` (`discoverCards`), `src/features/library/views.ts` (`libraryCards`) | `tests/card-grid.test.ts`, `tests/render-budget.test.ts` |
-| The account choice screen: create vs. connect, and the order the routes are offered in | `src/app/account-choice-view.ts` | `src/app/identity-controller.ts` (`startAccountChoice` binds every row), `src/signer/nip07.ts` (`hasNip07`) | `tests/account-choice-view.test.ts`, `tests/shell.test.ts` |
+| The account choice screen: create vs. restore, and the order the routes are offered in | `src/app/account-choice-view.ts` | `src/app/identity-controller.ts` (`startAccountChoice` binds every row) | `tests/account-choice-view.test.ts`, `tests/shell.test.ts` |
 | The Settings page: which cards exist, the groups they sit in, and their order | `src/app/settings-view.ts` | every settings card below, `src/app/layout.ts` (`appView`) | `tests/settings-view.test.ts`, `tests/shell.test.ts` |
 | Settings surfaces written in place rather than rerendered - a background answer, or the reader's own preference change | `src/app/monero-address-controller.ts` (`repaint`), `src/features/backup/views.ts` (`updateBackupStatus`, `updateBackupCard`), `src/app/settings-view.ts` (`updateTrainingPreferences`) | `src/app/preferences-controller.ts`, `src/app/backup-controller.ts`, `src/app/shell.ts` (`bindBackupCard`), `src/app/tip-jar-controller.ts` (the Tip Jar switch) | `tests/backup-views.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts`, `tests/render-budget.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
@@ -71,8 +71,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | Discover exercise/program UI | `src/features/discover/views.ts` | `src/nostr/canon.ts`, `programImport.ts`, shell import handlers | `tests/discover.test.ts`, `tests/canon.test.ts`, `tests/programImport.test.ts` |
 | Catalog event parsing/fetch/cache | `src/nostr/canon.ts`, `src/nostr/creator-programs.ts` | `src/nostr/pool.ts`, `src/core/types.ts` | `tests/canon.test.ts` |
 | Isolated browser smoke verification | `src/app/isolated-browser-smoke.ts`, `src/browser-smoke.ts`, `scripts/browser-smoke.mjs` | `vite.smoke.config.ts`, `smoke.html`, `src/app/program-publish-controller.ts` | `tests/isolated-browser-smoke.test.ts`, `tests/program-publish-controller.test.ts` |
-| NIP-07 signing and device-local keys | `src/signer/nip07.ts`, `src/signer/local-key.ts` | `src/signer/types.ts` | `tests/local-key-signer.test.ts`, shell/share tests use fakes |
-| NIP-46 remote signing | `src/signer/nip46.ts` | `src/signer/types.ts`, shell sign-in flow | `tests/shell.test.ts` plus browser validation |
+| Workstr account local keys | `src/signer/local-key.ts` | `src/signer/types.ts`, `src/security/device-vault.ts` | `tests/local-key-signer.test.ts`, shell/share tests use fakes |
 | Workout-summary and creator-program event publishing | `src/nostr/share.ts`, `src/nostr/program-publish.ts`, `src/nostr/program-delete.ts` | `src/features/train/session-summary.ts`, `src/nostr/secret-redaction.ts`, signer contract | `tests/share.test.ts`, `tests/program-publish.test.ts`, `tests/program-delete.test.ts`, `tests/secret-redaction.test.ts` |
 | NIP-A3 Monero payment targets (`kind:10133`) | `src/nostr/payment-targets.ts` | `src/nostr/pool.ts`, `src/signer/types.ts` | `tests/payment-targets.test.ts` |
 | Monero wallet phase-1 spike, phase-2 wallet core, and Settings wallet UI (#246): runtime import, node reachability, lazy wallet runtime, per-account vault storage (`monero.hot-wallet.<pubkey>` seed bundle, `monero.hot-wallet-data.<pubkey>` keys/scan cache, adopting the legacy device-wide `monero.hot-wallet` only on request), mock stagenet wallet, and QA evidence | `src/features/monero/wallet-node.ts`, `src/features/monero/wallet-runtime.ts`, `src/features/monero/wallet-core.ts`, `src/features/monero/wallet-storage.ts`, `src/features/monero/wallet-view.ts`, `src/features/monero/wallet-spike.ts`, `src/features/monero/mock-stagenet-wallet.ts`, `src/features/monero/phase1-report.ts`, `src/features/monero/types.ts` | `src/app/monero-wallet-controller.ts`, `src/app/settings-view.ts`, `src/app/shell.ts`, `src/monero-spike.ts`, `monero-spike.html`, `vite.monero-spike.config.ts`, `scripts/monero-spike-browser.mjs`, `docs/monero-wallet-phase1.md`, `docs/monero-wallet-phase2-core.md`, `docs/monero-wallet-phase3-settings-ui.md`, `docs/monero-ios-qa-checklist.md`, `docs/monero-rpc-browser-bridge.md`, `src/security/device-vault.ts`, `src/shims/node-assert.ts` | `tests/monero-wallet-spike.test.ts`, `tests/monero-wallet-core.test.ts`, `tests/monero-wallet-controller.test.ts`, `tests/monero-worker-asset.test.ts`, `tests/browser-assert-shim.test.ts`, `tests/settings-view.test.ts`, `npm run spike:monero:browser` |
@@ -175,9 +174,9 @@ and patch it directly, which is also why a page render can leave it standing.
   checklist markup.
 - `src/app/catalog-controller.ts` owns catalog refresh/cache/profile loading and local
   library import, update, deletion, favorite, and detail actions.
-- `src/app/identity-controller.ts` owns signer connection, adoption choices, sign-out,
-  and the NIP-46 connection modal lifecycle. A local key it creates, restores or receives by
-  pairing is handed to the device vault controller and signed in only once it is stored.
+- `src/app/identity-controller.ts` owns Workstr account creation/restore, adoption choices, sign-out,
+  and device pairing. A local key it creates, restores or receives by pairing is handed to the
+  device vault controller and signed in only once it is stored.
 - `src/app/device-vault-controller.ts` owns the device vault's user flows: `prepareBoot`
   decides whether launch shows the lock screen, Protect this device, or nothing;
   `protectLocalAccount` is the only route a local Nostr key takes into storage; and it binds
@@ -397,9 +396,9 @@ targets, or muscle metadata solely from the current exercise library.
 ### Identity and network
 
 - `src/signer/types.ts` is the common signing/encryption contract.
-- `nip07.ts` wraps `window.nostr`; `nip46.ts` owns remote/bunker connections and cached
-  connection metadata; `local-key.ts` owns device-managed NSEC signup/restore and keeps
-  that key on this device, stored only in the device vault under `nostr.local-key`.
+- `local-key.ts` owns Workstr account NSEC signup/restore and keeps that key on this device,
+  stored only in the device vault under `nostr.local-key`. The generic `Signer` contract remains
+  for Nostr features, but Workstr Web no longer ships NIP-07 or NIP-46 signer adapters.
 - `src/security/` is the device vault: Argon2id from the device code wraps a random root
   key, HKDF derives one AES-GCM key per scope, and the unlocked session is a non-extractable
   WebCrypto key in memory. It knows no Nostr or Monero; modules name a scope.

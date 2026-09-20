@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
-import { launchSignerUri, renderShell } from '../src/app/shell';
+import { renderShell } from '../src/app/shell';
 import { shellMarkup } from '../src/app/layout';
 import type { ShellHandle } from '../src/app/shell-types';
 import type { AppState } from '../src/app/state';
@@ -745,11 +745,12 @@ describe('shell', () => {
     expect(modal.querySelector('#auth-tab-login')).toBeNull();
     expect(modal.querySelector('#auth-tab-create')).toBeNull();
 
-    // Everything on one page, in the order it should be considered in.
+    // Everything on one page, limited to Workstr-managed account routes.
     expect(modal.querySelector('#create-local-account')).toBeTruthy();
     expect(modal.querySelector('#pair-new-device')).toBeTruthy();
     expect(modal.querySelector('#restore-local-account')).toBeTruthy();
-    expect(modal.querySelector('#connect-remote-signer')).toBeTruthy();
+    expect(modal.querySelector('#connect-remote-signer')).toBeNull();
+    expect(modal.querySelector('#connect-extension-signer')).toBeNull();
     expect(modal.querySelector('#continue-local')).toBeTruthy();
     await drainBoot(shell);
   });
@@ -766,7 +767,6 @@ describe('shell', () => {
     store: null,
     settings: { unit: 'kg', publicRelays: [] },
     monero: { status: 'idle', address: '' },
-    signerType: 'local',
     view: 'exercises',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     exercises: [],
@@ -884,7 +884,6 @@ describe('shell', () => {
       store: null,
       settings: { unit: 'kg', publicRelays: [] },
       monero: { status: 'idle', address: '' },
-      signerType: 'local',
       view: 'settings',
       subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
       exercises: [],
@@ -923,29 +922,6 @@ describe('shell', () => {
     expect(markup).toContain('data-beast-mode-state="unlocked"');
     expect(markup).toContain('>UNLOCKED</span>');
     expect(markup).toContain('4/4 objectives');
-  });
-});
-
-describe('signer app launch', () => {
-  it('reuses the current context on mobile instead of opening a blank tab', () => {
-    document.body.innerHTML = '';
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
-      expect(this.target).toBe('');
-      expect(this.href).toBe('nostrconnect://example');
-    });
-    launchSignerUri('nostrconnect://example', true);
-    expect(click).toHaveBeenCalledOnce();
-    expect(document.querySelector('a')).toBeNull();
-    click.mockRestore();
-  });
-
-  it('keeps the desktop signer flow in a separate tab', () => {
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
-      expect(this.target).toBe('_blank');
-    });
-    launchSignerUri('nostrconnect://example', false);
-    expect(click).toHaveBeenCalledOnce();
-    click.mockRestore();
   });
 });
 
@@ -1033,15 +1009,12 @@ describe('boot with a device vault', () => {
     localStorage.clear();
   });
 
-  it('opens an extension-signer account with no vault and no prompt', async () => {
+  it('removes obsolete signer type state on boot', async () => {
     localStorage.clear();
-    localStorage.setItem('workstr.currentPubkey', 'e'.repeat(64));
     localStorage.setItem('workstr.signerType', 'nip07');
 
-    const { root, shell } = await bootShell();
-    expect((root.querySelector('#vault-lock') as HTMLElement).hidden).toBe(true);
-    expect(shell.state.store).toBeTruthy();
-    expect(shell.state.deviceVault).toBe('absent');
+    const { shell } = await bootShell();
+    expect(localStorage.getItem('workstr.signerType')).toBeNull();
 
     await drainBoot(shell);
     localStorage.clear();

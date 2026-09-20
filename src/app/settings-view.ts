@@ -8,7 +8,6 @@ import { moneroTipsCard } from '../features/support/payment-mode-views';
 import { moneroWalletCard } from '../features/monero/wallet-view';
 import { isFreeEquipment, ownedEquipmentKeys } from '../core/equipment';
 import { normalizeWeightUnit } from '../core/units';
-import { hasNip07 } from '../signer/nip07';
 import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { backupPanel, backupPanelState } from '../features/backup/views';
 import { tipJarBackupSection } from '../features/monero/wallet-backup-view';
@@ -114,10 +113,8 @@ function npubLine(state: AppState): string {
 }
 
 function accountCard(state: AppState): string {
-  const keyLine = state.signerType === 'local' ? 'Device-managed key for faster sync.' : 'Keys stay in your signer.';
-  const addDeviceAction = state.signerType === 'local'
-    ? '<button id="add-device-settings" class="button small">Add device</button>'
-    : '';
+  const keyLine = 'Device-managed key for encrypted sync.';
+  const addDeviceAction = state.pubkey ? '<button id="add-device-settings" class="button small">Add device</button>' : '';
   const accountAvatar = avatarFace('settings-account-avatar', accountIdentity(state));
   const account = state.pubkey
     ? `<div class="settings-row-main account-row"><div class="settings-account-identity">${accountAvatar}<span><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></span></div><div class="settings-row-actions">${addDeviceAction}<button id="sign-out-settings" class="button small">Sign out</button><button id="remove-account-data" class="button quiet danger small">Remove data</button></div></div>`
@@ -129,7 +126,7 @@ function accountCard(state: AppState): string {
   // profile arrives, so those two carry the classes it looks for. The signer line and the
   // npub do not change once signed in, and it leaves them alone.
   const identityLine = state.pubkey
-    ? `<span class="settings-account-summary">${avatarFace('settings-account-summary-avatar', accountIdentity(state))}<span class="settings-category-copy"><strong>${html(displayIdentity(state))}</strong><small>Signed in with ${state.signerType === 'local' ? 'a device key' : 'your signer'}</small>${npubLine(state)}</span></span>`
+    ? `<span class="settings-account-summary">${avatarFace('settings-account-summary-avatar', accountIdentity(state))}<span class="settings-category-copy"><strong>${html(displayIdentity(state))}</strong><small>Signed in with a Workstr account</small>${npubLine(state)}</span></span>`
     : '<span class="settings-category-copy"><strong>Local only</strong><small>Not connected to an account yet</small></span>';
   return `<details class="settings-category account-card" data-settings-section="account">
     <summary>${identityLine}<span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'SIGNED IN' : 'LOCAL'}</span></summary>
@@ -154,11 +151,11 @@ function trainingPreferencesCard(state: AppState): string {
 
 function advancedCard(state: AppState): string {
   const relay = state.settings.workstrRelay || 'default Workstr relay';
-  const signerType = state.signerType || (state.pubkey ? 'unknown' : 'none');
+  const identityMode = state.pubkey ? 'workstr account' : 'local only';
   const secureContext = typeof window !== 'undefined' && window.isSecureContext;
   return `<details class="settings-category advanced-settings" data-settings-section="advanced">
-    <summary><span class="settings-category-copy"><strong>Advanced</strong><small>Diagnostics, relay, signer, and technical state</small></span></summary>
-    <div class="settings-category-body"><div class="terminal-mini">version: ${html(APP_VERSION)}\nsecure context: ${secureContext}\ncountdown audio: ${html(countdownAudioState())}\nnip07 signer: ${hasNip07() ? 'available' : 'not detected'}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nsigner type: ${html(signerType)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div>
+    <summary><span class="settings-category-copy"><strong>Advanced</strong><small>Diagnostics, relay, and technical state</small></span></summary>
+    <div class="settings-category-body"><div class="terminal-mini">version: ${html(APP_VERSION)}\nsecure context: ${secureContext}\ncountdown audio: ${html(countdownAudioState())}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nidentity mode: ${html(identityMode)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div>
   </details>`;
 }
 

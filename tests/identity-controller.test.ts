@@ -8,12 +8,6 @@ import { namespaceHasUserData, deleteNamespace } from '../src/db/adopt';
 import type { AppState } from '../src/app/state';
 import type { Signer } from '../src/signer/types';
 
-vi.mock('../src/signer/nip07', () => ({ hasNip07: () => false, createNip07Signer: vi.fn() }));
-vi.mock('../src/signer/nip46', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/signer/nip46')>();
-  return { ...actual, createNostrConnectSignerRequest: vi.fn(), createBunkerSigner: vi.fn(), createCachedNip46Signer: vi.fn(() => null) };
-});
-
 const PUBKEY = 'a'.repeat(64);
 
 function baseState(overrides: Partial<AppState> = {}): AppState {
@@ -25,7 +19,6 @@ function baseState(overrides: Partial<AppState> = {}): AppState {
     store: null,
     settings: { unit: 'kg', publicRelays: [] },
     support: { status: 'idle', receipts: [] },
-    signerType: null,
     view: 'settings',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     exercises: [],
@@ -135,7 +128,7 @@ describe('identity controller adoption branching', () => {
     const account = generateLocalAccount();
     controller.startRestoreLocalAccount();
     restoreWith(h, account.nsec);
-    await vi.waitFor(() => expect(h.openIdentity).toHaveBeenCalledWith(account.pubkey, true, 'local'));
+    await vi.waitFor(() => expect(h.openIdentity).toHaveBeenCalledWith(account.pubkey, true));
 
     expect(await namespaceHasUserData(account.pubkey)).toBe(true);
     expect(await namespaceHasUserData('local')).toBe(false);
@@ -160,7 +153,7 @@ describe('identity controller adoption branching', () => {
     expect(h.openIdentity).not.toHaveBeenCalled();
 
     h.root.querySelector<HTMLElement>('#adopt-use-account')!.click();
-    await vi.waitFor(() => expect(h.openIdentity).toHaveBeenCalledWith(account.pubkey, true, 'local'));
+    await vi.waitFor(() => expect(h.openIdentity).toHaveBeenCalledWith(account.pubkey, true));
     // "Use the account's data" keeps the identity namespace, local untouched.
     expect(await namespaceHasUserData('local')).toBe(true);
   });
@@ -177,7 +170,7 @@ describe('identity controller adoption branching', () => {
     const account = generateLocalAccount();
     controller.startRestoreLocalAccount();
     restoreWith(h, account.nsec);
-    await vi.waitFor(() => expect(h.openIdentity).toHaveBeenCalledWith(account.pubkey, true, 'local'));
+    await vi.waitFor(() => expect(h.openIdentity).toHaveBeenCalledWith(account.pubkey, true));
     // Seed-only local namespace is left alone — no copy, no prompt.
     expect(await namespaceHasUserData(account.pubkey)).toBe(false);
   });
@@ -219,7 +212,7 @@ describe('local keys go through the device vault', () => {
     await vi.waitFor(() => expect(h.openIdentity).toHaveBeenCalled());
     const [account] = h.protectLocalAccount.mock.calls[0] as [LocalAccountKey];
     expect(account.nsec).toBe(nsec);
-    expect(h.openIdentity).toHaveBeenCalledWith(account.pubkey, true, 'local');
+    expect(h.openIdentity).toHaveBeenCalledWith(account.pubkey, true);
   });
 });
 
@@ -230,7 +223,7 @@ describe('identity controller sign-out', () => {
     localStorage.setItem('workstr.localNsec.hex', 'ab'.repeat(32));
     localStorage.setItem('workstr.currentPubkey', PUBKEY);
     localStorage.setItem('workstr.signerType', 'local');
-    const h = harness({ pubkey: PUBKEY, signerType: 'local' });
+    const h = harness({ pubkey: PUBKEY });
     const controller = createIdentityController(h.ctx);
 
     await controller.signOut();

@@ -1,7 +1,4 @@
-import { renderSVG } from 'uqr';
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
-import { hasNip07, createNip07Signer } from '../signer/nip07';
-import { clearNip46State, createBunkerSigner, createCachedNip46Signer, createNostrConnectSignerRequest, defaultBunkerRelays } from '../signer/nip46';
 import { clearLocalKey, createCachedLocalKeySigner, exportLocalNsec, generateLocalAccount, parseRecoveryKey, type LocalAccountKey } from '../signer/local-key';
 import { accountChoiceMarkup } from './account-choice-view';
 import { createDevicePairingController } from './device-pairing-controller';
@@ -12,14 +9,10 @@ import type { AppState } from './state';
 import { html } from './format';
 
 const SESSION_KEY = 'workstr.currentPubkey';
-const SIGNER_TYPE_KEY = 'workstr.signerType';
+const OBSOLETE_SIGNER_KEYS = ['workstr.signerType', 'workstr.nip46.clientSecret', 'workstr.nip46.connection', 'workstr.nip46.grantedPerms'];
 
-export function launchSignerUri(uri: string, mobile: boolean, doc: Document = document): void {
-  const link = doc.createElement('a');
-  link.href = uri;
-  if (!mobile) link.target = '_blank';
-  link.rel = 'noreferrer'; link.style.display = 'none';
-  doc.body.appendChild(link); link.click(); link.remove();
+function clearObsoleteSignerState(): void {
+  for (const key of OBSOLETE_SIGNER_KEYS) localStorage.removeItem(key);
 }
 
 export interface IdentityControllerContext {
@@ -29,7 +22,7 @@ export interface IdentityControllerContext {
   openModal(content: string): void;
   closeModal(): void;
   openLocal(): Promise<void>;
-  openIdentity(pubkey: string, persist?: boolean, signerType?: AppState['signerType']): Promise<void>;
+  openIdentity(pubkey: string, persist?: boolean): Promise<void>;
   // The only way a local key reaches storage, and the vault status Settings draws from.
   vault: { protectLocalAccount(account: LocalAccountKey): Promise<Signer | null>; refreshStatus(): Promise<void> };
 }
@@ -37,17 +30,13 @@ export interface IdentityControllerContext {
 export function createIdentityController(ctx: IdentityControllerContext) {
   const { root, state, render, openModal, closeModal, openLocal, openIdentity, vault } = ctx;
   let activeSigner: Signer | null = null;
-  let pendingConnect: { uri: string; mobile: boolean } | null = null;
 
 async function signOut(): Promise<void> {
   activeSigner = null;
-  clearNip46State();
+  clearObsoleteSignerState();
   await clearLocalKey(); await vault.refreshStatus();
-  // It describes the permissions one connection was granted, not this device. The next
-  // signer may prompt for everything, and retrying early at it would prompt twice.
   forgetAutoApprove();
   localStorage.removeItem(SESSION_KEY);
-  localStorage.removeItem(SIGNER_TYPE_KEY);
   state.editingId = null;
   state.librarySelect = { active: false, slugs: new Set() };
   state.discoverSelect = { active: false, addresses: new Set() };
@@ -70,103 +59,47 @@ async function signOutAndRemoveData(): Promise<void> {
 // identity that already has data on this device asks once — never merge.
 // A purely seeded local account has nothing worth adopting, so it skips
 // both the copy and the prompt.
-async function completeSignIn(pubkey: string, signerType: AppState['signerType']): Promise<void> {
+async function completeSignIn(pubkey: string): Promise<void> {
   if (state.pubkey || !(await namespaceHasUserData(LOCAL_NAMESPACE))) {
-    await openAndRender(pubkey, signerType);
+    await openAndRender(pubkey);
     return;
   }
   if (await namespaceHasUserData(pubkey)) {
-    askAdoptChoice(pubkey, signerType);
+    askAdoptChoice(pubkey);
     return;
   }
-  await adoptLocalAndOpen(pubkey, signerType);
+  await adoptLocalAndOpen(pubkey);
 }
 
-async function adoptLocalAndOpen(pubkey: string, signerType: AppState['signerType']): Promise<void> {
+async function adoptLocalAndOpen(pubkey: string): Promise<void> {
   state.store?.close();
   state.store = null;
   await copyNamespace(LOCAL_NAMESPACE, pubkey);
   await deleteNamespace(LOCAL_NAMESPACE);
-  await openAndRender(pubkey, signerType);
+  await openAndRender(pubkey);
 }
 
-function askAdoptChoice(pubkey: string, signerType: AppState['signerType']): void {
+function askAdoptChoice(pubkey: string): void {
   openModal(`<div class="page-title">Existing account data</div>
     <p class="section-help">This identity already has Workstr data on this device. Pick the dataset to continue with — the two are never merged. Keeping this device's data replaces the identity's copy on this device.</p>
     <div class="web-empty-actions">
       <button id="adopt-keep-device" class="button primary">Keep this device's data</button>
       <button id="adopt-use-account" class="button">Use the account's data</button>
     </div>`);
-  root.querySelector('#adopt-keep-device')?.addEventListener('click', () => { closeModal(); void adoptLocalAndOpen(pubkey, signerType); });
-  root.querySelector('#adopt-use-account')?.addEventListener('click', () => { closeModal(); void openAndRender(pubkey, signerType); });
+  root.querySelector('#adopt-keep-device')?.addEventListener('click', () => { closeModal(); void adoptLocalAndOpen(pubkey); });
+  root.querySelector('#adopt-use-account')?.addEventListener('click', () => { closeModal(); void openAndRender(pubkey); });
 }
-
 
 async function getActiveSigner(): Promise<Signer | null> {
+  if (!state.pubkey) return null;
   if (activeSigner) return activeSigner;
-  if (state.signerType === 'nip07' && hasNip07()) {
-    activeSigner = createNip07Signer();
-    return activeSigner;
-  }
-  if (state.signerType === 'nip46') {
-    // The signed-in key is already known here — it names the database this session is
-    // reading — so the reconnected signer never has to ask the bunker for it.
-    activeSigner = createCachedNip46Signer(state.pubkey || undefined, { onAuthUrl: launchSignerRequest });
-    return activeSigner;
-  }
-  if (state.signerType === 'local') {
-    activeSigner = await createCachedLocalKeySigner();
-    return activeSigner;
-  }
-  return null;
+  activeSigner = await createCachedLocalKeySigner();
+  return activeSigner;
 }
 
-// Thrown away when a call to it times out. A NIP-46 signer holds a relay subscription that
-// its answers arrive on, and a phone that backgrounds the app kills that socket without
-// the signer noticing: it keeps reporting itself open while every request goes nowhere.
-// Dropping it means the next attempt builds a fresh connection instead of retrying into a
-// dead one until the user reloads the page.
 function dropActiveSigner(): void {
   activeSigner = null;
 }
-
-
-
-async function connectNip07(): Promise<void> {
-  try {
-    const signer = createNip07Signer();
-    const pubkey = await signer.getPublicKey();
-    activeSigner = signer;
-    await clearLocalKey(); await vault.refreshStatus();
-    await completeSignIn(pubkey, 'nip07');
-  } catch (error) {
-    state.signInStatus = `extension signer error ${(error as Error).message}`;
-    render();
-  }
-}
-
-async function startRemoteSignerRequest(): Promise<void> {
-  try {
-    state.signInStatus = 'creating signer connect request...'; render();
-    const request = createNostrConnectSignerRequest(defaultBunkerRelays(), { onAuthUrl: launchSignerRequest });
-    const mobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
-    state.signInStatus = `waiting for signer approval on ${request.relays.join(', ')}`;
-    render();
-    showSignerConnectModal(request.uri, mobile);
-    await request.ready;
-    if (mobile) launchSignerRequest(request.uri);
-    const connected = await request.signer;
-    activeSigner = connected.signer;
-    await clearLocalKey(); await vault.refreshStatus();
-    closeModal();
-    await completeSignIn(connected.pubkey, 'nip46');
-  } catch (error) {
-    closeModal();
-    state.signInStatus = `signer error ${(error as Error).message}`;
-    render();
-  }
-}
-
 
 const pairing = createDevicePairingController({
   root,
@@ -174,14 +107,14 @@ const pairing = createDevicePairingController({
   openModal,
   closeModal,
   getSigner: getActiveSigner,
-  getLocalNsec: () => (state.signerType === 'local' || !state.pubkey ? exportLocalNsec() : Promise.resolve(null)),
+  getLocalNsec: () => exportLocalNsec(),
   // Held in memory until this device has its own code. Nothing is stored if that is cancelled.
   adoptTransferredKey: async (nsec: string) => {
     const account = parseRecoveryKey(nsec);
     const signer = await vault.protectLocalAccount(account);
     if (!signer) return false;
     activeSigner = signer;
-    await completeSignIn(account.pubkey, 'local');
+    await completeSignIn(account.pubkey);
     return true;
   }
 });
@@ -191,21 +124,16 @@ const pairing = createDevicePairingController({
 // gets missed when the markup changes.
 function bindSettingsAuth(): void {
   root.querySelector('#sign-in-settings')?.addEventListener('click', () => startAccountChoice());
-  root.querySelector('#sign-in-nip07')?.addEventListener('click', () => { void connectNip07(); });
   root.querySelector('#sign-out-settings')?.addEventListener('click', () => { void signOut(); });
   root.querySelector('#remove-account-data')?.addEventListener('click', () => { void signOutAndRemoveData(); });
   root.querySelector('#add-device-settings')?.addEventListener('click', () => pairing.startScan());
 }
 
-// One flow, not two tabs. The markup is in `account-choice-view.ts`; what stays here is
-// which action each row runs, and every one of them is the action it ran before.
 function startAccountChoice(): void {
   openModal(accountChoiceMarkup());
   root.querySelector('#create-local-account')?.addEventListener('click', () => void createLocalAccountFlow());
   root.querySelector('#pair-new-device')?.addEventListener('click', () => pairing.startNewDevice());
   root.querySelector('#restore-local-account')?.addEventListener('click', () => showRestoreLocalAccountModal());
-  root.querySelector('#connect-remote-signer')?.addEventListener('click', () => { closeModal(); void startRemoteSignerRequest(); });
-  root.querySelector('#connect-extension-signer')?.addEventListener('click', () => { closeModal(); void connectNip07(); });
   root.querySelector('#continue-local')?.addEventListener('click', closeModal);
 }
 
@@ -220,7 +148,7 @@ async function protectAndSignIn(account: LocalAccountKey): Promise<void> {
   if (!signer) return;
   activeSigner = signer;
   closeModal();
-  await completeSignIn(account.pubkey, 'local');
+  await completeSignIn(account.pubkey);
 }
 
 function showRecoveryKeyModal(account: LocalAccountKey): void {
@@ -232,7 +160,7 @@ function showRecoveryKeyModal(account: LocalAccountKey): void {
       <button id="copy-recovery-key" class="button" type="button">Copy recovery key</button>
       <button id="continue-local-account" class="button primary" type="button">I saved it</button>
     </div>
-    <p class="section-help">Next you choose a device code. Workstr keeps this key only on this device, encrypted under that code. This is convenient, but less protected than a dedicated signer.</p>`);
+    <p class="section-help">Next you choose a device code. Workstr keeps this key only on this device, encrypted under that code.</p>`);
   root.querySelector('#copy-recovery-key')?.addEventListener('click', (event) => {
     void navigator.clipboard.writeText(nsec);
     (event.currentTarget as HTMLButtonElement).textContent = 'Copied';
@@ -248,10 +176,9 @@ function showRestoreLocalAccountModal(input = '', error: string | null = null): 
     <p class="section-help">Paste an nsec recovery key. It is kept on this device, encrypted under your device code, so sync can run without signer prompts.</p>
     <textarea id="local-key-input" class="auth-key-input" rows="4" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="nsec1...">${html(input)}</textarea>
     ${error ? `<p class="auth-error" role="alert">Recovery key error: ${html(error)}</p>` : ''}
-    <p class="section-help">Only use this on a device you trust. For maximum key protection, use a dedicated signer instead.</p>
+    <p class="section-help">Only use this on a device you trust.</p>
     <div class="web-empty-actions">
       <button id="restore-local-key" class="button primary" type="button">Use this key</button>
-      <button id="restore-use-signer" class="button" type="button">Use signer instead</button>
     </div>`);
   const keyInput = root.querySelector<HTMLTextAreaElement>('#local-key-input');
   if (input && keyInput) {
@@ -268,68 +195,16 @@ function showRestoreLocalAccountModal(input = '', error: string | null = null): 
       showRestoreLocalAccountModal(value, (err as Error).message);
     }
   })());
-  root.querySelector('#restore-use-signer')?.addEventListener('click', () => { closeModal(); void startRemoteSignerRequest(); });
   root.querySelector('#account-back')?.addEventListener('click', () => startAccountChoice());
 }
 
-function showSignerConnectModal(uri: string, mobile: boolean): void {
-  pendingConnect = { uri, mobile };
-  renderConnectModal();
-}
-
-function renderConnectModal(): void {
-  if (!pendingConnect) return;
-  const { uri, mobile } = pendingConnect;
-  openModal(`<div class="page-title">Connect mobile signer</div>
-    <p class="section-help">${mobile
-      ? 'Approve the request in your signer app, then return to this tab. You can also scan the QR code from another device.'
-      : 'Scan the QR code with your NIP-46 signer app (Clave, Amber, ...). Once you approve, this tab signs in automatically.'}</p>
-    <div class="signer-qr">${renderSVG(uri, { border: 2 })}</div>
-    <div class="web-empty-actions">
-      <button id="connect-copy" class="button" type="button">Copy secret</button>
-      <button id="connect-open" class="button" type="button">Open signer app</button>
-    </div>
-    <details class="auth-bunker-details">
-      <summary>Paste bunker URL instead</summary>
-      <textarea id="bunker-input" class="auth-key-input" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="bunker://... or signer@example.com"></textarea>
-      <button id="connect-bunker" class="button primary" type="button">Connect bunker</button>
-    </details>`);
-  root.querySelector('#connect-copy')?.addEventListener('click', (event) => {
-    void navigator.clipboard.writeText(uri);
-    (event.currentTarget as HTMLButtonElement).textContent = 'Copied';
-  });
-  root.querySelector('#connect-open')?.addEventListener('click', () => launchSignerRequest(uri));
-  root.querySelector('#connect-bunker')?.addEventListener('click', () => { void connectBunkerInput(); });
-}
-
-async function connectBunkerInput(): Promise<void> {
-  const input = root.querySelector<HTMLTextAreaElement>('#bunker-input')?.value || '';
-  try {
-    state.signInStatus = 'connecting bunker signer...';
-    const signer = await createBunkerSigner(input, { onAuthUrl: launchSignerRequest });
-    const pubkey = await signer.getPublicKey();
-    activeSigner = signer;
-    await clearLocalKey(); await vault.refreshStatus();
-    pendingConnect = null;
-    closeModal();
-    await completeSignIn(pubkey, 'nip46');
-  } catch (error) {
-    state.signInStatus = `bunker signer error ${(error as Error).message}`;
-    renderConnectModal();
-  }
-}
-
-function launchSignerRequest(uri: string): void {
-  launchSignerUri(uri, /android|iphone|ipad|ipod/i.test(navigator.userAgent));
-}
-
-async function openAndRender(pubkey: string, signerType: AppState['signerType'] = state.signerType): Promise<void> {
-  await openIdentity(pubkey, true, signerType);
+async function openAndRender(pubkey: string): Promise<void> {
+  await openIdentity(pubkey, true);
   render();
 }
   return {
-    signOut, signOutAndRemoveData, connectNip07, startRemoteSignerRequest, startAccountChoice, startLocalAccount: createLocalAccountFlow, startRestoreLocalAccount: () => showRestoreLocalAccountModal(), getActiveSigner, dropActiveSigner,
+    signOut, signOutAndRemoveData, startAccountChoice, startLocalAccount: createLocalAccountFlow, startRestoreLocalAccount: () => showRestoreLocalAccountModal(), getActiveSigner, dropActiveSigner,
     startAddDevice: () => pairing.startScan(), releasePairing: pairing.release, bindSettingsAuth,
-    clearPending: () => { pendingConnect = null; }
+    clearPending: () => undefined
   };
 }

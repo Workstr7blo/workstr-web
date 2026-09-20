@@ -25,7 +25,7 @@ function freshVault(): { databaseName: string; vault: DeviceVault } {
 function harness(vault: DeviceVault, stateOverrides: Partial<AppState> = {}, clockStart = 1_000_000) {
   document.body.innerHTML = '<div id="app"><div id="modal"><div id="modal-content"></div></div><div id="vault-lock" hidden></div></div>';
   const root = document.getElementById('app') as HTMLElement;
-  const state = { pubkey: null, signerType: null, deviceVault: 'absent', ...stateOverrides } as AppState;
+  const state = { pubkey: null, deviceVault: 'absent', ...stateOverrides } as AppState;
   let clock = clockStart;
   const onUnlocked = vi.fn();
   const onLocked = vi.fn();
@@ -122,7 +122,7 @@ describe('launch', () => {
 
   it('does not prompt an external-signer account that has no vault', async () => {
     const { vault } = freshVault();
-    const h = harness(vault, { pubkey: 'a'.repeat(64), signerType: 'nip46' });
+    const h = harness(vault, { pubkey: 'a'.repeat(64) });
     expect(await h.controller.prepareBoot()).toBe('open');
     expect(h.lock().hidden).toBe(true);
   });
@@ -144,8 +144,8 @@ describe('launch', () => {
   });
 
   it('blocks the app until the right code is entered, saying only that a wrong one is wrong', async () => {
-    const { vault } = await vaultWithNostrKey();
-    const h = harness(vault, { signerType: 'local' });
+    const { vault, pubkey } = await vaultWithNostrKey();
+    const h = harness(vault, { pubkey });
     expect(await h.controller.prepareBoot()).toBe('blocked');
     expect(h.lock().hidden).toBe(false);
     expect(h.lock().textContent).toContain('Enter your nine-digit device code.');
@@ -233,7 +233,7 @@ describe('launch', () => {
     const { vault, pubkey } = await vaultWithNostrKey();
     const other = generateSecretKey();
     await saveLocalSecret(bytesToHex(other));
-    const h = harness(vault, { pubkey, signerType: 'local' });
+    const h = harness(vault, { pubkey });
     await h.controller.prepareBoot();
     enter(h.lock(), 'unlock', PIN);
     submit(h.lock(), 'vault-unlock-form');
@@ -289,7 +289,7 @@ describe('protecting an existing local account', () => {
     const account = legacyAccount();
     await saveLocalSecret(account.hex);
     const { vault } = freshVault();
-    const h = harness(vault, { pubkey: account.pubkey, signerType: 'local' });
+    const h = harness(vault, { pubkey: account.pubkey });
 
     expect(await h.controller.prepareBoot()).toBe('blocked');
     expect(h.lock().textContent).toContain('Protect this device');
@@ -315,7 +315,7 @@ describe('protecting an existing local account', () => {
     await saveLocalSecret(account.hex);
     const { vault } = freshVault();
     // The stored key is not the signed-in account, so verification must fail.
-    const h = harness(vault, { pubkey: legacyAccount().pubkey, signerType: 'local' });
+    const h = harness(vault, { pubkey: legacyAccount().pubkey });
     await h.controller.prepareBoot();
     h.lock().querySelector<HTMLElement>('#vault-protect-start')!.click();
     enter(h.lock(), 'new', PIN);
@@ -460,7 +460,7 @@ describe('Settings', () => {
   it('locks: drops the session, keeps the records, and resumes on the next unlock', async () => {
     const { vault } = await vaultWithNostrKey();
     await vault.unlock(PIN);
-    const h = harness(vault, { deviceVault: 'unlocked', signerType: 'local' });
+    const h = harness(vault, { deviceVault: 'unlocked' });
     h.root.insertAdjacentHTML('beforeend', deviceSecurityCard(h.state));
     h.controller.bindSettings();
 

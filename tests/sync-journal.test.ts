@@ -30,7 +30,7 @@ vi.mock('../src/sync/relay', async () => {
 
 function fakeSigner(): Signer {
   return {
-    type: 'nip07',
+    type: 'local',
     getPublicKey: async () => TEST_PUBKEY,
     signEvent: async (event: UnsignedNostrEvent) => ({ ...event, id: 'id', pubkey: TEST_PUBKEY, sig: 'sig' }),
     nip44Encrypt: async (_peer: string, plaintext: string) => plaintext,

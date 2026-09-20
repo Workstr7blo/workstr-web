@@ -1,8 +1,8 @@
 import { rememberedAutoApprove, type AutoApproveMemory } from './auto-approve';
 import type { Signer, UnsignedNostrEvent } from './types';
 
-// Generous on purpose: a NIP-46 request travels to a signer app over a relay and may wait
-// on a human tapping approve. What it must not be is absent — a signer that never answers
+// Generous on purpose: signing may involve a locked local key or other future signer work.
+// What it must not be is absent — a signer that never answers
 // leaves a sync pass hanging forever, with no error, no retry, and a status line stuck on
 // "Syncing now…" that no button can clear.
 export const SIGNER_TIMEOUT_MS = 45000;
@@ -23,11 +23,8 @@ export const AUTO_APPROVE_MS = 3000;
 // How long to wait before deciding an answer was lost rather than pending, on a signer that
 // has shown it answers by itself.
 //
-// A NIP-46 answer can go missing: the signer publishes it before the client's subscription
-// is back on the relay, and an answer nobody is listening for is gone for good. The request
-// itself landed, so the signer shows it handled while the client waits out its whole
-// timeout. Retrying recovers it immediately — the failed attempt is what puts the
-// subscription back up — so the only thing the long wait buys is the delay itself.
+// An answer can go missing even though the request itself was accepted. Retrying recovers
+// that class immediately, so the only thing the long wait buys is the delay itself.
 export const LOST_ANSWER_MS = 9000;
 
 // Raised only by this wrapper's own deadline, never by the call underneath. Retrying is

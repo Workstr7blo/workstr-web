@@ -22,7 +22,7 @@ const suite = RELAY ? describe : describe.skip;
 function keySigner(secret = generateSecretKey()): Signer {
   const pubkey = getPublicKey(secret);
   return {
-    type: 'nip07',
+    type: 'local',
     getPublicKey: async () => pubkey,
     signEvent: async (event: UnsignedNostrEvent) => finalizeEvent({ ...event, pubkey } as never, secret) as never,
     nip44Encrypt: async (peer: string, plaintext: string) => nip44.encrypt(plaintext, nip44.getConversationKey(secret, peer)),

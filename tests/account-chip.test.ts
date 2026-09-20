@@ -12,7 +12,6 @@ const state = (over: Partial<AppState> = {}): AppState => ({
   profileName: 'Trainer',
   profilePicture: 'https://example.invalid/a.png',
   profileNames: {},
-  signerType: 'local',
   store: null,
   settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] },
   monero: { status: 'idle', address: '' },
@@ -56,11 +55,11 @@ describe('the account chip', () => {
     expect(root.querySelector('img.connection-avatar')).toBe(image);
     expect(root.querySelector('.connection-chip-label')?.textContent).toBe('Coach');
     expect(root.querySelector('.settings-account-identity strong')?.textContent).toBe('Coach');
-    // The name is patched where the name lives. The line under it says which signer holds
-    // the key, which a profile does not change - overwriting it with the name was the bug
+    // The name is patched where the name lives. The line under it says which account mode
+    // owns the key, which a profile does not change - overwriting it with the name was the bug
     // this assertion replaces.
     expect(root.querySelector('.account-card summary .settings-category-copy strong')?.textContent).toBe('Coach');
-    expect(root.querySelector('.account-card summary .settings-category-copy small')?.textContent).toBe('Signed in with a device key');
+    expect(root.querySelector('.account-card summary .settings-category-copy small')?.textContent).toBe('Signed in with a Workstr account');
   });
 
   it('moves the same element to a new picture rather than making another', () => {
@@ -80,7 +79,7 @@ describe('the account chip', () => {
     expect(root.querySelector('img.connection-avatar')?.getAttribute('src')).toBe('https://example.invalid/a.png');
     expect(root.querySelector('img.settings-account-avatar')).toBeTruthy();
     expect(root.querySelector('.settings-account-identity strong')?.textContent).toBe('Trainer');
-    expect(root.querySelector('.settings-account-identity small')?.textContent).toBe('Device-managed key for faster sync.');
+    expect(root.querySelector('.settings-account-identity small')?.textContent).toBe('Device-managed key for encrypted sync.');
   });
 
   it('puts a failed picture back on screen when a working one replaces it', () => {

@@ -31,8 +31,7 @@ function snapshot(sync: { height: number | null; daemonHeight: number | null; sy
 
 function state(overrides: Partial<AppState> = {}, wallet: MoneroWalletUiState = { status: 'unknown' }): AppState {
   return {
-    pubkey: PUBKEY, npub: null, profileName: null, profilePicture: null, profileNames: {},
-    signerType: 'local', store: null, view: 'tipjar',
+    pubkey: PUBKEY, npub: null, profileName: null, profilePicture: null, profileNames: {}, store: null, view: 'tipjar',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] },
     monero: { status: 'ready', address: '' },

@@ -11,7 +11,7 @@ const SELF = 'ab'.repeat(32);
 // the test while still travelling through the real encrypt/decrypt calls.
 function fakeSigner(overrides: Partial<Signer> = {}): Signer {
   return {
-    type: 'nip07',
+    type: 'local',
     getPublicKey: async () => SELF,
     signEvent: async (event: UnsignedNostrEvent) => ({ ...event, id: 'id', pubkey: SELF, sig: 'sig' }),
     nip44Encrypt: async (_peer: string, plaintext: string) => plaintext,

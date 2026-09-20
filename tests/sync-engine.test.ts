@@ -68,7 +68,7 @@ vi.mock('../src/sync/relay', async () => {
 // Round-trips through the real codec without real keys: the "ciphertext" is the plaintext.
 function fakeSigner(): Signer {
   return {
-    type: 'nip07',
+    type: 'local',
     getPublicKey: async () => SELF,
     signEvent: async (event: UnsignedNostrEvent) => ({ ...event, id: 'id', pubkey: SELF, sig: 'sig' }),
     nip44Encrypt: async (_peer: string, plaintext: string) => plaintext,
@@ -480,12 +480,12 @@ describe('when the relay or signer will not cooperate', () => {
   });
 
   it('does not hang forever when the signer never answers', async () => {
-    // The iPhone bug: a NIP-46 signer that goes silent used to leave the pass wedged with
+    // The timeout bug: a signer that goes silent used to leave the pass wedged with
     // the status stuck on "syncing", no error, and Sync now returning the same dead promise.
     const store = await freshStore();
     await populate(store);
     const silent: Signer = {
-      type: 'nip46',
+      type: 'local',
       getPublicKey: async () => SELF,
       signEvent: () => new Promise(() => {}),
       nip44Encrypt: () => new Promise(() => {}),
@@ -505,15 +505,14 @@ describe('when the relay or signer will not cooperate', () => {
     expect((await store.listSyncQueue()).length).toBeGreaterThan(0);
   });
 
-  // A phone that backgrounds the app kills the websocket a NIP-46 signer's answers come
-  // back on, and the signer keeps reporting itself open. Retrying into that same dead
-  // connection can only fail, so the pass tells its caller to throw the signer away.
+  // A signer can stop answering while still being held as the active signer. Retrying into
+  // that same dead signer can only fail, so the pass tells its caller to throw it away.
   it('asks for a fresh connection when the signer stops answering', async () => {
     const store = await freshStore();
     await populate(store);
     const stalled = vi.fn();
     const silent: Signer = {
-      type: 'nip46',
+      type: 'local',
       getPublicKey: async () => SELF,
       signEvent: () => new Promise(() => {}),
       nip44Encrypt: () => new Promise(() => {}),
@@ -533,7 +532,7 @@ describe('when the relay or signer will not cooperate', () => {
     const store = await freshStore();
     await populate(store);
     const silent: Signer = {
-      type: 'nip46',
+      type: 'local',
       getPublicKey: async () => SELF,
       signEvent: () => new Promise(() => {}),
       nip44Encrypt: () => new Promise(() => {}),
@@ -563,7 +562,7 @@ describe('when the relay or signer will not cooperate', () => {
     // The reported failure: the first call of a pass is reading the public key, so a dead
     // connection surfaced as "did not respond to getPublicKey within 45s".
     const mute: Signer = {
-      type: 'nip46',
+      type: 'local',
       getPublicKey: () => new Promise(() => {}),
       signEvent: () => new Promise(() => {}),
       nip44Encrypt: () => new Promise(() => {}),
@@ -584,7 +583,7 @@ describe('when the relay or signer will not cooperate', () => {
     await populate(store);
     let attempts = 0;
     const silent: Signer = {
-      type: 'nip46',
+      type: 'local',
       // Sealing is local, so the signature is the only thing left that can hang.
       signEvent: () => { attempts += 1; return new Promise(() => {}); },
       getPublicKey: async () => SELF,

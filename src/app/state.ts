@@ -78,7 +78,6 @@ export interface AppState {
   // Tip Jar activity for one account's open wallet, as loaded from the device vault and joined
   // with the wallet's last transaction list. Absent until that wallet has been opened.
   tipJarActivity?: { pubkey: string; walletId: string; records: TipJarActivity[] };
-  signerType: 'nip07' | 'nip46' | 'local' | null;
   view: View;
   subState: { exercises: 'library' | 'discover'; workouts: 'programs' | 'discover' | 'history' | 'recovery'; statistics: 'training' | 'body' };
   exercises: Exercise[];

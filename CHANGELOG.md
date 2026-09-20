@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Removed NIP-07 browser-extension sign-in and NIP-46 remote-signer sign-in. Workstr Web now
+  supports only local-only mode and Workstr-managed accounts whose recovery key is protected by
+  the device vault; account setup offers create, restore, and Workstr device pairing routes.
+
 - Changed the Tip on a program card to a piggy bank with a small plus, in place of the Monero
   mark. The button still says Tip and is still the same orange control: what changed is that the
   icon now says what it does, add to this creator's Tip Jar, rather than naming the network

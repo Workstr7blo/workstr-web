@@ -234,7 +234,6 @@ export interface WorkstrSettings {
   paymentMode?: PaymentMode;
   publicRelays: string[];
   workstrRelay?: string;
-  signerType?: 'nip07' | 'nip46' | 'idenstr' | 'local';
   syncCursor?: number;
   // Highest starter-seed version applied to this namespace; see db/seed.ts.
   seedVersion?: number;

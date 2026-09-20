@@ -35,7 +35,7 @@ import { createProgramBuilder } from './program-builder';
 import { createSessionPersistence } from './session-persistence';
 import { createCatalogController } from './catalog-controller';
 import { createDeviceVaultController } from './device-vault-controller';
-import { createIdentityController, launchSignerUri } from './identity-controller';
+import { createIdentityController } from './identity-controller';
 import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
 import { createMoneroAddressController } from './monero-address-controller';
@@ -50,24 +50,24 @@ import { createMoneroSendController } from './monero-send-controller';
 import { updateTipJarNav } from '../features/monero/tip-jar-view';
 import { createProgramPublishController } from './program-publish-controller';
 import type { ShellHandle, ShellOptions } from './shell-types';
-export { launchSignerUri };
 const SESSION_KEY = 'workstr.currentPubkey';
-const SIGNER_TYPE_KEY = 'workstr.signerType';
+const OBSOLETE_SIGNER_TYPE_KEY = 'workstr.signerType';
 const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'off', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
 
 function profileName(profile: RelayProfile | null): string | null { return profile?.name?.trim() || profile?.nip05?.trim() || null; }
 
 export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, monero: { status: 'idle', address: '' }, moneroWallet: { status: 'unknown' }, signerType: localStorage.getItem(SIGNER_TYPE_KEY) as AppState['signerType'], view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', level: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, deviceVault: 'absent', expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, monero: { status: 'idle', address: '' }, moneroWallet: { status: 'unknown' }, view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', level: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, deviceVault: 'absent', expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   const trace = createRenderTrace();
   async function boot(): Promise<void> {
+    localStorage.removeItem(OBSOLETE_SIGNER_TYPE_KEY);
     // Installs from before demo mode was removed may still have the fake
     // demo pubkey persisted; it is not valid hex and would crash npubEncode.
     if (state.pubkey === 'demo-local-pubkey') {
       state.pubkey = null;
       localStorage.removeItem(SESSION_KEY);
-      localStorage.removeItem(SIGNER_TYPE_KEY);
+      localStorage.removeItem(OBSOLETE_SIGNER_TYPE_KEY);
     }
     // Paint the shell immediately; data lands on the next render. Nothing above this line
     // may await, or the first paint slips to a microtask and the shell renders empty.
@@ -88,16 +88,15 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     render({ reason: 'boot-account-open' });
   }
 
-  async function openIdentity(pubkey: string, persist = true, signerType: AppState['signerType'] = state.signerType): Promise<void> {
+  async function openIdentity(pubkey: string, persist = true): Promise<void> {
     state.pubkey = pubkey;
-    state.signerType = signerType;
     state.npub = nip19.npubEncode(pubkey);
     state.signInStatus = null;
     // Persist before the slow steps: reloading mid-sign-in must not lose the
     // session (the profile fetch alone can take its full 5s timeout).
     if (persist) {
       localStorage.setItem(SESSION_KEY, pubkey);
-      if (signerType) localStorage.setItem(SIGNER_TYPE_KEY, signerType);
+      localStorage.removeItem(OBSOLETE_SIGNER_TYPE_KEY);
     }
     await loadNamespace(pubkey);
     const cached = readCachedProfile(pubkey);
@@ -117,7 +116,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   async function openLocal(): Promise<void> {
     state.pubkey = null; state.npub = null;
     state.profileName = null; state.profilePicture = null;
-    state.signerType = null; state.signInStatus = null;
+    state.signInStatus = null;
     await loadNamespace(LOCAL_NAMESPACE);
   }
 

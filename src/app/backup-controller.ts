@@ -5,7 +5,7 @@ import { backupPanelState, updateBackupCard, updateBackupStatus } from '../featu
 import { tipJarBackupSection } from '../features/monero/wallet-backup-view';
 import { createSyncEngine, type SyncEngine, type SyncStatus } from '../sync/engine';
 
-// Survives the sign-in round trip, including a NIP-46 hop out to a signer app and back.
+// Survives the sign-in round trip while account setup moves through recovery and vault steps.
 // The signed-out namespace is a different database from the one backup will run in, so
 // the intent cannot be stored in either of them.
 const INTENT_KEY = 'workstr.backup.pendingEnable';
