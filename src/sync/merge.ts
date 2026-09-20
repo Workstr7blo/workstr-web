@@ -55,7 +55,7 @@ async function unreadEvents(store: WorkstrStore, relayUrl: string, signer: Signe
   return unread;
 }
 
-// Decrypts one event at a time. Under NIP-46 every decrypt is a round trip to a remote
+// Decrypts one event at a time. Every decrypt is account-key work, so chunking keeps
 // signer, so this is deliberately not parallel and callers keep it off the critical path.
 //
 // The seen ledger is what keeps a routine start cheap. The `d` tag and `created_at` of an

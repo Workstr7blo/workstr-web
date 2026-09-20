@@ -9,7 +9,7 @@ const ADDRESS = `8${'J'.repeat(94)}`;
 
 function state(overrides: Partial<AppState> = {}): AppState {
   return {
-    pubkey: 'ab'.repeat(32), npub: null, profileName: null, profilePicture: null, signerType: 'local',
+    pubkey: 'ab'.repeat(32), npub: null, profileName: null, profilePicture: null,
     settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] },
     monero: { status: 'ready', address: '' },
     moneroWallet: { status: 'ready', stored: true, addresses: [ADDRESS], snapshot: { metadata: { creatorSubaddress: ADDRESS }, balance: null, sync: { height: 1, daemonHeight: 1, synchronized: true, updatedAt: 'x' } } },

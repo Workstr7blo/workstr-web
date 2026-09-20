@@ -39,8 +39,7 @@ function bundle(): MoneroWalletSecretBundle {
 
 function state(overrides: Partial<AppState> = {}, wallet: MoneroWalletUiState = { status: 'stored', stored: true }): AppState {
   return {
-    pubkey: PUBKEY, npub: null, profileName: null, profilePicture: null, profileNames: {},
-    signerType: 'local', store: null, view: 'settings',
+    pubkey: PUBKEY, npub: null, profileName: null, profilePicture: null, profileNames: {}, store: null, view: 'settings',
     settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] },
     monero: { status: 'ready', address: '' },
     moneroWallet: wallet,

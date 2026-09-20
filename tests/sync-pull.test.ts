@@ -21,7 +21,7 @@ vi.mock('../src/sync/relay', () => ({
 // is the whole point here: these tests count signer round trips, not bytes.
 function fakeSigner(): Signer {
   return {
-    type: 'nip07',
+    type: 'local',
     getPublicKey: async () => SELF,
     signEvent: async (event: UnsignedNostrEvent) => ({ ...event, id: 'id', pubkey: SELF, sig: 'sig' }),
     nip44Encrypt: async (_peer: string, plaintext: string) => plaintext,

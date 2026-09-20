@@ -41,7 +41,6 @@ function state(partial: Partial<AppState> = {}): AppState {
     store: null,
     settings: { unit: 'kg' },
     monero: { status: 'idle', address: '' },
-    signerType: null,
     view: 'settings',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     exercises: [],

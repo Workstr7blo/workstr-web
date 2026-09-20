@@ -11,16 +11,15 @@ beforeEach(() => forgetAutoApprove());
 
 const blank: AutoApproveMemory = { known: () => false, record: () => {} };
 
-// A signer that never answers — a NIP-46 app that was backgrounded, or a connection that
-// died when the user switched apps to approve. This is what hung a whole sync pass.
+// A signer that never answers. This is what hung a whole sync pass.
 function deadSigner(): Signer {
   const never = () => new Promise<never>(() => {});
-  return { type: 'nip46', getPublicKey: never, signEvent: never, nip44Encrypt: never, nip44Decrypt: never };
+  return { type: 'local', getPublicKey: never, signEvent: never, nip44Encrypt: never, nip44Decrypt: never };
 }
 
 function liveSigner(): Signer {
   return {
-    type: 'nip46',
+    type: 'local',
     getPublicKey: vi.fn(async () => SELF),
     signEvent: async (event: UnsignedNostrEvent) => ({ ...event, id: 'id', pubkey: SELF, sig: 'sig' }),
     nip44Encrypt: async (_peer: string, plaintext: string) => plaintext,
@@ -53,8 +52,8 @@ describe('signer timeout', () => {
   });
 
   it('asks for the public key once, not once per record', async () => {
-    // encodePrivateRecord calls getPublicKey for every record; unmemoised that is an extra
-    // NIP-46 round trip per record, on the slowest path there is.
+    // encodePrivateRecord calls getPublicKey for every record; unmemoised that is extra
+    // signer work per record on the slowest path there is.
     const inner = liveSigner();
     const signer = withSignerTimeout(inner, 1000);
     await Promise.all([signer.getPublicKey(), signer.getPublicKey(), signer.getPublicKey()]);
@@ -70,8 +69,8 @@ describe('signer timeout', () => {
     expect(await signer.getPublicKey()).toBe(SELF);
   });
 
-  it('defaults to a window long enough for a human to tap approve', () => {
-    // A NIP-46 request may wait on someone switching apps; too short is its own bug.
+  it('defaults to a generous window before declaring the signer absent', () => {
+    // Too short a timeout turns normal device work into its own bug.
     expect(SIGNER_TIMEOUT_MS).toBeGreaterThanOrEqual(30000);
   });
 });
@@ -84,7 +83,7 @@ describe('an answer that went missing', () => {
   function lossySigner(loseFirst: number): { signer: Signer; calls: number } {
     const state = { calls: 0, signer: null as unknown as Signer };
     state.signer = {
-      type: 'nip46',
+      type: 'local',
       getPublicKey: async () => 'ab'.repeat(32),
       signEvent: async (event) => {
         state.calls += 1;

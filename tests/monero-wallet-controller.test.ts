@@ -30,8 +30,7 @@ function snapshot() {
 
 function state(overrides: Partial<AppState> = {}): AppState {
   return {
-    pubkey: 'ab'.repeat(32), npub: null, profileName: null, profilePicture: null, profileNames: {},
-    signerType: 'local', store: null,
+    pubkey: 'ab'.repeat(32), npub: null, profileName: null, profilePicture: null, profileNames: {}, store: null,
     settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] },
     monero: { status: 'idle', address: '' },
     moneroWallet: { status: 'unknown' },

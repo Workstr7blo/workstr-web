@@ -11,8 +11,8 @@ Milestones are releases. A milestone is done when it is tagged and on the domain
 
 - The UI reads and writes only IndexedDB. The network is a catalog to import from and,
   later, an encrypted replica — never a dependency for rendering a screen.
-- Keys never touch the app. All signing and encryption goes through the `Signer`
-  interface (NIP-07, NIP-46).
+- Workstr account keys are generated or restored in the app, encrypted by the device vault,
+  and exposed to Nostr features only through the generic `Signer` interface.
 - The app opens straight into training. Sign-in is optional and lives in Settings.
   Namespaces are never merged.
 - Data is never hostage: JSON export and import ship in every release.
@@ -47,7 +47,7 @@ deployed to the domain and released as v2.6.0 (2026-09-15).
 - **Beast Mode creator programs** — local program cards can publish signed `kind:33402`
   creator programs to configured public relays after the objective Settings checklist is
   unlocked; Discover shows those alongside official operator programs.
-- **Identity and sharing** — optional NIP-07 / NIP-46 sign-in from Settings, per-namespace
+- **Identity and sharing** — optional Workstr account sign-in from Settings, per-namespace
   database with never-merge adoption, `kind:1` workout summaries published to the write
   relay set with real acknowledgement checking.
 - **Live training modes** — EMOM blocks, supersets, and mixed strength + EMOM programs in

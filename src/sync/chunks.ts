@@ -76,7 +76,7 @@ export function supersededRatio(chunk: ChunkSource, winners: Map<string, LogEntr
 
 // How much sealed event content one chunk may carry.
 //
-// The ceiling is the NIP-46 signing request: the signer is sent the whole event, NIP-44
+// The ceiling is the signing request: the signer is sent the whole event, NIP-44
 // encrypted into an event of its own, so the content is inflated roughly 1.4x by the time
 // it reaches the signer's relay. 12 KB of content lands near 17 KB against a 32 KB ceiling.
 //

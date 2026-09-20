@@ -9,8 +9,7 @@ import type { AppState } from '../src/app/state';
 
 function state(overrides: Partial<AppState> = {}): AppState {
   return {
-    pubkey: null, npub: null, profileName: null, profilePicture: null, profileNames: {},
-    signerType: null, store: null,
+    pubkey: null, npub: null, profileName: null, profilePicture: null, profileNames: {}, store: null,
     settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] },
     monero: { status: 'idle', address: '' },
     library: [], discoverExercises: [], finishedSessions: [], sheets: [],
@@ -26,7 +25,7 @@ function render(overrides: Partial<AppState> = {}): HTMLElement {
 }
 
 function signedIn(overrides: Partial<AppState> = {}): Partial<AppState> {
-  return { pubkey: 'ab'.repeat(32), signerType: 'local', ...overrides } as Partial<AppState>;
+  return { pubkey: 'ab'.repeat(32), ...overrides } as Partial<AppState>;
 }
 
 const groupLabels = (root: HTMLElement): string[] =>
@@ -346,7 +345,7 @@ describe('the Settings page', () => {
   });
 
   it('shows the signed-in identity in the Account summary', () => {
-    const signedIn = render({ pubkey: 'ab'.repeat(32), signerType: 'local', profileName: 'Trainer' });
+    const signedIn = render({ pubkey: 'ab'.repeat(32), profileName: 'Trainer' });
     const summary = signedIn.querySelector('.account-card > summary');
     expect(summary?.querySelector('.settings-account-summary')).toBeTruthy();
     expect(summary?.textContent).toContain('Signed in');
@@ -354,26 +353,13 @@ describe('the Settings page', () => {
     expect(render().querySelector('.account-card > summary .status-pill')?.textContent).toBe('LOCAL');
   });
 
-  it('shows Add device only for device-managed accounts', () => {
-    const local = render(signedIn({ signerType: 'local', profileName: 'Trainer' }));
-    expect(local.querySelector('#add-device-settings')).toBeTruthy();
-    expect(local.querySelector('#sign-out-settings')).toBeTruthy();
-    expect(local.querySelector('#remove-account-data')).toBeTruthy();
-    expect(local.querySelector('.account-card .settings-account-identity small')?.textContent).toBe('Device-managed key for faster sync.');
-    expect(local.querySelector('.account-card > summary')?.textContent).toContain('Signed in with a device key');
-
-    const nip07 = render(signedIn({ signerType: 'nip07', profileName: 'Trainer' }));
-    expect(nip07.querySelector('#add-device-settings')).toBeNull();
-    expect(nip07.querySelector('#sign-out-settings')).toBeTruthy();
-    expect(nip07.querySelector('#remove-account-data')).toBeTruthy();
-    expect(nip07.querySelector('.account-card .settings-account-identity small')?.textContent).toBe('Keys stay in your signer.');
-    expect(nip07.querySelector('.account-card > summary')?.textContent).toContain('Signed in with your signer');
-
-    const nip46 = render(signedIn({ signerType: 'nip46', profileName: 'Trainer' }));
-    expect(nip46.querySelector('#add-device-settings')).toBeNull();
-    expect(nip46.querySelector('#sign-out-settings')).toBeTruthy();
-    expect(nip46.querySelector('#remove-account-data')).toBeTruthy();
-    expect(nip46.querySelector('.account-card .settings-account-identity small')?.textContent).toBe('Keys stay in your signer.');
+  it('shows Add device for Workstr accounts', () => {
+    const account = render(signedIn({ profileName: 'Trainer' }));
+    expect(account.querySelector('#add-device-settings')).toBeTruthy();
+    expect(account.querySelector('#sign-out-settings')).toBeTruthy();
+    expect(account.querySelector('#remove-account-data')).toBeTruthy();
+    expect(account.querySelector('.account-card .settings-account-identity small')?.textContent).toBe('Device-managed key for encrypted sync.');
+    expect(account.querySelector('.account-card > summary')?.textContent).toContain('Signed in with a Workstr account');
 
     const localOnly = render();
     expect(localOnly.querySelector('#add-device-settings')).toBeNull();
@@ -405,7 +391,7 @@ describe('the background patchers still find their cards', () => {
   // overwritten a moment later. Rendering the view and running the patch over it is the
   // only way to see that; either one alone looks fine.
   it('leaves the Account summary saying what the view wrote', () => {
-    const signedIn = state({ pubkey: 'ab'.repeat(32), npub: 'npub1trainer', signerType: 'local', profileName: 'Trainer' });
+    const signedIn = state({ pubkey: 'ab'.repeat(32), npub: 'npub1trainer', profileName: 'Trainer' });
     document.body.innerHTML = `<div id="app">${settingsView(signedIn)}</div>`;
     const root = document.getElementById('app') as HTMLElement;
     const before = root.querySelector('.account-card > summary .settings-category-copy small')?.textContent;
@@ -417,7 +403,7 @@ describe('the background patchers still find their cards', () => {
     // Shown because the profile gives a name; without one the display name is already the
     // shortened npub and the line is suppressed rather than printed twice.
     expect(root.querySelector('.settings-account-npub')?.textContent).toBe(displayNpub('ab'.repeat(32)));
-    document.body.innerHTML = `<div id="app">${settingsView(state({ pubkey: 'ab'.repeat(32), signerType: 'local' }))}</div>`;
+    document.body.innerHTML = `<div id="app">${settingsView(state({ pubkey: 'ab'.repeat(32) }))}</div>`;
     expect(document.querySelector('.settings-account-npub')).toBeNull();
   });
 

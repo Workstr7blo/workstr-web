@@ -35,7 +35,7 @@ delegates signing to a companion app (Idenstr). The web version keeps the same p
 |--------------------------------|--------------------------------------------------|
 | Node HTTP server + REST API    | No server; logic runs in the browser             |
 | SQLite (`workstr.db`)          | IndexedDB (same logical schema)                  |
-| Idenstr (server-side signer)   | User-owned signer: NIP-07 extension or NIP-46 remote signer |
+| Idenstr (server-side signer)   | Workstr-managed local-key account protected by the device vault |
 | LAN / Tailscale boundary       | Public website, keyless by design                |
 | Private data stays on server   | Private data stays in browser; optionally kept in **encrypted sync** on the Workstr relay |
 
@@ -193,8 +193,7 @@ rules out open exercise publishing does not apply the same way.
 | NIP / kind | Role in Workstr Web |
 |---|---|
 | **NIP-01** | Base protocol: events, filters, REQ/EVENT/EOSE over WebSocket. Used for all relay I/O. |
-| **NIP-07** | Browser-extension signer (`window.nostr`): `getPublicKey()`, `signEvent()`, `nip44.encrypt/decrypt`. Primary desktop login. |
-| **NIP-46** | Remote signer ("bunker"/Amber): same operations over an encrypted relay channel. Primary mobile login. Connect via `bunker://` URI or `nostrconnect://` QR. |
+| **Workstr account key** | Workstr-generated/restored nsec protected by the device vault and exposed only through the local-key `Signer`. |
 | **NIP-44** | Versioned encryption used to encrypt **all private data events** to the user's *own* pubkey (self-encryption: conversation key of user↔user). |
 | **NIP-78 (kind 30078)** | Arbitrary app data, addressable-replaceable. Carrier for private encrypted objects, journal chunks, and the wrapped account backup key. `d` tag = V2 record address (Section 7.3). Because 30078 is a shared kind, the Workstr relay filters on `workstr:v2:` as well as the kind. Phase 2a. |
 | **NIP-101e (kind 33401)** | Exercise template. **Read-only for the client**: the app imports these, it never authors them. Written only by the operator key. Tag layout as the self-hosted app emits it: `d`, `title`, `format`, `format_units`, `equipment`, `t` topics, Workstr's granular `workstr_muscle` tags, a `workstr_meta` JSON tag, and `imeta` for media. |
@@ -223,8 +222,7 @@ there is nothing to be admitted to.
    precondition for any local feature.
 
 **Sign in and adopt (optional)**
-1. User picks a signer in Settings: NIP-07 (if `window.nostr` exists) or NIP-46 (paste
-   `bunker://` URI or scan QR).
+1. User creates/restores a Workstr account in Settings, or pairs from another Workstr device.
 2. App calls `signer.getPublicKey()` → `pubkey` names the target namespace
    (`workstr-<pubkey>`), so multiple identities on one device never mix.
 3. **Adoption, decided once:**
@@ -579,8 +577,6 @@ src/
     funding.ts         # Workstr's Monero donation address
   signer/
     types.ts           # interface Signer { getPublicKey; signEvent; nip44Encrypt; nip44Decrypt }
-    nip07.ts           # window.nostr adapter
-    nip46.ts           # bunker adapter (connect URI/QR, request queue, batching)
     idenstr.ts         # [planned] OPTIONAL third backend: HTTP adapter to a self-hosted
                        #   Idenstr, so this codebase can also replace the self-hosted UI
   db/
@@ -724,15 +720,15 @@ compiles and is testable against the blocks before it.
    Pages workflow deploying a hello-world PWA (manifest + service worker) to the
    Njalla CNAME domain. *Deploy pipeline works before any feature exists.*
 2. `core/types.ts`, `core/ids.ts`, `core/units.ts` (+tests), copy `muscles.ts`.
-3. `signer/types.ts` + `signer/nip07.ts`; optional sign-in from Settings showing the
-   connected npub.
+3. `signer/types.ts` + `signer/local-key.ts`; optional Workstr account sign-in from Settings
+   showing the connected npub.
 4. `db/schema.ts` + `db/store.ts` + `db/adopt.ts` (+tests, using fake-indexeddb) — the
    `local` namespace exists from the first commit; identity is added on top of it, never
    underneath it.
 5. Dev environment (see Section 12) proven from a phone.
 
 **Exit criteria:** visit the real domain, install as PWA, use the app with no identity at
-all, optionally sign in with a NIP-07 extension and see your npub, offline reload works.
+all, optionally create a Workstr account and see your npub, offline reload works.
 
 ### Phase 1 — The free product (no workstr relay, no server at all)
 
@@ -748,8 +744,6 @@ nothing.
 4. **Progress block:** volume/muscle charts, e1RM records, streak, body-weight log.
 5. **Recovery block:** recovery-state computation from session history + muscle map;
    suggestion UI and Quick Workout. Pure functions + tests.
-6. **Signer block 2:** `signer/nip46.ts` (bunker URI + QR connect, request batching)
-   → mobile sign-in without an extension.
 7. **Nostr block:** `nostr/pool.ts`, `nostr/share.ts`, `nostr/program-publish.ts` —
    compose and publish the `kind:1` summary and Beast Mode creator `kind:33402` programs
    to the configured public relay set, with acknowledgement checking. No media upload and
@@ -989,7 +983,7 @@ client-side lock is theatre that costs trust and buys nothing.
 ## 12. Development environment
 
 The app is static files, so dev = serving a folder — but **secure-context rules
-apply even in dev** (service workers, `crypto.subtle`, NIP-07 need HTTPS or
+apply even in dev** (service workers, `crypto.subtle`, service workers need HTTPS or
 localhost; plain `http://<LAN-IP>` will silently break them, especially on phones).
 
 Recommended setup on a home server / VM:
@@ -1025,8 +1019,6 @@ Recommended setup on a home server / VM:
    user's key. Say it loudly at onboarding; offer JSON export as mitigation. Note this
    only ever applies to a user who *chose* to sign in — the anonymous default has no key
    to lose, only a browser database to clear.
-2. **NIP-46 latency.** Every sign/encrypt is a relay round-trip; batch, lazy-decrypt,
-   cache. Design flows so a normal workout needs zero signer prompts.
 3. **Curated library is copyable.** Signed by the operator key, provenance is obvious,
    and anyone can republish it. This is now a non-issue by design: the library is
    published publicly (Section 7.1), so copying is distribution, not leakage.
@@ -1036,7 +1028,7 @@ Recommended setup on a home server / VM:
    reputation, some networks block VPN ranges. Acceptable at launch; revisit when the
    relay approaches its total storage ceiling.
 6. **Addressable-event size limits.** Keep every 30078 under the tested signer/relay
-   budget. The chunk packer measures the sealed envelope and deliberately leaves NIP-46
+   budget. The chunk packer measures the sealed envelope and deliberately leaves signed-event
    headroom; never substitute a raw-JSON estimate.
 7. **Legal/boring:** ToS + privacy page (short, honest: "we store ciphertext"), and local
    tax registration once income crosses the relevant small-supplier threshold. Donations

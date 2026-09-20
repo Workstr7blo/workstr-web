@@ -43,14 +43,13 @@ describe('merging records into an empty database', () => {
     expect((await store.getSettings()).unit).toBe('lbs');
   });
 
-  it('keeps this device relay, signer and backup settings on a restore', async () => {
+  it('keeps this device relay and backup settings on a restore', async () => {
     const store = await freshStore();
-    await store.saveSettings({ ...(await store.getSettings()), workstrRelay: 'wss://mine', signerType: 'nip46', backup: { enabled: true } });
+    await store.saveSettings({ ...(await store.getSettings()), workstrRelay: 'wss://mine', backup: { enabled: true } });
     await mergeRecords(store, [record(SETTINGS_ADDRESS, '2099-01-01T00:00:00.000Z', { unit: 'lbs' })]);
     const settings = await store.getSettings();
     expect(settings.unit).toBe('lbs');
     expect(settings.workstrRelay).toBe('wss://mine');
-    expect(settings.signerType).toBe('nip46');
     expect(settings.backup).toEqual({ enabled: true });
   });
 });

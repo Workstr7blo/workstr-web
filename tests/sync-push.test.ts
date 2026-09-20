@@ -12,7 +12,7 @@ const freshStore = () => WorkstrStore.open(`push-${namespace += 1}`);
 
 function fakeSigner(): Signer {
   return {
-    type: 'nip07', getPublicKey: async () => SELF,
+    type: 'local', getPublicKey: async () => SELF,
     signEvent: async (event: UnsignedNostrEvent) => ({ ...event, id: 'id', pubkey: SELF, sig: 'sig' }),
     nip44Encrypt: async (_p: string, plaintext: string) => `enc:${plaintext.length}`,
     nip44Decrypt: async () => '{}'

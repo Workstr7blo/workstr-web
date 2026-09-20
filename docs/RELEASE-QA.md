@@ -7,10 +7,9 @@ release.
 Every line states an expected result, so a failure is unambiguous. If a line is unclear
 when you get to it, fix the line — a checklist you have to interpret is not a checklist.
 
-**Time:** about an afternoon. **You need:** an iPhone, a desktop browser with a NIP-07
-extension, a NIP-46 signer (Amber), a second Nostr client (Damus, Primal or Amethyst), and
-a second device with a camera — an Android phone if you have one, because it takes the
-native decoder path an iPhone never will.
+**Time:** about an afternoon. **You need:** an iPhone, a desktop browser, a second Nostr
+client (Damus, Primal or Amethyst), and a second device with a camera — an Android phone if
+you have one, because it takes the native decoder path an iPhone never will.
 
 ---
 
@@ -156,8 +155,8 @@ a real thumb, a real screen reader, and a device whose clock is not the build ma
 
 Needs **two real devices and a real signer**. Everything else about sync is covered by
 automation (see the evidence section below); this section exists for what a browser driver
-and an integration suite cannot reach — a real NIP-46 signer round trip on a phone, an
-installed PWA that has been backgrounded, and a genuinely offline radio.
+and an integration suite cannot reach — an installed PWA that has been backgrounded,
+device-pairing handoff, and a genuinely offline radio.
 
 - [ ] **Turning it on.** Phone, signed out, Settings → Data & Sync → Sign in to sync.
       Sign-in is offered, and Auto-sync is on after the identity flow completes.
@@ -172,9 +171,6 @@ installed PWA that has been backgrounded, and a genuinely offline radio.
       come back. Local-only pre-era history is not invented on the laptop.
 - [ ] **Offline.** Put the phone in airplane mode, log a full workout. Nothing blocks, and
       no error interrupts training. Restore the network; pending changes upload.
-- [ ] **NIP-46 specifically.** A remote signer sleeps and the tab is backgrounded. Sync
-      reports a readable error rather than hanging, reconnects, and does not repeatedly
-      ask for approval while a workout is running.
 - [ ] **Off is off.** Turn Auto-sync off, log a workout, confirm nothing new reaches the
       relay (`relay-admin usage <pubkey>` does not grow), and that turning it back on does
       not duplicate anything.
@@ -221,8 +217,6 @@ copied, and refusing to try is itself a check below.
 - [ ] **Single use.** Photograph the QR before a successful transfer. Afterwards, scan the
       photograph on the trusted device and approve it: the new device, already signed in,
       does nothing with the second response.
-- [ ] **External signer refused.** Signed in with NIP-07 or NIP-46, press Add device. The
-      app says it cannot copy the key, and no camera permission is ever requested.
 - [ ] **Backgrounded PWA.** New device shows a code; lock the phone or switch apps, approve
       on the trusted device, and come back inside the window. The response is collected on
       reconnect — this is the case the ephemeral relay rendezvous exists for.
@@ -258,8 +252,6 @@ is a finding.
 - [ ] **Restore.** Signed out: restore with a recovery key, create a code, the account opens.
 - [ ] **Pairing.** Add a device by QR. The new device asks for its own code after the
       transfer and before Signed in; the trusted device is not asked for its code.
-- [ ] **External signers unaffected.** Sign in with NIP-07 and with NIP-46 on a device with
-      no local key. No code is ever asked for.
 - [ ] **Lock.** Settings → Device security → Lock Workstr. The lock screen appears. On the
       laptop, pressing Tab repeatedly never leaves the lock card. The right code returns to
       the same place with sync running.
@@ -306,7 +298,7 @@ release.
 | iPhone model / iOS version | |
 | Desktop browser(s) | |
 | Pairing devices (trusted → new) | |
-| NIP-46 signing latency (observed) | |
+| Workstr account signing check (observed) | |
 | Failures found | |
 | Tagged? | |
 

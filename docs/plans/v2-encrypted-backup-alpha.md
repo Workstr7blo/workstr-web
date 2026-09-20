@@ -13,7 +13,7 @@
 
 **Architecture:** IndexedDB remains the source of truth. Workstr-web encrypts private records to the user's own pubkey with NIP-44, wraps them in addressable `kind:30078` events, and publishes them to the Workstr relay. The relay is open to every pubkey and runs a **write-policy plugin** that accepts only Workstr's own encrypted records, so it never becomes a general-purpose relay carrying other clients' notes.
 
-**Tech Stack:** Vite/TypeScript PWA, IndexedDB via `idb`, `nostr-tools`, NIP-07/NIP-46 signer abstraction, Strfry, Caddy, NIP-44, NIP-78.
+**Tech Stack:** Vite/TypeScript PWA, IndexedDB via `idb`, `nostr-tools`, Workstr local-key signer abstraction, Strfry, Caddy, NIP-44, NIP-78.
 
 ---
 
@@ -173,7 +173,7 @@ Server work (1–3) must land before any real device test. Client work (4–8) c
 - An empty IndexedDB restores from the relay.
 - Older remote records do not overwrite newer local records; newer ones do update.
 - Tombstones are applied safely.
-- Lazy decryption keeps NIP-46 round-trips off the critical path.
+- Lazy decryption keeps account-key work off the critical path.
 
 ### Issue 8: Add the Auto-backup toggle and automatic sync
 

@@ -24,8 +24,7 @@ const library = [
 function state(partial: Partial<AppState> = {}, settings: Partial<WorkstrSettings> = {}): AppState {
   return {
     pubkey: null, npub: null, profileName: null, profileNames: {}, authorProfiles: {}, store: null,
-    settings: { unit: 'kg', publicRelays: [], ...settings } as WorkstrSettings,
-    signerType: null, view: 'exercises',
+    settings: { unit: 'kg', publicRelays: [], ...settings } as WorkstrSettings, view: 'exercises',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     exercises: [], programs: [], activeSession: null, finishedSessions: [],
     publishingSessionId: null, publishingStatus: null, editingId: null, filter: '',

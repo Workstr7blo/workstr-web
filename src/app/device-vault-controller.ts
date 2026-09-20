@@ -120,7 +120,7 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
         const age = Math.abs(now() - ((await vault.createdAt()) ?? 0));
         if (age >= EMPTY_VAULT_GRACE_MS) await vault.destroy();
       }
-      if (state.signerType === 'local' && state.pubkey && await hasLegacyLocalKey()) {
+      if (state.pubkey && await hasLegacyLocalKey()) {
         setStatus('setup-required');
         showProtect();
         return 'blocked';
@@ -164,7 +164,7 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
     // vault already existed: the code just entered is all it needs to finish. When it cannot,
     // that key is still readable without any code, so the user is told rather than left with it.
     let unmoved = false;
-    if (state.signerType === 'local' && await hasLegacyLocalKey().catch(() => false)) {
+    if (state.pubkey && await hasLegacyLocalKey().catch(() => false)) {
       unmoved = await migrateLegacyLocalKey(state.pubkey, vault).then(() => false, () => true);
     }
     hideLock();

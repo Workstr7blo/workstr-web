@@ -148,8 +148,8 @@ The lock screen is its own layer above every other one, the modal and the rest-t
 included. Being opaque is not enough on its own, so while it is up everything beside it is
 marked `inert`: Tab and screen readers cannot reach the page underneath, which after Lock
 Workstr is the whole app. At launch the account has not been opened: there is no workout store for this identity, no local signer, and so no
-sync. Anonymous local training with no vault, and NIP-07 or NIP-46 accounts with no vault,
-open with no prompt.
+sync. Anonymous local training with no vault opens with no prompt. Workstr accounts use a
+device-vault-protected local key and do not have external-signer no-vault sessions.
 
 A vault holding no secrets is a setup that never finished. It is deleted at launch rather
 than asking for a code that protects nothing - once it is more than 30 seconds old. A younger
@@ -244,9 +244,8 @@ defence for a copied database.
 
 The code is not part of the sync protocol. Nothing derived from it is used for sync, and no
 code, vault record or vault key enters a sync record, a backup-key event, or a JSON export.
-Unlocking makes the local signer available; that signer unwraps the account's backup key
-exactly as a NIP-07 or NIP-46 signer would. A phone on a local key, a laptop on an extension
-and a tablet on a remote signer sync together when they are the same npub.
+Unlocking makes the local signer available; that signer unwraps the account's backup key.
+A phone and laptop sync together when they use the same Workstr account npub.
 
 ## Future scopes
 

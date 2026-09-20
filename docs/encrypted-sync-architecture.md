@@ -32,15 +32,15 @@ Private payloads are canonical JSON, compressed with gzip when that makes them s
 and encrypted locally with AES-256-GCM. The binary envelope authenticates its version,
 compression mode, author pubkey, and record address, so ciphertext cannot be moved to a
 different account or address undetected. The signer signs the outer NIP-78 event but is
-not asked to encrypt or decrypt every record. This keeps restore practical with NIP-46.
+not asked to encrypt or decrypt every record. This keeps restore practical with the Workstr local-key signer.
 
 A local-key account's nsec is held in the device vault (`docs/device-vault-architecture.md`),
 and the device code is not part of this protocol. Nothing derived from the code is used for
 sync, and no code, vault record or vault key is written to a sync record or a backup-key
 event. Until the vault is unlocked a local-key account has no signer and its namespace is
 not opened, so the engine does not start; after unlock the local signer unwraps
-`workstr:v2:key` exactly as a NIP-07 or NIP-46 signer does. That is why a phone on a local
-key and a laptop on an extension sync together when they are the same npub.
+`workstr:v2:key` for the same Workstr account. That is why a phone and laptop sync
+together when they are the same npub.
 
 ## Record vocabulary
 
@@ -88,7 +88,7 @@ unseen changes.
 ## Chunking and compaction
 
 Chunks are sized using the sealed payload's actual byte count, under
-`MAX_CHUNK_CONTENT_BYTES`, leaving headroom for the signed NIP-46 request. A single entry
+`MAX_CHUNK_CONTENT_BYTES`, leaving headroom for the signed event request. A single entry
 that exceeds the budget is surfaced as a publish failure rather than silently dropped.
 
 Sealed chunks are immutable in normal operation. Compaction is allowed only for a

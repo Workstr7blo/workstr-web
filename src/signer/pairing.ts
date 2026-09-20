@@ -98,8 +98,8 @@ export function createPairingSession(at: number = nowSeconds()): PairingSession 
   };
 }
 
-// A distinct scheme rather than a nostrconnect:// lookalike, so a NIP-46 QR scanned here
-// and a pairing QR scanned by a signer both fail cleanly instead of half-parsing.
+// A distinct scheme rather than a nostrconnect:// lookalike, so Workstr device pairing
+// and old signer-connect QR codes fail cleanly instead of half-parsing.
 export function pairingUri(request: PairingRequest): string {
   const params = new URLSearchParams({
     v: String(request.version),
