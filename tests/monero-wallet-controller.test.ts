@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMoneroWalletController } from '../src/app/monero-wallet-controller';
 import { moneroTipsCard } from '../src/features/support/payment-mode-views';
-import { moneroWalletCard } from '../src/features/monero/wallet-view';
+import { tipJarView, updateTipJarPage } from '../src/features/monero/tip-jar-view';
 import type { AppState } from '../src/app/state';
 import type { MoneroWalletCore } from '../src/features/monero/wallet-core';
 import type { DeviceVault } from '../src/security/device-vault';
@@ -31,7 +31,7 @@ function snapshot() {
 function state(overrides: Partial<AppState> = {}): AppState {
   return {
     pubkey: 'ab'.repeat(32), npub: null, profileName: null, profilePicture: null, profileNames: {}, store: null,
-    settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] },
+    settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] },
     monero: { status: 'idle', address: '' },
     moneroWallet: { status: 'unknown' },
     deviceVault: 'unlocked',
@@ -44,7 +44,7 @@ function state(overrides: Partial<AppState> = {}): AppState {
 
 function app(overrides: Partial<AppState> = {}) {
   const s = state(overrides);
-  document.body.innerHTML = `<div id="app">${moneroTipsCard(s)}${moneroWalletCard(s)}</div>`;
+  document.body.innerHTML = `<div id="app">${moneroTipsCard(s)}${tipJarView(s)}</div>`;
   const root = document.getElementById('app') as HTMLElement;
   const vault = { isUnlocked: () => s.deviceVault === 'unlocked' } as DeviceVault;
   const core = {
@@ -67,62 +67,63 @@ function app(overrides: Partial<AppState> = {}) {
   const ctrl = createMoneroWalletController({ root, state: s, toast, repaintMoneroAddress: () => {
     const body = root.querySelector('#monero-tips-body');
     if (body) body.innerHTML = moneroTipsCard(s).match(/<div class="settings-category-body monero-tips-body"[^>]*>([\s\S]*)<\/div>\s*<\/section>/)?.[1] || body.innerHTML;
-  }, vault, core });
+  }, onChange: () => updateTipJarPage(root, s), vault, core });
   ctrl.bind();
   return { root, state: s, core, ctrl, toast };
 }
 
 describe('Monero wallet controller', () => {
   it('detects missing wallet storage without reading wallet secrets', async () => {
-    const { state, core, ctrl } = app();
+    const { root, state, core, ctrl } = app();
     await ctrl.refreshIfNeeded();
     expect(core.hasWallet).toHaveBeenCalledTimes(1);
     expect(state.moneroWallet?.status).toBe('missing');
-    expect(document.querySelector('#monero-wallet-create')).toBeTruthy();
+    expect(root.querySelector('#tip-jar-create')).toBeTruthy();
   });
 
-  it('reports a stored wallet with its public addresses and offers only Open', async () => {
+  it('reports a stored wallet with its public addresses so auto-sync can open it', async () => {
     const { root, state, core, ctrl } = app();
     vi.mocked(core.hasWallet).mockResolvedValue(true);
     vi.mocked(core.storedAddresses).mockResolvedValue(['8Creator', '4Primary']);
     await ctrl.refreshIfNeeded();
     expect(state.moneroWallet).toMatchObject({ status: 'stored', stored: true, addresses: ['8Creator', '4Primary'] });
-    expect(root.querySelector('#monero-wallet-open')).toBeTruthy();
-    expect(root.querySelector('#monero-wallet-create')).toBeNull();
+    expect(root.querySelector('#tip-jar-create')).toBeNull();
+    expect(root.querySelector('#monero-wallet-open, #monero-wallet-create')).toBeNull();
   });
 
-  it('keeps Open, never Create, after a stored wallet fails to open', async () => {
-    const { root, state, core } = app({ moneroWallet: { status: 'stored', stored: true } });
+  it('keeps stored wallet state, never Create, after an auto-open fails', async () => {
+    const { root, state, core, ctrl } = app({ moneroWallet: { status: 'stored', stored: true } });
+    vi.mocked(core.isOpen).mockReturnValue(false);
     vi.mocked(core.openWallet).mockRejectedValue(new Error('Monero node is not ready: offline'));
-    root.querySelector<HTMLButtonElement>('#monero-wallet-open')?.click();
-    await vi.waitFor(() => expect(state.moneroWallet?.status).toBe('error'));
-    expect(root.querySelector('#monero-wallet-open')).toBeTruthy();
-    expect(root.querySelector('#monero-wallet-create')).toBeNull();
-    expect(root.querySelector('#monero-wallet-restore-form')).toBeNull();
+    await ctrl.autoSync();
+    expect(state.moneroWallet?.status).toBe('error');
+    expect(root.querySelector('#tip-jar-create')).toBeNull();
+    expect(root.querySelector('#monero-wallet-open, #monero-wallet-create, #monero-wallet-restore-form')).toBeNull();
   });
 
   it('runs one create for a double tap', async () => {
-    const { root, core } = app({ moneroWallet: { status: 'missing', stored: false } });
-    const button = root.querySelector<HTMLButtonElement>('#monero-wallet-create')!;
-    button.click();
-    button.click();
+    const { state, core, ctrl } = app({ moneroWallet: { status: 'missing', stored: false } });
+    void ctrl.createWallet();
+    void ctrl.createWallet();
     await vi.waitFor(() => expect(core.createWallet).toHaveBeenCalled());
     expect(core.createWallet).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(state.moneroWallet?.status).toBe('ready'));
   });
 
   it('shows the stored wallet when another tap or tab stored one first', async () => {
-    const { root, state, core } = app({ moneroWallet: { status: 'missing', stored: false } });
+    const { root, state, core, ctrl } = app({ moneroWallet: { status: 'missing', stored: false } });
     vi.mocked(core.createWallet).mockRejectedValue(new Error('A Monero wallet is already stored for this account. Open it instead.'));
-    root.querySelector<HTMLButtonElement>('#monero-wallet-create')?.click();
-    await vi.waitFor(() => expect(state.moneroWallet?.status).toBe('stored'));
-    expect(root.querySelector('#monero-wallet-open')).toBeTruthy();
+    await ctrl.createWallet();
+    expect(state.moneroWallet?.status).toBe('stored');
+    expect(root.querySelector('#tip-jar-create')).toBeNull();
   });
 
   it('drops a result that lands after the account switched', async () => {
-    const { root, state, core, ctrl } = app({ moneroWallet: { status: 'stored', stored: true } });
+    const { state, core, ctrl } = app({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] }, moneroWallet: { status: 'stored', stored: true } });
     let finish: (value: ReturnType<typeof snapshot>) => void = () => undefined;
+    vi.mocked(core.isOpen).mockReturnValue(false);
     vi.mocked(core.openWallet).mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
-    root.querySelector<HTMLButtonElement>('#monero-wallet-open')?.click();
+    void ctrl.autoSync();
     await vi.waitFor(() => expect(core.openWallet).toHaveBeenCalled());
     ctrl.reset();
     finish(snapshot());
@@ -163,18 +164,15 @@ describe('Monero wallet controller', () => {
     root.querySelector<HTMLButtonElement>('#monero-wallet-claim-dismiss')?.click();
     expect(core.claimLegacyWallet).not.toHaveBeenCalled();
     expect(state.moneroWallet?.legacyAvailable).toBe(false);
-    expect(root.querySelector('#monero-wallet-create')).toBeTruthy();
+    expect(root.querySelector('#tip-jar-create')).toBeTruthy();
   });
 
-  it('creates a vault-backed wallet from the Settings card', async () => {
-    const { root, state, core } = app({ moneroWallet: { status: 'missing' } });
-    root.querySelector<HTMLButtonElement>('#monero-wallet-create')?.click();
-    await Promise.resolve();
-    await Promise.resolve();
+  it('creates a vault-backed wallet from the Tip Jar page controller path', async () => {
+    const { root, state, core, ctrl } = app({ moneroWallet: { status: 'missing' } });
+    await ctrl.createWallet();
     expect(core.createWallet).toHaveBeenCalledTimes(1);
     expect(state.moneroWallet?.status).toBe('ready');
-    // What an opened wallet shows in Settings is diagnostics, not operations (#261).
-    expect(root.querySelector('.monero-wallet-diagnostics')).toBeTruthy();
+    expect(root.querySelector('.monero-wallet-diagnostics')).toBeNull();
     expect(root.querySelector('#monero-wallet-sync, #monero-wallet-balance, #monero-wallet-use-address')).toBeNull();
   });
 

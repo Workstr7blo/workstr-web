@@ -5,7 +5,7 @@ import { PIGGY_BANK } from '../../app/piggy-bank';
 import { tipJarActivityCard, updateTipJarActivity } from './tip-jar-history-view';
 import { tipJarNavLabel, tipJarOn, tipJarStatus, type TipJarStatus } from './tip-jar-state';
 import { sendReadiness } from './wallet-send';
-import { xmrAmount } from './wallet-view';
+import { xmrAmount, moneroWalletBusy } from './wallet-view';
 
 // Two stacked sheets: the copy glyph the address row carries, beside the shortened address.
 const COPY_GLYPH = '<rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15.5 6.2A2.2 2.2 0 0 0 13.4 4.5H6.7A2.2 2.2 0 0 0 4.5 6.7v6.7c0 1 .7 1.9 1.7 2.1"/>';
@@ -72,6 +72,16 @@ function notice(lead: string, help: string, actions = ''): string {
   </div>`;
 }
 
+function missingWalletBody(state: AppState): string {
+  const busy = state.moneroWallet ? moneroWalletBusy(state.moneroWallet.status) : false;
+  if (state.moneroWallet?.legacyAvailable) {
+    return notice('Use the Tip Jar saved on this device?', 'An earlier Workstr version saved one wallet for the whole device. Use it only if this account owns that wallet.',
+      `<button id="monero-wallet-claim" class="button payment" type="button"${busy ? ' disabled' : ''}>Use for this account</button><button id="monero-wallet-claim-dismiss" class="button" type="button"${busy ? ' disabled' : ''}>Not now</button>`);
+  }
+  return notice('Set up your Tip Jar.', 'Workstr creates a Monero wallet on this device to hold your tips. You can also restore one, or use another wallet, in Settings.',
+    '<button id="tip-jar-create" class="button payment" type="button">Create Tip Jar</button><button class="button" type="button" data-view="settings">Open Settings</button>');
+}
+
 function walletBody(state: AppState, status: TipJarStatus): string {
   const wallet = state.moneroWallet;
   const snapshot = wallet?.snapshot;
@@ -110,7 +120,7 @@ export function tipJarPhase(state: AppState): string {
   if (!state.pubkey) return 'signed-out';
   if (state.deviceVault !== 'unlocked') return 'locked';
   const wallet = state.moneroWallet;
-  if (wallet?.status === 'missing' || (wallet?.stored === false && !wallet.snapshot)) return 'missing';
+  if (wallet?.status === 'missing' || (wallet?.stored === false && !wallet.snapshot)) return wallet?.legacyAvailable ? 'missing:legacy' : 'missing';
   if (wallet?.stored || wallet?.snapshot) return `wallet:${wallet.snapshot?.metadata.creatorSubaddress || wallet.addresses?.[0] || ''}`;
   return 'checking';
 }
@@ -121,10 +131,7 @@ export function tipJarBody(state: AppState): string {
     case 'off': return offBody();
     case 'signed-out': return notice('Sign in to use your Tip Jar.', 'Your Tip Jar belongs to your Nostr account.', '<button class="button primary" type="button" data-view="settings">Open Settings</button>');
     case 'locked': return notice('Unlock Workstr to open your Tip Jar.', 'Your Tip Jar is kept in this device\'s protected vault.');
-    case 'missing': return notice('Set up your Tip Jar.', state.moneroWallet?.legacyAvailable
-      ? 'A Tip Jar wallet from an earlier version of Workstr is on this device. You can use it for this account in Settings.'
-      : 'Workstr creates a Monero wallet on this device to hold your tips. You can also restore one, or use another wallet, in Settings.',
-    '<button id="tip-jar-create" class="button payment" type="button">Create Tip Jar</button><button class="button" type="button" data-view="settings">Open Settings</button>');
+    case 'missing': return missingWalletBody(state);
     case 'wallet': return walletBody(state, status);
     default: return notice('Getting your Tip Jar ready…', 'This only takes a moment.');
   }

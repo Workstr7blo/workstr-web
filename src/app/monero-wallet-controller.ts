@@ -1,7 +1,7 @@
 import { deviceVault as defaultVault, type DeviceVault } from '../security/device-vault';
 import { MoneroWalletCore, WALLET_ALREADY_STORED } from '../features/monero/wallet-core';
 import { updateTipJarBackupSection } from '../features/monero/wallet-backup-view';
-import { moneroWalletBody, moneroWalletBusy } from '../features/monero/wallet-view';
+import { moneroWalletBusy } from '../features/monero/wallet-view';
 import type { MoneroSyncProgress, MoneroWalletRestoreRequest, MoneroWalletUiState, TipJarWalletTx } from '../features/monero/types';
 import type { TipJarBackupPayload } from '../features/monero/wallet-backup';
 import type { AppState } from './state';
@@ -70,19 +70,10 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
   }
 
   function paint(): void {
-    const body = root.querySelector<HTMLElement>('#monero-wallet-body');
-    if (body) body.innerHTML = moneroWalletBody(state);
-    // The Tip Jar backup controls in Data & Sync read the same wallet state: whether there is
-    // anything to export, and the recovery phrase once it has been revealed.
+    // The wallet no longer owns a normal Settings card (#275). State changes are reflected in
+    // the Tip Jar page/nav and in Data & Sync backup controls; Advanced diagnostics redraw with
+    // the page rather than on every sync tick.
     updateTipJarBackupSection(root, state);
-    const card = root.querySelector<HTMLElement>('.monero-wallet-card');
-    const pill = card?.querySelector<HTMLElement>('summary .status-pill');
-    if (pill) {
-      const status = state.moneroWallet?.status || '';
-      const label = state.deviceVault !== 'unlocked' ? 'LOCKED' : status === 'ready' ? 'READY' : status === 'stored' ? 'STORED' : moneroWalletBusy(status) ? 'WORKING' : 'NOT SET';
-      pill.textContent = label;
-      pill.classList.toggle('ok', label === 'READY' || label === 'STORED');
-    }
     bind();
   }
 
@@ -302,7 +293,7 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     bind,
     refreshIfNeeded,
     autoSync,
-    // Tip Jar create from its own page; Settings offers the same action.
+    // Tip Jar create from its own page; normal Settings only configures published receiving.
     createWallet: () => createWallet().then(autoSync),
     // Restoring and revealing the recovery phrase are driven from Data & Sync, but the wallet
     // lifecycle stays here so there is one place that decides what `state.moneroWallet` says.

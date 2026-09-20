@@ -5,7 +5,7 @@ import { APP_VERSION } from './version';
 import { countdownAudioState } from '../features/train/countdown-audio';
 import { supportPanel } from '../features/support/views';
 import { moneroTipsCard } from '../features/support/payment-mode-views';
-import { moneroWalletCard } from '../features/monero/wallet-view';
+import { moneroWalletDiagnostics } from '../features/monero/wallet-view';
 import { isFreeEquipment, ownedEquipmentKeys } from '../core/equipment';
 import { normalizeWeightUnit } from '../core/units';
 import { beastModeSettingsCard } from '../features/sheets/beast-mode';
@@ -153,9 +153,19 @@ function advancedCard(state: AppState): string {
   const relay = state.settings.workstrRelay || 'default Workstr relay';
   const identityMode = state.pubkey ? 'workstr account' : 'local only';
   const secureContext = typeof window !== 'undefined' && window.isSecureContext;
+  const workstrDiagnostics = `version: ${html(APP_VERSION)}\nsecure context: ${secureContext}\ncountdown audio: ${html(countdownAudioState())}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nidentity mode: ${html(identityMode)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}`;
+  const tipJarDiagnostics = state.pubkey ? moneroWalletDiagnostics(state) : '';
   return `<details class="settings-category advanced-settings" data-settings-section="advanced">
     <summary><span class="settings-category-copy"><strong>Advanced</strong><small>Diagnostics, relay, and technical state</small></span></summary>
-    <div class="settings-category-body"><div class="terminal-mini">version: ${html(APP_VERSION)}\nsecure context: ${secureContext}\ncountdown audio: ${html(countdownAudioState())}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nidentity mode: ${html(identityMode)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}</div></div>
+    <div class="settings-category-body">
+      <details class="settings-inline-advanced settings-diagnostics">
+        <summary>Diagnostics</summary>
+        <div class="settings-diagnostics-body">
+          <div class="terminal-mini">${workstrDiagnostics}</div>
+          ${tipJarDiagnostics}
+        </div>
+      </details>
+    </div>
   </details>`;
 }
 
@@ -165,7 +175,7 @@ export function settingsView(state: AppState): string {
     trainingPreferencesCard(state),
     signedIn ? beastModeSettingsCard(state) : ''
   ];
-  const paymentCards = signedIn ? [moneroTipsCard(state), moneroWalletCard(state)] : [];
+  const paymentCards = signedIn ? [moneroTipsCard(state)] : [];
   // Supporting Workstr is not creator tipping, so it does not follow the Monero tips switch.
   const supportCards = signedIn ? [supportPanel()] : [];
   return `<div class="page active settings-page">

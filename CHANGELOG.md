@@ -78,14 +78,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   badge: the piggy bank is the Tip Jar, and the ring around it appears only while it is
   syncing. Monero and XMR still appear where money does - balance, receive, send and the
   advanced wallet settings.
-- Changed the Tip Jar wallet card in Settings to stop being a diagnostics panel. The receive
-  address, balance, raw wallet and node heights, restore height, Sync wallet, Refresh balance
-  and Use for tips are gone from the normal controls: the wallet syncs by itself, the Tip Jar
-  page owns balance, receive and send, backup and recovery live in Data & Sync, and the block
-  heights moved into a collapsed Diagnostics section.
+- Changed normal Settings to show only Tip Jar configuration: the toggle and public payment
+  address. The separate Tip Jar wallet status card, its READY pill and its `Wallet synced.`
+  message are gone from normal Settings, and wallet/node telemetry now lives under Advanced
+  diagnostics. Tip Jar setup and readiness stay on the Tip Jar page, while backup and recovery
+  remain under Data & Sync.
 - Renamed Monero tips to Tip Jar in Settings, with simpler copy and no protocol names in the
-  main card. The wallet card is now "Tip Jar wallet", the advanced place for wallet setup and
-  diagnostics.
+  main card.
 
 - Changed the Monero wallet to one wallet per Nostr account instead of one per device, so
   Workstr never links two identities through a shared wallet. A wallet saved by an earlier
