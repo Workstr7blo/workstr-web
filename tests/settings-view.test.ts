@@ -28,6 +28,27 @@ function signedIn(overrides: Partial<AppState> = {}): Partial<AppState> {
   return { pubkey: 'ab'.repeat(32), ...overrides } as Partial<AppState>;
 }
 
+function tipJarSnapshot() {
+  return {
+    metadata: {
+      version: 1 as const,
+      id: 'wallet-1',
+      scope: `monero.hot-wallet.${'ab'.repeat(32)}`,
+      network: 'mainnet' as const,
+      node: { mode: 'workstr' as const, host: 'xmr.workstr.fit', port: 43736, ssl: true, network: 'mainnet' as const },
+      restoreHeight: 3763000,
+      primaryAddress: '4PrimaryAddress',
+      creatorSubaddress: `8${'A'.repeat(94)}`,
+      creatorSubaddressIndex: 1,
+      createdAt: '2026-09-15T00:00:00.000Z',
+      updatedAt: '2026-09-15T00:00:00.000Z',
+      source: 'created' as const
+    },
+    balance: null,
+    sync: { height: 3766916, daemonHeight: 3766916, synchronized: true, updatedAt: '2026-09-20T00:00:00.000Z' }
+  };
+}
+
 const groupLabels = (root: HTMLElement): string[] =>
   Array.from(root.querySelectorAll('.settings-group-label')).map((el) => el.textContent?.trim() || '');
 
@@ -54,7 +75,7 @@ describe('the Settings page', () => {
     expect(groupOf('.training-preferences-card')).toBe('Training');
     expect(groupOf('.beast-mode-card')).toBe('Training');
     expect(groupOf('.monero-tips-card')).toBe('Payments');
-    expect(groupOf('.monero-wallet-card')).toBe('Payments');
+    expect(root.querySelector('.monero-wallet-card')).toBeNull();
     expect(groupOf('.support-panel')).toBe('Support');
     expect(groupOf('.data-sync-card')).toBe('System & Data');
     expect(groupOf('.advanced-settings')).toBe('System & Data');
@@ -186,50 +207,38 @@ describe('the Settings page', () => {
       expect(supportPanel()).toContain('Private support with Monero');
     });
 
-    it('shows the wallet card as a locked vault surface until device security is open', () => {
-      const locked = off({ deviceVault: 'locked', moneroWallet: { status: 'locked' } });
-      const card = locked.querySelector('.monero-wallet-card') as HTMLElement;
-      expect(card.querySelector('summary strong')?.textContent).toBe('Tip Jar wallet');
-      expect(card.querySelector('summary .status-pill')?.textContent).toBe('LOCKED');
-      expect(card.textContent).toContain('Wallet secrets stay in the device vault');
-      expect(card.querySelector('#monero-wallet-create')).toBeNull();
-    });
-
-    // #261: creating is the only setup action left here. Restoring moved to Data & Sync, where
-    // it sits beside the training backup and behind a password rather than a raw seed box.
-    it('offers only Create once the vault confirms this account has no wallet', () => {
-      const root = off({ deviceVault: 'unlocked', moneroWallet: { status: 'missing', stored: false } });
-      const card = root.querySelector('.monero-wallet-card') as HTMLElement;
-      expect(card.querySelector('#monero-wallet-create')?.textContent).toBe('Create Tip Jar');
-      expect(card.querySelector('#monero-wallet-restore-form')).toBeNull();
-      expect(card.querySelector('#monero-wallet-seed')).toBeNull();
-      expect(card.querySelector('#monero-wallet-open')).toBeNull();
-      expect(card.textContent).toContain('Data & Sync');
-    });
-
-    it('offers only Open for a stored wallet, including after a failed open', () => {
-      for (const moneroWallet of [{ status: 'stored' as const, stored: true }, { status: 'error' as const, stored: true, message: 'Could not open wallet (node down).' }]) {
-        const card = off({ deviceVault: 'unlocked', moneroWallet }).querySelector('.monero-wallet-card') as HTMLElement;
-        expect(card.querySelector('#monero-wallet-open')).toBeTruthy();
-        expect(card.querySelector('#monero-wallet-create')).toBeNull();
-        expect(card.querySelector('#monero-wallet-restore-form')).toBeNull();
+    it('keeps wallet setup and telemetry out of normal Tip Jar Settings', () => {
+      const root = off({ deviceVault: 'unlocked', moneroWallet: { status: 'ready', stored: true, snapshot: tipJarSnapshot(), message: 'Wallet synced.', messageKind: 'ok' } });
+      const paymentGroup = root.querySelector('.monero-tips-card')?.closest('.settings-group') as HTMLElement;
+      expect(root.querySelector('.monero-wallet-card')).toBeNull();
+      expect(paymentGroup.textContent).toContain('Tip Jar');
+      expect(paymentGroup.textContent).toContain('Monero payment address');
+      for (const hidden of ['Tip Jar wallet', 'READY', 'Wallet synced.', 'Wallet height', 'Node height', 'Wallet status', 'Network', 'xmr.workstr.fit']) {
+        expect(paymentGroup.textContent).not.toContain(hidden);
       }
+      expect(paymentGroup.querySelector('#monero-tips-toggle')).toBeTruthy();
+      expect(paymentGroup.querySelector('#monero-address-save')).toBeTruthy();
+      expect(paymentGroup.querySelector('#monero-address-refresh')).toBeTruthy();
+      expect(paymentGroup.querySelector('#monero-wallet-create, #monero-wallet-open, #monero-wallet-recheck')).toBeNull();
     });
 
-    it('offers nothing that writes a wallet before storage has been checked', () => {
-      for (const moneroWallet of [{ status: 'unknown' as const }, { status: 'checking' as const }, { status: 'error' as const, message: 'Could not check wallet storage.' }]) {
-        const card = off({ deviceVault: 'unlocked', moneroWallet }).querySelector('.monero-wallet-card') as HTMLElement;
-        expect(card.querySelector('#monero-wallet-create')).toBeNull();
-        expect(card.querySelector('#monero-wallet-restore-form')).toBeNull();
-      }
-      const failed = off({ deviceVault: 'unlocked', moneroWallet: { status: 'error', message: 'Could not check wallet storage.' } });
-      expect(failed.querySelector('#monero-wallet-recheck')).toBeTruthy();
-    });
-
-    it('asks before giving a legacy device wallet to this account', () => {
-      const card = off({ deviceVault: 'unlocked', moneroWallet: { status: 'missing', stored: false, legacyAvailable: true } }).querySelector('.monero-wallet-card') as HTMLElement;
-      expect(card.querySelector('#monero-wallet-claim')?.textContent).toBe('Use for this account');
-      expect(card.querySelector('#monero-wallet-claim-dismiss')).toBeTruthy();
+    it('moves Tip Jar wallet telemetry into collapsed Advanced diagnostics', () => {
+      const root = off({ deviceVault: 'unlocked', moneroWallet: { status: 'ready', stored: true, snapshot: tipJarSnapshot() } });
+      const advanced = root.querySelector('.advanced-settings') as HTMLDetailsElement;
+      const diagnostics = advanced.querySelector('.settings-diagnostics') as HTMLDetailsElement;
+      const tipJar = diagnostics.querySelector('.monero-wallet-diagnostics') as HTMLDetailsElement;
+      expect(diagnostics.open).toBe(false);
+      expect(tipJar.open).toBe(false);
+      expect(tipJar.querySelector('summary')?.textContent).toBe('Tip Jar');
+      expect(tipJar.textContent).toContain('Wallet height');
+      expect(tipJar.textContent).toContain('3766916');
+      expect(tipJar.textContent).toContain('Node height');
+      expect(tipJar.textContent).toContain('Wallet status');
+      expect(tipJar.textContent).toContain('Synced');
+      expect(tipJar.textContent).toContain('Network');
+      expect(tipJar.textContent).toContain('mainnet');
+      expect(tipJar.textContent).toContain('Node');
+      expect(tipJar.textContent).toContain('xmr.workstr.fit:43736');
     });
 
     it('labels whether the published address is this account\'s Workstr wallet or an external one', () => {
