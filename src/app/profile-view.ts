@@ -71,7 +71,7 @@ function viewProfile(state: AppState): string {
 export function photoPreview(state: AppState, picture: string): string {
   const initial = accountIdentity(state).initial;
   const face = picture && isSafeAvatarUrl(picture)
-    ? `<img class="profile-photo-image" src="${html(picture)}" alt="Profile photo preview" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="profile-photo-image fallback" hidden>${html(initial)}</span>`
+    ? `<img class="profile-photo-image" src="${html(picture)}" alt="Profile photo preview" referrerpolicy="no-referrer" data-fallback="next"><span class="profile-photo-image fallback" hidden>${html(initial)}</span>`
     : `<span class="profile-photo-image fallback" role="img" aria-label="No profile photo">${html(initial)}</span>`;
   return `${face}<span class="profile-photo-badge" aria-hidden="true">${CAMERA}</span>`;
 }

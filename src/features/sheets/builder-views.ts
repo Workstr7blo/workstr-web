@@ -45,7 +45,7 @@ function prescriptionRowMarkup(row: BuilderRow, index: number, position: number,
 function strengthRowMarkup(row: BuilderRow, index: number, current: BuilderState, unit: WeightUnit): string {
   const src = current.library.find((exercise) => exercise.slug === row.exerciseSlug)?.image_url || row.imageUrl;
   const img = src
-    ? `<img class="wex-img" src="${html(responsiveImageUrl(src, 240))}" alt="" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'wex-img placeholder'}))">`
+    ? `<img class="wex-img" src="${html(responsiveImageUrl(src, 240))}" alt="" loading="lazy" decoding="async" data-fallback="replace" data-fallback-tag="div" data-fallback-class="wex-img placeholder">`
     : `<div class="wex-img placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg></div>`;
   return `<div class="wex-row" data-i="${index}">
     <div class="wex-move-btns">

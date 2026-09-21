@@ -828,9 +828,9 @@ describe('shell', () => {
 
   it('keeps the broken-avatar fallback adjacent to the image it replaces', () => {
     const chip = accountChip(shellMarkup(signedIn()));
-    // `onerror` reaches the fallback through `nextElementSibling`, so nothing may sit between
+    // `data-fallback="next"` reaches the fallback through `nextElementSibling`, so nothing may sit between
     // them. The status badge has to come after the fallback, not before it.
-    expect(chip).toContain('onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="connection-avatar fallback" hidden>S</span><span class="connection-identity-status"');
+    expect(chip).toContain('data-fallback="next"><span class="connection-avatar fallback" hidden>S</span><span class="connection-identity-status"');
   });
 
   it('falls back to the profile initial and still badges the avatar', () => {

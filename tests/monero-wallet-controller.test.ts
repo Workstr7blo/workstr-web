@@ -203,6 +203,19 @@ describe('Monero wallet controller', () => {
     expect(state.moneroWallet?.backup).toBeNull();
   });
 
+  // Locking puts the lock screen over Settings without redrawing it, so the words have to leave
+  // the page itself, not just the state that would draw it next time.
+  it('takes a revealed phrase out of the page when the vault locks', async () => {
+    const { root, state, ctrl } = app({ moneroWallet: { status: 'ready', snapshot: snapshot() } });
+    await ctrl.toggleRecoveryPhrase();
+    root.insertAdjacentHTML('beforeend', `<button id="tip-jar-reveal-phrase">Hide</button><div class="tip-jar-recovery-phrase"><code>${state.moneroWallet?.backup?.seed}</code></div>`);
+    await ctrl.close();
+    expect(state.moneroWallet?.backup ?? null).toBeNull();
+    expect(root.querySelector('.tip-jar-recovery-phrase')).toBeNull();
+    expect(root.textContent).not.toContain('seed words never logged');
+    expect(root.querySelector('#tip-jar-reveal-phrase')?.textContent).toBe('Reveal');
+  });
+
   it('hands the sealed-backup payload out without touching the seed itself', async () => {
     const { core, ctrl } = app({ moneroWallet: { status: 'ready', snapshot: snapshot() } });
     await expect(ctrl.backupPayload()).resolves.toMatchObject({ restoreHeight: 3763000, network: 'mainnet' });

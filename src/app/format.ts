@@ -50,7 +50,7 @@ export function authorPill(profile: RelayProfile | undefined, pubkey: string, { 
   const title = [profile?.nip05, pubkey].filter(Boolean).join(' · ');
   const initial = name.trim().slice(0, 1).toUpperCase() || '?';
   const avatar = profile?.picture
-    ? `<img src="${html(profile.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'author-avatar-fallback',textContent:'${html(initial)}'}))">`
+    ? `<img src="${html(profile.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-fallback="replace" data-fallback-class="author-avatar-fallback" data-fallback-text="${html(initial)}">`
     : `<span class="author-avatar-fallback">${html(initial)}</span>`;
   return `<span class="author-pill${compact ? ' compact' : ''}" title="${html(title)}">${avatar}<span>${html(name)}</span></span>`;
 }
@@ -184,7 +184,7 @@ export function formatMinutes(seconds: number): string {
 
 export function exerciseImage(src?: string): string {
   return src
-    ? `<img class="wk-ex-img" src="${html(src)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'wk-ex-img placeholder'}))">`
+    ? `<img class="wk-ex-img" src="${html(src)}" alt="" loading="lazy" data-fallback="replace" data-fallback-tag="div" data-fallback-class="wk-ex-img placeholder">`
     : `<div class="wk-ex-img placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>`;
 }
 

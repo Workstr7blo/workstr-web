@@ -40,10 +40,11 @@ describe('the account chip', () => {
   it('keeps the image immediately before its fallback', () => {
     const root = mount(accountIdentity(state()));
     const image = root.querySelector('img.connection-avatar');
-    // The `onerror` handler reaches the fallback through `nextElementSibling`. Anything
+    // `data-fallback="next"` reaches the fallback through `nextElementSibling`. Anything
     // between them turns a broken avatar into a blank hole.
     expect(image?.nextElementSibling?.className).toBe('connection-avatar fallback');
-    expect(image?.getAttribute('onerror')).toContain('nextElementSibling');
+    expect(image?.getAttribute('data-fallback')).toBe('next');
+    expect(image?.hasAttribute('onerror')).toBe(false);
   });
 
   // The point of the whole change: an <img> that is still showing the same picture is not

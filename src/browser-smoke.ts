@@ -1,7 +1,9 @@
 import './style.css';
 import { assertIsolatedBrowserSmokeOrigin, renderIsolatedBrowserSmoke } from './app/isolated-browser-smoke';
+import { installImageFallbacks } from './app/image-fallback';
 
 assertIsolatedBrowserSmokeOrigin(window.location.hostname);
+installImageFallbacks();
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('missing smoke app root');
 

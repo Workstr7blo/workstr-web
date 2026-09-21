@@ -22,6 +22,7 @@ export interface TipJarBackupControllerContext {
   wallet: {
     restore(request: MoneroWalletRestoreRequest): Promise<boolean>;
     toggleRecoveryPhrase(): Promise<void>;
+    hideRecoveryPhrase?(): void;
     backupPayload(): Promise<TipJarBackupPayload>;
   };
   // Hands a restored backup's creator context back to Tip Jar activity.
@@ -189,6 +190,7 @@ export function createTipJarBackupController(ctx: TipJarBackupControllerContext)
     if (details instanceof HTMLDetailsElement && details.classList.contains('tip-jar-recovery')) {
       const current = tipJarBackupState(state);
       if (current.advanced !== details.open) state.tipJarBackup = { ...current, advanced: details.open };
+      if (!details.open) ctx.wallet.hideRecoveryPhrase?.();
     }
   }, true);
 
