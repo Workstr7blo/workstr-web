@@ -40,6 +40,7 @@ import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
 import { createMoneroAddressController } from './monero-address-controller';
 import { createProfileController } from './profile-controller';
+import { createAutoLock } from './auto-lock';
 import { emptyProfileEditor } from './profile-editor';
 import { createMoneroWalletController } from './monero-wallet-controller';
 import { createTipJarBackupController } from './tip-jar-backup-controller';
@@ -329,8 +330,6 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     toastTimer = window.setTimeout(() => { el.className = ''; }, 2600);
   }
 
-  // Quick workout draws from the full library like self-hosted: local store
-  // exercises plus the relay library, deduped by slug.
   let toastTimer: number | undefined;
 
   createUpdateController({ root, state, toast });
@@ -343,6 +342,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     onLocked: () => { identity.dropActiveSigner(); backup.stop(); void moneroWallet.close(); tipJarActivity.reset(); },
     onReset: async () => { identity.dropActiveSigner(); backup.stop(); await moneroWallet.close(); await openAccount(); identity.startRestoreLocalAccount(); }
   });
+  createAutoLock({ root, isUnlocked: () => state.deviceVault === 'unlocked', lock: vaultUi.lock, busy: () => Boolean(state.activeSession) });
   const identity = createIdentityController({ root, state, render, openModal, closeModal, openLocal, openIdentity, vault: vaultUi });
   const programPublish = createProgramPublishController({ root, state, render, toast, openModal, getSigner: options.programPublish?.getSigner || identity.getActiveSigner, publishCreatorProgram: options.programPublish?.publishCreatorProgram, programPublishRelays: options.programPublish?.programPublishRelays, persistCanonCache: catalog.persistCanonCache });
 
@@ -358,7 +358,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   const walletCore = new MoneroWalletCore({ vault: deviceVault, account: () => state.pubkey });
   const tipJarActivity = createTipJarActivityController({ state, fetchProfile, onChange: () => tipJar.repaint() });
   const moneroWallet = createMoneroWalletController({ root, state, toast, onChange: () => tipJar.repaint(), onActivity: (walletId, txs) => { void tipJarActivity.walletActivity(walletId, txs); }, core: walletCore });
-  const tipJarBackup = createTipJarBackupController({ root, state, toast, activity: tipJarActivity, wallet: { restore: moneroWallet.restore, toggleRecoveryPhrase: moneroWallet.toggleRecoveryPhrase, backupPayload: async () => ({ ...await moneroWallet.backupPayload(), activity: await tipJarActivity.backupRecords(await walletCore.storedWalletId()) }) } });
+  const tipJarBackup = createTipJarBackupController({ root, state, toast, activity: tipJarActivity, wallet: { restore: moneroWallet.restore, toggleRecoveryPhrase: moneroWallet.toggleRecoveryPhrase, hideRecoveryPhrase: moneroWallet.hideBackup, backupPayload: async () => ({ ...await moneroWallet.backupPayload(), activity: await tipJarActivity.backupRecords(await walletCore.storedWalletId()) }) } });
   let tipJar: ReturnType<typeof createTipJarController>;
   const openTipJarPage = (mode?: 'receive') => { state.view = 'tipjar'; render(); tipJar.open(); if (mode === 'receive') root.querySelector<HTMLButtonElement>('#tip-jar-receive')?.click(); };
   const moneroSend = createMoneroSendController({

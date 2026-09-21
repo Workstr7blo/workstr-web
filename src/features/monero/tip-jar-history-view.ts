@@ -67,7 +67,7 @@ function parts(record: TipJarActivity, state: AppState): RowParts {
   const picture = tipJarCreatorPicture(pubkey, state, record.pictureSnapshot);
   // A picture that fails to load becomes the initial, as author pills elsewhere do.
   const avatar = picture
-    ? `<span class="tip-jar-activity-avatar"><img src="${html(picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'tip-jar-activity-avatar-fallback',textContent:'${initial(name)}'}))"></span>`
+    ? `<span class="tip-jar-activity-avatar"><img src="${html(picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-fallback="replace" data-fallback-class="tip-jar-activity-avatar-fallback" data-fallback-text="${initial(name)}"></span>`
     : `<span class="tip-jar-activity-avatar">${avatarFallback(name)}</span>`;
   const context = record.programName ? `Tip for ${record.programName}` : 'Tip';
   return { name, context, avatar, spoken: `Sent ${amount} to ${name}${record.programName ? ` for ${record.programName}` : ''}` };

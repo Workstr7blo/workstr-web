@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  assertBackupPassword,
   decryptTipJarBackup,
   encryptTipJarBackup,
+  TIP_JAR_BACKUP_MIN_PASSWORD,
   parseTipJarBackupFile,
   tipJarBackupFilename,
   tipJarBackupPayload,
@@ -82,6 +84,49 @@ describe('the Tip Jar backup file', () => {
 
   it('will not export under a password too short to be worth an Argon2id pass', async () => {
     await expect(encryptTipJarBackup(tipJarBackupPayload(bundle()), 'short')).rejects.toBeInstanceOf(TipJarBackupError);
+  });
+
+  // The file travels - email, cloud drives, USB sticks - and anyone holding it can guess
+  // offline, so the floor is twelve characters. Length is the only rule: no character classes.
+  it('asks for at least twelve characters and nothing else', () => {
+    expect(TIP_JAR_BACKUP_MIN_PASSWORD).toBe(12);
+    expect(() => assertBackupPassword('8charsxx')).toThrow('at least 12 characters');
+    expect(() => assertBackupPassword('elevenchars')).toThrow('at least 12 characters');
+    expect(() => assertBackupPassword('twelve chars')).not.toThrow();
+    expect(() => assertBackupPassword('all lowercase words with spaces and no digits')).not.toThrow();
+    expect(() => assertBackupPassword('twelve chars', 'twelve charz')).toThrow('do not match');
+  });
+
+  it('turns away the few long passwords that would be guessed first', () => {
+    for (const weak of ['password1234', '123456789012', 'QWERTY123456', 'aaaaaaaaaaaaaaa']) expect(() => assertBackupPassword(weak), weak).toThrow('too easy to guess');
+  });
+
+  // Restoring is not export: a file made under the old eight-character floor must still open, so
+  // a wrong short password fails as a wrong password rather than as a length rule.
+  it('applies no length rule when restoring', async () => {
+    const file = await encryptTipJarBackup(tipJarBackupPayload(bundle()), PASSWORD);
+    await expect(decryptTipJarBackup(JSON.stringify(file), 'short')).rejects.toThrow(/password is not right/);
+  });
+
+  it('overwrites the decrypted bytes once they are decoded', async () => {
+    const file = await encryptTipJarBackup(tipJarBackupPayload(bundle()), PASSWORD);
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle);
+    let plaintext: ArrayBuffer | null = null;
+    const spy = vi.spyOn(crypto.subtle, 'decrypt').mockImplementation(async (...args: Parameters<SubtleCrypto['decrypt']>) => (plaintext = await decrypt(...args)));
+    try {
+      await decryptTipJarBackup(JSON.stringify(file), PASSWORD);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(plaintext).not.toBeNull();
+    expect(new Uint8Array(plaintext!).every((byte) => byte === 0)).toBe(true);
+  });
+
+  it('tells the reader the rule and that the password cannot be recovered', () => {
+    const host = document.createElement('div');
+    host.innerHTML = tipJarBackupBody(state({ tipJarBackup: { panel: 'export' } } as Partial<AppState>));
+    expect(host.querySelector('#tip-jar-backup-password-help')?.textContent).toBe('Use at least 12 characters. A passphrase of several words works well. This password cannot be recovered.');
+    expect(host.querySelector('#tip-jar-backup-password')?.getAttribute('minlength')).toBe('12');
   });
 
   it('names the file for the day and its own extension', () => {
@@ -172,6 +217,7 @@ describe('the Tip Jar backup controller', () => {
     const walletApi = {
       restore: vi.fn(async () => true),
       toggleRecoveryPhrase: vi.fn(async () => undefined),
+      hideRecoveryPhrase: vi.fn(),
       backupPayload: vi.fn(async (): Promise<TipJarBackupPayload> => tipJarBackupPayload(bundle()))
     };
     const toast = vi.fn();
@@ -278,6 +324,17 @@ describe('the Tip Jar backup controller', () => {
     expect(walletApi.toggleRecoveryPhrase).not.toHaveBeenCalled();
     click(root, 'tip-jar-reveal-phrase');
     expect(walletApi.toggleRecoveryPhrase).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the recovery phrase when Advanced recovery is closed', () => {
+    const { root, walletApi } = mount();
+    const details = root.querySelector<HTMLDetailsElement>('.tip-jar-recovery')!;
+    details.open = true;
+    details.dispatchEvent(new Event('toggle'));
+    expect(walletApi.hideRecoveryPhrase).not.toHaveBeenCalled();
+    details.open = false;
+    details.dispatchEvent(new Event('toggle'));
+    expect(walletApi.hideRecoveryPhrase).toHaveBeenCalledTimes(1);
   });
 
   async function chooseFile(root: HTMLElement, contents: string): Promise<void> {

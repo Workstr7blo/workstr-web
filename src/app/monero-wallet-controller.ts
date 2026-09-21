@@ -263,6 +263,15 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     }
   }
 
+  // The rendered phrase goes with the state, not at the next render: a lock puts the lock screen
+  // over Settings without redrawing it, and the words would otherwise sit in the page behind it.
+  function forgetRecoveryPhrase(): void {
+    if (state.moneroWallet?.backup) state.moneroWallet = { ...state.moneroWallet, backup: null };
+    root.querySelectorAll('.tip-jar-recovery-phrase').forEach((node) => node.remove());
+    const reveal = root.querySelector('#tip-jar-reveal-phrase');
+    if (reveal) reveal.textContent = 'Reveal';
+  }
+
   function bind(): void {
     root.querySelector('#monero-wallet-create')?.addEventListener('click', () => { void createWallet().then(autoSync); });
     root.querySelector('#monero-wallet-open')?.addEventListener('click', () => { void openWallet().then(autoSync); });
@@ -298,6 +307,7 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     backupPayload: (): Promise<TipJarBackupPayload> => core.backupPayload(),
     // Tip Jar switched off: nothing keeps talking to the Monero node.
     async stop(): Promise<void> {
+      forgetRecoveryPhrase();
       stopAutoSync();
       generation += 1;
       const was = current();
@@ -306,12 +316,12 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
       ctx.onChange?.();
       await core.close();
     },
-    // Leaving Settings hides the recovery phrase; it is shown again only by another tap.
-    hideBackup(): void {
-      if (state.moneroWallet?.backup) state.moneroWallet = { ...state.moneroWallet, backup: null };
-    },
+    // Leaving Settings, or closing Advanced recovery, hides the recovery phrase; it is shown
+    // again only by another deliberate tap.
+    hideBackup: forgetRecoveryPhrase,
     // Vault lock: the wallet stays this account's, so what is stored is still known.
     async close(): Promise<void> {
+      forgetRecoveryPhrase();
       stopAutoSync();
       generation += 1;
       const was = current();
@@ -322,6 +332,7 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     },
     // Account switch or reset: nothing about the previous account's wallet carries over.
     reset(): void {
+      forgetRecoveryPhrase();
       stopAutoSync();
       generation += 1;
       state.moneroWallet = { status: 'unknown' };
