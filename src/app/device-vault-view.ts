@@ -7,6 +7,7 @@
 import { nip19 } from 'nostr-tools';
 import type { AppState } from './state';
 import { html } from './format';
+import { AUTO_LOCK_OPTIONS, readAutoLockSetting } from './auto-lock';
 
 const SCOPE_NAMES: Record<string, string> = {
   'nostr.local-key': 'Your Nostr identity key',
@@ -161,11 +162,17 @@ export function vaultBusyModalMarkup(message: string): string {
 // a device with no vault has no code to change.
 export function deviceSecurityCard(state: AppState): string {
   if (state.deviceVault !== 'unlocked') return '';
+  const autoLock = readAutoLockSetting();
+  const options = AUTO_LOCK_OPTIONS.map((option) => `<option value="${option.value}"${option.value === autoLock ? ' selected' : ''}>${html(option.label)}</option>`).join('');
   return `<details class="settings-category device-security-card" data-settings-section="device-security">
     <summary><span class="settings-category-copy"><strong>Device security</strong><small>Protected by a nine-digit device code</small></span><span class="status-pill ok">UNLOCKED</span></summary>
     <div class="settings-category-body"><div class="settings-row-main account-row">
       <div><strong>Device code</strong><small>Your local identity is protected by a nine-digit code.</small></div>
       <div class="settings-row-actions"><button id="change-device-code" class="button small" type="button">Change device code</button><button id="lock-workstr" class="button small" type="button">Lock Workstr</button></div>
+    </div>
+    <div class="settings-row-main account-row">
+      <div><strong>Auto-lock</strong><small>Lock after this long without a tap. Switching apps between sets does not count, and a live workout keeps it open.</small></div>
+      <label class="compact-select"><select id="auto-lock-select" aria-label="Auto-lock">${options}</select></label>
     </div></div>
   </details>`;
 }

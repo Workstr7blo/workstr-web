@@ -21,7 +21,7 @@ function recipientBlock(state: MoneroSendState): string {
   const name = recipient.name || 'Monero address';
   const initial = html(name.trim().slice(0, 1).toUpperCase() || '?');
   const avatar = recipient.picture
-    ? `<img src="${html(recipient.picture)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${initial}'}))">`
+    ? `<img src="${html(recipient.picture)}" alt="" referrerpolicy="no-referrer" data-fallback="replace" data-fallback-text="${initial}">`
     : `<span>${initial}</span>`;
   return `<div class="monero-send-recipient">
     <span class="monero-send-avatar" aria-hidden="true">${avatar}</span>

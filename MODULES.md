@@ -29,6 +29,8 @@ and patch it directly, which is also why a page render can leave it standing.
 | Local account keys and where the secret lives | `src/signer/local-key.ts` | `src/security/device-vault.ts`, `src/signer/local-key-storage.ts` (the pre-vault store, read only to migrate out of) | `tests/local-key-signer.test.ts`, `tests/local-key-migration.test.ts`, `tests/local-key-storage.test.ts` |
 | Device vault: storage, unlocked session, scopes, changing the code | `src/security/device-vault.ts` | `src/security/device-vault-crypto.ts`, `src/security/device-vault-kdf.ts`, `src/security/device-vault-types.ts`, `src/security/device-pin.ts`, `docs/device-vault-architecture.md` | `tests/device-vault.test.ts`, `tests/device-vault-kdf.test.ts` |
 | Device vault screens: unlock at launch, protect an existing account, device code prompts, lock, reset | `src/app/device-vault-controller.ts` | `src/app/device-vault-view.ts`, `src/app/device-pin-input.ts`, `src/app/device-vault-backoff.ts` (wrong-code waits, kept across reloads), `src/app/shell.ts` (`boot`), `src/app/identity-controller.ts` | `tests/device-vault-controller.test.ts`, `tests/shell.test.ts` |
+| Auto-lock after inactivity (#278): the setting, the activity clock, and locking through the vault's own `lock` | `src/app/auto-lock.ts` | `src/app/device-vault-view.ts` (the Auto-lock select), `src/app/device-vault-controller.ts` (`lock`), `src/app/shell.ts` | `tests/auto-lock.test.ts` |
+| Page security: the Content Security Policy, image fallbacks without inline script, XSS regression, and the secret-logging guard (#278) | `index.html` (the CSP), `src/app/image-fallback.ts`, `docs/security-model.md` | `src/main.ts`, `src/browser-smoke.ts` (both install the fallbacks), `src/app/format.ts` (`html`), `scripts/monero-ts-csp.mjs` with `vite.config.ts` (the build patch that keeps monero-ts loadable without `'unsafe-eval'`) | `tests/content-security-policy.test.ts`, `tests/image-fallback.test.ts`, `tests/xss-regression.test.ts`, `tests/secret-logging.test.ts`, `tests/monero-ts-csp.test.ts` |
 | QR device pairing crypto and relay transport | `src/signer/pairing.ts` | `src/nostr/device-pairing.ts`, `relay/write-policy.mjs`, `docs/device-pairing-architecture.md` | `tests/pairing.test.ts`, `tests/pairing-relay.integration.test.ts` |
 | QR device pairing screens and camera | `src/app/device-pairing-controller.ts` | `src/features/identity/pairing-view.ts`, `src/app/qr-scanner.ts`, `src/app/identity-controller.ts` | `tests/device-pairing-controller.test.ts` |
 | Catalog/library actions and cache, and the library following the catalog | `src/app/catalog-controller.ts` | `src/nostr/canon.ts`, `src/nostr/library-updates.ts`, `src/nostr/programImport.ts`, `src/db/store.ts` | `tests/discover.test.ts`, `tests/library-updates.test.ts`, `tests/programImport.test.ts`, browser verification |
@@ -482,6 +484,8 @@ targets, or muscle metadata solely from the current exercise library.
 - `docs/plans/`: detailed plans for unshipped milestones.
 - `docs/RELEASE-QA.md`: real-device release checklist.
 - `docs/device-vault-architecture.md`: device code, vault format, security limits, recovery.
+- `docs/security-model.md`: the Tip Jar as a hot wallet, the browser compromise boundary, the
+  Content Security Policy and its `<meta>` limits, backups, secret logging.
 - `relay/README.md`: relay-side write policy, its rationale, and how to deploy it.
 - `CHANGELOG.md`: shipped and unreleased user-visible behavior.
 

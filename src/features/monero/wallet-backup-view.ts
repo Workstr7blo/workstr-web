@@ -45,8 +45,9 @@ function message(ui: TipJarBackupUiState): string {
 function exportForm(ui: TipJarBackupUiState): string {
   const busy = ui.busy ? ' disabled' : '';
   return `<form class="tip-jar-backup-form" id="tip-jar-backup-export-form">
-    <p class="section-help">Choose a password for this backup file. You need it to restore the Tip Jar, and Workstr cannot recover it for you.</p>
-    <label><span>Backup password</span><input id="tip-jar-backup-password" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" minlength="${TIP_JAR_BACKUP_MIN_PASSWORD}"${busy} /></label>
+    <p class="section-help">Choose a password for this backup file. You need it to restore the Tip Jar.</p>
+    <label><span>Backup password</span><input id="tip-jar-backup-password" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" minlength="${TIP_JAR_BACKUP_MIN_PASSWORD}" aria-describedby="tip-jar-backup-password-help"${busy} /></label>
+    <p class="section-help" id="tip-jar-backup-password-help">Use at least ${TIP_JAR_BACKUP_MIN_PASSWORD} characters. A passphrase of several words works well. This password cannot be recovered.</p>
     <label><span>Confirm password</span><input id="tip-jar-backup-password-confirm" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"${busy} /></label>
     <div class="settings-row-actions">
       <button class="button payment" type="submit"${busy}>Export backup</button>

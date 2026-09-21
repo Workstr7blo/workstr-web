@@ -43,7 +43,7 @@ export interface ExerciseCardParts {
 
 export function exerciseCard({ exercise, keyAttribute, classes = '', selectable = false, nameAction = '', footer = '' }: ExerciseCardParts): string {
   const src = exercise.image_url || '';
-  const photo = src ? `<img class="card-photo" src="${html(responsiveImageUrl(src, 360))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : '';
+  const photo = src ? `<img class="card-photo" src="${html(responsiveImageUrl(src, 360))}" alt="" loading="lazy" decoding="async" data-fallback="remove">` : '';
   return `
     <div class="ex-card${classes}" ${keyAttribute}>
       <div class="card-img">

@@ -20,8 +20,16 @@ export const TIP_JAR_BACKUP_VERSION = 1;
 // Its own extension rather than `.txt` or `.json`, so a phone does not offer to open it in a
 // text editor and a user does not "fix" the ciphertext by hand.
 export const TIP_JAR_BACKUP_EXTENSION = 'wstrwallet';
-// Short enough that people will actually use one; long enough that Argon2id is worth running.
-export const TIP_JAR_BACKUP_MIN_PASSWORD = 8;
+// Longer than the device code on purpose. The code guards storage on one device; this password
+// guards a file that may be emailed, synced to a cloud drive or kept on a USB stick for years,
+// and whoever holds the file can guess against it offline without Workstr ever seeing a try.
+// Length is the whole rule: no character classes, which mostly produce predictable passwords.
+// Only restoring is exempt, so a backup made under the old eight-character floor still opens.
+export const TIP_JAR_BACKUP_MIN_PASSWORD = 12;
+
+// The few twelve-character passwords that would be guessed first. Not a strength meter; just
+// the obvious ones a length rule alone would let through.
+const WEAK_BACKUP_PASSWORDS = new Set(['password1234', '123456789012', 'qwerty123456', 'passwordpassword', '111111111111', 'qwertyuiopas', 'abcdefghijkl', 'monero123456', 'workstr12345']);
 
 const SALT_BYTES = 16;
 const NONCE_BYTES = 12;
@@ -104,6 +112,7 @@ async function backupKey(password: string, salt: Uint8Array<ArrayBuffer>, parame
 
 export function assertBackupPassword(password: string, confirmation?: string): void {
   if (password.length < TIP_JAR_BACKUP_MIN_PASSWORD) throw new TipJarBackupError(`Use a backup password of at least ${TIP_JAR_BACKUP_MIN_PASSWORD} characters.`);
+  if (WEAK_BACKUP_PASSWORDS.has(password.toLowerCase()) || /^(.)\1+$/.test(password)) throw new TipJarBackupError('That password is too easy to guess. A few unrelated words work well.');
   if (confirmation !== undefined && password !== confirmation) throw new TipJarBackupError('The two passwords do not match.');
 }
 
@@ -165,7 +174,14 @@ export async function decryptTipJarBackup(text: string, password: string): Promi
     // what it nearly always is.
     throw new TipJarBackupError('That backup password is not right.');
   }
-  return assertBackupPayload(new TextDecoder().decode(plaintext), file.network);
+  // Best effort only. The decoded JSON is a JavaScript string, which cannot be overwritten, so
+  // the recovery phrase stays in memory until it is collected; the byte copy at least does not.
+  const bytes = new Uint8Array(plaintext);
+  try {
+    return assertBackupPayload(new TextDecoder().decode(bytes), file.network);
+  } finally {
+    bytes.fill(0);
+  }
 }
 
 function assertBackupPayload(json: string, network: MoneroNetwork): TipJarBackupPayload {

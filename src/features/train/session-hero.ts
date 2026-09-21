@@ -17,8 +17,6 @@ export function sessionHeroMedia(exercise: SessionExercise | undefined, name: st
   const src = exercise?.imageUrl;
   if (!src) return '<div class="session-ex-image wide placeholder">No image</div>';
   const srcset = responsiveImageSrcset(src, [480, 720, 1080]);
-  // `srcset` has to go with `src` when the image fails, or the browser reloads a rendition
-  // straight back into the element the placeholder just took over.
-  const onerror = "this.classList.add('placeholder');this.removeAttribute('src');this.removeAttribute('srcset');this.textContent='No image'";
-  return `<img class="session-ex-image wide" src="${html(responsiveImageUrl(src, 720))}"${srcset ? ` srcset="${html(srcset)}" sizes="${SIZES}"` : ''} alt="${html(name)}" loading="eager" onerror="${onerror}">`;
+  // A failed image becomes the "No image" placeholder in place (`image-fallback.ts`, "hero").
+  return `<img class="session-ex-image wide" src="${html(responsiveImageUrl(src, 720))}"${srcset ? ` srcset="${html(srcset)}" sizes="${SIZES}"` : ''} alt="${html(name)}" loading="eager" data-fallback="hero">`;
 }

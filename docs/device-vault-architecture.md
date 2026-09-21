@@ -7,6 +7,9 @@ the storage format, and recovery. The code lives in `src/security/`; the screens
 
 ## What it protects, and what it does not
 
+`docs/security-model.md` is the wider threat model: the Tip Jar as a hot wallet, the browser
+compromise boundary, the Content Security Policy and the backup password.
+
 The device code protects secrets **at rest**. A local account's nsec is no longer readable
 by anyone who can open the browser's storage: decrypting it needs the code, and the code is
 never written anywhere.
@@ -118,11 +121,19 @@ States, in `state.deviceVault`: `absent`, `setup-required`, `locked`, `unlocking
 The unlocked session is memory only. It lasts for the application session and ends when:
 
 - the PWA is closed or reloaded, or the browser discards the page;
-- the user presses **Lock Workstr** in Settings → Device security;
+- the user presses **Lock Workstr** in Settings → Access & Security → Device security;
+- **Auto-lock** fires: no tap, key or scroll for the chosen time (15 minutes, 30 minutes -
+  the default - 1 hour, or never, "when Workstr closes"). It is judged against the clock, so
+  time spent in another app counts and a return after longer than the limit finds Workstr
+  locked; a live workout counts as activity. It calls the same lock as the button
+  (`src/app/auto-lock.ts`), and the choice is a per-device preference in `localStorage`;
 - the user signs out.
 
 Navigating between pages or briefly backgrounding the app does not lock it, and the code is
-not asked for again before a signature, a sync or a future Monero transaction.
+not asked for again before a signature, a sync or a Monero transaction - including each tip.
+The unlocked session is the authorization boundary; the send sheet's review and confirm step
+is what stands between an intent and a broadcast. Auto-lock is not the ten-minute
+`VAULT_UPDATE_AWAY_MS` below, which only decides when an update may reload.
 
 A waiting app update keeps to that. Installing one reloads the page, and a reload locks the
 vault, so while the vault is unlocked an update is applied only after the app has been in the
@@ -130,7 +141,8 @@ background for at least ten minutes - checked by a timer while away, and again o
 because phones freeze background timers (`src/app/update-controller.ts`). With no vault, or a
 locked one, the update still applies the moment the app is left.
 
-Locking drops the session and the cached local signer and stops encrypted sync. It keeps
+Locking drops the session and the cached local signer, stops encrypted sync, closes the Tip
+Jar wallet, closes any open sheet, and removes a revealed recovery phrase from the page. It keeps
 the encrypted records, the signed-in public key and all workout data. Locking is not signing
 out.
 

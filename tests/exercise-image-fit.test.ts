@@ -98,13 +98,13 @@ describe('exercise image markup', () => {
       expect(imgCount(card)).toBe(1);
       expect(card).toContain('class="card-placeholder"');
       expect(card).toContain('class="card-photo" src="https://i.nostr.build/jack.png?w=360"');
-      expect(card).toContain('onerror="this.remove()"');
+      expect(card).toContain('data-fallback="remove"');
     }
   });
 
   it('keeps the row thumbnail fallback', () => {
     expect(exerciseImage('')).toContain('wk-ex-img placeholder');
-    expect(exerciseImage('https://x/y.png')).toContain("className:'wk-ex-img placeholder'");
+    expect(exerciseImage('https://x/y.png')).toContain('data-fallback="replace" data-fallback-tag="div" data-fallback-class="wk-ex-img placeholder"');
   });
 
   it('draws the hero once, responsive, named, and falls back to the placeholder', () => {
@@ -113,7 +113,7 @@ describe('exercise image markup', () => {
     expect(hero).toContain('class="session-ex-image wide"');
     expect(hero).toContain('srcset="');
     expect(hero).toContain('alt="Jumping Jack"');
-    expect(hero).toContain("this.classList.add('placeholder')");
+    expect(hero).toContain('data-fallback="hero"');
     expect(sessionHeroMedia(undefined, 'Jumping Jack')).toBe('<div class="session-ex-image wide placeholder">No image</div>');
   });
 

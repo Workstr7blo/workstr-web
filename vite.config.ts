@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
+import { moneroTsCspPlugin } from './scripts/monero-ts-csp.mjs';
 
 // Release builds get the tag from CI (APP_VERSION). Pages builds off main and
 // local builds fall back to `git describe`, which yields e.g. v0.9.0-3-gabc1234
@@ -16,6 +17,9 @@ function appVersion(): string {
 
 export default defineConfig({
   base: './',
+  plugins: [moneroTsCspPlugin()],
+  // The dev server pre-bundles dependencies with Rolldown, outside the plugin pipeline above.
+  optimizeDeps: { rolldownOptions: { plugins: [moneroTsCspPlugin({ bundler: true })] } },
   define: {
     __APP_VERSION__: JSON.stringify(appVersion())
   },

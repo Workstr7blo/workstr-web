@@ -24,13 +24,13 @@ export function accountIdentity(state: AppState): AccountIdentity {
   };
 }
 
-// The image must stay immediately before its fallback: the `onerror` handler reaches the
-// fallback through `nextElementSibling`, so anything inserted between them turns a broken
+// The image must stay immediately before its fallback: `data-fallback="next"` reaches the
+// fallback through `nextElementSibling` (`image-fallback.ts`), so anything inserted between them turns a broken
 // avatar into a blank hole. Emitting the pair from one place is what keeps that true for
 // the topbar and Settings copies at once.
 export function avatarFace(className: string, identity: AccountIdentity): string {
   if (!identity.picture) return `<span class="${className} fallback">${html(identity.initial)}</span>`;
-  return `<img class="${className}" src="${html(identity.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="${className} fallback" hidden>${html(identity.initial)}</span>`;
+  return `<img class="${className}" src="${html(identity.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-fallback="next"><span class="${className} fallback" hidden>${html(identity.initial)}</span>`;
 }
 
 // The badge on the avatar answers "is my identity connected", and that is the only state the

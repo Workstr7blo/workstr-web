@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added Auto-lock under Settings, Access & Security, Device security. Workstr locks after 15
+  minutes, 30 minutes (the default) or an hour without a tap, or only when it closes. Switching
+  apps between sets does not lock it, a live workout keeps it open, and coming back after longer
+  than the limit asks for the device code.
+
 - Added a Profile section at the top of Settings. It shows your avatar, display name, npub and
   public Monero address, and Edit profile changes all three with one Save changes. Change photo
   opens the device photo picker and uploads the image to nostr.build, signed by your account;
@@ -63,6 +68,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verification, and an iOS Safari/PWA QA checklist before production wallet UI work.
 
 ### Changed
+
+- Tip Jar backups now need a password of at least 12 characters, and a few obvious passwords
+  are refused. The file travels, so its password has to hold up to offline guessing. Existing
+  backups made with a shorter password still restore.
+- Hardened the page against injected code. Workstr now ships a Content Security Policy that runs
+  only its own bundled scripts. Broken-image fallbacks no longer use inline script. A revealed
+  recovery phrase leaves the page when Advanced recovery closes or Workstr locks.
 
 - Replaced the Account section of Settings with Profile and a new Access & Security section,
   which holds Add device, Sign out, Remove local data and Device security. The Monero address
