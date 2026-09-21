@@ -36,14 +36,18 @@ and patch it directly, which is also why a page render can leave it standing.
 | Deleting what a Lightning build left on a device | `src/db/retire-lightning.ts`, `src/db/store.ts` (`retireLightningSettings`) | `src/app/shell.ts` (boot, `loadNamespace`) | `tests/retire-lightning.test.ts`, `tests/store.test.ts` |
 | Stored/live session adaptation | `src/app/session-persistence.ts` | `src/db/store.ts`, `src/app/state.ts` | `tests/session-runner.test.ts`, `tests/store.test.ts` |
 | Catalog surfaces: what a relay answer is written into, and when nothing is | `src/app/catalog-surfaces.ts` | `src/app/catalog-controller.ts`, `src/features/discover/views.ts` (`discoverGrid`) | `tests/shell.test.ts`, `tests/discover.test.ts` |
-| The account chip and the Settings Account identity | `src/app/account-chip.ts` | `src/app/layout.ts`, `src/app/shell.ts` (profile hydration) | `tests/account-chip.test.ts`, `tests/shell.test.ts` |
+| The account chip, and writing an arriving profile into the read-only Profile card | `src/app/account-chip.ts` | `src/app/layout.ts`, `src/app/shell.ts` (profile hydration) | `tests/account-chip.test.ts`, `tests/shell.test.ts` |
+| The Settings Profile editor (#277): avatar, display name and public Monero address as one card, one Save changes publishing only the changed events, partial-failure retry, Refresh profile, and the local-only state | `src/app/profile-controller.ts` (load, edit, upload, save, refresh), `src/app/profile-view.ts` (markup), `src/app/profile-editor.ts` (draft, dirty state per event, validation) | `src/nostr/profile-metadata.ts`, `src/nostr/media-upload.ts`, `src/app/monero-address-controller.ts` (`publish`, `refresh`), `src/app/shell.ts` | `tests/profile-controller.test.ts`, `tests/profile-editor.test.ts`, `tests/settings-view.test.ts`, `tests/account-chip.test.ts` |
+| Writing the user's own `kind:0` without erasing fields other clients own | `src/nostr/profile-metadata.ts` | `src/nostr/replaceable-event.ts`, `src/nostr/profile.ts` (display-only read and cache) | `tests/profile-metadata.test.ts` |
+| Profile photo upload: NIP-96 discovery, NIP-98 authorization, response parsing | `src/nostr/media-upload.ts` | `src/signer/types.ts` | `tests/media-upload.test.ts` |
+| Reading and publishing the user's own replaceable events: "nobody answered" versus "no event", and relay acknowledgement | `src/nostr/replaceable-event.ts` | `src/nostr/profile-metadata.ts`, `src/nostr/payment-targets.ts` | `tests/replaceable-event.test.ts`, `tests/payment-targets.test.ts` |
 | The persistent frame, top-level navigation and page markup | `src/app/layout.ts` (`shellFrame`, `appView`, `pageOverlays`, `updateNavigation`) | relevant `src/features/*/views.ts` | feature view tests, `tests/shell.test.ts` |
 | Redrawing the page: what made it happen, and keeping the reader's place | `src/app/root-rebuild.ts`, `src/app/scroll.ts` | `src/app/shell.ts` (`render`), the `.content` pane in `src/app/layout.ts` | `tests/root-rebuild.test.ts`, `tests/scroll.test.ts`, `tests/render-budget.test.ts` |
 | How much the app redraws, and what a background answer may never replace | `tests/render-budget.test.ts` | every surface writer below | `tests/render-budget.test.ts` |
 | Writing a grid of cards without rebuilding the ones that did not change | `src/app/card-grid.ts` | `src/app/catalog-surfaces.ts`, `src/app/browse-surfaces.ts`, `src/features/discover/views.ts` (`discoverCards`), `src/features/library/views.ts` (`libraryCards`) | `tests/card-grid.test.ts`, `tests/render-budget.test.ts` |
 | The account choice screen: create vs. restore, and the order the routes are offered in | `src/app/account-choice-view.ts` | `src/app/identity-controller.ts` (`startAccountChoice` binds every row) | `tests/account-choice-view.test.ts`, `tests/shell.test.ts` |
 | The Settings page: which cards exist, the groups they sit in, and their order | `src/app/settings-view.ts` | every settings card below, `src/app/layout.ts` (`appView`) | `tests/settings-view.test.ts`, `tests/shell.test.ts` |
-| Settings surfaces written in place rather than rerendered - a background answer, or the reader's own preference change | `src/app/monero-address-controller.ts` (`repaint`), `src/features/backup/views.ts` (`updateBackupStatus`, `updateBackupCard`), `src/app/settings-view.ts` (`updateTrainingPreferences`) | `src/app/preferences-controller.ts`, `src/app/backup-controller.ts`, `src/app/shell.ts` (`bindBackupCard`), `src/app/tip-jar-controller.ts` (the Tip Jar switch) | `tests/backup-views.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts`, `tests/render-budget.test.ts` |
+| Settings surfaces written in place rather than rerendered - a background answer, or the reader's own preference change | `src/app/profile-controller.ts` (`repaint`), `src/features/backup/views.ts` (`updateBackupStatus`, `updateBackupCard`), `src/app/settings-view.ts` (`updateTrainingPreferences`) | `src/app/preferences-controller.ts`, `src/app/backup-controller.ts`, `src/app/shell.ts` (`bindBackupCard`), `src/app/tip-jar-controller.ts` (the Tip Jar switch) | `tests/backup-views.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts`, `tests/render-budget.test.ts` |
 | Shared UI formatting/filtering | `src/app/format.ts` | `src/core/equipment.ts`, `src/core/units.ts` | `tests/format.test.ts`, `tests/equipment.test.ts`, `tests/units.test.ts` |
 | Shared taxonomy: Level, Movement type, Equipment, and the labels filters show | `src/core/training-taxonomy.ts`, `src/core/equipment.ts` | `src/app/format.ts` (exercise facets), `src/features/sheets/program-labels.ts` (`programTaxonomy`), `src/features/sheets/program-browser.ts` | `tests/training-taxonomy.test.ts`, `tests/equipment.test.ts`, `tests/exercise-browser.test.ts`, `tests/program-browser.test.ts` |
 | Responsive image delivery for exercise photos | `src/core/media.ts` | `src/features/train/session-hero.ts`, `src/features/library/views.ts`, `src/features/discover/views.ts`, `src/features/sheets/builder-views.ts`, `src/app/catalog-controller.ts` | `tests/media.test.ts`, `tests/session-runner.test.ts` |
@@ -80,7 +84,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | Sending from the Tip Jar (#246 phase 5): the send sheet (amount, review with fee and total, explicit confirm, result), creator tips from program cards, and plain sends from the Tip Jar page | `src/features/monero/wallet-send.ts` (readiness, amount parsing, network address check, error wording), `src/features/monero/send-view.ts`, `src/app/monero-send-controller.ts` | `src/features/monero/wallet-core.ts` (`prepareTransfer`, `relayTransfer`), `src/app/monero-tip-controller.ts` (`sendTip`), `src/app/tip-jar-controller.ts` (`#tip-jar-send`), `src/features/monero/tip-jar-view.ts`, `src/app/tip-jar-activity-controller.ts` (`recordOutgoing`), `src/app/shell.ts`, `src/style.css` | `tests/monero-send.test.ts`, `tests/monero-wallet-core.test.ts`, `tests/tip-jar.test.ts` |
 | Tip Jar activity (#263): the Recent activity card, outgoing-tip metadata joined to wallet transactions by txid, creator name and picture resolution, and its vault storage (`monero.tip-jar-activity.<pubkey>`) | `src/features/monero/tip-jar-history.ts` (model, txid join, resolution, storage), `src/features/monero/tip-jar-history-view.ts`, `src/app/tip-jar-activity-controller.ts` | `src/features/monero/wallet-core.ts` (`transactions`, `storedWalletId`), `src/app/monero-wallet-controller.ts` (`onActivity`), `src/features/monero/wallet-backup.ts` (`activity`), `src/app/tip-jar-backup-controller.ts`, `src/app/shell.ts`, `src/style.css` | `tests/tip-jar-activity.test.ts`, `tests/tip-jar.test.ts`, `tests/monero-wallet-core.test.ts` |
 | Tip Jar backup (#261): the encrypted `.wstrwallet` file, its export/restore controls in Data & Sync, and Advanced recovery (recovery phrase, restore height, seed restore) | `src/features/monero/wallet-backup.ts` (format, Argon2id + AES-GCM, validation), `src/features/monero/wallet-backup-view.ts`, `src/app/tip-jar-backup-controller.ts` | `src/features/backup/views.ts` (hosts the section), `src/app/backup-controller.ts`, `src/app/settings-view.ts`, `src/app/shell.ts`, `src/app/monero-wallet-controller.ts` (`backupPayload`, `restore`), `src/security/device-vault-kdf.ts`, `src/style.css` | `tests/tip-jar-backup.test.ts`, `tests/backup-views.test.ts`, `tests/settings-view.test.ts` |
-| The Tip Jar switch in Settings and the user's public Monero address | `src/features/support/payment-mode-views.ts`, `src/app/monero-address-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/settings-view.ts`, `src/app/tip-jar-controller.ts` (the switch handler) | `tests/monero-address-controller.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts` |
+| The Tip Jar switch in Settings, and reading and publishing the user's public Monero address | `src/features/support/payment-mode-views.ts`, `src/app/monero-address-controller.ts` | `src/nostr/payment-targets.ts`, `src/app/settings-view.ts`, `src/app/tip-jar-controller.ts` (the switch handler), `src/app/profile-controller.ts` (the only editor of the address) | `tests/monero-address-controller.test.ts`, `tests/settings-view.test.ts`, `tests/shell.test.ts` |
 | Support Workstr | `src/features/support/views.ts` | `src/core/funding.ts`, `src/app/monero-mark.ts`, `src/nostr/payment-targets.ts`, `src/app/settings-view.ts` | `tests/support-views.test.ts`, `tests/settings-view.test.ts` |
 | IndexedDB schema | `src/db/schema.ts` | `src/core/types.ts`, `src/db/store.ts` | `tests/store.test.ts`, `tests/export.test.ts`, `tests/adopt.test.ts` |
 | IndexedDB repository operations | `src/db/store.ts` | schema and domain types | `tests/store.test.ts` |
@@ -187,12 +191,21 @@ and patch it directly, which is also why a page render can leave it standing.
 - `src/app/preferences-controller.ts` owns settings persistence, body/history actions,
   backup controls, and Quick Workout/recovery handlers.
 - `src/app/monero-address-controller.ts` owns the current user's public NIP-A3 Monero
-  address: the `kind:10133` lookup, validation, publish and clear, and the in-place repaint
-  of that Settings section. It never writes the address to the database, so the relays stay
-  the only source of truth and nothing about it enters encrypted sync. It reads the address on
-  the first Settings visit whether or not Monero tips are on, because an address left
-  published after tips are switched off must stay removable; `repaint` shows or hides the
-  section and rewrites the line under the switch.
+  address as a service with no screen of its own: the `kind:10133` lookup, validation, and
+  `publish` (an empty address clears only the Monero target). It never writes the address to
+  the database, so the relays stay the only source of truth and nothing about it enters
+  encrypted sync. It reads the address on the first Settings visit whether or not the Tip Jar
+  is on, because an address left published after tips are switched off must stay removable.
+- `src/app/profile-controller.ts` owns the Settings Profile editor. It shows the avatar,
+  display name, npub and Monero address as one card, and on Save changes publishes `kind:0`
+  only when the name or picture changed and `kind:10133` (through the address controller) only
+  when the address changed. Each lands independently: whichever succeeded becomes the new
+  baseline, so a retry never republishes it. It refuses to write `kind:0` until the complete
+  event has been read. A chosen photo is uploaded (`src/nostr/media-upload.ts`) into the draft
+  and published only with Save changes. The card is repainted in place, never rendered.
+- Settings order is Profile, Training, Payments, Access & Security, Support, System & Data.
+  Access & Security holds Add device, Sign out, Remove local data (set apart as destructive)
+  and the Device security card; it does not repeat the avatar or name.
 - `src/app/piggy-bank.ts` owns the Tip Jar's piggy bank: the one `PIGGY_BANK` path, drawn by the
   bottom-nav item and by an incoming activity row, and `tipPiggyIcon`, the same pig with a plus
   on its back for a Tip control. It sits in `app/` because the nav and activity draw it from
@@ -277,11 +290,9 @@ and patch it directly, which is also why a page render can leave it standing.
   wallet, syncs it, and re-syncs every two minutes while the page is visible. It never
   creates, restores or overwrites a wallet.
 - `src/features/support/payment-mode-views.ts` renders the Tip Jar settings card: a
-  `role="switch"` checkbox and, under it, the public payment-address section. The section
-  shows while tips are on and, while they are off, only for an address still published on
-  relays (`moneroAddressVisible`), with the line under the switch saying so
-  (`moneroTipsCopy`). The card is a `<section>`, not a `<details>`: one control, nothing to
-  collapse. The stored setting keeps its `paymentMode` name, now `'off' | 'monero'`.
+  `role="switch"` checkbox and nothing else. The public address moved to the Profile card
+  (#277), and the switch neither publishes nor removes it. The card is a `<section>`, not a
+  `<details>`: one control, nothing to collapse. The stored setting keeps its `paymentMode` name, now `'off' | 'monero'`.
 - `src/features/support/views.ts` owns the Support Workstr card: `supportPanel` renders the
   canonical `OPERATOR_MONERO_ADDRESS` as an amount-free `monero:` QR, a shortened display,
   and a copy action. It does not follow the Monero tips switch, because supporting Workstr
@@ -405,7 +416,14 @@ targets, or muscle metadata solely from the current exercise library.
 - `src/nostr/share.ts` builds and publishes public workout summaries, requiring actual
   relay acknowledgement/verification before reporting success.
 - `src/nostr/profile.ts` fetches kind-0 identity metadata across configured/default
-  relays, retries transient failures, and maintains the per-browser public profile cache.
+  relays, retries transient failures, and maintains the per-browser public profile cache. It
+  keeps a name and a picture only, so it is for display and never the start of a publish.
+- `src/nostr/profile-metadata.ts` writes the user's own `kind:0`: it reads the complete
+  event (rejecting when no relay answered), preserves every property, and changes only
+  `display_name` and `picture`. `name` is never touched.
+- `src/nostr/media-upload.ts` uploads a profile photo to a NIP-96 server (nostr.build by
+  default), reading the API URL and size limit from its discovery document and authorizing
+  with a NIP-98 event signed by the active signer. Only the returned URL enters `kind:0`.
 - `src/nostr/secret-redaction.ts` redacts wallet connection strings, secret parameters,
   nsecs and bare 64-hex keys. `src/nostr/program-publish.ts` refuses to publish a program
   carrying any of them, and the publish controller redacts relay errors through it.

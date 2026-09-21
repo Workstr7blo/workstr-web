@@ -34,7 +34,7 @@ function state(overrides: Partial<AppState> = {}): AppState {
     authorProfiles: {},
     authorPaymentTargets: { [AUTHOR]: ADDRESS },
     settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] },
-    monero: { status: 'idle', address: '' },
+    monero: { status: 'idle', address: '' }, profile: { status: 'idle', editing: false },
     view: 'workouts',
     subState: { exercises: 'library', workouts: 'discover', statistics: 'training' },
     exercises: [],

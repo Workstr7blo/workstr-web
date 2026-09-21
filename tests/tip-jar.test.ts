@@ -305,7 +305,7 @@ describe('Tip Jar automatic sync', () => {
     const onChange = vi.fn();
     const onActivity = vi.fn();
     const vault = { isUnlocked: () => s.deviceVault === 'unlocked' } as DeviceVault;
-    const ctrl = createMoneroWalletController({ root, state: s, toast: vi.fn(), repaintMoneroAddress: vi.fn(), onChange, onActivity, vault, core });
+    const ctrl = createMoneroWalletController({ root, state: s, toast: vi.fn(), onChange, onActivity, vault, core });
     return { s, core, ctrl, onChange, onActivity };
   }
 

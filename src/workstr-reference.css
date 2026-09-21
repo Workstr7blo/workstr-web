@@ -547,14 +547,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .settings-category[open] > summary::after { transform: rotate(90deg); }
 .settings-category > summary:focus-visible { outline: 2px solid var(--purple-2); outline-offset: -3px; }
 .settings-category-copy { min-width: 0; display: grid; gap: 4px; }
-.settings-account-summary { min-width: 0; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; align-items: center; }
-/* Both the picture and the letter that stands in for it, because `avatarFace` renders one
-   or the other under the same class. An unsized <img> here takes its natural dimensions -
-   a 400px profile picture - and overruns the 34px column with the name and npub on top
-   of it. `flex`/`width`/`height` together, so it cannot be stretched by its container. */
-.settings-account-summary-avatar { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; min-width: 34px; overflow: hidden; border: 1px solid var(--border-hot); border-radius: 50%; object-fit: cover; background: rgba(var(--accent-rgb), .18); color: var(--purple-2); font: 900 13px/1 Inter, ui-sans-serif, sans-serif; }
-.settings-account-summary-avatar[hidden] { display: none !important; }
-.settings-account-npub { color: var(--muted); font: 11px/1.2 ui-monospace, monospace; opacity: .8; }
 .settings-category-copy strong { color: var(--text); font: 850 15px/1.15 Inter, ui-sans-serif, sans-serif; }
 .settings-category-copy small { overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .settings-category-meta { color: var(--purple-2); font: 850 10px/1 ui-monospace, monospace; letter-spacing: .1em; }
@@ -599,11 +591,56 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .status-pill.ok { color: var(--success-green); border-color: rgba(0,208,132,.38); background: rgba(0,208,132,.08); }
 .status-pill.bad { color: var(--danger-red); border-color: rgba(255,56,100,.4); background: rgba(255,56,100,.08); }
 .account-row { align-items: center; }
-.settings-account-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.settings-account-identity > span:last-child { min-width: 0; }
-.settings-account-avatar { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; overflow: hidden; border: 1px solid var(--border-hot); border-radius: 11px; object-fit: cover; background: rgba(var(--accent-rgb), .18); color: var(--purple-2); font-weight: 900; }
-.settings-account-avatar.fallback { font-size: 14px; }
-.settings-account-avatar[hidden] { display: none !important; }
+/* Access & Security: routine rows, then the destructive one set apart below a rule. */
+.access-danger { margin-top: 6px; border-color: rgba(var(--danger-rgb), .3); background: rgba(var(--danger-rgb), .05); }
+
+/* The Profile card is always open: who you are is the first thing Settings answers, so it
+   is a plain section rather than a disclosure. Every action carries a text label and is at
+   least 44px tall, and the fields stack, so nothing is compressed on a phone. */
+.profile-card-body { display: grid; gap: 12px; padding: 14px 16px; }
+.profile-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.profile-copy { min-width: 0; display: grid; gap: 4px; }
+.profile-copy strong { overflow: hidden; color: var(--text); font: 850 16px/1.2 Inter, ui-sans-serif, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.profile-copy small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.profile-npub { overflow: hidden; font: 11px/1.2 ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
+/* Both the picture and the letter that stands in for it, because `avatarFace` renders one
+   or the other under the same class. An unsized <img> takes its natural dimensions - a
+   400px profile picture - and overruns the name beside it. */
+.profile-avatar { display: grid; place-items: center; flex: 0 0 52px; width: 52px; height: 52px; min-width: 52px; overflow: hidden; border: 1px solid var(--border-hot); border-radius: 50%; object-fit: cover; background: rgba(var(--accent-rgb), .18); color: var(--purple-2); font: 900 19px/1 Inter, ui-sans-serif, sans-serif; }
+.profile-avatar[hidden] { display: none !important; }
+.profile-facts { margin: 0; }
+.profile-facts > div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.025); }
+.profile-facts dt { flex-shrink: 0; color: var(--muted); font-size: 12px; }
+.profile-facts dd { min-width: 0; margin: 0; overflow: hidden; color: var(--text); font: 500 12px/1.4 ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.profile-status { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.profile-status:empty { display: none; }
+.profile-status.ok { color: var(--success-green); }
+.profile-status.bad { color: var(--danger-soft); }
+.profile-status-mark { font-weight: 850; }
+.profile-actions, .profile-form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-actions .button, .profile-form-actions .button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.profile-photo { display: flex; align-items: center; gap: 14px; }
+.profile-photo-button { position: relative; flex: 0 0 72px; width: 72px; height: 72px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.profile-photo-button:disabled { cursor: progress; opacity: .7; }
+.profile-photo-button:focus-visible { outline: 2px solid var(--purple-2); outline-offset: 3px; }
+.profile-photo-image { display: grid; place-items: center; width: 72px; height: 72px; overflow: hidden; border: 1px solid var(--border-hot); border-radius: 50%; object-fit: cover; background: rgba(var(--accent-rgb), .18); color: var(--purple-2); font: 900 24px/1 Inter, ui-sans-serif, sans-serif; }
+.profile-photo-image[hidden] { display: none !important; }
+.profile-photo-badge { position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--void); border-radius: 50%; background: var(--purple-2); color: #fff; }
+.profile-photo .button { min-height: 44px; }
+.profile-field { display: grid; gap: 6px; min-width: 0; }
+.profile-field > span { color: var(--text); font-size: 13px; font-weight: 750; }
+.profile-field > small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.profile-field input { min-height: 44px; }
+.profile-address-input { font: 500 13px/1.4 ui-monospace, monospace; }
+.profile-npub-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.profile-npub-full { flex: 1; min-width: 0; overflow: hidden; color: var(--muted); font: 11px/1.4 ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.profile-npub-row .button { min-height: 44px; }
+.profile-advanced-toggle { justify-self: start; min-height: 44px; padding: 0 2px; border: 0; background: none; color: var(--purple-2); font: 800 12px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.profile-advanced-toggle::after { content: ' \203A'; display: inline-block; transition: transform .16s ease; }
+.profile-advanced-toggle[aria-expanded="true"]::after { transform: rotate(90deg); }
+.profile-advanced-panel[hidden] { display: none; }
+.profile-confirm { display: grid; gap: 10px; padding: 12px; border: 1px solid rgba(var(--danger-rgb), .35); border-radius: 12px; background: rgba(var(--danger-rgb), .06); }
+.profile-confirm p { margin: 0; color: var(--text); font-size: 13px; }
 .beast-mode-card .section-help, .beast-mode-lock-modal .section-help { margin: 0 0 2px; font-size: 12px; line-height: 1.35; }
 .beast-mode-checklist ul { display: grid; gap: 0; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 13px; list-style: none; }
 .beast-mode-check { display: flex; gap: 9px; align-items: center; padding: 9px 10px; background: rgba(255,255,255,.02); }
@@ -978,6 +1015,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 }
 
 @media (max-width: 430px) {
+  .profile-form-actions .button { flex: 1 1 100%; }
+  .profile-actions .button { flex: 1 1 auto; }
   .settings-page .panel { padding: 14px; border-radius: 18px; }
   .settings-group-cards { border-radius: 14px; }
   .settings-category > summary { gap: 8px; padding: 10px; }

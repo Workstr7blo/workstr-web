@@ -16,7 +16,6 @@ export interface MoneroWalletControllerContext {
   root: HTMLElement;
   state: AppState;
   toast(message: string, kind?: 'ok' | 'bad'): void;
-  repaintMoneroAddress(): void;
   // Every wallet state change, so the Tip Jar nav badge and page follow it.
   onChange?(): void;
   // The open wallet's id and, after a sync, its transaction list (null when only opened, or
@@ -64,9 +63,6 @@ export function createMoneroWalletController(ctx: MoneroWalletControllerContext)
     state.moneroWallet = { stored, legacyAvailable, addresses, ...next };
     paint();
     ctx.onChange?.();
-    // The address section repaints only when its wallet label can change, so a draft being
-    // typed there keeps its focus.
-    if (String(addresses) !== String(state.moneroWallet.addresses)) ctx.repaintMoneroAddress();
   }
 
   function paint(): void {

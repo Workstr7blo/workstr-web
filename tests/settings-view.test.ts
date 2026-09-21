@@ -11,7 +11,7 @@ function state(overrides: Partial<AppState> = {}): AppState {
   return {
     pubkey: null, npub: null, profileName: null, profilePicture: null, profileNames: {}, store: null,
     settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] },
-    monero: { status: 'idle', address: '' },
+    monero: { status: 'idle', address: '' }, profile: { status: 'idle', editing: false },
     library: [], discoverExercises: [], finishedSessions: [], sheets: [],
     backup: { state: 'off', pending: 0 },
     signInStatus: null,
@@ -57,8 +57,8 @@ const cardTitles = (root: HTMLElement): string[] =>
   Array.from(root.querySelectorAll('.settings-category > summary .settings-category-copy strong')).map((el) => el.textContent?.trim() || '');
 
 describe('the Settings page', () => {
-  it('reads as five groups in the order a person thinks in', () => {
-    expect(groupLabels(render(signedIn()))).toEqual(['Account', 'Training', 'Payments', 'Support', 'System & Data']);
+  it('reads as six groups in the order a person thinks in', () => {
+    expect(groupLabels(render(signedIn()))).toEqual(['Profile', 'Training', 'Payments', 'Access & Security', 'Support', 'System & Data']);
   });
 
   it('orders the cards within each group', () => {
@@ -71,7 +71,9 @@ describe('the Settings page', () => {
     const root = render(signedIn());
     const groupOf = (selector: string): string | undefined => root.querySelector(selector)
       ?.closest('.settings-group')?.querySelector('.settings-group-label')?.textContent?.trim();
-    expect(groupOf('.account-card')).toBe('Account');
+    expect(root.querySelector('.account-card')).toBeNull();
+    expect(groupOf('.profile-card')).toBe('Profile');
+    expect(groupOf('.access-card')).toBe('Access & Security');
     expect(groupOf('.training-preferences-card')).toBe('Training');
     expect(groupOf('.beast-mode-card')).toBe('Training');
     expect(groupOf('.monero-tips-card')).toBe('Payments');
@@ -101,7 +103,7 @@ describe('the Settings page', () => {
   it('gives every group a one-line blurb', () => {
     const root = render(signedIn());
     const blurbs = Array.from(root.querySelectorAll('.settings-group-copy small')).map((el) => el.textContent?.trim());
-    expect(blurbs).toHaveLength(5);
+    expect(blurbs).toHaveLength(6);
     expect(blurbs.every((line) => Boolean(line))).toBe(true);
     expect(root.querySelector('.page-blurb')?.textContent?.trim()).toBeTruthy();
   });
@@ -113,8 +115,8 @@ describe('the Settings page', () => {
     const training = root.querySelector('.training-preferences-card')?.closest('.settings-group');
     expect(training?.querySelectorAll('.settings-group-cards')).toHaveLength(1);
     expect(training?.querySelectorAll('.settings-group-cards > .settings-category')).toHaveLength(2);
-    const account = root.querySelector('.account-card')?.closest('.settings-group');
-    expect(account?.querySelectorAll('.settings-group-cards > .settings-category')).toHaveLength(1);
+    const profile = root.querySelector('.profile-card')?.closest('.settings-group');
+    expect(profile?.querySelectorAll('.settings-group-cards > .settings-category')).toHaveLength(1);
   });
 
   it('keeps Support visually its own thing', () => {
@@ -130,10 +132,11 @@ describe('the Settings page', () => {
     expect(card?.querySelector('#import-file')).toBeTruthy();
   });
 
-  it('renders local-only Settings as account, training, and local data only', () => {
+  it('renders local-only Settings as profile, training, and local data only', () => {
     const root = render();
-    expect(groupLabels(root)).toEqual(['Account', 'Training', 'System & Data']);
-    expect(cardTitles(root)).toEqual(['Local only', 'Training Preferences', 'Data & Sync', 'Advanced']);
+    expect(groupLabels(root)).toEqual(['Profile', 'Training', 'System & Data']);
+    expect(cardTitles(root)).toEqual(['Training Preferences', 'Data & Sync', 'Advanced']);
+    expect(root.querySelector('.access-card')).toBeNull();
     expect(root.querySelector('.beast-mode-card')).toBeNull();
     expect(root.querySelector('.monero-tips-card')).toBeNull();
     expect(root.querySelector('.support-panel')).toBeNull();
@@ -166,7 +169,6 @@ describe('the Settings page', () => {
     const off = (overrides: Partial<AppState> = {}): HTMLElement => render(signedIn(overrides));
     const on = (overrides: Partial<AppState> = {}): HTMLElement =>
       render(signedIn({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] }, ...overrides } as Partial<AppState>));
-    const body = (root: HTMLElement): HTMLElement => root.querySelector('#monero-tips-body') as HTMLElement;
 
     it('is one switch in Payments, off by default', () => {
       const root = off();
@@ -178,25 +180,20 @@ describe('the Settings page', () => {
       expect(toggle.checked).toBe(false);
       expect(card.querySelector('#monero-tips-label')?.textContent).toBe('Tip Jar');
       expect(card.querySelector('#monero-tips-copy')?.textContent).toBe('Send and receive tips in Workstr.');
-      expect(body(root).hidden).toBe(true);
+      expect(card.querySelector('input[type="text"]')).toBeNull();
       expect(card.closest('.settings-group')?.querySelector('.settings-group-copy small')?.textContent).toBe('Tip program creators with Monero');
     });
 
-    it('shows the address section when on', () => {
-      const root = on();
-      expect(root.querySelector<HTMLInputElement>('#monero-tips-toggle')?.checked).toBe(true);
-      expect(body(root).hidden).toBe(false);
-      expect(root.querySelector('.monero-tips-card #monero-address')).toBeTruthy();
-    });
-
-    // Turning tips off unpublishes nothing, so an address still on the relays keeps the
-    // section that can remove it, and the line under the switch says why it is there.
-    it('keeps a published address reachable with tips off', () => {
-      const root = off({ monero: { status: 'ready', address: `8${'B'.repeat(94)}` } } as Partial<AppState>);
-      expect(root.querySelector<HTMLInputElement>('#monero-tips-toggle')?.checked).toBe(false);
-      expect(root.querySelector('#monero-tips-copy')?.textContent).toBe('Off. Your Monero address is still published.');
-      expect(body(root).hidden).toBe(false);
-      expect(root.querySelector('#monero-address-save')).toBeTruthy();
+    // The public address is the Profile's. The switch neither shows nor edits it, and says
+    // nothing about it whichever way it is set.
+    it('keeps the public address out of Payments whichever way the switch is set', () => {
+      for (const root of [on(), off({ monero: { status: 'ready', address: `8${'B'.repeat(94)}` } } as Partial<AppState>)]) {
+        const payments = root.querySelector('.monero-tips-card')?.closest('.settings-group') as HTMLElement;
+        expect(payments.querySelector('#profile-address, #monero-address')).toBeNull();
+        expect(payments.textContent).not.toContain('payment address');
+        expect(root.querySelector('#monero-tips-copy')?.textContent).toBe('Send and receive tips in Workstr.');
+        expect(root.querySelector('.profile-card .profile-address')).toBeTruthy();
+      }
     });
 
     it('shows the same Support Workstr card whichever way it is set', () => {
@@ -212,13 +209,10 @@ describe('the Settings page', () => {
       const paymentGroup = root.querySelector('.monero-tips-card')?.closest('.settings-group') as HTMLElement;
       expect(root.querySelector('.monero-wallet-card')).toBeNull();
       expect(paymentGroup.textContent).toContain('Tip Jar');
-      expect(paymentGroup.textContent).toContain('Monero payment address');
       for (const hidden of ['Tip Jar wallet', 'READY', 'Wallet synced.', 'Wallet height', 'Node height', 'Wallet status', 'Network', 'xmr.workstr.fit']) {
         expect(paymentGroup.textContent).not.toContain(hidden);
       }
       expect(paymentGroup.querySelector('#monero-tips-toggle')).toBeTruthy();
-      expect(paymentGroup.querySelector('#monero-address-save')).toBeTruthy();
-      expect(paymentGroup.querySelector('#monero-address-refresh')).toBeTruthy();
       expect(paymentGroup.querySelector('#monero-wallet-create, #monero-wallet-open, #monero-wallet-recheck')).toBeNull();
     });
 
@@ -239,23 +233,6 @@ describe('the Settings page', () => {
       expect(tipJar.textContent).toContain('mainnet');
       expect(tipJar.textContent).toContain('Node');
       expect(tipJar.textContent).toContain('xmr.workstr.fit:43736');
-    });
-
-    it('labels whether the published address is this account\'s Workstr wallet or an external one', () => {
-      const address = `8${'D'.repeat(94)}`;
-      const own = off({ monero: { status: 'ready', address }, moneroWallet: { status: 'stored', stored: true, addresses: [address] } });
-      expect(own.querySelector('.monero-address-source')?.textContent).toBe('From your Workstr wallet.');
-      const external = off({ monero: { status: 'ready', address }, moneroWallet: { status: 'missing', stored: false, addresses: [] } });
-      expect(external.querySelector('.monero-address-source')?.textContent).toContain('External wallet');
-      const unchecked = off({ monero: { status: 'ready', address }, moneroWallet: { status: 'unknown' } });
-      expect(unchecked.querySelector('.monero-address-source')).toBeNull();
-    });
-
-    it('keeps an unsaved wallet subaddress visible in the public tips address section', () => {
-      const root = off({ monero: { status: 'idle', address: '', draft: `8${'C'.repeat(94)}`, message: 'Wallet creator subaddress copied here.' } });
-      expect(body(root).hidden).toBe(false);
-      expect(root.querySelector<HTMLInputElement>('#monero-address')?.value).toBe(`8${'C'.repeat(94)}`);
-      expect(root.querySelector('#monero-address-save')).toBeTruthy();
     });
 
     it('leaves no Lightning surface anywhere in Settings', () => {
@@ -353,28 +330,24 @@ describe('the Settings page', () => {
     });
   });
 
-  it('shows the signed-in identity in the Account summary', () => {
-    const signedIn = render({ pubkey: 'ab'.repeat(32), profileName: 'Trainer' });
-    const summary = signedIn.querySelector('.account-card > summary');
-    expect(summary?.querySelector('.settings-account-summary')).toBeTruthy();
-    expect(summary?.textContent).toContain('Signed in');
-    expect(summary?.querySelector('.status-pill')?.textContent).toBe('SIGNED IN');
-    expect(render().querySelector('.account-card > summary .status-pill')?.textContent).toBe('LOCAL');
-  });
-
-  it('shows Add device for Workstr accounts', () => {
-    const account = render(signedIn({ profileName: 'Trainer' }));
-    expect(account.querySelector('#add-device-settings')).toBeTruthy();
-    expect(account.querySelector('#sign-out-settings')).toBeTruthy();
-    expect(account.querySelector('#remove-account-data')).toBeTruthy();
-    expect(account.querySelector('.account-card .settings-account-identity small')?.textContent).toBe('Device-managed key for encrypted sync.');
-    expect(account.querySelector('.account-card > summary')?.textContent).toContain('Signed in with a Workstr account');
+  it('moves device and account access into Access & Security', () => {
+    const account = render(signedIn({ profileName: 'Trainer', deviceVault: 'unlocked' } as Partial<AppState>));
+    const access = account.querySelector('.access-card')?.closest('.settings-group') as HTMLElement;
+    for (const id of ['#add-device-settings', '#sign-out-settings', '#remove-account-data', '#change-device-code', '#lock-workstr']) {
+      expect(access.querySelector(id), id).toBeTruthy();
+      expect(account.querySelector('.profile-card')?.querySelector(id), id).toBeNull();
+    }
+    // Profile already says who this is; Access & Security does not repeat it.
+    expect(access.querySelector('.profile-avatar, img')).toBeNull();
+    expect(access.textContent).not.toContain('Trainer');
+    // The destructive action is set apart from the routine ones.
+    expect(access.querySelector('.access-danger #remove-account-data')?.classList.contains('danger')).toBe(true);
 
     const localOnly = render();
     expect(localOnly.querySelector('#add-device-settings')).toBeNull();
     expect(localOnly.querySelector('#sign-out-settings')).toBeNull();
     expect(localOnly.querySelector('#remove-account-data')).toBeNull();
-    expect(localOnly.querySelector('#sign-in-settings')).toBeTruthy();
+    expect(localOnly.querySelector('.profile-card #sign-in-settings')?.textContent).toBe('Create or restore account');
   });
 });
 
@@ -395,25 +368,18 @@ describe('the background patchers still find their cards', () => {
     expect(root.querySelector('.data-sync-card #export-data')).toBeTruthy();
   });
 
-  // The bug this catches: the Account summary was redesigned and `patchSettingsAccount`
-  // still wrote the old shape into it, so the page rendered correctly and was then
-  // overwritten a moment later. Rendering the view and running the patch over it is the
-  // only way to see that; either one alone looks fine.
-  it('leaves the Account summary saying what the view wrote', () => {
+  // The bug this catches: the old Account summary was redesigned and its patcher still wrote
+  // the old shape into it, so the page rendered correctly and was then overwritten a moment
+  // later. Rendering the view and running the patch over it is the only way to see that.
+  it('leaves the Profile card saying what the view wrote', () => {
     const signedIn = state({ pubkey: 'ab'.repeat(32), npub: 'npub1trainer', profileName: 'Trainer' });
     document.body.innerHTML = `<div id="app">${settingsView(signedIn)}</div>`;
     const root = document.getElementById('app') as HTMLElement;
-    const before = root.querySelector('.account-card > summary .settings-category-copy small')?.textContent;
 
     updateAccountIdentity(root, accountIdentity(signedIn));
 
-    expect(root.querySelector('.account-card > summary .settings-category-copy strong')?.textContent).toBe('Trainer');
-    expect(root.querySelector('.account-card > summary .settings-category-copy small')?.textContent).toBe(before);
-    // Shown because the profile gives a name; without one the display name is already the
-    // shortened npub and the line is suppressed rather than printed twice.
-    expect(root.querySelector('.settings-account-npub')?.textContent).toBe(displayNpub('ab'.repeat(32)));
-    document.body.innerHTML = `<div id="app">${settingsView(state({ pubkey: 'ab'.repeat(32) }))}</div>`;
-    expect(document.querySelector('.settings-account-npub')).toBeNull();
+    expect(root.querySelector('.profile-card .profile-name')?.textContent).toBe('Trainer');
+    expect(root.querySelector('.profile-card .profile-npub')?.textContent).toBe(displayNpub('ab'.repeat(32)));
   });
 
   it('patches the sync status line inside the grouped page', () => {

@@ -2,7 +2,7 @@ import { displayIdentity, html } from './format';
 import type { AppState } from './state';
 
 // Who is signed in reaches the screen in two places - the topbar chip and the Settings
-// Account card - and a profile answers from a relay seconds after launch, long after the
+// Profile card - and a profile answers from a relay seconds after launch, long after the
 // reader has settled somewhere. Rebuilding the root for it redrew the topbar, the
 // navigation, every image and the current page to change a name and a picture. Both
 // surfaces are written from this one adapter so the patched version cannot say something
@@ -72,7 +72,7 @@ export function updateAccountIdentity(root: ParentNode, identity: AccountIdentit
   const label = chip.querySelector('.connection-chip-label');
   if (label) label.textContent = identity.signedIn ? identity.label : 'Account';
   patchChipExtras(chip, identity);
-  patchSettingsAccount(root, identity);
+  patchSettingsProfile(root, identity);
   return true;
 }
 
@@ -113,26 +113,14 @@ function patchChipExtras(chip: HTMLElement, identity: AccountIdentity): void {
   else if (!identity.signedIn && !status && main) main.insertAdjacentHTML('beforeend', chipStatus(identity));
 }
 
-// The Settings Account card shows the same name and picture. It is a page away from the
+// The Settings Profile card shows the same name and picture. It is a page away from the
 // chip, so a reader on Settings would otherwise watch the topbar update and the card it is
-// actually looking at stay stale until something else redrew it.
-function patchSettingsAccount(root: ParentNode, identity: AccountIdentity): void {
-  const card = root.querySelector('.account-card');
-  if (!card) return;
-  // What a profile changes is the name and the picture. The lines around them - the signer
-  // it is held in, the npub - are fixed for as long as the account is signed in, so they
-  // are the view's to write and not this function's to overwrite.
-  if (identity.signedIn) {
-    const summary = card.querySelector(':scope > summary .settings-account-summary');
-    if (summary) {
-      patchAvatar(summary, 'settings-account-summary-avatar', identity);
-      const summaryName = summary.querySelector('.settings-category-copy strong');
-      if (summaryName) summaryName.textContent = identity.label;
-    }
-  }
-  const row = card.querySelector('.settings-account-identity');
-  if (!row || !identity.signedIn) return;
-  patchAvatar(row, 'settings-account-avatar', identity);
-  const name = row.querySelector('strong');
+// actually looking at stay stale until something else redrew it. Only the read-only card is
+// written: an open editor holds a draft, and a profile arriving must not overwrite it.
+function patchSettingsProfile(root: ParentNode, identity: AccountIdentity): void {
+  const card = root.querySelector('.profile-card[data-profile-mode="view"]');
+  if (!card || !identity.signedIn) return;
+  patchAvatar(card.querySelector('.profile-avatar-wrap'), 'profile-avatar', identity);
+  const name = card.querySelector('.profile-name');
   if (name) name.textContent = identity.label;
 }

@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 // This checks the one thing that would have caught it: that every class the code stamps on an
 // avatar is a class the stylesheet actually sizes.
 const CSS = ['src/workstr-reference.css', 'src/style.css'].map((file) => readFileSync(file, 'utf8')).join('\n');
-const SOURCES = ['src/app/account-chip.ts', 'src/app/settings-view.ts'].map((file) => readFileSync(file, 'utf8')).join('\n');
+const SOURCES = ['src/app/account-chip.ts', 'src/app/settings-view.ts', 'src/app/profile-view.ts'].map((file) => readFileSync(file, 'utf8')).join('\n');
 
 function avatarClasses(): string[] {
   const found = new Set<string>();
@@ -25,8 +25,8 @@ describe('every avatar class the code stamps', () => {
   it('finds the classes actually in use', () => {
     // A guard on the guard: if the helpers are renamed and this stops matching, the test
     // would pass by finding nothing at all.
-    expect(avatarClasses().length).toBeGreaterThanOrEqual(3);
-    expect(avatarClasses()).toContain('settings-account-summary-avatar');
+    expect(avatarClasses().length).toBeGreaterThanOrEqual(2);
+    expect(avatarClasses()).toContain('profile-avatar');
   });
 
   it('has a rule that gives it a size', () => {

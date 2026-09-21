@@ -115,7 +115,7 @@ describe('the render budget', () => {
     await waitFor(() => addressSettled(shell), 'the address lookup');
 
     expect(shell.renders.rebuilds).toBe(before);
-    expect(root.querySelector('.monero-tips-card #monero-address-section')).toBeTruthy();
+    expect(root.querySelector('.profile-card .profile-address')?.textContent).not.toBe('Loading…');
     localStorage.removeItem('workstr.currentPubkey');
     await drainBoot(shell);
   });
@@ -268,13 +268,13 @@ describe('what a background answer must not replace', () => {
     localStorage.setItem('workstr.currentPubkey', 'ab'.repeat(32));
     const { root, shell } = await boot();
     root.querySelector<HTMLElement>('#account-chip')?.click();
-    const account = root.querySelector<HTMLDetailsElement>('.account-card')!;
+    const account = root.querySelector<HTMLDetailsElement>('.access-card')!;
     account.open = true;
     const support = root.querySelector<HTMLDetailsElement>('.support-panel')!;
 
     await waitFor(() => addressSettled(shell), 'the address lookup');
 
-    expect(root.querySelector('.account-card')).toBe(account);
+    expect(root.querySelector('.access-card')).toBe(account);
     expect(account.open).toBe(true);
     expect(root.querySelector('.support-panel')).toBe(support);
     localStorage.removeItem('workstr.currentPubkey');

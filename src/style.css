@@ -5,11 +5,6 @@
    on, so turning them on is the thing that brings Monero orange in. */
 .monero-tips-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 66px; padding: 14px 16px; }
 .monero-tips-row .settings-category-copy small { white-space: normal; }
-.monero-tips-body { border-top: 1px solid rgba(var(--accent-line-rgb), .16); }
-.monero-tips-body[hidden] { display: none; }
-/* The body already draws the line under the switch; the address section's own divider would
-   stack a second one right below it. */
-.monero-tips-body > .monero-address-section { margin-top: 0; padding-top: 0; border-top: 0; }
 .settings-toggle {
   appearance: none; -webkit-appearance: none; position: relative; flex: none; width: 46px; height: 28px; margin: 0;
   border: 1px solid var(--border); border-radius: 999px; background: rgba(255, 255, 255, .06);
@@ -34,20 +29,10 @@
   background: rgba(var(--payment-rgb), .06);
   box-shadow: 0 0 24px var(--payment-glow);
 }
-:root[data-payment-mode="monero"] .monero-tips-body { border-top-color: rgba(var(--payment-rgb), .28); }
 
 /* The public Monero payment address. Field, focus ring and publish action are Monero
    surfaces and take --payment-*; the card around them stays Workstr purple. Monospace
    because the only thing a user does with a 95-character address is compare it. */
-.monero-address-section { display: grid; gap: 10px; margin-top: 2px; padding-top: 12px; border-top: 1px solid rgba(var(--payment-rgb), .2); }
-.monero-address-input { border-color: rgba(var(--payment-rgb), .38); font: 500 13px/1.4 ui-monospace, monospace; }
-.monero-address-input:focus { border-color: rgba(var(--payment-rgb), .72); box-shadow: 0 0 0 3px rgba(var(--payment-rgb), .18); }
-.monero-address-input:disabled { opacity: .62; }
-.monero-address-status { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
-.monero-address-status.ok { color: var(--payment-accent); }
-.monero-address-status.bad { color: #ffd6df; }
-.monero-address-source { margin: 0; color: var(--dim); font-size: 12px; line-height: 1.45; }
-.monero-address-section .settings-row-actions { justify-content: flex-start; }
 .support-monero-qr { width: 210px; max-width: 100%; padding: 12px; border: 1px solid rgba(var(--payment-rgb), .45); border-radius: 12px; background: #fff; box-shadow: 0 0 26px rgba(var(--payment-rgb), .18); }
 .support-monero-qr svg { display: block; width: 100%; height: auto; }
 .support-monero-address { display: block; width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid rgba(var(--payment-rgb), .3); border-radius: 10px; background: rgba(var(--payment-rgb), .07); color: var(--text); font: 500 12px/1.5 ui-monospace, monospace; word-break: break-all; user-select: all; }
@@ -90,7 +75,6 @@
 
 @media (max-width: 760px) {
   .monero-tips-row { min-height: 64px; padding: 13px 14px; }
-  .monero-address-section .settings-row-actions .button { flex: 1; }
 }
 
 /* Settings hierarchy polish (#207): keep the existing grouped architecture, but make each

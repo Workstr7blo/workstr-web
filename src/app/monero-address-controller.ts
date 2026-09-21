@@ -4,36 +4,37 @@ import {
   parseMoneroPaymentTarget,
   publishMoneroPaymentTarget
 } from '../nostr/payment-targets';
-import { moneroAddressBody, moneroAddressValue, moneroAddressVisible, moneroTipsCopy, type MoneroAddressState } from '../features/support/payment-mode-views';
 import type { Signer } from '../signer/types';
 import type { AppState } from './state';
 
+// The current user's public NIP-A3 Monero address: reading it from the relays and publishing
+// a change to it. It has no screen of its own. The Settings Profile editor shows and edits the
+// address alongside the display name and picture, and calls `publish` only when the address is
+// what changed; the Tip Jar page reads `state.monero` to say whether tips reach it.
 export interface MoneroAddressControllerContext {
-  root: HTMLElement;
   state: AppState;
-  toast(message: string, kind?: 'ok' | 'bad'): void;
   getSigner(): Promise<Signer | null>;
-  // Every address state change, so the Tip Jar page can say whether tips reach it.
+  // Every address state change, so the Profile card and the Tip Jar page can follow it.
   onChange?(): void;
 }
 
-const INVALID_ADDRESS = 'That does not look like a Monero address. Mainnet addresses are 95 characters (106 when integrated) and start with 4 or 8.';
-const SIGN_IN_FIRST = 'Sign in with your Nostr signer to publish a public Monero address.';
-// A remote signer that has not been granted this kind waits on a person, and the prompt is
-// in a signer app the user is not looking at. The publish looks identical to a relay
-// failure from here, so the one thing worth saying is where to look.
-const SIGNER_SILENT = 'Your signer did not answer. Open your signer app and approve the request, then save again. Nothing was changed on the relays.';
+export type MoneroAddressPublishResult = { ok: true; address: string } | { ok: false; message: string };
 
-function isSignerTimeout(error: unknown): boolean {
+const INVALID_ADDRESS = 'That does not look like a Monero address. Mainnet addresses are 95 characters (106 when integrated) and start with 4 or 8.';
+const SIGN_IN_FIRST = 'Sign in to publish a public Monero address.';
+// A signer that has not been granted this kind waits on a person, and the publish looks
+// identical to a relay failure from here, so the one thing worth saying is where to look.
+const SIGNER_SILENT = 'Your signer did not answer. Nothing was changed on the relays.';
+
+export function isSignerTimeout(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return /signer approval timed out|Signer did not respond/i.test(message);
 }
 
-// Relay and signer failures are worth showing — "which relay refused, and why" is the only
-// actionable part — but they arrive as raw remote text, so only the first line is kept and
-// it is capped. Nothing secret passes through this path: a payment target is public by
+// Relay and signer failures arrive as raw remote text, so only the first line is kept and it
+// is capped. Nothing secret passes through this path: a payment target is public by
 // definition and no key or wallet credential is in scope here.
-function reason(error: unknown): string {
+export function publishFailureReason(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error ?? '');
   const line = raw.split('\n')[0].trim();
   if (!line) return 'no reason given';
@@ -41,116 +42,67 @@ function reason(error: unknown): string {
 }
 
 export function createMoneroAddressController(ctx: MoneroAddressControllerContext) {
-  const { root, state, toast, getSigner } = ctx;
+  const { state, getSigner } = ctx;
+  let inflight: Promise<void> | null = null;
 
-  function set(next: Partial<MoneroAddressState>): void {
+  function set(next: Partial<AppState['monero']>): void {
     state.monero = { ...state.monero, ...next };
-    paint();
     ctx.onChange?.();
   }
 
-  // Repainted in place rather than through the shell render: a full render rebuilds the
-  // Settings page and closes the very category the user is reading the result in.
-  //
-  // The section shows while tips are on, and while tips are off only for an address that is
-  // still published - so a lookup answering, a removal succeeding and the switch moving can
-  // each show or hide it, and the line under the switch changes with it.
-  function paint(): void {
-    const body = root.querySelector<HTMLElement>('#monero-tips-body');
-    if (body) body.hidden = !moneroAddressVisible(state);
-    const copy = root.querySelector('#monero-tips-copy');
-    if (copy) copy.textContent = moneroTipsCopy(state);
-    const host = root.querySelector('#monero-address-section');
-    if (!host) return;
-    host.innerHTML = moneroAddressBody(state.monero, Boolean(state.pubkey), state.moneroWallet?.addresses);
-    bind();
-  }
-
-  // Read with tips off as well as on. An address published while tips were on stays public
-  // when they are switched off, and the card can only offer to remove it once it knows.
-  async function refresh(): Promise<void> {
-    if (!state.pubkey) { set({ status: 'idle', address: '', draft: undefined, event: undefined, message: SIGN_IN_FIRST, messageKind: undefined }); return; }
-    if (state.monero.status === 'loading' || state.monero.status === 'saving') return;
+  // Read with tips off as well as on: an address published while tips were on stays public
+  // when they are switched off, and the Profile editor is where it is changed or removed.
+  // A second caller while a read is running shares it rather than starting another.
+  function refresh(): Promise<void> {
+    if (inflight) return inflight;
+    if (!state.pubkey) { set({ status: 'idle', address: '', event: undefined, message: undefined, messageKind: undefined }); return Promise.resolve(); }
+    if (state.monero.status === 'saving') return Promise.resolve();
     const pubkey = state.pubkey;
-    set({ status: 'loading', message: 'Reading your payment targets from relays…', messageKind: undefined });
-    try {
-      const event = await fetchPaymentTargetsEvent(pubkey, state.settings.publicRelays);
-      // A namespace switch mid-lookup would otherwise show one account's address to another.
-      if (state.pubkey !== pubkey) return;
-      set({ status: 'ready', address: parseMoneroPaymentTarget(event) ?? '', draft: undefined, event, message: undefined, messageKind: undefined });
-    } catch (error) {
-      if (state.pubkey !== pubkey) return;
-      set({ status: 'error', message: `Could not read your payment targets (${reason(error)}). Your published address is unchanged — try Refresh from relays.`, messageKind: 'bad' });
-    }
+    set({ status: 'loading', message: undefined, messageKind: undefined });
+    inflight = (async () => {
+      try {
+        const event = await fetchPaymentTargetsEvent(pubkey, state.settings.publicRelays);
+        // A namespace switch mid-lookup would otherwise show one account's address to another.
+        if (state.pubkey !== pubkey) return;
+        set({ status: 'ready', address: parseMoneroPaymentTarget(event) ?? '', event, message: undefined, messageKind: undefined });
+      } catch (error) {
+        if (state.pubkey !== pubkey) return;
+        set({ status: 'error', message: `Could not read your Monero address (${publishFailureReason(error)}).`, messageKind: 'bad' });
+      } finally {
+        inflight = null;
+      }
+    })();
+    return inflight;
   }
 
-  // The first visit to Settings loads the address; after that only the Refresh button asks the
-  // relays again.
+  // The first visit to Settings loads the address; after that only Refresh profile asks again.
   function refreshIfNeeded(): void {
     if (!state.pubkey || state.monero.status !== 'idle') return;
     void refresh();
   }
 
-  // Allowed with tips off: that is how an address left published gets removed.
-  async function save(): Promise<void> {
-    if (!state.pubkey) { set({ message: SIGN_IN_FIRST, messageKind: 'bad' }); toast('Sign in to publish a Monero address', 'bad'); return; }
-    if (state.monero.status === 'loading' || state.monero.status === 'saving') return;
-    const field = root.querySelector<HTMLInputElement>('#monero-address');
-    const next = (field?.value ?? moneroAddressValue(state.monero)).trim();
-    if (next && !looksLikeMoneroAddress(next)) {
-      set({ draft: next, message: INVALID_ADDRESS, messageKind: 'bad' });
-      toast('Check the Monero address', 'bad');
-      return;
-    }
+  // An empty address removes only the Monero target; every other `payto` and unknown tag in
+  // the event is carried through by the NIP-A3 helper.
+  async function publish(address: string): Promise<MoneroAddressPublishResult> {
+    if (!state.pubkey) return { ok: false, message: SIGN_IN_FIRST };
+    const next = address.trim();
+    if (next && !looksLikeMoneroAddress(next)) return { ok: false, message: INVALID_ADDRESS };
     const signer = await getSigner();
-    if (!signer) { set({ draft: next, message: SIGN_IN_FIRST, messageKind: 'bad' }); toast('Sign in to publish a Monero address', 'bad'); return; }
-    set({ status: 'saving', draft: next, message: next ? 'Signing and publishing your payment target…' : 'Removing your Monero payment target…', messageKind: undefined });
+    if (!signer) return { ok: false, message: SIGN_IN_FIRST };
+    set({ status: 'saving', message: undefined, messageKind: undefined });
     try {
       // `existing` is only passed once a lookup has succeeded; left undefined the helper
       // reads the event itself and fails loudly rather than dropping unrelated targets.
-      const result = await publishMoneroPaymentTarget(signer, next, {
-        relays: state.settings.publicRelays,
-        existing: state.monero.event
-      });
-      const address = parseMoneroPaymentTarget(result.event) ?? '';
-      const partial = result.failedRelays.length
-        ? ` Accepted by ${result.okRelays.length} of ${result.okRelays.length + result.failedRelays.length} relays.`
-        : '';
-      set({
-        status: 'ready',
-        address,
-        draft: undefined,
-        event: result.event,
-        message: `${address ? 'Monero address published.' : 'Monero address removed.'}${partial}`,
-        messageKind: 'ok'
-      });
-      toast(address ? 'Monero address published' : 'Monero address removed');
+      const result = await publishMoneroPaymentTarget(signer, next, { relays: state.settings.publicRelays, existing: state.monero.event });
+      const published = parseMoneroPaymentTarget(result.event) ?? '';
+      set({ status: 'ready', address: published, event: result.event });
+      return { ok: true, address: published };
     } catch (error) {
-      set({
-        // A failed publish leaves the relays as they were, so the loaded event is still
-        // current; only a session that never managed to read one stays unread.
-        status: state.monero.event === undefined ? 'error' : 'ready',
-        draft: next,
-        message: isSignerTimeout(error)
-          ? SIGNER_SILENT
-          : `Could not publish (${reason(error)}). Nothing was changed on the relays — try again.`,
-        messageKind: 'bad'
-      });
-      toast(isSignerTimeout(error) ? 'Your signer did not answer' : 'Could not publish the Monero address', 'bad');
+      // A failed publish leaves the relays as they were, so the loaded event is still current.
+      set({ status: state.monero.event === undefined ? 'error' : 'ready' });
+      return { ok: false, message: isSignerTimeout(error) ? SIGNER_SILENT : `Could not publish (${publishFailureReason(error)}).` };
     }
   }
 
-  function bind(): void {
-    const field = root.querySelector<HTMLInputElement>('#monero-address');
-    // Deliberately no repaint on input: the draft is only mirrored so an unrelated repaint
-    // cannot throw away what is being typed.
-    field?.addEventListener('input', () => { state.monero = { ...state.monero, draft: field.value }; });
-    field?.addEventListener('keydown', (event) => {
-      if ((event as KeyboardEvent).key === 'Enter') { event.preventDefault(); void save(); }
-    });
-    root.querySelector('#monero-address-save')?.addEventListener('click', () => { void save(); });
-    root.querySelector('#monero-address-refresh')?.addEventListener('click', () => { void refresh(); });
-  }
-
-  return { bind, refresh, refreshIfNeeded, repaint: paint, save };
+  return { refresh, refreshIfNeeded, publish, repaint: () => ctx.onChange?.() };
 }

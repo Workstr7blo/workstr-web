@@ -436,7 +436,7 @@ describe('shell', () => {
     // Opening Settings starts the funding fetch, which renders again when it answers. Let
     // that finish first, or the render being counted is that one and not the profile's.
     await new Promise((resolve) => setTimeout(resolve, 0));
-    const card = root.querySelector('.account-card') as HTMLDetailsElement;
+    const card = root.querySelector('.access-card') as HTMLDetailsElement;
     card.open = true;
     const page = root.querySelector('.settings-page');
     const rebuiltBefore = shell.renders.rebuilds;
@@ -449,7 +449,8 @@ describe('shell', () => {
     expect(card.open).toBe(true);
     expect(root.querySelector('.connection-chip-label')?.textContent).toBe('Trainer');
     expect(root.querySelector('img.connection-avatar')?.getAttribute('src')).toBe('https://example.invalid/t.png');
-    expect(root.querySelector('.account-card .settings-account-identity strong')?.textContent).toBe('Trainer');
+    expect(root.querySelector('.profile-card .profile-name')?.textContent).toBe('Trainer');
+    expect(root.querySelector('.profile-card img.profile-avatar')?.getAttribute('src')).toBe('https://example.invalid/t.png');
     localStorage.removeItem('workstr.currentPubkey');
     await drainBoot(shell);
   });
@@ -469,7 +470,8 @@ describe('shell', () => {
     }
     root.querySelector<HTMLElement>('#account-chip')?.click();
     const settings = root.querySelector('.settings-page') as HTMLElement;
-    expect(settings?.textContent).toContain('Account');
+    expect(settings?.textContent).toContain('Profile');
+    expect(settings?.textContent).not.toContain('Access & Security');
     expect(settings?.textContent).not.toContain('Beast Mode');
     expect(settings?.textContent).not.toContain('Create 1 local program');
     expect(settings?.textContent).not.toContain('Complete 5 workouts');
@@ -481,11 +483,13 @@ describe('shell', () => {
     expect(settings?.textContent).not.toContain('Tip Jar');
     expect(settings?.querySelector('.advanced-settings:not([open])')).toBeTruthy();
     expect(settings?.querySelectorAll('.settings-category:not([open])')).toHaveLength(4);
-    expect(settings?.querySelector('.account-card summary')?.textContent).toContain('Local only');
+    expect(settings?.querySelector('.profile-card')?.textContent).toContain('Local only');
+    expect(settings?.querySelector('.profile-card #profile-edit')).toBeNull();
+    expect(settings?.querySelector('.profile-card #profile-photo-input')).toBeNull();
     expect(settings?.querySelector('.beast-mode-card')).toBeNull();
     expect(settings?.querySelector('.monero-tips-card')).toBeNull();
     expect(settings?.querySelector('.support-panel')).toBeNull();
-    expect(settings?.querySelector('.account-card .terminal-mini')).toBeNull();
+    expect(settings?.querySelector('.profile-card .terminal-mini')).toBeNull();
     expect(settings?.querySelector('#sign-in-settings')).toBeTruthy();
     expect(settings?.querySelector('#create-account-settings')).toBeNull();
     expect(settings?.querySelector('#restore-account-settings')).toBeNull();
@@ -509,7 +513,6 @@ describe('shell', () => {
     root.querySelector<HTMLElement>('#account-chip')?.click();
 
     const toggle = () => root.querySelector<HTMLInputElement>('#monero-tips-toggle')!;
-    const body = () => root.querySelector<HTMLElement>('#monero-tips-body')!;
     // #260: the Tip Jar no longer marks the header, so the nav item is the surface to watch.
     const navLabel = () => root.querySelector('.sidebar [data-view="tipjar"] .tip-jar-label')?.textContent;
     const chipMark = () => root.querySelector('#account-chip .connection-payment-mark');
@@ -521,7 +524,8 @@ describe('shell', () => {
     // Off is the default, and off carries no payment colour and no medallion.
     expect(toggle().checked).toBe(false);
     expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false);
-    expect(body().hidden).toBe(true);
+    // The address is the Profile's, so the switch carries no address editor either way.
+    expect(root.querySelector('.monero-tips-card input[type="text"]')).toBeNull();
     expect(chipMark()).toBeNull();
     expect(navLabel()).toBe('Tip Jar');
     const card = root.querySelector('.monero-tips-card');
@@ -530,15 +534,13 @@ describe('shell', () => {
     flip(true);
     await vi.waitFor(() => expect(document.documentElement.getAttribute('data-payment-mode')).toBe('monero'));
     expect(shell.state.settings.paymentMode).toBe('monero');
-    expect(body().hidden).toBe(false);
-    expect(root.querySelector('#monero-tips-body #monero-address-section')).toBeTruthy();
+    expect(root.querySelector('.profile-card .profile-address')).toBeTruthy();
     expect(chipMark()).toBeNull();
     expect(navLabel()).toBe('Syncing');
 
     flip(false);
     await vi.waitFor(() => expect(document.documentElement.hasAttribute('data-payment-mode')).toBe(false));
     expect(shell.state.settings.paymentMode).toBe('off');
-    expect(body().hidden).toBe(true);
     expect(chipMark()).toBeNull();
     expect(navLabel()).toBe('Tip Jar');
 
@@ -766,7 +768,7 @@ describe('shell', () => {
     authorProfiles: {},
     store: null,
     settings: { unit: 'kg', publicRelays: [] },
-    monero: { status: 'idle', address: '' },
+    monero: { status: 'idle', address: '' }, profile: { status: 'idle', editing: false },
     view: 'exercises',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     exercises: [],
@@ -883,7 +885,7 @@ describe('shell', () => {
       authorProfiles: {},
       store: null,
       settings: { unit: 'kg', publicRelays: [] },
-      monero: { status: 'idle', address: '' },
+      monero: { status: 'idle', address: '' }, profile: { status: 'idle', editing: false },
       view: 'settings',
       subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
       exercises: [],
