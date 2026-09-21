@@ -39,6 +39,8 @@ import { createIdentityController } from './identity-controller';
 import { createPreferencesController } from './preferences-controller';
 import { createBackupController } from './backup-controller';
 import { createMoneroAddressController } from './monero-address-controller';
+import { createProfileController } from './profile-controller';
+import { emptyProfileEditor } from './profile-editor';
 import { createMoneroWalletController } from './monero-wallet-controller';
 import { createTipJarBackupController } from './tip-jar-backup-controller';
 import { MoneroWalletCore } from '../features/monero/wallet-core';
@@ -57,7 +59,7 @@ const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'off', publ
 function profileName(profile: RelayProfile | null): string | null { return profile?.name?.trim() || profile?.nip05?.trim() || null; }
 
 export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
-  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, monero: { status: 'idle', address: '' }, moneroWallet: { status: 'unknown' }, view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', level: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, deviceVault: 'absent', expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
+  const state: AppState = { pubkey: localStorage.getItem(SESSION_KEY), npub: null, profileName: null, profilePicture: null, profileNames: {}, authorProfiles: {}, authorPaymentTargets: {}, store: null, settings: { ...DEFAULT_SETTINGS }, monero: { status: 'idle', address: '' }, profile: emptyProfileEditor(), moneroWallet: { status: 'unknown' }, view: 'exercises', subState: { exercises: 'library', workouts: 'programs', statistics: 'training' }, exercises: [], programs: [], activeSession: null, finishedSessions: [], publishingSessionId: null, publishingStatus: null, editingId: null, filter: '', programFilter: '', programFilters: { goal: '', focus: '', format: '', level: '', equipment: '' }, programFilterSheet: null, expandedProgramAddress: null, exerciseStatus: 'loading the Workstr catalog from relays...', programStatus: '', signInStatus: null, backup: { state: 'off', pending: 0 }, deviceVault: 'absent', expandedSessionId: null, history: { monthKey: null, selectedDate: null }, qw: { duration: 45, exercises: [], pool: {}, meta: '', visible: false }, bodyEntries: [], sheets: [], library: [], librarySelect: { active: false, slugs: new Set<string>() }, discoverSelect: { active: false, addresses: new Set<string>() }, discoverExercises: [], exFilter: { cat: '', muscle: '', diff: '', equip: '' }, discoverFilter: { q: '', cat: '', muscle: '', diff: '', equip: '' } };
 
   const trace = createRenderTrace();
   async function boot(): Promise<void> {
@@ -106,8 +108,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       if (!profile || state.pubkey !== pubkey) return;
       writeCachedProfile(profile);
       state.profileName = profileName(profile); state.profilePicture = profile.picture || null;
-      // A name and a picture change the chip and the Settings Account card and nothing else,
-      // and this lands seconds after launch, wherever the reader has got to by then.
+      // Lands seconds after launch, and changes only the chip and the Settings Profile card.
       if (!updateAccountIdentity(root, accountIdentity(state))) render({ reason: 'profile-relay' });
     });
   }
@@ -124,7 +125,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     state.store?.close();
     // The Monero address and wallet belong to whoever is signed in, so they are dropped with the
     // namespace rather than carried into the next account's Settings.
-    state.monero = { status: 'idle', address: '' };
+    state.monero = { status: 'idle', address: '' }; state.profile = emptyProfileEditor();
     moneroWallet.reset();
     tipJarActivity.reset();
     state.store = await WorkstrStore.open(namespace);
@@ -246,7 +247,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     render({ toTop: true, reason });
     if (view === 'exercises' && !state.discoverExercises.length) void catalog.refreshExercises();
     if (view === 'workouts' && !state.programs.length) void catalog.refreshPrograms();
-    if (view === 'settings') { moneroAddress.refreshIfNeeded(); tipJarBackup.refresh(); void moneroWallet.refreshIfNeeded(); }
+    if (view === 'settings') { tipJarBackup.refresh(); void moneroWallet.refreshIfNeeded(); }
     if (view === 'tipjar') tipJar.open();
   }
 
@@ -290,7 +291,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
       state.expandedSessionId = state.expandedSessionId === id ? null : id;
       render();
     }));
-    bindHistoryCalendar(); moneroAddress.bind(); moneroWallet.bind();
+    bindHistoryCalendar(); moneroWallet.bind(); if (state.view === 'settings') profile.refreshIfNeeded();
     preferences.bindRecoveryControls();
     preferences.bindBodyControls();
   }
@@ -350,12 +351,13 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
     persistCanonCache: catalog.persistCanonCache, loadFinishedSessions: sessionPersistence.loadFinished, getActiveSigner: identity.getActiveSigner
   });
   const preferences = createPreferencesController({ root, state, render, toast, startTrainingSession: sessionRunner.startTrainingSession, loadFinishedSessions: sessionPersistence.loadFinished });
-  const moneroAddress = createMoneroAddressController({ root, state, toast, getSigner: identity.getActiveSigner, onChange: () => tipJar.repaint() });
+  const moneroAddress = createMoneroAddressController({ state, getSigner: identity.getActiveSigner, onChange: () => { tipJar.repaint(); profile.repaint(); } });
+  const profile = createProfileController({ root, state, toast, getSigner: identity.getActiveSigner, moneroAddress });
   // One wallet core, shared by the controller that owns the wallet's life and the one that
   // owns its backup file. Two cores would be two open wallets fighting over the same vault.
   const walletCore = new MoneroWalletCore({ vault: deviceVault, account: () => state.pubkey });
   const tipJarActivity = createTipJarActivityController({ state, fetchProfile, onChange: () => tipJar.repaint() });
-  const moneroWallet = createMoneroWalletController({ root, state, toast, repaintMoneroAddress: moneroAddress.repaint, onChange: () => tipJar.repaint(), onActivity: (walletId, txs) => { void tipJarActivity.walletActivity(walletId, txs); }, core: walletCore });
+  const moneroWallet = createMoneroWalletController({ root, state, toast, onChange: () => tipJar.repaint(), onActivity: (walletId, txs) => { void tipJarActivity.walletActivity(walletId, txs); }, core: walletCore });
   const tipJarBackup = createTipJarBackupController({ root, state, toast, activity: tipJarActivity, wallet: { restore: moneroWallet.restore, toggleRecoveryPhrase: moneroWallet.toggleRecoveryPhrase, backupPayload: async () => ({ ...await moneroWallet.backupPayload(), activity: await tipJarActivity.backupRecords(await walletCore.storedWalletId()) }) } });
   let tipJar: ReturnType<typeof createTipJarController>;
   const openTipJarPage = (mode?: 'receive') => { state.view = 'tipjar'; render(); tipJar.open(); if (mode === 'receive') root.querySelector<HTMLButtonElement>('#tip-jar-receive')?.click(); };

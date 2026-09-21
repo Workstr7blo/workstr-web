@@ -58,7 +58,7 @@ function state(partial: Partial<AppState> = {}): AppState {
     authorProfiles: {},
     store: null,
     settings: { unit: 'kg', publicRelays: ['wss://nos.lol'] },
-    monero: { status: 'idle', address: '' },
+    monero: { status: 'idle', address: '' }, profile: { status: 'idle', editing: false },
     view: 'workouts',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     exercises: [],

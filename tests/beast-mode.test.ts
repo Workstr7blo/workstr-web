@@ -40,7 +40,7 @@ function state(partial: Partial<AppState> = {}): AppState {
     authorProfiles: {},
     store: null,
     settings: { unit: 'kg' },
-    monero: { status: 'idle', address: '' },
+    monero: { status: 'idle', address: '' }, profile: { status: 'idle', editing: false },
     view: 'settings',
     subState: { exercises: 'library', workouts: 'programs', statistics: 'training' },
     exercises: [],

@@ -1,6 +1,5 @@
 import type { AppState } from './state';
-import { accountIdentity, avatarFace } from './account-chip';
-import { displayIdentity, displayNpub, exerciseFilterValues, html } from './format';
+import { displayIdentity, exerciseFilterValues, html } from './format';
 import { APP_VERSION } from './version';
 import { countdownAudioState } from '../features/train/countdown-audio';
 import { supportPanel } from '../features/support/views';
@@ -12,15 +11,17 @@ import { beastModeSettingsCard } from '../features/sheets/beast-mode';
 import { backupPanel, backupPanelState } from '../features/backup/views';
 import { tipJarBackupSection } from '../features/monero/wallet-backup-view';
 import { deviceSecurityCard } from './device-vault-view';
+import { profileCard } from './profile-view';
 
 // Settings is read top to bottom by someone who is not thinking in features: who I am, how I
-// train, how I pay, how I support this, and then the technical drawer. The cards themselves
+// train, how I pay, how this device reaches my account, how I support this, and then the
+// technical drawer. The cards themselves
 // are unchanged and still come from the feature that owns each one; what this file decides is
 // the order they appear in and the groups they appear under.
 //
 // Cards in a group share one bordered container and are divided by a line rather than a gap,
 // so a group reads as one object. Whitespace separates groups. A group holding a single card
-// is indistinguishable from a standalone card, which is what Account and Support want.
+// is indistinguishable from a standalone card, which is what Profile and Support want.
 interface SettingsGroup {
   id: string;
   label: string;
@@ -33,7 +34,8 @@ interface SettingsGroup {
 // Stroke icons in the sidebar's style. Decorative: the label beside each one already names
 // the group, so they are hidden from assistive technology rather than described twice.
 const GROUP_ICONS = {
-  account: '<circle cx="12" cy="8" r="4"/><path d="M5 21v-1a7 7 0 0 1 14 0v1"/>',
+  profile: '<circle cx="12" cy="8" r="4"/><path d="M5 21v-1a7 7 0 0 1 14 0v1"/>',
+  access: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   training: '<path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/>',
   payments: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
   support: '<path d="M12 20s-7-4.3-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.7-7 9-7 9z"/>',
@@ -65,7 +67,7 @@ function settingsGroup(group: SettingsGroup): string {
 // The two strings the card derives from settings, read by the view below and by
 // `updateTrainingPreferences`. They are written once because a patcher that computes its own
 // copy is a patcher that drifts from the view the day someone edits one of them - which is
-// exactly how the Account summary broke in #201.
+// exactly how the old Account summary broke in #201.
 function trainingSummary(state: AppState): string {
   return `${normalizeWeightUnit(state.settings.unit) === 'kg' ? 'Kilograms' : 'Pounds'} · ${ownedEquipmentKeys(state.settings.ownedEquipment).length} equipment`;
 }
@@ -104,33 +106,28 @@ function equipmentPreference(state: AppState): string {
   </div>`;
 }
 
-// Only worth a line of its own when it is not already the name above it: with no profile
-// the display name *is* the shortened npub, and printing it twice says nothing.
-function npubLine(state: AppState): string {
+// How this device reaches the account, and the actions that affect only this device. Who the
+// account is belongs to the Profile card above, so nothing here repeats the avatar or name.
+// Removing local data is destructive and sits apart from the routine actions, behind its
+// confirmation in the identity controller.
+function accessCard(state: AppState): string {
   if (!state.pubkey) return '';
-  const short = displayNpub(state.pubkey);
-  return displayIdentity(state) === short ? '' : `<small class="settings-account-npub">${html(short)}</small>`;
-}
-
-function accountCard(state: AppState): string {
-  const keyLine = 'Device-managed key for encrypted sync.';
-  const addDeviceAction = state.pubkey ? '<button id="add-device-settings" class="button small">Add device</button>' : '';
-  const accountAvatar = avatarFace('settings-account-avatar', accountIdentity(state));
-  const account = state.pubkey
-    ? `<div class="settings-row-main account-row"><div class="settings-account-identity">${accountAvatar}<span><strong>${html(displayIdentity(state))}</strong><small>${html(keyLine)}</small></span></div><div class="settings-row-actions">${addDeviceAction}<button id="sign-out-settings" class="button small">Sign out</button><button id="remove-account-data" class="button quiet danger small">Remove data</button></div></div>`
-    : `<div class="settings-row-main account-row"><div><strong>Local only</strong><small>Use Workstr now, add encrypted sync when ready.</small></div><div class="settings-row-actions"><button id="sign-in-settings" class="button primary">Account</button></div></div>`;
-  // The identity is the summary here rather than a word: the avatar, the name and the npub
-  // are what someone checks when they open Settings to see who they are signed in as.
-  //
-  // `patchSettingsAccount` in `account-chip.ts` writes the name and the avatar here when a
-  // profile arrives, so those two carry the classes it looks for. The signer line and the
-  // npub do not change once signed in, and it leaves them alone.
-  const identityLine = state.pubkey
-    ? `<span class="settings-account-summary">${avatarFace('settings-account-summary-avatar', accountIdentity(state))}<span class="settings-category-copy"><strong>${html(displayIdentity(state))}</strong><small>Signed in with a Workstr account</small>${npubLine(state)}</span></span>`
-    : '<span class="settings-category-copy"><strong>Local only</strong><small>Not connected to an account yet</small></span>';
-  return `<details class="settings-category account-card" data-settings-section="account">
-    <summary>${identityLine}<span class="status-pill ${state.pubkey ? 'ok' : ''}">${state.pubkey ? 'SIGNED IN' : 'LOCAL'}</span></summary>
-    <div class="settings-category-body">${account}</div>
+  return `<details class="settings-category access-card" data-settings-section="access">
+    <summary><span class="settings-category-copy"><strong>Account access</strong><small>Add a device or sign out of this one</small></span></summary>
+    <div class="settings-category-body access-card-body">
+      <div class="settings-row-main account-row">
+        <div><strong>Add device</strong><small>Show a pairing code to sign in on another device.</small></div>
+        <div class="settings-row-actions"><button id="add-device-settings" class="button small" type="button">Add device</button></div>
+      </div>
+      <div class="settings-row-main account-row">
+        <div><strong>Sign out</strong><small>Your training data stays on this device.</small></div>
+        <div class="settings-row-actions"><button id="sign-out-settings" class="button small" type="button">Sign out</button></div>
+      </div>
+      <div class="settings-row-main account-row access-danger">
+        <div><strong>Remove local data</strong><small>Deletes this account's training data from this device and signs out.</small></div>
+        <div class="settings-row-actions"><button id="remove-account-data" class="button danger small" type="button">Remove local data</button></div>
+      </div>
+    </div>
   </details>`;
 }
 
@@ -181,9 +178,10 @@ export function settingsView(state: AppState): string {
   return `<div class="page active settings-page">
     <div class="page-title">Settings</div>
     <p class="page-blurb">Customize your experience, keep your data safe, and support a stronger, more sovereign future.</p>
-    ${settingsGroup({ id: 'account', label: 'Account', blurb: 'Your identity and device connection', icon: GROUP_ICONS.account, cards: [accountCard(state), deviceSecurityCard(state)] })}
+    ${settingsGroup({ id: 'profile', label: 'Profile', blurb: 'Your public Nostr profile', icon: GROUP_ICONS.profile, cards: [profileCard(state)] })}
     ${settingsGroup({ id: 'training', label: 'Training', blurb: 'Configure your training experience', icon: GROUP_ICONS.training, cards: trainingCards })}
     ${settingsGroup({ id: 'payments', label: 'Payments', blurb: 'Tip program creators with Monero', icon: GROUP_ICONS.payments, cards: paymentCards })}
+    ${settingsGroup({ id: 'access', label: 'Access & Security', blurb: 'How this device reaches your account', icon: GROUP_ICONS.access, cards: [accessCard(state), deviceSecurityCard(state)] })}
     ${settingsGroup({ id: 'support', label: 'Support', blurb: 'Help keep Workstr independent', icon: GROUP_ICONS.support, cards: supportCards, variant: 'support' })}
     ${settingsGroup({ id: 'system', label: 'System & Data', blurb: 'Manage your data and advanced settings', icon: GROUP_ICONS.system, cards: [backupPanel(backupPanelState(state, tipJarBackupSection(state))), advancedCard(state)] })}
   </div>`;

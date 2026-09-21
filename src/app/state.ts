@@ -3,6 +3,7 @@ import type { BodyWeightEntry, Exercise, TrainingBlock, WorkstrSettings } from '
 import type { RelayProgram } from '../nostr/canon';
 import type { RelayProfile } from '../nostr/pool';
 import type { MoneroAddressState } from '../features/support/payment-mode-views';
+import type { ProfileEditorState } from './profile-editor';
 import type { MoneroWalletUiState, TipJarActivity, TipJarBackupUiState } from '../features/monero/types';
 import type { SyncStatus } from '../sync/engine';
 import type { DeviceVaultStatus } from '../security/device-vault-types';
@@ -72,6 +73,8 @@ export interface AppState {
   // The user's public Monero payment target, shown under Monero tips in Settings. Session
   // state, not a setting: the relays own the address.
   monero: MoneroAddressState;
+  // The Settings Profile editor: the complete `kind:0` once read, and the unsaved draft.
+  profile: ProfileEditorState;
   moneroWallet?: MoneroWalletUiState;
   // The Tip Jar backup controls in Data & Sync. Absent until Settings has been opened.
   tipJarBackup?: TipJarBackupUiState;

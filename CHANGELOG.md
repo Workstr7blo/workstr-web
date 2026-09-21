@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a Profile section at the top of Settings. It shows your avatar, display name, npub and
+  public Monero address, and Edit profile changes all three with one Save changes. Change photo
+  opens the device photo picker and uploads the image to nostr.build, signed by your account;
+  Advanced takes an image URL you host yourself. Workstr publishes only what changed: the name
+  and photo update your Nostr profile, keeping every other field another app wrote there, and
+  the address updates your NIP-A3 payment targets, keeping any other targets. If one of the two
+  fails, the other stays saved and Save changes retries only the failed part. Refresh profile
+  reloads both and asks before discarding unsaved edits.
+
 - Added sending from the Tip Jar. Tip on a program card now opens a tip sheet in Workstr:
   pick 0.001, 0.005 or 0.01 XMR or type an amount, review the amount, network fee and total,
   and confirm. The transfer is signed on your device and broadcast through the Monero node;
@@ -54,6 +63,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verification, and an iOS Safari/PWA QA checklist before production wallet UI work.
 
 ### Changed
+
+- Replaced the Account section of Settings with Profile and a new Access & Security section,
+  which holds Add device, Sign out, Remove local data and Device security. The Monero address
+  moved from the Tip Jar card to Profile; the Tip Jar card is now only the on/off switch, and
+  turning it off or on never publishes or removes your address.
 
 - Removed NIP-07 browser-extension sign-in and NIP-46 remote-signer sign-in. Workstr Web now
   supports only local-only mode and Workstr-managed accounts whose recovery key is protected by

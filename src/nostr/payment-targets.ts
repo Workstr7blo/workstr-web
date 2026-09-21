@@ -1,6 +1,7 @@
 import { SimplePool } from 'nostr-tools';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../signer/types';
 import { DEFAULT_PUBLIC_RELAYS } from './pool';
+import { fetchLatestReplaceable, publishToRelays, withTimeout, type ReplaceablePool } from './replaceable-event';
 
 // NIP-A3 public payment targets. `kind:10133` is a replaceable event whose `payto` tags
 // advertise where an author can be paid, so it is read for other people's programs and
@@ -20,25 +21,13 @@ const MONERO_METHOD_ALIASES = ['monero', 'xmr'];
 const FETCH_TIMEOUT_MS = 5000;
 const AUTHOR_BATCH_SIZE = 40;
 const SIGN_TIMEOUT_MS = 120000;
-const PUBLISH_TIMEOUT_MS = 8000;
 
-export interface PaymentTargetsPool {
-  get(relays: string[], filter: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
-  publish(relays: string[], event: SignedNostrEvent): Array<Promise<string>>;
-  close(relays: string[]): void;
-}
+export type PaymentTargetsPool = ReplaceablePool;
 
 export interface PublishPaymentTargetResult {
   event: SignedNostrEvent;
   okRelays: string[];
   failedRelays: string[];
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(label)), timeoutMs);
-    promise.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
-  });
 }
 
 export function paymentTargetRelays(configured: string[] = []): string[] {
@@ -111,29 +100,10 @@ export function buildPaymentTargetsEvent(existingTags: string[][] = [], address:
   };
 }
 
-async function queryPaymentTargetsEvent(relays: string[], pubkey: string, timeoutMs: number): Promise<SignedNostrEvent | null> {
-  const pool = new SimplePool();
-  try {
-    // Connections are opened first, and explicitly. `pool.get` resolves null both when the
-    // author publishes no event and when not one relay could be reached, and the caller
-    // must not confuse those: a browser that is simply offline would otherwise be told the
-    // user has no payment targets, and the next publish would overwrite the ones it never
-    // managed to read.
-    const connections = await Promise.allSettled(relays.map((relay) => withTimeout(
-      pool.ensureRelay(relay, { connectionTimeout: timeoutMs }),
-      timeoutMs,
-      `${relay} did not answer`
-    )));
-    const reachable = relays.filter((_relay, index) => connections[index].status === 'fulfilled');
-    if (!reachable.length) throw new Error('no relay could be reached for the payment target lookup');
-    return await withTimeout(
-      pool.get(reachable, { kinds: [PAYMENT_TARGETS_KIND], authors: [pubkey] }) as Promise<SignedNostrEvent | null>,
-      timeoutMs,
-      'payment target lookup timed out'
-    );
-  } finally {
-    pool.close(relays);
-  }
+// Rejects when no relay could be reached, so an offline browser is never mistaken for an
+// author with no payment targets.
+function queryPaymentTargetsEvent(relays: string[], pubkey: string, timeoutMs: number): Promise<SignedNostrEvent | null> {
+  return fetchLatestReplaceable(relays, PAYMENT_TARGETS_KIND, pubkey, timeoutMs, 'payment target');
 }
 
 // One relay query for many authors, so opening Discover with Monero tips on costs a single
@@ -242,22 +212,6 @@ export async function fetchAuthorMoneroPaymentTargets(
   return targets;
 }
 
-function publishReason(result?: PromiseSettledResult<string>): string {
-  if (!result) return 'no result from relay';
-  if (result.status === 'fulfilled') return result.value || 'accepted';
-  return result.reason instanceof Error ? result.reason.message : String(result.reason);
-}
-
-// A relay that fulfils with a "connection failure:" message never saw the event, so it is a
-// failure despite the resolved promise. Mirrors the check in program-publish.ts; kept local
-// so the payment layer does not import the creator-program module graph.
-//
-// Tolerates a missing result: a pool that returns fewer promises than relays has not
-// published to the remainder, and that counts as a failure rather than a crash.
-function isAccepted(result?: PromiseSettledResult<string>): boolean {
-  return !!result && result.status === 'fulfilled' && !result.value.toLowerCase().startsWith('connection failure:');
-}
-
 export interface PublishMoneroPaymentTargetOptions {
   relays?: string[];
   /** Latest known event. Omit to look it up first, which is what preserves other targets. */
@@ -292,18 +246,5 @@ export async function publishMoneroPaymentTarget(
   );
 
   const pool = options.poolFactory?.() || (new SimplePool() as unknown as PaymentTargetsPool);
-  try {
-    const results = await Promise.allSettled(
-      pool.publish(relays, signed).map((publish) => withTimeout(publish, PUBLISH_TIMEOUT_MS, 'relay publish timed out'))
-    );
-    const okRelays = relays.filter((_relay, index) => isAccepted(results[index]));
-    const failedRelays = relays.filter((_relay, index) => !isAccepted(results[index]));
-    if (!okRelays.length) {
-      const index = relays.findIndex((_relay, at) => !isAccepted(results[at]));
-      throw new Error(`no relay accepted the payment target (${relays[index]}: ${publishReason(results[index])})`);
-    }
-    return { event: signed, okRelays, failedRelays };
-  } finally {
-    pool.close(relays);
-  }
+  return { event: signed, ...await publishToRelays(pool, relays, signed, 'payment target') };
 }

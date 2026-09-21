@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMoneroAddressController } from '../src/app/monero-address-controller';
-import { EMPTY_ADDRESS_COPY, moneroAddressSection, moneroTipsCard } from '../src/features/support/payment-mode-views';
+import { moneroTipsCard } from '../src/features/support/payment-mode-views';
 import type { AppState } from '../src/app/state';
 import type { SignedNostrEvent, Signer } from '../src/signer/types';
 
@@ -36,94 +36,64 @@ function state(overrides: Partial<AppState> = {}): AppState {
 const signer = { getPublicKey: async () => PUBKEY, signEvent: vi.fn() } as unknown as Signer;
 
 function harness(overrides: Partial<AppState> = {}, getSigner: () => Promise<Signer | null> = async () => signer) {
-  document.body.innerHTML = '<div id="app"></div>';
-  const root = document.getElementById('app') as HTMLElement;
   const app = state(overrides);
-  const toast = vi.fn();
-  root.innerHTML = moneroAddressSection(app.monero, Boolean(app.pubkey));
-  const controller = createMoneroAddressController({ root, state: app, toast, getSigner });
-  controller.bind();
-  const field = () => root.querySelector<HTMLInputElement>('#monero-address');
-  const text = () => root.textContent || '';
-  return { root, state: app, toast, controller, field, text };
+  const onChange = vi.fn();
+  const controller = createMoneroAddressController({ state: app, getSigner, onChange });
+  return { state: app, controller, onChange };
 }
 
-describe('Monero payment address settings', () => {
+describe('the public Monero address service', () => {
   beforeEach(() => {
     fetchPaymentTargetsEventMock.mockReset();
     publishMoneroPaymentTargetMock.mockReset();
   });
 
-  it('shows the address section while Monero tips are on', () => {
-    const off = moneroTipsCard(state({ settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] } }));
-    expect(off).toContain('id="monero-tips-body" hidden');
-    expect(off).not.toContain(' checked');
-
-    const on = moneroTipsCard(state());
-    expect(on).not.toContain('id="monero-tips-body" hidden');
-    expect(on).toContain('role="switch" id="monero-tips-toggle"');
-    expect(on).toContain('Monero payment address');
-    expect(on).not.toContain('NIP-A3');
-    expect(on).not.toContain('kind:10133');
-    expect(on).toContain('Use a fresh Monero subaddress.');
-    expect(on).toContain('It is not stored in Workstr sync.');
-    // A switch, not a disclosure: one control and nothing to collapse.
-    expect(on).toContain('<section class="settings-category monero-tips-card" data-settings-section="monero-tips">');
-    expect(on).not.toContain('<details');
-    expect(on).toContain('<strong id="monero-tips-label">Tip Jar</strong>');
+  // The address is part of the Profile now. The Tip Jar card is only the switch, so turning
+  // tips on or off can neither publish nor remove an address.
+  it('leaves the Tip Jar card as a switch with no address editor', () => {
+    for (const paymentMode of ['off', 'monero'] as const) {
+      const markup = moneroTipsCard(state({ settings: { unit: 'kg', paymentMode, publicRelays: [] } }));
+      expect(markup).toContain('role="switch" id="monero-tips-toggle"');
+      expect(markup).toContain('<strong id="monero-tips-label">Tip Jar</strong>');
+      expect(markup).not.toContain('monero-address');
+      expect(markup).not.toContain('Refresh from relays');
+      expect(markup).not.toContain('<details');
+    }
   });
 
-  it('never calls it a wallet and offers no NWC action', () => {
-    const monero = moneroTipsCard(state());
-    expect(monero.toLowerCase()).not.toContain('wallet');
-    expect(monero).not.toContain('nwc');
-  });
-
-  it('asks signed-out users to sign in instead of showing a publish field', () => {
-    const markup = moneroAddressSection({ status: 'idle', address: '' }, false);
-    expect(markup).toContain('Sign in with your Nostr signer');
-    expect(markup).not.toContain('id="monero-address"');
-    expect(markup).not.toContain('Save address');
-  });
-
-  it('shows the published address after reading kind:10133 from relays', async () => {
+  it('reads the published address from kind:10133', async () => {
     fetchPaymentTargetsEventMock.mockResolvedValueOnce(targetsEvent([['payto', 'monero', ADDRESS]]));
     const app = harness();
 
     await app.controller.refresh();
 
     expect(fetchPaymentTargetsEventMock).toHaveBeenCalledWith(PUBKEY, ['wss://relay.example']);
-    expect(app.state.monero.status).toBe('ready');
-    expect(app.state.monero.address).toBe(ADDRESS);
-    expect(app.field()?.value).toBe(ADDRESS);
-    expect(app.text()).toContain('PUBLISHED');
+    expect(app.state.monero).toMatchObject({ status: 'ready', address: ADDRESS });
+    expect(app.onChange).toHaveBeenCalled();
   });
 
-  it('states plainly when the author publishes no Monero target', async () => {
+  it('shares one lookup between callers that ask at the same time', async () => {
     fetchPaymentTargetsEventMock.mockResolvedValueOnce(null);
     const app = harness();
 
-    await app.controller.refresh();
+    await Promise.all([app.controller.refresh(), app.controller.refresh()]);
 
-    expect(app.state.monero.address).toBe('');
-    expect(app.text()).toContain(EMPTY_ADDRESS_COPY);
-    expect(app.text()).toContain('NOT SET');
+    expect(fetchPaymentTargetsEventMock).toHaveBeenCalledTimes(1);
+    expect(app.state.monero).toMatchObject({ status: 'ready', address: '' });
   });
 
-  it('keeps Settings usable when the lookup fails, and does not claim there is no address', async () => {
+  it('marks a failed lookup unread rather than claiming there is no address', async () => {
     fetchPaymentTargetsEventMock.mockRejectedValueOnce(new Error('payment target lookup timed out'));
     const app = harness();
 
     await app.controller.refresh();
 
     expect(app.state.monero.status).toBe('error');
-    expect(app.text()).toContain('Could not read your payment targets');
-    expect(app.text()).toContain('payment target lookup timed out');
-    expect(app.text()).not.toContain(EMPTY_ADDRESS_COPY);
-    expect(app.field()).toBeTruthy();
+    expect(app.state.monero.event).toBeUndefined();
+    expect(app.state.monero.message).toContain('payment target lookup timed out');
   });
 
-  it('publishes an edited address through the NIP-A3 helper', async () => {
+  it('publishes through the NIP-A3 helper with the event it read, so other targets survive', async () => {
     fetchPaymentTargetsEventMock.mockResolvedValueOnce(targetsEvent([['payto', 'lightning', 'user@example.com']]));
     publishMoneroPaymentTargetMock.mockResolvedValueOnce({
       event: targetsEvent([['payto', 'lightning', 'user@example.com'], ['payto', 'monero', OTHER_ADDRESS]]),
@@ -133,94 +103,66 @@ describe('Monero payment address settings', () => {
     const app = harness();
     await app.controller.refresh();
 
-    app.field()!.value = OTHER_ADDRESS;
-    await app.controller.save();
+    const result = await app.controller.publish(`  ${OTHER_ADDRESS} `);
 
     const [, address, options] = publishMoneroPaymentTargetMock.mock.calls[0];
     expect(address).toBe(OTHER_ADDRESS);
     expect(options.relays).toEqual(['wss://relay.example']);
-    // The event just read is handed back so unrelated payment targets survive the write.
     expect(options.existing?.tags).toEqual([['payto', 'lightning', 'user@example.com']]);
+    expect(result).toEqual({ ok: true, address: OTHER_ADDRESS });
     expect(app.state.monero.address).toBe(OTHER_ADDRESS);
-    expect(app.text()).toContain('Monero address published.');
-    expect(app.toast).toHaveBeenCalledWith('Monero address published');
   });
 
-  it('clears the target when the field is emptied', async () => {
+  it('removes only the Monero target when published empty', async () => {
     fetchPaymentTargetsEventMock.mockResolvedValueOnce(targetsEvent([['payto', 'monero', ADDRESS]]));
-    publishMoneroPaymentTargetMock.mockResolvedValueOnce({
-      event: targetsEvent([]),
-      okRelays: ['wss://relay.example'],
-      failedRelays: []
-    });
+    publishMoneroPaymentTargetMock.mockResolvedValueOnce({ event: targetsEvent([]), okRelays: ['wss://relay.example'], failedRelays: [] });
     const app = harness();
     await app.controller.refresh();
-    expect(app.text()).toContain('Save address');
 
-    app.field()!.value = '   ';
-    await app.controller.save();
+    const result = await app.controller.publish('');
 
     expect(publishMoneroPaymentTargetMock.mock.calls[0][1]).toBe('');
+    expect(result).toEqual({ ok: true, address: '' });
     expect(app.state.monero.address).toBe('');
-    expect(app.text()).toContain('Monero address removed.');
   });
 
   it('refuses to publish something that is not a Monero address', async () => {
     const app = harness();
 
-    app.field()!.value = 'not-an-address';
-    await app.controller.save();
+    const result = await app.controller.publish('not-an-address');
 
     expect(publishMoneroPaymentTargetMock).not.toHaveBeenCalled();
-    expect(app.text()).toContain('That does not look like a Monero address');
-    // The typed value survives so it can be corrected rather than retyped.
-    expect(app.field()?.value).toBe('not-an-address');
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.message).toContain('That does not look like a Monero address');
   });
 
-  // A remote signer that has not been granted kind:10133 waits on a person, and the prompt
-  // is in an app the user is not looking at. "No reason given from a relay" would send them
-  // to the wrong place entirely.
-  it('sends the user to their signer when the signer never answered', async () => {
+  it('says the signer did not answer rather than blaming a relay', async () => {
     publishMoneroPaymentTargetMock.mockRejectedValueOnce(new Error('signer approval timed out'));
     const app = harness();
 
-    app.field()!.value = ADDRESS;
-    await app.controller.save();
+    const result = await app.controller.publish(ADDRESS);
 
-    expect(app.text()).toContain('Your signer did not answer');
-    expect(app.text()).toContain('approve the request');
-    expect(app.text()).not.toContain('Could not publish (');
-    expect(app.toast).toHaveBeenCalledWith('Your signer did not answer', 'bad');
-    // Still typed in, so approving in the signer app and saving again is one tap.
-    expect(app.field()?.value).toBe(ADDRESS);
+    expect(!result.ok && result.message).toContain('Your signer did not answer');
   });
 
-  it('reports a failed publish without losing the known address', async () => {
+  it('keeps the known address when a publish fails', async () => {
     fetchPaymentTargetsEventMock.mockResolvedValueOnce(targetsEvent([['payto', 'monero', ADDRESS]]));
     publishMoneroPaymentTargetMock.mockRejectedValueOnce(new Error('no relay accepted the payment target (wss://relay.example: blocked)'));
     const app = harness();
     await app.controller.refresh();
 
-    app.field()!.value = OTHER_ADDRESS;
-    await app.controller.save();
+    const result = await app.controller.publish(OTHER_ADDRESS);
 
-    expect(app.state.monero.address).toBe(ADDRESS);
-    expect(app.state.monero.status).toBe('ready');
-    expect(app.text()).toContain('Could not publish');
-    expect(app.text()).toContain('blocked');
-    expect(app.toast).toHaveBeenCalledWith('Could not publish the Monero address', 'bad');
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.message).toContain('blocked');
+    expect(app.state.monero).toMatchObject({ status: 'ready', address: ADDRESS });
   });
 
   it('never publishes against an unread event, so unrelated targets cannot be dropped', async () => {
-    publishMoneroPaymentTargetMock.mockResolvedValueOnce({
-      event: targetsEvent([['payto', 'monero', ADDRESS]]),
-      okRelays: ['wss://relay.example'],
-      failedRelays: []
-    });
+    publishMoneroPaymentTargetMock.mockResolvedValueOnce({ event: targetsEvent([['payto', 'monero', ADDRESS]]), okRelays: ['wss://relay.example'], failedRelays: [] });
     const app = harness();
 
-    app.field()!.value = ADDRESS;
-    await app.controller.save();
+    await app.controller.publish(ADDRESS);
 
     // Undefined means "look it up first" in publishMoneroPaymentTarget; null would mean
     // "this author has no event", which is a claim no lookup has backed here.
@@ -231,38 +173,21 @@ describe('Monero payment address settings', () => {
     const app = harness({ pubkey: null }, async () => null);
 
     app.controller.refreshIfNeeded();
-    await app.controller.save();
+    const result = await app.controller.publish(ADDRESS);
 
     expect(fetchPaymentTargetsEventMock).not.toHaveBeenCalled();
     expect(publishMoneroPaymentTargetMock).not.toHaveBeenCalled();
-    expect(app.toast).toHaveBeenCalledWith('Sign in to publish a Monero address', 'bad');
+    expect(result.ok).toBe(false);
   });
 
-  // Turning tips off unpublishes nothing, so the address is still read: it is the only way the
-  // card can offer to remove one left behind.
-  it('reads the published address with tips off and keeps it removable', async () => {
+  it('reads the address with tips off, because turning tips off unpublishes nothing', async () => {
     fetchPaymentTargetsEventMock.mockResolvedValueOnce(targetsEvent([['payto', 'monero', ADDRESS]]));
     const app = harness({ settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] } });
-    app.root.innerHTML = moneroTipsCard(app.state);
-    app.controller.bind();
-    const body = () => app.root.querySelector<HTMLElement>('#monero-tips-body');
-    const copy = () => app.root.querySelector('#monero-tips-copy')?.textContent;
 
-    expect(body()?.hidden).toBe(true);
     app.controller.refreshIfNeeded();
     await vi.waitFor(() => expect(app.state.monero.status).toBe('ready'));
 
-    expect(fetchPaymentTargetsEventMock).toHaveBeenCalledTimes(1);
-    expect(body()?.hidden).toBe(false);
-    expect(copy()).toBe('Off. Your Monero address is still published.');
-    expect(app.field()?.value).toBe(ADDRESS);
-
-    publishMoneroPaymentTargetMock.mockResolvedValueOnce({ event: targetsEvent([]), okRelays: ['wss://relay.example'], failedRelays: [] });
-    app.field()!.value = '';
-    await app.controller.save();
-
-    expect(publishMoneroPaymentTargetMock.mock.calls[0][1]).toBe('');
-    expect(body()?.hidden).toBe(true);
-    expect(copy()).toBe('Send and receive tips in Workstr.');
+    expect(app.state.monero.address).toBe(ADDRESS);
+    expect(publishMoneroPaymentTargetMock).not.toHaveBeenCalled();
   });
 });

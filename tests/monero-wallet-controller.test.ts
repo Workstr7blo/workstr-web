@@ -32,7 +32,7 @@ function state(overrides: Partial<AppState> = {}): AppState {
   return {
     pubkey: 'ab'.repeat(32), npub: null, profileName: null, profilePicture: null, profileNames: {}, store: null,
     settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] },
-    monero: { status: 'idle', address: '' },
+    monero: { status: 'idle', address: '' }, profile: { status: 'idle', editing: false },
     moneroWallet: { status: 'unknown' },
     deviceVault: 'unlocked',
     library: [], discoverExercises: [], finishedSessions: [], sheets: [],
@@ -64,10 +64,7 @@ function app(overrides: Partial<AppState> = {}) {
     close: vi.fn(async () => undefined)
   } as unknown as MoneroWalletCore;
   const toast = vi.fn();
-  const ctrl = createMoneroWalletController({ root, state: s, toast, repaintMoneroAddress: () => {
-    const body = root.querySelector('#monero-tips-body');
-    if (body) body.innerHTML = moneroTipsCard(s).match(/<div class="settings-category-body monero-tips-body"[^>]*>([\s\S]*)<\/div>\s*<\/section>/)?.[1] || body.innerHTML;
-  }, onChange: () => updateTipJarPage(root, s), vault, core });
+  const ctrl = createMoneroWalletController({ root, state: s, toast, onChange: () => updateTipJarPage(root, s), vault, core });
   ctrl.bind();
   return { root, state: s, core, ctrl, toast };
 }

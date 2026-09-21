@@ -14,7 +14,7 @@ const state = (over: Partial<AppState> = {}): AppState => ({
   profileNames: {},
   store: null,
   settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] },
-  monero: { status: 'idle', address: '' },
+  monero: { status: 'idle', address: '' }, profile: { status: 'idle', editing: false },
   library: [],
   discoverExercises: [],
   finishedSessions: [],
@@ -54,12 +54,10 @@ describe('the account chip', () => {
     updateAccountIdentity(root, accountIdentity(state({ profileName: 'Coach' })));
     expect(root.querySelector('img.connection-avatar')).toBe(image);
     expect(root.querySelector('.connection-chip-label')?.textContent).toBe('Coach');
-    expect(root.querySelector('.settings-account-identity strong')?.textContent).toBe('Coach');
-    // The name is patched where the name lives. The line under it says which account mode
-    // owns the key, which a profile does not change - overwriting it with the name was the bug
-    // this assertion replaces.
-    expect(root.querySelector('.account-card summary .settings-category-copy strong')?.textContent).toBe('Coach');
-    expect(root.querySelector('.account-card summary .settings-category-copy small')?.textContent).toBe('Signed in with a Workstr account');
+    expect(root.querySelector('.profile-card .profile-name')?.textContent).toBe('Coach');
+    // The name is patched where the name lives. The npub under it does not change with a
+    // profile - overwriting it with the name was the bug this assertion replaces.
+    expect(root.querySelector('.profile-card .profile-npub')?.textContent).toMatch(/^npub1/);
   });
 
   it('moves the same element to a new picture rather than making another', () => {
@@ -77,9 +75,9 @@ describe('the account chip', () => {
     expect(root.querySelector('img.connection-avatar')).toBeNull();
     updateAccountIdentity(root, accountIdentity(state()));
     expect(root.querySelector('img.connection-avatar')?.getAttribute('src')).toBe('https://example.invalid/a.png');
-    expect(root.querySelector('img.settings-account-avatar')).toBeTruthy();
-    expect(root.querySelector('.settings-account-identity strong')?.textContent).toBe('Trainer');
-    expect(root.querySelector('.settings-account-identity small')?.textContent).toBe('Device-managed key for encrypted sync.');
+    expect(root.querySelector('img.profile-avatar')).toBeTruthy();
+    expect(root.querySelector('.profile-card .profile-name')?.textContent).toBe('Trainer');
+    expect(root.querySelector('.profile-card .profile-npub')?.textContent).toMatch(/^npub1/);
   });
 
   it('puts a failed picture back on screen when a working one replaces it', () => {
@@ -90,6 +88,15 @@ describe('the account chip', () => {
     updateAccountIdentity(root, accountIdentity(state({ profilePicture: 'https://example.invalid/c.png' })));
     expect(image.hidden).toBe(false);
     expect(fallback.hidden).toBe(true);
+  });
+
+  // An open editor holds a draft. A profile arriving from a relay must not write over it.
+  it('leaves an open Profile editor alone', () => {
+    const editing = state({ profile: { status: 'ready', editing: true, event: null, baseline: { displayName: 'Trainer', picture: '', address: '' }, draft: { displayName: 'Typed', picture: '', address: '' } } } as Partial<AppState>);
+    const root = mount(accountIdentity(editing), editing);
+    updateAccountIdentity(root, accountIdentity(state({ profileName: 'Coach' })));
+    expect(root.querySelector<HTMLInputElement>('#profile-display-name')?.value).toBe('Typed');
+    expect(root.querySelector('.connection-chip-label')?.textContent).toBe('Coach');
   });
 
   it('carries the signed-out chip and its Local line', () => {
@@ -122,7 +129,7 @@ describe('the account chip', () => {
     expect(root.querySelector('#account-chip')!.innerHTML).toBe(before);
   });
 
-  // Every view except Settings has no Account card, and the chip itself is gone while the
+  // Every view except Settings has no Profile card, and the chip itself is gone while the
   // shell has not mounted yet. Reporting that is how a caller tells a silent state update
   // from a visible one.
   it('reports that there was nothing to write to', () => {
@@ -131,7 +138,7 @@ describe('the account chip', () => {
     expect(updateAccountIdentity(root, accountIdentity(state()))).toBe(false);
   });
 
-  it('writes the chip when the Account card is not on screen', () => {
+  it('writes the chip when the Profile card is not on screen', () => {
     document.body.innerHTML = `<div id="app">${accountChip(accountIdentity(state({ profileName: null, profilePicture: null })))}</div>`;
     const root = document.getElementById('app') as HTMLElement;
     expect(updateAccountIdentity(root, accountIdentity(state()))).toBe(true);
