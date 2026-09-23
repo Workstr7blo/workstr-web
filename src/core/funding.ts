@@ -4,4 +4,4 @@
 // before anything renders a payment code from it. The donate section on workstr.fit shows
 // the same address and has to change with it.
 export const OPERATOR_MONERO_ADDRESS =
-  '43SH87nCju4L58vNbzrM88aSQ1yughBNvBzNauUkT71jNzv7rvdPcqpKRY94VUdEGJXbJs5dshSaNi4jAb9x96ecLid3rQq';
+  '82YkCRd9dBTAK4HmzVnXpkeLvmaQZ9JyrBdhd5E4cd8WXCXoB8dDKDXQFbTVdpkWNcCcaZ86XG1GCLhHDN5Cx33RFAp4dNE';

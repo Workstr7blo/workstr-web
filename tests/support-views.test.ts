@@ -62,7 +62,7 @@ describe('the Support Workstr card', () => {
 
   it('shortens the address on screen but copies and announces all of it', () => {
     expect(markup).toContain(`>${shortMoneroAddress(OPERATOR_MONERO_ADDRESS)}</code>`);
-    expect(shortMoneroAddress(OPERATOR_MONERO_ADDRESS)).toBe('43SH87nCju4L...ecLid3rQq');
+    expect(shortMoneroAddress(OPERATOR_MONERO_ADDRESS)).toBe('82YkCRd9dBTA...3RFAp4dNE');
     expect(markup).toContain(`data-copy="${OPERATOR_MONERO_ADDRESS}"`);
     expect(markup).toContain(`<span class="sr-only">Workstr Monero address: ${OPERATOR_MONERO_ADDRESS}</span>`);
     expect(markup).toContain(`aria-label="QR code for the Workstr Monero address ${OPERATOR_MONERO_ADDRESS}"`);
