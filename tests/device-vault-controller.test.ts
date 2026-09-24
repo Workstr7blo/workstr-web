@@ -406,9 +406,9 @@ describe('storing a new local key', () => {
 });
 
 describe('Settings', () => {
-  it('shows the Device security card only while a vault is unlocked', () => {
-    expect(deviceSecurityCard({ deviceVault: 'unlocked' } as AppState)).toContain('Change device code');
-    expect(deviceSecurityCard({ deviceVault: 'unlocked' } as AppState)).toContain('Lock Workstr');
+  it('shows the Security & devices card only while there is a device or account to manage', () => {
+    expect(deviceSecurityCard({ deviceVault: 'unlocked' } as AppState)).toContain('Change');
+    expect(deviceSecurityCard({ deviceVault: 'unlocked', pubkey: 'ab'.repeat(32) } as AppState)).toContain('Lock now');
     expect(deviceSecurityCard({ deviceVault: 'locked' } as AppState)).toBe('');
     expect(deviceSecurityCard({ deviceVault: 'absent' } as AppState)).toBe('');
   });
@@ -417,7 +417,7 @@ describe('Settings', () => {
     const { databaseName, vault: seeded } = await vaultWithNostrKey();
     await seeded.unlock(PIN);
     const h = harness(seeded, { deviceVault: 'unlocked' });
-    h.root.insertAdjacentHTML('beforeend', deviceSecurityCard(h.state));
+    h.root.insertAdjacentHTML('beforeend', deviceSecurityCard({ ...h.state, pubkey: 'ab'.repeat(32) } as AppState));
     h.controller.bindSettings();
 
     h.root.querySelector<HTMLElement>('#change-device-code')!.click();
@@ -443,7 +443,7 @@ describe('Settings', () => {
     const { vault } = await vaultWithNostrKey();
     await vault.unlock(PIN);
     const h = harness(vault, { deviceVault: 'unlocked' });
-    h.root.insertAdjacentHTML('beforeend', deviceSecurityCard(h.state));
+    h.root.insertAdjacentHTML('beforeend', deviceSecurityCard({ ...h.state, pubkey: 'ab'.repeat(32) } as AppState));
     h.controller.bindSettings();
     h.root.querySelector<HTMLElement>('#change-device-code')!.click();
     enter(h.modalContent(), 'current', OTHER_PIN);
@@ -461,7 +461,7 @@ describe('Settings', () => {
     const { vault } = await vaultWithNostrKey();
     await vault.unlock(PIN);
     const h = harness(vault, { deviceVault: 'unlocked' });
-    h.root.insertAdjacentHTML('beforeend', deviceSecurityCard(h.state));
+    h.root.insertAdjacentHTML('beforeend', deviceSecurityCard({ ...h.state, pubkey: 'ab'.repeat(32) } as AppState));
     h.controller.bindSettings();
 
     h.root.querySelector<HTMLElement>('#lock-workstr')!.click();

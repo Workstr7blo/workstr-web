@@ -10,9 +10,9 @@ describe('the Support Workstr card', () => {
   const markup = supportPanel();
 
   it('is a Settings category with a payment code where a funding meter would be', () => {
-    expect(markup).toContain('class="settings-category support-panel compact-support support-panel-monero"');
+    expect(markup).toContain('class="settings-category support-panel compact-support support-panel-monero support-standalone"');
     expect(markup).toContain('<strong>Support Workstr</strong>');
-    expect(markup).toContain('Private support with Monero');
+    expect(markup).toContain('Help keep Workstr independent');
     expect(markup).toContain('Scan with a Monero wallet or copy the address.');
   });
 

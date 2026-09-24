@@ -526,7 +526,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
    and radius therefore belong to the container, not to each card. */
 .settings-group { margin: 22px 0 0; }
 .settings-group:first-of-type { margin-top: 14px; }
-.settings-group-head { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; margin: 0 2px 9px; }
+.settings-group-head { margin: 0 2px 7px; }
 .settings-group-icon { display: grid; place-items: center; height: 24px; color: var(--purple-2); }
 .settings-group-icon svg { width: 18px; height: 18px; }
 .settings-group-copy { min-width: 0; display: grid; gap: 2px; }
@@ -538,7 +538,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
    gradient is not boxed inside a second frame. */
 .settings-group-cards--support { border-color: rgba(var(--accent-rgb), .34); }
 .settings-category { min-width: 0; max-width: 100%; background: transparent; overflow: clip; }
-.settings-category > summary { display: grid; grid-template-columns: minmax(0, 1fr) max-content 18px; min-height: 60px; align-items: center; gap: 10px; padding: 11px 12px; cursor: pointer; list-style: none; }
+.settings-category > summary { display: grid; grid-template-columns: minmax(0, 1fr) max-content 18px; min-height: 54px; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; list-style: none; }
 .settings-category > summary::-webkit-details-marker { display: none; }
 /* Points right when closed and down when open: the collapsed row reads as "there is more
    in here", which is what the design asks for, without giving up the disclosure. */
@@ -550,7 +550,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .settings-category-copy strong { color: var(--text); font: 850 15px/1.15 Inter, ui-sans-serif, sans-serif; }
 .settings-category-copy small { overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .settings-category-meta { color: var(--purple-2); font: 850 10px/1 ui-monospace, monospace; letter-spacing: .1em; }
-.settings-category-body { display: grid; gap: 10px; padding: 10px; }
+.settings-category-body { display: grid; gap: 8px; padding: 9px 10px; }
 .settings-inline-section { padding: 0; }
 .settings-inline-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .settings-inline-heading strong { color: var(--text); }
@@ -593,6 +593,23 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 .account-row { align-items: center; }
 /* Access & Security: routine rows, then the destructive one set apart below a rule. */
 .access-danger { margin-top: 6px; border-color: rgba(var(--danger-rgb), .3); background: rgba(var(--danger-rgb), .05); }
+
+/* Security & devices is a single flat list: one action or control per row, divided by
+   quiet lines instead of nested bordered mini-cards. */
+.security-settings-list { gap: 0; padding: 0 12px 10px; }
+.security-setting-row { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 10px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--border); }
+.security-settings-list > .security-setting-row:first-child { border-top: 0; }
+.security-setting-copy { min-width: 0; }
+.security-setting-copy strong { display: block; color: var(--text); font-weight: 850; }
+.security-setting-copy small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.security-setting-row > .button { min-height: 40px; white-space: nowrap; }
+.security-setting-row--danger { border-color: rgba(var(--danger-rgb), .28); }
+.security-account-actions { border-top: 1px solid var(--border); }
+.security-account-actions > summary { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font: 850 12px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; list-style: none; }
+.security-account-actions > summary::-webkit-details-marker { display: none; }
+.security-account-actions > summary::after { content: '\203A'; color: var(--purple-2); font: 900 18px/1 ui-monospace, monospace; transition: transform .16s ease; }
+.security-account-actions[open] > summary::after { transform: rotate(90deg); }
+.security-account-actions-body { display: grid; gap: 0; }
 
 /* The Profile card is always open: who you are is the first thing Settings answers, so it
    is a plain section rather than a disclosure. Every action carries a text label and is at
@@ -996,7 +1013,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 @media (max-width: 700px) {
   .settings-page .panel { margin: 8px 0; padding: 14px; }
   .settings-group { margin-top: 18px; }
-  .settings-category > summary { min-height: 58px; padding: 10px 11px; }
+  .settings-category > summary { min-height: 52px; padding: 9px 10px; }
   .settings-category-body { padding: 9px; }
   .settings-row-main { align-items: stretch; flex-direction: column; gap: 9px; padding: 10px; }
   .settings-row-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); justify-content: stretch; width: 100%; }
@@ -1009,9 +1026,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
   .training-preference-row > .compact-select select { width: 100%; }
   .training-preference-copy small { max-width: 34ch; }
   .data-sync-card .settings-row-actions, .manual-backup-row .settings-row-actions { grid-template-columns: 1fr 1fr; }
-  .account-row { align-items: center; flex-direction: row; }
-  .account-row .settings-row-actions { display: flex; width: auto; }
-  .account-row .settings-row-actions .button { width: auto; }
+  .security-setting-row { grid-template-columns: minmax(0, 1fr) max-content; align-items: center; }
+  .security-setting-row--select, .security-setting-row--danger { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .security-setting-row--select > .compact-select, .security-setting-row--select > .compact-select select, .security-setting-row--danger > .button { width: 100%; justify-content: center; }
 }
 
 @media (max-width: 430px) {

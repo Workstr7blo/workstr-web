@@ -436,7 +436,7 @@ describe('shell', () => {
     // Opening Settings starts the funding fetch, which renders again when it answers. Let
     // that finish first, or the render being counted is that one and not the profile's.
     await new Promise((resolve) => setTimeout(resolve, 0));
-    const card = root.querySelector('.access-card') as HTMLDetailsElement;
+    const card = root.querySelector('.device-security-card') as HTMLDetailsElement;
     card.open = true;
     const page = root.querySelector('.settings-page');
     const rebuiltBefore = shell.renders.rebuilds;

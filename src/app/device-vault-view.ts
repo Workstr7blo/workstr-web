@@ -158,21 +158,46 @@ export function vaultBusyModalMarkup(message: string): string {
   return `<div class="page-title">One moment</div><p class="section-help" role="status">${html(message)}</p>`;
 }
 
-// Present only while there is an unlocked vault: a locked one is behind the lock screen, and
-// a device with no vault has no code to change.
+// Present only when there is an account action or an unlocked vault to manage.
 export function deviceSecurityCard(state: AppState): string {
-  if (state.deviceVault !== 'unlocked') return '';
+  if (!state.pubkey && state.deviceVault !== 'unlocked') return '';
   const autoLock = readAutoLockSetting();
   const options = AUTO_LOCK_OPTIONS.map((option) => `<option value="${option.value}"${option.value === autoLock ? ' selected' : ''}>${html(option.label)}</option>`).join('');
-  return `<details class="settings-category device-security-card" data-settings-section="device-security">
-    <summary><span class="settings-category-copy"><strong>Device security</strong><small>Protected by a nine-digit device code</small></span><span class="status-pill ok">UNLOCKED</span></summary>
-    <div class="settings-category-body"><div class="settings-row-main account-row">
-      <div><strong>Device code</strong><small>Your local identity is protected by a nine-digit code.</small></div>
-      <div class="settings-row-actions"><button id="change-device-code" class="button small" type="button">Change device code</button><button id="lock-workstr" class="button small" type="button">Lock Workstr</button></div>
-    </div>
-    <div class="settings-row-main account-row">
-      <div><strong>Auto-lock</strong><small>Lock after this long without a tap. Switching apps between sets does not count, and a live workout keeps it open.</small></div>
-      <label class="compact-select"><select id="auto-lock-select" aria-label="Auto-lock">${options}</select></label>
-    </div></div>
+  const vaultProtected = state.deviceVault === 'unlocked';
+  const status = vaultProtected ? 'PROTECTED' : 'SET UP';
+  const deviceRows = vaultProtected ? `
+      <div class="security-setting-row security-setting-row--action">
+        <div class="security-setting-copy"><strong>Device code</strong><small>Nine-digit code protecting this device.</small></div>
+        <button id="change-device-code" class="button small" type="button">Change</button>
+      </div>
+      <div class="security-setting-row security-setting-row--select">
+        <div class="security-setting-copy"><strong>Auto-lock</strong><small>Lock after inactivity; paused during live workouts.</small></div>
+        <label class="compact-select"><select id="auto-lock-select" aria-label="Auto-lock">${options}</select></label>
+      </div>` : '';
+  const accountRows = state.pubkey ? `
+      <div class="security-setting-row security-setting-row--action">
+        <div class="security-setting-copy"><strong>Other devices</strong><small>Connect another device.</small></div>
+        <button id="add-device-settings" class="button small" type="button">Add device</button>
+      </div>
+      ${vaultProtected ? `<div class="security-setting-row security-setting-row--action">
+        <div class="security-setting-copy"><strong>This device</strong><small>Require the device code immediately.</small></div>
+        <button id="lock-workstr" class="button small" type="button">Lock now</button>
+      </div>` : ''}
+      <details class="security-account-actions">
+        <summary>Account actions</summary>
+        <div class="security-account-actions-body">
+          <div class="security-setting-row security-setting-row--action">
+            <div class="security-setting-copy"><strong>Sign out</strong><small>Sign out while keeping this account's training data on this device.</small></div>
+            <button id="sign-out-settings" class="button small" type="button">Sign out</button>
+          </div>
+          <div class="security-setting-row security-setting-row--action security-setting-row--danger">
+            <div class="security-setting-copy"><strong>Remove local data</strong><small>Delete this account's training data from this device and sign out.</small></div>
+            <button id="remove-account-data" class="button danger small" type="button">Remove local data</button>
+          </div>
+        </div>
+      </details>` : '';
+  return `<details class="settings-category device-security-card security-devices-card" data-settings-section="security-devices">
+    <summary><span class="settings-category-copy"><strong>Security & devices</strong><small>Device code, auto-lock and account access</small></span><span class="status-pill ${vaultProtected ? 'ok' : ''}">${status}</span></summary>
+    <div class="settings-category-body security-settings-list">${deviceRows}${accountRows}</div>
   </details>`;
 }
