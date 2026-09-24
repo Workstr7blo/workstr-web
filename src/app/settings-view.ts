@@ -25,35 +25,17 @@ import { profileCard } from './profile-view';
 interface SettingsGroup {
   id: string;
   label: string;
-  blurb: string;
-  icon: string;
   cards: string[];
-  variant?: string;
 }
-
-// Stroke icons in the sidebar's style. Decorative: the label beside each one already names
-// the group, so they are hidden from assistive technology rather than described twice.
-const GROUP_ICONS = {
-  profile: '<circle cx="12" cy="8" r="4"/><path d="M5 21v-1a7 7 0 0 1 14 0v1"/>',
-  access: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-  training: '<path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/>',
-  payments: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
-  support: '<path d="M12 20s-7-4.3-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.7-7 9-7 9z"/>',
-  system: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V15z"/>'
-};
 
 function settingsGroup(group: SettingsGroup): string {
   const cards = group.cards.filter(Boolean);
   if (!cards.length) return '';
   return `<section class="settings-group" aria-labelledby="settings-group-${group.id}">
     <div class="settings-group-head">
-      <span class="settings-group-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${group.icon}</svg></span>
-      <span class="settings-group-copy">
-        <h2 class="settings-group-label" id="settings-group-${group.id}">${html(group.label)}</h2>
-        <small>${html(group.blurb)}</small>
-      </span>
+      <h2 class="settings-group-label" id="settings-group-${group.id}">${html(group.label)}</h2>
     </div>
-    <div class="settings-group-cards${group.variant ? ` settings-group-cards--${group.variant}` : ''}">${cards.join('')}</div>
+    <div class="settings-group-cards">${cards.join('')}</div>
   </section>`;
 }
 
@@ -106,31 +88,6 @@ function equipmentPreference(state: AppState): string {
   </div>`;
 }
 
-// How this device reaches the account, and the actions that affect only this device. Who the
-// account is belongs to the Profile card above, so nothing here repeats the avatar or name.
-// Removing local data is destructive and sits apart from the routine actions, behind its
-// confirmation in the identity controller.
-function accessCard(state: AppState): string {
-  if (!state.pubkey) return '';
-  return `<details class="settings-category access-card" data-settings-section="access">
-    <summary><span class="settings-category-copy"><strong>Account access</strong><small>Add a device or sign out of this one</small></span></summary>
-    <div class="settings-category-body access-card-body">
-      <div class="settings-row-main account-row">
-        <div><strong>Add device</strong><small>Show a pairing code to sign in on another device.</small></div>
-        <div class="settings-row-actions"><button id="add-device-settings" class="button small" type="button">Add device</button></div>
-      </div>
-      <div class="settings-row-main account-row">
-        <div><strong>Sign out</strong><small>Your training data stays on this device.</small></div>
-        <div class="settings-row-actions"><button id="sign-out-settings" class="button small" type="button">Sign out</button></div>
-      </div>
-      <div class="settings-row-main account-row access-danger">
-        <div><strong>Remove local data</strong><small>Deletes this account's training data from this device and signs out.</small></div>
-        <div class="settings-row-actions"><button id="remove-account-data" class="button danger small" type="button">Remove local data</button></div>
-      </div>
-    </div>
-  </details>`;
-}
-
 function trainingPreferencesCard(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
   return `<details class="settings-category training-preferences-card" data-settings-section="training-preferences">
@@ -172,17 +129,19 @@ export function settingsView(state: AppState): string {
     trainingPreferencesCard(state),
     signedIn ? beastModeSettingsCard(state) : ''
   ];
-  const paymentCards = signedIn ? [moneroTipsCard(state)] : [];
-  // Supporting Workstr is not creator tipping, so it does not follow the Monero tips switch.
-  const supportCards = signedIn ? [supportPanel()] : [];
+  const tipJarCards = signedIn ? [moneroTipsCard(state)] : [];
+  const securityCards = [
+    deviceSecurityCard(state),
+    backupPanel(backupPanelState(state, tipJarBackupSection(state))),
+    advancedCard(state)
+  ];
   return `<div class="page active settings-page">
     <div class="page-title">Settings</div>
-    <p class="page-blurb">Customize your experience, keep your data safe, and support a stronger, more sovereign future.</p>
-    ${settingsGroup({ id: 'profile', label: 'Profile', blurb: 'Your public Nostr profile', icon: GROUP_ICONS.profile, cards: [profileCard(state)] })}
-    ${settingsGroup({ id: 'training', label: 'Training', blurb: 'Configure your training experience', icon: GROUP_ICONS.training, cards: trainingCards })}
-    ${settingsGroup({ id: 'payments', label: 'Payments', blurb: 'Tip program creators with Monero', icon: GROUP_ICONS.payments, cards: paymentCards })}
-    ${settingsGroup({ id: 'access', label: 'Access & Security', blurb: 'How this device reaches your account', icon: GROUP_ICONS.access, cards: [accessCard(state), deviceSecurityCard(state)] })}
-    ${settingsGroup({ id: 'support', label: 'Support', blurb: 'Help keep Workstr independent', icon: GROUP_ICONS.support, cards: supportCards, variant: 'support' })}
-    ${settingsGroup({ id: 'system', label: 'System & Data', blurb: 'Manage your data and advanced settings', icon: GROUP_ICONS.system, cards: [backupPanel(backupPanelState(state, tipJarBackupSection(state))), advancedCard(state)] })}
+    <p class="page-blurb">Profile, training and app preferences.</p>
+    ${settingsGroup({ id: 'profile', label: 'Profile', cards: [profileCard(state)] })}
+    ${settingsGroup({ id: 'training', label: 'Training', cards: trainingCards })}
+    ${settingsGroup({ id: 'tip-jar', label: 'Tip Jar', cards: tipJarCards })}
+    ${settingsGroup({ id: 'security-data', label: 'Security & Data', cards: securityCards })}
+    ${signedIn ? supportPanel() : ''}
   </div>`;
 }

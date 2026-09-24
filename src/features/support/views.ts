@@ -4,8 +4,8 @@ import { moneroQr } from '../../app/monero-mark';
 import { html, shortMoneroAddress } from '../../app/format';
 
 function supportCard(summary: string, body: string): string {
-  return `<details class="settings-category support-panel compact-support support-panel-monero" data-settings-section="support">
-    <summary><span class="settings-category-copy"><strong>Support Workstr</strong><small>${html(summary)}</small></span><span class="settings-category-meta">XMR</span></summary>
+  return `<details class="settings-category support-panel compact-support support-panel-monero support-standalone" data-settings-section="support">
+    <summary><span class="settings-category-copy"><strong>Support Workstr</strong><small>${html(summary)}</small></span></summary>
     <div class="settings-category-body">${body}</div>
   </details>`;
 }
@@ -28,7 +28,7 @@ export function supportPanel(address: string = OPERATOR_MONERO_ADDRESS): string 
   }
   // No `tx_amount`: what to send is the supporter's decision, not a number Workstr fills in.
   const uri = `monero:${target}`;
-  return supportCard('Private support with Monero', `
+  return supportCard('Help keep Workstr independent', `
     <div class="support-monero">
       <div class="support-monero-qr" role="img" aria-label="QR code for the Workstr Monero address ${html(target)}">${moneroQr(uri)}</div>
       <code class="support-monero-address" aria-hidden="true">${html(shortMoneroAddress(target))}</code>

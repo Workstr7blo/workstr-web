@@ -57,8 +57,8 @@ const cardTitles = (root: HTMLElement): string[] =>
   Array.from(root.querySelectorAll('.settings-category > summary .settings-category-copy strong')).map((el) => el.textContent?.trim() || '');
 
 describe('the Settings page', () => {
-  it('reads as six groups in the order a person thinks in', () => {
-    expect(groupLabels(render(signedIn()))).toEqual(['Profile', 'Training', 'Payments', 'Access & Security', 'Support', 'System & Data']);
+  it('reads as four functional groups in the order a person thinks in', () => {
+    expect(groupLabels(render(signedIn()))).toEqual(['Profile', 'Training', 'Tip Jar', 'Security & Data']);
   });
 
   it('orders the cards within each group', () => {
@@ -73,14 +73,15 @@ describe('the Settings page', () => {
       ?.closest('.settings-group')?.querySelector('.settings-group-label')?.textContent?.trim();
     expect(root.querySelector('.account-card')).toBeNull();
     expect(groupOf('.profile-card')).toBe('Profile');
-    expect(groupOf('.access-card')).toBe('Access & Security');
+    expect(root.querySelector('.access-card')).toBeNull();
+    expect(groupOf('.device-security-card')).toBe('Security & Data');
     expect(groupOf('.training-preferences-card')).toBe('Training');
     expect(groupOf('.beast-mode-card')).toBe('Training');
-    expect(groupOf('.monero-tips-card')).toBe('Payments');
+    expect(groupOf('.monero-tips-card')).toBe('Tip Jar');
     expect(root.querySelector('.monero-wallet-card')).toBeNull();
-    expect(groupOf('.support-panel')).toBe('Support');
-    expect(groupOf('.data-sync-card')).toBe('System & Data');
-    expect(groupOf('.advanced-settings')).toBe('System & Data');
+    expect(root.querySelector('.support-panel')?.closest('.settings-group')).toBeNull();
+    expect(groupOf('.data-sync-card')).toBe('Security & Data');
+    expect(groupOf('.advanced-settings')).toBe('Security & Data');
   });
 
   // Grouping is a claim about meaning, so it is made in markup a screen reader can follow
@@ -100,12 +101,10 @@ describe('the Settings page', () => {
     }
   });
 
-  it('gives every group a one-line blurb', () => {
+  it('keeps the page introduction short and avoids group blurbs', () => {
     const root = render(signedIn());
-    const blurbs = Array.from(root.querySelectorAll('.settings-group-copy small')).map((el) => el.textContent?.trim());
-    expect(blurbs).toHaveLength(6);
-    expect(blurbs.every((line) => Boolean(line))).toBe(true);
-    expect(root.querySelector('.page-blurb')?.textContent?.trim()).toBeTruthy();
+    expect(root.querySelectorAll('.settings-group-copy small')).toHaveLength(0);
+    expect(root.querySelector('.page-blurb')?.textContent?.trim()).toBe('Profile, training and app preferences.');
   });
 
   // Cards in a group share one container and are divided by a line, so a group reads as one
@@ -119,10 +118,12 @@ describe('the Settings page', () => {
     expect(profile?.querySelectorAll('.settings-group-cards > .settings-category')).toHaveLength(1);
   });
 
-  it('keeps Support visually its own thing', () => {
+  it('renders Support as a standalone compact Settings row', () => {
     const root = render(signedIn());
-    const support = root.querySelector('.support-panel')?.closest('.settings-group-cards');
-    expect(support?.classList.contains('settings-group-cards--support')).toBe(true);
+    const support = root.querySelector('.support-panel') as HTMLElement;
+    expect(support?.classList.contains('support-standalone')).toBe(true);
+    expect(support.closest('.settings-group')).toBeNull();
+    expect(support.querySelector('.settings-category-meta')).toBeNull();
   });
 
   it('keeps export and import inside Data & Sync', () => {
@@ -134,7 +135,7 @@ describe('the Settings page', () => {
 
   it('renders local-only Settings as profile, training, and local data only', () => {
     const root = render();
-    expect(groupLabels(root)).toEqual(['Profile', 'Training', 'System & Data']);
+    expect(groupLabels(root)).toEqual(['Profile', 'Training', 'Security & Data']);
     expect(cardTitles(root)).toEqual(['Training Preferences', 'Data & Sync', 'Advanced']);
     expect(root.querySelector('.access-card')).toBeNull();
     expect(root.querySelector('.beast-mode-card')).toBeNull();
@@ -170,7 +171,7 @@ describe('the Settings page', () => {
     const on = (overrides: Partial<AppState> = {}): HTMLElement =>
       render(signedIn({ settings: { unit: 'kg', paymentMode: 'monero', publicRelays: [] }, ...overrides } as Partial<AppState>));
 
-    it('is one switch in Payments, off by default', () => {
+    it('is one switch in Tip Jar, off by default', () => {
       const root = off();
       const card = root.querySelector('.monero-tips-card') as HTMLElement;
       const toggle = card.querySelector<HTMLInputElement>('#monero-tips-toggle')!;
@@ -181,16 +182,16 @@ describe('the Settings page', () => {
       expect(card.querySelector('#monero-tips-label')?.textContent).toBe('Tip Jar');
       expect(card.querySelector('#monero-tips-copy')?.textContent).toBe('Send and receive tips in Workstr.');
       expect(card.querySelector('input[type="text"]')).toBeNull();
-      expect(card.closest('.settings-group')?.querySelector('.settings-group-copy small')?.textContent).toBe('Tip program creators with Monero');
+      expect(card.closest('.settings-group')?.querySelector('.settings-group-label')?.textContent).toBe('Tip Jar');
     });
 
     // The public address is the Profile's. The switch neither shows nor edits it, and says
     // nothing about it whichever way it is set.
-    it('keeps the public address out of Payments whichever way the switch is set', () => {
+    it('keeps the public address out of Tip Jar whichever way the switch is set', () => {
       for (const root of [on(), off({ monero: { status: 'ready', address: `8${'B'.repeat(94)}` } } as Partial<AppState>)]) {
-        const payments = root.querySelector('.monero-tips-card')?.closest('.settings-group') as HTMLElement;
-        expect(payments.querySelector('#profile-address, #monero-address')).toBeNull();
-        expect(payments.textContent).not.toContain('payment address');
+        const tipJar = root.querySelector('.monero-tips-card')?.closest('.settings-group') as HTMLElement;
+        expect(tipJar.querySelector('#profile-address, #monero-address')).toBeNull();
+        expect(tipJar.textContent).not.toContain('payment address');
         expect(root.querySelector('#monero-tips-copy')?.textContent).toBe('Send and receive tips in Workstr.');
         expect(root.querySelector('.profile-card .profile-address')).toBeTruthy();
       }
@@ -201,7 +202,7 @@ describe('the Settings page', () => {
       const onCard = on().querySelector('.support-panel')?.outerHTML;
       expect(offCard).toBeTruthy();
       expect(offCard).toBe(onCard);
-      expect(supportPanel()).toContain('Private support with Monero');
+      expect(supportPanel()).toContain('Scan with a Monero wallet or copy the address.');
     });
 
     it('keeps wallet setup and telemetry out of normal Tip Jar Settings', () => {
@@ -330,18 +331,25 @@ describe('the Settings page', () => {
     });
   });
 
-  it('moves device and account access into Access & Security', () => {
+  it('moves device and account access into one Security & devices disclosure', () => {
     const account = render(signedIn({ profileName: 'Trainer', deviceVault: 'unlocked' } as Partial<AppState>));
-    const access = account.querySelector('.access-card')?.closest('.settings-group') as HTMLElement;
+    const security = account.querySelector('.device-security-card')?.closest('.settings-group') as HTMLElement;
+    expect(security.querySelector('.settings-group-label')?.textContent).toBe('Security & Data');
     for (const id of ['#add-device-settings', '#sign-out-settings', '#remove-account-data', '#change-device-code', '#lock-workstr']) {
-      expect(access.querySelector(id), id).toBeTruthy();
+      expect(security.querySelector(id), id).toBeTruthy();
       expect(account.querySelector('.profile-card')?.querySelector(id), id).toBeNull();
     }
-    // Profile already says who this is; Access & Security does not repeat it.
-    expect(access.querySelector('.profile-avatar, img')).toBeNull();
-    expect(access.textContent).not.toContain('Trainer');
-    // The destructive action is set apart from the routine ones.
-    expect(access.querySelector('.access-danger #remove-account-data')?.classList.contains('danger')).toBe(true);
+    expect(security.querySelector('.device-security-card summary .status-pill')?.textContent).toBe('PROTECTED');
+    expect(security.querySelector('.device-security-card summary')?.textContent).not.toContain('UNLOCKED');
+    expect(security.querySelectorAll('.security-setting-row')).toHaveLength(6);
+    expect(security.querySelector('.security-setting-row')?.textContent).toContain('Device code');
+    expect(security.querySelector('.security-setting-row')?.querySelectorAll('button')).toHaveLength(1);
+    expect(security.textContent).toContain('Lock now');
+    expect(security.querySelector('.security-account-actions #sign-out-settings')).toBeTruthy();
+    expect(security.querySelector('.security-account-actions #remove-account-data')?.classList.contains('danger')).toBe(true);
+    const securityDevices = security.querySelector('.device-security-card') as HTMLElement;
+    expect(securityDevices.querySelector('.profile-avatar, img')).toBeNull();
+    expect(securityDevices.textContent).not.toContain('Trainer');
 
     const localOnly = render();
     expect(localOnly.querySelector('#add-device-settings')).toBeNull();

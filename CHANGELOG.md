@@ -69,6 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Redesigned Settings around Profile, Training, Tip Jar and Security & Data groups. Security &
+  devices is now one compact disclosure with one action per row, Support Workstr is a standalone
+  row, and Monero branding stays inside payment-specific controls.
+
 - Tip Jar backups now need a password of at least 12 characters, and a few obvious passwords
   are refused. The file travels, so its password has to hold up to offline guessing. Existing
   backups made with a shorter password still restore.
