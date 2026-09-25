@@ -69,10 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Streamlined Data & Sync into a compact Settings list: Auto-sync is a switch row, Sync now is
-  a trailing action, Training data and Tip Jar data open focused detail views, and Advanced
-  recovery stays behind its own row so export, restore and recovery controls no longer crowd the
-  main Settings screen.
+- Streamlined Data & Sync into a compact Settings control center: Auto-sync is a standard
+  switch row, Sync now stays beside the live status, and Training data, Tip Jar data, and
+  Advanced recovery all expand inline with the same disclosure pattern so backup, restore, and
+  recovery controls are grouped without a nested menu.
 
 - Redesigned Settings around Profile, Training, Tip Jar and Security & Data groups. Security &
   devices is now one compact disclosure with one action per row, Support Workstr is a standalone

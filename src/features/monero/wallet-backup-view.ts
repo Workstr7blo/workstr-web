@@ -78,7 +78,7 @@ function restoreForm(ui: TipJarBackupUiState, replacing: boolean): string {
 // Quiet by design: a closed line of text, not a second card and not a warning panel. The
 // phrase behind it is the one thing in Workstr that can move money on its own, so opening the
 // disclosure is not enough to show it - that takes a second, deliberate tap.
-function advancedRecovery(state: AppState, ui: TipJarBackupUiState, stored: boolean): string {
+function advancedRecoveryBody(state: AppState, ui: TipJarBackupUiState, stored: boolean): string {
   const wallet = state.moneroWallet;
   const busy = ui.busy ? ' disabled' : '';
   const phrase = wallet?.backup;
@@ -90,9 +90,7 @@ function advancedRecovery(state: AppState, ui: TipJarBackupUiState, stored: bool
     </div>` : ''}
     <div class="settings-subtle-row"><span>Restore height</span><strong>${html(String(phrase?.restoreHeight ?? wallet?.snapshot?.metadata.restoreHeight ?? '—'))}</strong></div>`
     : '';
-  return `<details class="settings-inline-advanced tip-jar-recovery"${ui.advanced ? ' open' : ''}>
-    <summary>Advanced recovery</summary>
-    <div class="tip-jar-recovery-body">
+  return `<div id="tip-jar-recovery-body" class="tip-jar-recovery-body">
       <p class="section-help">These details can restore your Tip Jar in any compatible Monero wallet.</p>
       ${seedRows}
       <form class="tip-jar-backup-form" id="tip-jar-seed-restore-form">
@@ -101,8 +99,7 @@ function advancedRecovery(state: AppState, ui: TipJarBackupUiState, stored: bool
         <p class="section-help">Leave the height blank if you do not know it. The whole chain is scanned then, so no earlier payment is missed, and it can take a long time.</p>
         <div class="settings-row-actions"><button class="button" type="submit"${busy}>${stored ? 'Replace and restore' : 'Restore from phrase'}</button></div>
       </form>
-    </div>
-  </details>`;
+    </div>`;
 }
 
 export function tipJarBackupBody(state: AppState): string {
@@ -113,24 +110,28 @@ export function tipJarBackupBody(state: AppState): string {
   const stored = storedWallet(state.moneroWallet);
   if (!stored && !checked(state.moneroWallet)) return '<p class="section-help">Checking this device for a Tip Jar…</p>';
   const actions = stored
-    ? `<button class="data-sync-row data-sync-nav-row" type="button" id="tip-jar-backup-export"><span class="data-sync-row-copy"><strong>Create encrypted backup</strong><small>Save Tip Jar information to an encrypted ${TIP_JAR_BACKUP_EXTENSION} file.</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></button><button class="data-sync-row data-sync-nav-row" type="button" id="tip-jar-backup-restore"><span class="data-sync-row-copy"><strong>Restore from backup</strong><small>Choose an encrypted Tip Jar backup file.</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></button>`
-    : '<button class="data-sync-row data-sync-nav-row" type="button" id="tip-jar-backup-restore"><span class="data-sync-row-copy"><strong>Restore from backup</strong><small>Choose an encrypted Tip Jar backup file.</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></button>';
+    ? `<button class="data-sync-row data-sync-action-row" type="button" id="tip-jar-backup-export"><span class="data-sync-row-copy"><strong>Create encrypted backup</strong><small>Save Tip Jar information to an encrypted ${TIP_JAR_BACKUP_EXTENSION} file.</small></span></button><button class="data-sync-row data-sync-action-row" type="button" id="tip-jar-backup-restore"><span class="data-sync-row-copy"><strong>Restore from backup</strong><small>Choose an encrypted Tip Jar backup file.</small></span></button>`
+    : '<button class="data-sync-row data-sync-action-row" type="button" id="tip-jar-backup-restore"><span class="data-sync-row-copy"><strong>Restore from backup</strong><small>Choose an encrypted Tip Jar backup file.</small></span></button>';
   const panel = ui.panel === 'export' && stored ? exportForm(ui) : ui.panel === 'restore' ? restoreForm(ui, stored) : '';
   const intro = stored ? html(lastExportLabel(ui.exportedAt).replace('Last exported', 'Last backup:')) : 'Restore one from a backup file or a recovery phrase.';
   return `<p class="section-help">Create or restore an encrypted backup of your Tip Jar information.</p>
     <div class="data-sync-detail-actions">${actions}</div>
     <p class="section-help">${intro}</p>
     ${panel}
-    ${message(ui)}
-    ${advancedRecovery(state, ui, stored)}`;
+    ${message(ui)}`;
 }
 
 export function tipJarBackupSection(state: AppState): string {
-  return `<section class="data-sync-detail tip-jar-backup-group" id="data-sync-tip-jar-detail" data-sync-view="tip-jar" aria-labelledby="data-sync-tip-jar-title" hidden>
-        <button class="data-sync-back" type="button" data-sync-back data-sync-return="tip-jar">‹ Data &amp; Sync</button>
-        <h3 id="data-sync-tip-jar-title" tabindex="-1">Tip Jar data</h3>
-        <div id="tip-jar-backup-body">${tipJarBackupBody(state)}</div>
-      </section>`;
+  const ui = tipJarBackupState(state);
+  const stored = storedWallet(state.moneroWallet);
+  return `<details class="data-sync-panel tip-jar-backup-group">
+        <summary class="data-sync-row data-sync-disclosure-row"><span class="data-sync-row-copy"><strong>Tip Jar data</strong><small>Encrypted backup and restore</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></summary>
+        <div class="data-sync-panel-body" id="tip-jar-backup-body">${tipJarBackupBody(state)}</div>
+      </details>
+      <details class="data-sync-panel tip-jar-backup-group tip-jar-recovery tip-jar-recovery-group"${ui.advanced ? ' open' : ''}>
+        <summary class="data-sync-row data-sync-disclosure-row"><span class="data-sync-row-copy"><strong>Advanced recovery</strong><small>Recovery phrase and restore height</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></summary>
+        <div class="data-sync-panel-body">${advancedRecoveryBody(state, ui, stored)}</div>
+      </details>`;
 }
 
 // Written into the standing section rather than rendered, for the same reason the rest of this
@@ -138,7 +139,9 @@ export function tipJarBackupSection(state: AppState): string {
 // section is not mounted, which is every view except Settings.
 export function updateTipJarBackupSection(root: ParentNode, state: AppState): boolean {
   const body = root.querySelector('#tip-jar-backup-body');
-  if (!body) return false;
-  body.innerHTML = tipJarBackupBody(state);
+  const recovery = root.querySelector('.tip-jar-recovery .data-sync-panel-body');
+  if (!body && !recovery) return false;
+  if (body) body.innerHTML = tipJarBackupBody(state);
+  if (recovery) recovery.innerHTML = advancedRecoveryBody(state, tipJarBackupState(state), storedWallet(state.moneroWallet));
   return true;
 }
