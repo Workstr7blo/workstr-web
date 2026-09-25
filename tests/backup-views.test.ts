@@ -112,13 +112,15 @@ describe('the panel', () => {
     // Export and import are always there: data is never hostage to the relay.
     expect(html).toContain('id="export-data"');
     expect(html).toContain('id="import-data"');
-    expect(html).toContain('Manual backup');
+    expect(html).toContain('Backups');
+    expect(html).toContain('Training data');
   });
 
   it('keeps signed-out Data & Sync to manual backup only', () => {
     const html = backupPanel(panelState({ signedIn: false, enabled: false }));
     expect(html).toContain('Manual backup for this device');
-    expect(html).toContain('Manual backup');
+    expect(html).toContain('Backups');
+    expect(html).toContain('Training data');
     expect(html).toContain('id="export-data"');
     expect(html).toContain('id="import-data"');
     expect(html).not.toContain('Sign in to protect new training');
@@ -146,7 +148,7 @@ describe('the panel', () => {
   });
 
   it('disables sync-now while a sync is already running', () => {
-    expect(backupPanel(panelState({ sync: { state: 'syncing', pending: 0 } }))).toContain('id="sync-now" class="button" disabled');
+    expect(backupPanel(panelState({ sync: { state: 'syncing', pending: 0 } }))).toContain('id="sync-now" class="button small" disabled');
   });
 
   it('escapes a relay error rather than rendering it as markup', () => {
