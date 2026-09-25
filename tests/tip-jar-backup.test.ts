@@ -152,21 +152,21 @@ describe('the Tip Jar backup file', () => {
 });
 
 describe('the Tip Jar backup section in Data & Sync', () => {
-  it('sits under Sync and Manual backup, and never joins the training JSON', () => {
+  it('keeps Tip Jar backups separate from training data, and never joins the training JSON', () => {
     const body = backupCardBody(backupPanelState(state(), tipJarBackupSection(state())));
-    expect(body.indexOf('sync-control-group')).toBeLessThan(body.indexOf('manual-backup-group'));
-    expect(body.indexOf('manual-backup-group')).toBeLessThan(body.indexOf('tip-jar-backup-group'));
-    // Two files, two buttons. The JSON export is training and the Tip Jar backup is spend
+    expect(body.indexOf('sync-control-group')).toBeLessThan(body.indexOf('data-sync-backups'));
+    expect(body.indexOf('data-sync-backups')).toBeLessThan(body.indexOf('tip-jar-backup-group'));
+    // Two files, two destinations. The JSON export is training and the Tip Jar backup is spend
     // authority, and nothing here offers to put them in one artifact.
     expect(body).toContain('id="export-data"');
     expect(body).toContain('id="tip-jar-backup-export"');
-    expect(body).toContain('Your Tip Jar is backed up separately below.');
+    expect(body).toContain('Tip Jar data');
   });
 
   it('offers nothing while the device vault is locked, and only Restore with no wallet', () => {
     expect(tipJarBackupBody(state({ deviceVault: 'locked' }))).toContain('Unlock Workstr');
     const empty = state({}, { status: 'missing', stored: false });
-    expect(tipJarBackupBody(empty)).toContain('No Tip Jar on this device');
+    expect(tipJarBackupBody(empty)).toContain('Restore one from a backup file or a recovery phrase.');
     expect(tipJarBackupBody(empty)).not.toContain('id="tip-jar-backup-export"');
     expect(tipJarBackupBody(empty)).toContain('id="tip-jar-backup-restore"');
     // Storage has not answered yet: nothing that reads or writes a wallet is offered.
@@ -195,14 +195,14 @@ describe('the Tip Jar backup section in Data & Sync', () => {
     const height = [...document.querySelectorAll('.settings-subtle-row')].find((row) => row.textContent?.includes('3763633'));
     expect(height).toBeTruthy();
     expect(height?.closest('.tip-jar-recovery')).toBeTruthy();
-    expect(document.querySelector('.tip-jar-backup-row')?.textContent).not.toContain('3763633');
+    expect(document.querySelector('#tip-jar-backup-body')?.textContent).toContain('Restore height');
   });
 
   it('reports when this device last wrote a file, never that the file is safe', () => {
     const s = state();
     s.tipJarBackup = { panel: 'idle', advanced: false, busy: false, exportedAt: '2026-09-16T10:00:00.000Z' };
     const body = tipJarBackupBody(s);
-    expect(body).toContain('Last exported');
+    expect(body).toContain('Last backup:');
     expect(body).not.toMatch(/protected|secure|safe/i);
     expect(tipJarBackupBody(state())).toContain('Not backed up yet');
   });

@@ -105,7 +105,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | Encrypted sync: pull, decrypt and merge | `src/sync/merge.ts` | `src/sync/relay.ts`, `src/db/store.ts` (`applyRemote`, `sync_seen`) | `tests/sync-merge.test.ts`, `tests/sync-pull.test.ts`, `tests/sync-relay.integration.test.ts` (opt-in) |
 | Encrypted sync: orchestration and retry | `src/sync/engine.ts`, `src/sync/retry.ts`, `src/sync/key-repair.ts` | `src/sync/backfill.ts`, `src/sync/push.ts`, `src/sync/merge.ts` | `tests/sync-engine.test.ts` |
 | Signer call timeouts | `src/signer/timeout.ts`, `src/signer/auto-approve.ts` | `src/signer/types.ts`, `src/sync/engine.ts` | `tests/signer-timeout.test.ts` |
-| Encrypted sync controls and status | `src/features/backup/views.ts`, `src/app/backup-controller.ts` | `src/sync/engine.ts`, `src/app/layout.ts` | `tests/backup-views.test.ts`, `tests/sync-engine.test.ts` |
+| Encrypted sync controls, compact Data & Sync detail navigation, and status | `src/features/backup/views.ts`, `src/app/backup-controller.ts`, `src/app/data-sync-navigation.ts` | `src/sync/engine.ts`, `src/app/layout.ts` | `tests/backup-views.test.ts`, `tests/settings-view.test.ts`, `tests/sync-engine.test.ts` |
 | Sync-facing half of the store | `src/db/sync-store.ts` | `src/db/store.ts` (extends it) | `tests/sync-backfill.test.ts`, `tests/sync-merge.test.ts`, `tests/sync-pull.test.ts` |
 
 ## Important module groups

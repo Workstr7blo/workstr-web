@@ -1114,10 +1114,32 @@
 .tip-jar-label { display: block; }
 @media (prefers-reduced-motion: reduce) { .tip-jar-ring { transition: none; } }
 
-/* Tip Jar backup, inside Data & Sync. It sits under Manual backup and is divided from it the
-   same way, because the two are neighbours in the card and separate everywhere else: the JSON
-   export carries training, this file carries spend authority, and they are never one file. */
-.tip-jar-backup-group { padding-top: 10px; border-top: 1px solid var(--border); }
+/* Data & Sync is a compact mobile settings list, not a dashboard of nested cards. The main
+   view shows status rows and destinations; the noisy export/restore controls live in detail
+   views that keep their existing handlers and formats. */
+.data-sync-main, .data-sync-section, .data-sync-detail, .data-sync-detail-actions { display: grid; gap: 0; min-width: 0; }
+.data-sync-main[hidden], .data-sync-detail[hidden] { display: none !important; }
+.data-sync-section { padding: 2px 0 8px; }
+.data-sync-section + .data-sync-section, .data-sync-quiet-row { border-top: 1px solid var(--border); }
+.data-sync-section-label { padding: 8px 2px 6px; color: var(--purple-2); font: 800 10px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.data-sync-row { width: 100%; min-width: 0; min-height: 56px; display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 10px 12px; align-items: center; padding: 10px 2px; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; color: inherit; text-align: left; font: inherit; }
+.data-sync-section > .data-sync-row:first-of-type, .data-sync-detail-actions > .data-sync-row:first-child { border-top: 0; }
+.data-sync-nav-row { cursor: pointer; }
+.data-sync-nav-row:hover { background: rgba(var(--accent-rgb), .06); }
+.data-sync-nav-row:focus-visible, .data-sync-back:focus-visible, .data-sync-switch:focus-within { outline: 2px solid var(--purple-2); outline-offset: 2px; border-radius: 10px; }
+.data-sync-row-copy { min-width: 0; display: grid; gap: 4px; }
+.data-sync-row-copy strong { display: block; color: var(--text); font-weight: 850; }
+.data-sync-row-copy small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.data-sync-row-control, .data-sync-chevron { color: var(--purple-2); font-weight: 900; white-space: nowrap; }
+.data-sync-status-row { grid-template-columns: minmax(0, 1fr) max-content; }
+.data-sync-status-row .backup-progress, .data-sync-status-row .backup-progress-detail { grid-column: 1 / -1; width: 100%; }
+.data-sync-switch { min-width: 54px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid rgba(0,208,132,.34); border-radius: 999px; color: var(--success-green); background: rgba(0,208,132,.07); font-size: 12px; font-weight: 850; }
+.data-sync-switch input { width: auto; accent-color: var(--success-green); }
+.data-sync-back { min-height: 44px; justify-self: start; border: 0; background: transparent; color: var(--purple-2); font: 850 12px/1 ui-monospace, monospace; letter-spacing: .06em; cursor: pointer; }
+.data-sync-detail { gap: 8px; }
+.data-sync-detail h3 { margin: 0; color: var(--text); font-size: 18px; }
+.data-sync-detail .section-help { margin: 0; }
+.tip-jar-backup-group { padding-top: 0; border-top: 0; }
 .tip-jar-backup-row { margin: 0; }
 .tip-jar-backup-form { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 13px; background: rgba(255, 255, 255, .025); }
 .tip-jar-backup-form label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }

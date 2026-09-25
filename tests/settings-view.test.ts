@@ -153,7 +153,7 @@ describe('the Settings page', () => {
     const card = render().querySelector('.data-sync-card') as HTMLElement;
     expect(card.querySelector('summary .settings-category-copy small')?.textContent).toBe('Manual backup for this device');
     expect(card.querySelector('summary .status-pill')?.textContent).toBe('local');
-    expect(card.querySelector('.manual-backup-group')).toBeTruthy();
+    expect(card.querySelector('.data-sync-section')).toBeTruthy();
     expect(card.querySelector('#export-data')).toBeTruthy();
     expect(card.querySelector('#import-data')).toBeTruthy();
     expect(card.querySelector('#import-file')).toBeTruthy();
