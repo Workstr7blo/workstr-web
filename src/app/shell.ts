@@ -53,7 +53,6 @@ import { createMoneroSendController } from './monero-send-controller';
 import { updateTipJarNav } from '../features/monero/tip-jar-view';
 import { createProgramPublishController } from './program-publish-controller';
 import type { ShellHandle, ShellOptions } from './shell-types';
-import { bindDataSyncNavigation } from './data-sync-navigation';
 const SESSION_KEY = 'workstr.currentPubkey';
 const OBSOLETE_SIGNER_TYPE_KEY = 'workstr.signerType';
 const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'off', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
@@ -207,6 +206,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   function bindBackupCard(): void {
     root.querySelector('#auto-backup')?.addEventListener('change', (event) => { void backup.setEnabled((event.target as HTMLInputElement).checked); });
     root.querySelector('#enable-sync')?.addEventListener('click', () => { void backup.setEnabled(true); });
+    root.querySelector('#sync-now')?.addEventListener('click', () => { void backup.syncNow(); });
     root.querySelector('#export-data')?.addEventListener('click', () => { void preferences.exportUserData(); });
     root.querySelector('#import-data')?.addEventListener('click', () => root.querySelector<HTMLInputElement>('#import-file')?.click());
     root.querySelector('#import-file')?.addEventListener('change', (event) => { void preferences.importUserData(event.target as HTMLInputElement); });
@@ -221,7 +221,6 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}): Shel
   }
 
   function bindFrame(): void {
-    bindDataSyncNavigation(root, () => { void backup.syncNow(); });
     root.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
       const view = target.closest<HTMLElement>('[data-view]');

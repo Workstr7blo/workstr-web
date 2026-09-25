@@ -131,32 +131,21 @@ export function backupPanel(state: BackupPanelState): string {
 // reader had the card expanded - is not part of this.
 export function backupCardBody(state: BackupPanelState): string {
   const localOnly = state.backup?.localOnlyHistoryCount ?? 0;
-  // Said only where the Tip Jar backup is actually below it. Signed out there is no wallet and
-  // no section, and a line pointing at nothing is worse than no line.
-  const trainingDataRow = `<button class="data-sync-row data-sync-nav-row" type="button" data-sync-open="training" aria-controls="data-sync-training-detail">
-        <span class="data-sync-row-copy"><strong>Training data</strong><small>Export or import workout history</small></span><span class="data-sync-chevron" aria-hidden="true">›</span>
-      </button>`;
-  const trainingDataDetail = `<section class="data-sync-detail" id="data-sync-training-detail" data-sync-view="training" aria-labelledby="data-sync-training-title" hidden>
-        <button class="data-sync-back" type="button" data-sync-back data-sync-return="training">‹ Data &amp; Sync</button>
-        <h3 id="data-sync-training-title" tabindex="-1">Training data</h3>
-        <p class="section-help">Create a portable copy of your workout history or restore training from an existing Workstr export. The file uses Workstr's JSON backup format.</p>
-        <button class="data-sync-row data-sync-nav-row" id="export-data" type="button"><span class="data-sync-row-copy"><strong>Export training data</strong><small>Download all local workouts from this device.</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></button>
-        <button class="data-sync-row data-sync-nav-row" id="import-data" type="button"><span class="data-sync-row-copy"><strong>Import training data</strong><small>Choose a Workstr JSON export, then confirm before changes are applied.</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></button>
-        <input id="import-file" type="file" accept="application/json,.json" hidden />
-      </section>`;
-  const tipJarRow = state.signedIn && state.tipJarBackup ? `<button class="data-sync-row data-sync-nav-row" type="button" data-sync-open="tip-jar" aria-controls="data-sync-tip-jar-detail">
-        <span class="data-sync-row-copy"><strong>Tip Jar data</strong><small>Encrypted backup and restore</small></span><span class="data-sync-chevron" aria-hidden="true">›</span>
-      </button>` : '';
-  const advancedRow = state.signedIn && state.tipJarBackup ? `<button class="data-sync-row data-sync-nav-row data-sync-quiet-row" type="button" data-sync-open="tip-jar" aria-controls="data-sync-tip-jar-detail">
-        <span class="data-sync-row-copy"><strong>Advanced recovery</strong><small>Recovery phrase and restore height</small></span><span class="data-sync-chevron" aria-hidden="true">›</span>
-      </button>` : '';
+  const trainingDataPanel = `<details class="data-sync-panel data-sync-training-panel">
+        <summary class="data-sync-row data-sync-disclosure-row"><span class="data-sync-row-copy"><strong>Training data</strong><small>Export or import workout history</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></summary>
+        <div class="data-sync-panel-body" id="data-sync-training-detail">
+          <p class="section-help">Create a portable copy of your workout history or restore training from an existing Workstr export. The file uses Workstr's JSON backup format.</p>
+          <button class="data-sync-row data-sync-action-row" id="export-data" type="button"><span class="data-sync-row-copy"><strong>Export training data</strong><small>Download all local workouts from this device.</small></span></button>
+          <button class="data-sync-row data-sync-action-row" id="import-data" type="button"><span class="data-sync-row-copy"><strong>Import training data</strong><small>Choose a Workstr JSON export, then confirm before changes are applied.</small></span></button>
+          <input id="import-file" type="file" accept="application/json,.json" hidden />
+        </div>
+      </details>`;
   const backupsSection = `<section class="data-sync-section" aria-labelledby="data-sync-backups">
         <div class="data-sync-section-label" id="data-sync-backups">Backups</div>
-        ${trainingDataRow}
-        ${tipJarRow}
+        ${trainingDataPanel}
+        ${state.signedIn ? state.tipJarBackup ?? '' : ''}
       </section>`;
-  const localOnlyMain = `<div class="data-sync-main" data-sync-view="main">${backupsSection}</div>${trainingDataDetail}`;
-  if (!state.signedIn) return localOnlyMain;
+  if (!state.signedIn) return backupsSection;
   const eraLine = state.enabled && localOnly > 0
     ? `<div class="settings-subtle-row"><span>Local-only older workouts</span><strong>${localOnly}</strong></div>`
     : '';
@@ -164,7 +153,7 @@ export function backupCardBody(state: BackupPanelState): string {
     ? 'Encrypted backup for new training.'
     : 'Protect new training across devices.';
   const syncAction = state.enabled
-    ? `<label class="data-sync-switch"><input type="checkbox" id="auto-backup" role="switch" aria-label="Auto-sync training data" checked /><span>On</span></label>`
+    ? `<label class="data-sync-toggle"><input type="checkbox" id="auto-backup" role="switch" aria-label="Auto-sync training data" checked /><span class="data-sync-toggle-track" aria-hidden="true"><span class="data-sync-toggle-knob"></span></span></label>`
     : '<button id="enable-sync" class="button small">Turn on sync</button>';
   const live = state.enabled
     ? `<div class="data-sync-row data-sync-status-row" id="backup-status"><span class="settings-live-label">${html(statusLine(state))}</span><button id="sync-now" class="button small" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button>${progressMarkup(state.sync.progress)}</div>${eraLine}`
@@ -178,15 +167,8 @@ export function backupCardBody(state: BackupPanelState): string {
         ${live}
         ${olderNote}
       </section>`;
-  return `<div class="data-sync-main" data-sync-view="main">
-      ${syncSection}
-      ${backupsSection}
-      ${advancedRow}
-    </div>
-    ${trainingDataDetail}
-    ${state.tipJarBackup ?? ''}`;
+  return `${syncSection}${backupsSection}`;
 }
-
 // Turning sync on or off changes which controls the card has, not only what they say, so
 // the status patch above cannot carry it - but a render cannot either, because the reader
 // is inside this card when they press the switch and a rebuilt page would close it under
@@ -235,6 +217,11 @@ export function updateBackupStatus(root: ParentNode, state: BackupPanelState): b
   if (syncNow) syncNow.disabled = state.sync.state === 'syncing';
   // Absent while sync is off, which is also when there is no status worth reporting.
   const live = card.querySelector('#backup-status');
-  if (live) live.innerHTML = `<span class="settings-live-label">${html(statusLine(state))}</span><button id="sync-now" class="button small" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button>${progressMarkup(state.sync.progress)}`;
+  if (live) {
+    const label = live.querySelector('.settings-live-label');
+    if (label) label.textContent = statusLine(state);
+    live.querySelectorAll('.backup-progress, .backup-progress-detail').forEach((el) => el.remove());
+    if (state.sync.progress) live.insertAdjacentHTML('beforeend', progressMarkup(state.sync.progress));
+  }
   return true;
 }

@@ -195,7 +195,7 @@ describe('the Tip Jar backup section in Data & Sync', () => {
     const height = [...document.querySelectorAll('.settings-subtle-row')].find((row) => row.textContent?.includes('3763633'));
     expect(height).toBeTruthy();
     expect(height?.closest('.tip-jar-recovery')).toBeTruthy();
-    expect(document.querySelector('#tip-jar-backup-body')?.textContent).toContain('Restore height');
+    expect(document.querySelector('#tip-jar-backup-body')?.textContent).not.toContain('Restore height');
   });
 
   it('reports when this device last wrote a file, never that the file is safe', () => {
