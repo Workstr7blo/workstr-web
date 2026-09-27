@@ -3,7 +3,7 @@ import { SimplePool, verifyEvent } from 'nostr-tools';
 import { canonMuscle } from '../core/muscles';
 import { slugify } from '../core/ids';
 import type { CanonCache, Exercise, TrainingBlock, TrainingStep } from '../core/types';
-import { DEFAULT_PUBLIC_RELAYS } from './pool';
+import { DEFAULT_PUBLIC_RELAYS, DEFAULT_WRITE_RELAYS } from './pool';
 import { CREATOR_PROGRAM_D_PREFIX, queryCreatorPrograms } from './creator-programs';
 
 // The canon is everything signed by the operator key. The d-tag convention
@@ -11,7 +11,7 @@ import { CREATOR_PROGRAM_D_PREFIX, queryCreatorPrograms } from './creator-progra
 // nobody can forge the signature.
 // Workstr canon key: npub1aujzgcepu37azm8vjcx56d68qwhhs5zapevu2v4s2j6svr3h90tqm8xhzg
 export const OPERATOR_PUBKEY = 'ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6';
-export const CANON_RELAYS = DEFAULT_PUBLIC_RELAYS;
+export const CANON_RELAYS = [...new Set([...DEFAULT_PUBLIC_RELAYS, ...DEFAULT_WRITE_RELAYS])];
 
 export interface RelayProgramExercise {
   address: string;

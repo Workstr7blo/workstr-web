@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
-import { dedupeCanonExercises, EXERCISE_D_PREFIX, exerciseFromEvent, programFromEvent, selectCanonEvents } from '../src/nostr/canon';
+import { CANON_RELAYS, dedupeCanonExercises, EXERCISE_D_PREFIX, exerciseFromEvent, programFromEvent, selectCanonEvents } from '../src/nostr/canon';
 import { CREATOR_PROGRAM_D_PREFIX, INCIDENT_CREATOR_PROGRAM_EVENT_ID, selectCreatorProgramEvents } from '../src/nostr/creator-programs';
 
 const operatorSecret = generateSecretKey();
@@ -27,6 +27,16 @@ function exerciseEvent(secret: Uint8Array, slug: string, createdAt: number, titl
     ]
   }, secret);
 }
+
+describe('canon relay set', () => {
+  it('reads from the relays Workstr publishes canon exercises to, not only the small discovery bootstrap set', () => {
+    expect(CANON_RELAYS).toContain('wss://relay.damus.io');
+    expect(CANON_RELAYS).toContain('wss://nos.lol');
+    expect(CANON_RELAYS).toContain('wss://relay.powr.build');
+    expect(CANON_RELAYS).toContain('wss://nostr.mom');
+    expect(new Set(CANON_RELAYS).size).toBe(CANON_RELAYS.length);
+  });
+});
 
 describe('selectCanonEvents', () => {
   it('keeps only operator-authored events', () => {
