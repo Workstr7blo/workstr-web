@@ -1,4 +1,5 @@
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
 import { dateLabel, isDateKey, type DateKey } from '../../core/dates';
 import type { AppState } from '../../app/state';
 import { buildHistoryModel, type HistoryCell, type HistoryModel } from './history-model';
@@ -101,11 +102,11 @@ export function historyCalendar(model: HistoryModel, selectedDate: DateKey | nul
   return `<div class="history-calendar" id="history-calendar">
     <div class="history-cal-head">
       <button class="history-cal-nav" data-history-month="prev" type="button" aria-label="Previous month">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><polyline points="15 6 9 12 15 18"/></svg>
+        ${icon('chevron-left')}
       </button>
       <div class="history-cal-title" aria-live="polite">${html(model.monthLabel)}</div>
       <button class="history-cal-nav" data-history-month="next" type="button" aria-label="Next month">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg>
+        ${icon('chevron-right')}
       </button>
       <button class="history-cal-today" data-history-month="today" type="button" aria-label="Go to the current month">Today</button>
     </div>

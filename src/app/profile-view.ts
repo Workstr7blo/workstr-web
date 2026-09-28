@@ -2,6 +2,7 @@ import { nip19 } from 'nostr-tools';
 import type { AppState } from './state';
 import { accountIdentity, avatarFace } from './account-chip';
 import { displayIdentity, displayNpub, html, shortMoneroAddress } from './format';
+import { icon } from './icons';
 import { anyProfileDirty, isSafeAvatarUrl, normalizeProfileField, type ProfileEditorState } from './profile-editor';
 
 // The Settings Profile card: who the reader is to everyone else on Nostr. Rendering only -
@@ -10,8 +11,8 @@ import { anyProfileDirty, isSafeAvatarUrl, normalizeProfileField, type ProfileEd
 //
 // Normal mode is read-only on purpose. The avatar there is a picture, not a hidden button:
 // editing starts from a visible, labelled Edit profile action and nowhere else.
-const PENCIL = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
-const CAMERA = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+const PENCIL = icon('pencil', { size: 16 });
+const CAMERA = icon('camera', { size: 16 });
 
 function fullNpub(pubkey: string): string {
   try { return nip19.npubEncode(pubkey); } catch { return pubkey; }

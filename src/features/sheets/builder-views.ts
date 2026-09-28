@@ -1,9 +1,10 @@
 import { displayWeightKg, type WeightUnit } from '../../core/units';
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
 import type { BuilderEmomSection, BuilderRow, BuilderState } from './views';
 import { responsiveImageUrl } from '../../core/media';
 
-const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></svg>';
+const TRASH = icon('trash-2');
 
 // Exported because the duration field rewrites this line in place while it is being typed into.
 export function emomSectionSummary(section: BuilderEmomSection, moveCount: number): string {
@@ -46,7 +47,7 @@ function strengthRowMarkup(row: BuilderRow, index: number, current: BuilderState
   const src = current.library.find((exercise) => exercise.slug === row.exerciseSlug)?.image_url || row.imageUrl;
   const img = src
     ? `<img class="wex-img" src="${html(responsiveImageUrl(src, 240))}" alt="" loading="lazy" decoding="async" data-fallback="replace" data-fallback-tag="div" data-fallback-class="wex-img placeholder">`
-    : `<div class="wex-img placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg></div>`;
+    : `<div class="wex-img placeholder">${icon('dumbbell')}</div>`;
   return `<div class="wex-row" data-i="${index}">
     <div class="wex-move-btns">
       <button class="wex-move-btn" type="button" data-move="${index}" data-dir="-1" title="Move up">↑</button>

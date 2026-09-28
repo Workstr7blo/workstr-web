@@ -14,6 +14,7 @@
     "src/main.ts"
   ],
   "testHintExclusions": [
+    "src/app/icon-paths.ts",
     "src/app/pwa.ts",
     "src/app/version.ts",
     "src/main.ts"

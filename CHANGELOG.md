@@ -69,6 +69,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Standardized every interface icon on Lucide. Navigation, chevrons, the clock, search and
+  filter controls, the trash, checkmarks, the gear, the pencil and camera, the copy and QR
+  glyphs, the streak flame and the summary medal are now drawn from one source at one weight
+  instead of forty-five hand-written drawings that had drifted to five different stroke widths.
+  The recovery body map, the Monero mark, the progress rings and the trend chart are artwork
+  rather than icons and are unchanged.
+
 - Streamlined Data & Sync into a compact Settings control center: Auto-sync is a standard
   switch row, Sync now stays beside the live status, and Training data, Tip Jar data, and
   Advanced recovery all expand inline with the same disclosure pattern so backup, restore, and

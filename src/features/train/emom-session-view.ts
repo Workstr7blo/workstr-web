@@ -1,4 +1,5 @@
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
 import type { ActiveSession, SessionExercise, SessionSetLog } from '../../app/state';
 import type { EmomBlock, TrainingStep } from '../../core/types';
 import { emomDurationSec, type EmomPosition, type EmomSlot } from './emom';
@@ -94,8 +95,8 @@ function instructionsMarkup(key: string, instructions: string[], open: boolean):
   // interval re-renders this body, and a class toggled in place does not survive it.
   return `<div class="session-instructions ${open ? 'open' : ''}" data-emom-instructions="${html(key)}">
     <button class="session-instructions-toggle" data-toggle-emom-instructions="${html(key)}" type="button" aria-expanded="${open}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span>How to perform</span>
-      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      ${icon('info')}<span>How to perform</span>
+      ${icon('chevron-down', { class: 'chev' })}
     </button><div class="session-instructions-body">${instructions.map((instruction, index) => `<div class="session-instructions-step"><b>${index + 1}</b>${html(instruction)}</div>`).join('')}</div>
   </div>`;
 }
@@ -234,8 +235,8 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
     ${nextUp(nextSlot, nextSlot?.steps[0])}
   </div>`;
   footer.innerHTML = `<button class="session-pause-btn" id="emom-pause" type="button" aria-label="${input.paused ? 'Resume EMOM' : 'Pause EMOM'}">${input.paused
-    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Resume'
-    : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>Pause'}</button><button class="session-finish-early" id="finish-session" type="button">Finish early</button>`;
+    ? `${icon('play', { filled: true })}Resume`
+    : `${icon('pause', { filled: true })}Pause`}</button><button class="session-finish-early" id="finish-session" type="button">Finish early</button>`;
   root.querySelectorAll<HTMLButtonElement>('[data-log-emom]').forEach((button) => button.addEventListener('click', () => input.onLog(slot, Number(button.dataset.logEmom), button)));
   input.bindControls();
 }

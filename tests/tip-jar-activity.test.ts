@@ -240,7 +240,7 @@ describe('Recent activity card', () => {
   it('shows an outgoing tip with an up-right arrow, the creator, amount and program', () => {
     const row = card([tip()], { authorProfiles: { [CREATOR]: { pubkey: CREATOR, name: 'Settebello', picture: 'https://img/s.png' } } }).querySelector('.tip-jar-activity-row')!;
     expect(row.getAttribute('data-direction')).toBe('out');
-    expect(row.querySelector('.tip-jar-activity-arrow path')?.getAttribute('d')).toBe('M7 17 17 7');
+    expect(row.querySelector('.tip-jar-activity-arrow svg')?.getAttribute('data-icon')).toBe('arrow-up-right');
     expect(row.querySelector('img')?.getAttribute('src')).toBe('https://img/s.png');
     expect(row.querySelector('.tip-jar-activity-name')?.textContent).toBe('Settebello');
     expect(row.querySelector('.tip-jar-activity-amount')?.textContent).toBe('0.005 XMR');
@@ -251,7 +251,7 @@ describe('Recent activity card', () => {
 
   it('shows an incoming transfer as Received with a down-left arrow and no sender', () => {
     const row = card([received()]).querySelector('.tip-jar-activity-row')!;
-    expect(row.querySelector('.tip-jar-activity-arrow path')?.getAttribute('d')).toBe('M17 7 7 17');
+    expect(row.querySelector('.tip-jar-activity-arrow svg')?.getAttribute('data-icon')).toBe('arrow-down-left');
     expect(row.querySelector('.tip-jar-activity-name')?.textContent).toBe('Received');
     expect(row.querySelector('img')).toBeNull();
     expect(row.querySelector('.tip-jar-activity-context')).toBeNull();

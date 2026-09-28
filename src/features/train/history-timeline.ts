@@ -2,6 +2,7 @@ import { displayWeightKg, normalizeWeightUnit, type WeightUnit } from '../../cor
 import { dateKeyFromDate, dateLabel, isDateKey, relativeDayLabel, type DateKey } from '../../core/dates';
 import type { ActiveSession, AppState } from '../../app/state';
 import { formatSessionDate, html } from '../../app/format';
+import { icon } from '../../app/icons';
 import { paintBodyMapSvg } from '../../app/bodymap';
 import { groupSessionsForTimeline, sessionsOnDay, type HistoryDayGroup } from './history-model';
 import { sessionDetail, sessionDuration, sessionMuscleGroupNames, sessionMuscleSets, workoutVolume } from './views';
@@ -23,14 +24,14 @@ function sessionCard(session: ActiveSession, state: AppState, unit: WeightUnit):
   const expanded = state.expandedSessionId === session.id;
   return `<div class="workout-card history-session-card ${expanded ? 'expanded' : ''}" data-session="${session.id}">
     <div class="workout-card-header" data-toggle-session="${session.id}">
-      <div class="workout-card-map ${map ? 'has-map' : ''}" data-session-map="${session.id}">${map || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'}</div>
+      <div class="workout-card-map ${map ? 'has-map' : ''}" data-session-map="${session.id}">${map || icon('clock')}</div>
       <div class="workout-card-info">
         <div class="workout-card-name">${html(session.sheetName || 'Freestyle')}</div>
         <div class="workout-card-meta">${meta}</div>
         <div class="history-stat-row">${stats}</div>
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(' · '))}</div>` : ''}
       </div>
-      <svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      ${icon('chevron-down', { class: 'workout-card-chevron' })}
     </div>
     <div class="workout-card-body" data-session-body="${session.id}">${expanded ? sessionDetail(session, unit, Boolean(state.pubkey), state.publishingSessionId === session.id, state.publishingStatus || 'Waiting for signer...') : ''}</div>
   </div>`;

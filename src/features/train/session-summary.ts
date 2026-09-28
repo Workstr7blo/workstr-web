@@ -1,5 +1,6 @@
 import { normalizeWeightUnit } from '../../core/units';
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
 import type { ActiveSession, AppState, SessionExercise } from '../../app/state';
 import { fetchCanonPrograms, type RelayProgram } from '../../nostr/canon';
 import { publishWorkoutSummary } from '../../nostr/share';
@@ -113,7 +114,7 @@ export function createSessionSummary(ctx: SessionSummaryContext): SessionSummary
     ];
     ctx.openModal(`
       <div class="summary-hero">
-        <div class="sh-medal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/></svg></div>
+        <div class="sh-medal">${icon('award')}</div>
         <div class="sh-copy"><strong>${html(session.sheetName || 'Freestyle')}</strong><small>nicely done — here's the recap</small></div>
       </div>
       <div class="summary-stats">${stats.map((item) => `<div class="summary-stat"><div class="ss-val">${html(String(item.val))}</div><div class="ss-label">${item.label}</div></div>`).join('')}</div>

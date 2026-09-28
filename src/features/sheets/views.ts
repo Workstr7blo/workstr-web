@@ -6,6 +6,7 @@ import type { SheetWithExercises } from '../../db/store';
 import { OPERATOR_PUBKEY, type RelayProgram } from '../../nostr/canon';
 import type { AppState } from '../../app/state';
 import { authorPill, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
+import { icon } from '../../app/icons';
 import { paintBodyMapSvg } from '../../app/bodymap';
 import { programSummary } from './program-labels';
 import { trainingLevelMark } from '../../app/exercise-card';
@@ -248,7 +249,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
   // Status shows only when there is something to do about it; Published and local are in the
   // expanded actions.
   const changed = programStatusBadge(program, state).cls === 'changed';
-  const fallbackMap = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4"/></svg>';
+  const fallbackMap = icon('dumbbell');
   return `<div class="workout-card ${isExpanded ? 'expanded' : ''}" data-program-address="${html(program.address)}">
     <div class="workout-card-header" data-toggle-program="${html(program.address)}">
       <div class="workout-card-map ${map ? 'has-map' : ''}">${map || fallbackMap}</div>
@@ -259,7 +260,7 @@ export function programCard(program: RelayProgram, state: AppState, options: { s
         ${summary ? `<div class="workout-card-summary">${html(summary)}</div>` : ''}
         ${changed ? '<div class="workout-card-status">Unpublished changes</div>' : ''}
       </div>
-      <button class="workout-card-toggle" type="button" aria-expanded="${isExpanded}" aria-label="${isExpanded ? 'Collapse' : 'Expand'} ${html(program.name)}"><svg class="workout-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+      <button class="workout-card-toggle" type="button" aria-expanded="${isExpanded}" aria-label="${isExpanded ? 'Collapse' : 'Expand'} ${html(program.name)}">${icon('chevron-down', { class: 'workout-card-chevron' })}</button>
     </div>
     <div class="workout-card-body">${isExpanded ? programBody(program, state) : ''}</div>
   </div>`;
@@ -334,7 +335,7 @@ export function programBody(program: RelayProgram, state: AppState): string {
           <div class="wk-ex-short">${short}</div>
         </div>
         ${muscle ? `<span class="wk-ex-muscle-pill">${html(muscle)}</span>` : ''}
-        <svg class="wk-ex-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        ${icon('chevron-down', { class: 'wk-ex-chevron' })}
       </div>
       <div class="wk-ex-detail">
         <div class="wk-ex-detail-grid">

@@ -2,6 +2,7 @@ import type { BodyWeightEntry } from '../../core/types';
 import { displayWeightKg, normalizeWeightUnit, type WeightUnit } from '../../core/units';
 import type { AppState } from '../../app/state';
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
 import { monthLabel, type MonthKey } from '../../core/dates';
 import { getStats, normalizeStatsRange, STATS_RANGE_LABELS, STATS_RANGE_SHORT, STATS_RANGES } from './stats';
 
@@ -46,7 +47,7 @@ export function trainingStatsView(state: AppState): string {
   </div>`;
   return `<div class="stats-hero">
     <div class="summary-stat">
-      <div class="ss-val"><svg id="stat-streak-flame" class="flame ${stats.streak > 0 ? 'active' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c-4-2.5-7-6.5-7-11 0-3 2-5.5 4-7 .5 2.5 2 4 4 5 0-3 1.5-6 3-8 1.5 2 3 5 3 8 2-1 3.5-2.5 4-5 1.5 2.5 1 6-1 9s-5.5 5.5-10 9z"/></svg><span id="stat-streak">${stats.streak}</span></div>
+      <div class="ss-val">${icon('flame', { id: 'stat-streak-flame', class: `flame ${stats.streak > 0 ? 'active' : ''}` })}<span id="stat-streak">${stats.streak}</span></div>
       <div class="ss-label">Day streak</div>
     </div>
     <div class="summary-stat">
