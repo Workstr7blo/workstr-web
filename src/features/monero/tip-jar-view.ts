@@ -1,14 +1,11 @@
 import { html, shortMoneroAddress } from '../../app/format';
+import { icon } from '../../app/icons';
 import { moneroQr } from '../../app/monero-mark';
 import type { AppState } from '../../app/state';
-import { PIGGY_BANK } from '../../app/piggy-bank';
 import { tipJarActivityCard, updateTipJarActivity } from './tip-jar-history-view';
 import { tipJarNavLabel, tipJarOn, tipJarStatus, type TipJarStatus } from './tip-jar-state';
 import { sendReadiness } from './wallet-send';
 import { xmrAmount, moneroWalletBusy } from './wallet-view';
-
-// Two stacked sheets: the copy glyph the address row carries, beside the shortened address.
-const COPY_GLYPH = '<rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15.5 6.2A2.2 2.2 0 0 0 13.4 4.5H6.7A2.2 2.2 0 0 0 4.5 6.7v6.7c0 1 .7 1.9 1.7 2.1"/>';
 
 // The ring circumference is normalised with pathLength, so progress is a plain 0..100 offset.
 function ringOffset(progress: number): string {
@@ -27,7 +24,7 @@ export function tipJarNavIcon(status: TipJarStatus): string {
       <circle class="tip-jar-ring-track" cx="14" cy="14" r="12.6"/>
       <circle class="tip-jar-ring" cx="14" cy="14" r="12.6" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${ringOffset(status.progress)}" transform="rotate(-90 14 14)"/>
     </svg>
-    <svg class="tip-jar-piggy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PIGGY_BANK}</svg>
+    ${icon('piggy-bank', { class: 'tip-jar-piggy' })}
   </span><span class="tip-jar-label">${html(tipJarNavLabel(status.visual))}</span><span class="sr-only tip-jar-spoken">, ${html(status.spoken)}</span>`;
 }
 
@@ -95,7 +92,7 @@ function walletBody(state: AppState, status: TipJarStatus): string {
           <code class="tip-jar-address" aria-hidden="true">${html(shortMoneroAddress(address))}</code>
           <span class="sr-only">Your Tip Jar address: ${html(address)}</span>
           <button class="tip-jar-address-copy" type="button" data-tip-jar-copy data-address="${html(address)}" aria-label="Copy your full Tip Jar address">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${COPY_GLYPH}</svg>
+            ${icon('copy')}
           </button>
         </div>
         <div class="web-empty-actions"><button id="tip-jar-copy" class="button payment" type="button" data-tip-jar-copy data-address="${html(address)}">Copy address</button></div>

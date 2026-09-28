@@ -6,6 +6,7 @@ import { emomBlockDurationSec } from '../core/emom-blocks';
 import { emomBlocksFromBuilder, PROGRAM_GOALS, programDisplayTags, selectedProgramGoals, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
 import { editablePublicationIdentity, type PublicationIdentity } from '../nostr/program-ownership';
 import { html } from './format';
+import { icon } from './icons';
 import { formatTaxonomyLabel, normalizeTrainingLevel, TRAINING_LEVELS } from '../core/training-taxonomy';
 import type { AppState } from './state';
 
@@ -194,9 +195,7 @@ function renderModal(): void {
           <div class="builder-pick-name">${html(exercise.name)}</div>
           ${exercise.muscle_group ? `<div class="builder-pick-muscle">${html(exercise.muscle_group)}</div>` : ''}
         </div>
-        <span class="builder-pick-state">${added
-          ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
-          : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'}</span>
+        <span class="builder-pick-state">${added ? icon('check') : icon('plus')}</span>
       </div>`;
     }).join('');
   };

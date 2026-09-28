@@ -1,5 +1,5 @@
 import { html } from '../../app/format';
-import { PIGGY_BANK } from '../../app/piggy-bank';
+import { icon, type IconName } from '../../app/icons';
 import type { AppState } from '../../app/state';
 import { recentActivity, tipJarCreatorName, tipJarCreatorPicture } from './tip-jar-history';
 import type { TipJarActivity } from './types';
@@ -9,13 +9,9 @@ import { xmrAmount } from './wallet-view';
 // all Workstr can honestly say about where it came from.
 
 // Plain directional arrows: out of the Tip Jar leans up and right, into it down and left.
-const ARROW_OUT = '<path d="M7 17 17 7"/><path d="M8.5 7H17v8.5"/>';
-const ARROW_IN = '<path d="M17 7 7 17"/><path d="M15.5 17H7V8.5"/>';
-const PERSON = '<circle cx="12" cy="9" r="3.5"/><path d="M5.5 19.5c1.2-3 3.7-4.5 6.5-4.5s5.3 1.5 6.5 4.5"/>';
-
-function glyph(paths: string, className: string): string {
-  return `<svg class="${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths}</svg>`;
-}
+const ARROW_OUT: IconName = 'arrow-up-right';
+const ARROW_IN: IconName = 'arrow-down-left';
+const PERSON: IconName = 'user-round';
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -57,11 +53,11 @@ function avatarFallback(name: string): string {
 function parts(record: TipJarActivity, state: AppState): RowParts {
   const amount = xmrAmount(record.amountAtomic);
   if (record.direction === 'in') {
-    return { name: 'Received', context: '', avatar: `<span class="tip-jar-activity-avatar is-jar">${glyph(PIGGY_BANK, 'tip-jar-activity-glyph')}</span>`, spoken: `Received ${amount}` };
+    return { name: 'Received', context: '', avatar: `<span class="tip-jar-activity-avatar is-jar">${icon('piggy-bank', { class: 'tip-jar-activity-glyph' })}</span>`, spoken: `Received ${amount}` };
   }
   const pubkey = record.recipientPubkey;
   if (!pubkey) {
-    return { name: 'Sent', context: '', avatar: `<span class="tip-jar-activity-avatar is-generic">${glyph(PERSON, 'tip-jar-activity-glyph')}</span>`, spoken: `Sent ${amount}` };
+    return { name: 'Sent', context: '', avatar: `<span class="tip-jar-activity-avatar is-generic">${icon(PERSON, { class: 'tip-jar-activity-glyph' })}</span>`, spoken: `Sent ${amount}` };
   }
   const name = tipJarCreatorName(pubkey, state, record.nameSnapshot);
   const picture = tipJarCreatorPicture(pubkey, state, record.pictureSnapshot);
@@ -88,7 +84,7 @@ function activityRow(record: TipJarActivity, state: AppState, now: Date): string
   const sentence = `${spoken}, ${day.spoken} at ${time}${status ? `. ${status}` : ''}.`;
   return `<li class="tip-jar-activity-row" data-direction="${record.direction}" data-state="${record.state}">
     <span class="sr-only">${html(sentence)}</span>
-    <span class="tip-jar-activity-arrow" aria-hidden="true">${glyph(record.direction === 'out' ? ARROW_OUT : ARROW_IN, 'tip-jar-activity-arrow-icon')}</span>
+    <span class="tip-jar-activity-arrow" aria-hidden="true">${icon(record.direction === 'out' ? ARROW_OUT : ARROW_IN, { class: 'tip-jar-activity-arrow-icon' })}</span>
     <span aria-hidden="true">${avatar}</span>
     <span class="tip-jar-activity-main" aria-hidden="true">
       <span class="tip-jar-activity-name">${html(name)}</span>

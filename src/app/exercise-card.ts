@@ -2,6 +2,7 @@ import type { Exercise } from '../core/types';
 import { responsiveImageUrl } from '../core/media';
 import { formatTaxonomyLabel, normalizeTrainingLevel, TRAINING_LEVELS } from '../core/training-taxonomy';
 import { EX_PLACEHOLDER, html } from './format';
+import { icon } from './icons';
 
 // The one exercise card Library and Discover both draw, so the two cannot drift apart. It says
 // what the exercise is, what it trains and what level it suits; source, movement type, secondary
@@ -9,7 +10,7 @@ import { EX_PLACEHOLDER, html } from './format';
 // it. Each view supplies only what differs: the favourite star in Library, the import action in
 // Discover.
 
-const SELECTED_CHECK = '<span class="sel-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>';
+const SELECTED_CHECK = `<span class="sel-check">${icon('check', { size: 14 })}</span>`;
 
 // Muscle and level on one line, either alone when the other is missing, and no line at all when
 // both are. The level's dot is the separator, so a narrow card that wraps the line starts the

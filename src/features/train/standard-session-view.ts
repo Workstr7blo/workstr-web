@@ -1,4 +1,5 @@
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
 import type { ActiveSession, SessionExercise, SessionSetLog } from '../../app/state';
 import type { SupersetTransition } from './session-logic';
 import { sessionHeroMedia } from './session-hero';
@@ -175,8 +176,8 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   // it. (A page render does not reach in here, so it is not the cause.)
   const instructionsMarkup = instructions.length ? `<div class="session-instructions ${input.instructionsOpen ? 'open' : ''}" id="session-instructions">
     <button class="session-instructions-toggle" data-toggle-instructions="${html(slug)}" type="button" aria-expanded="${input.instructionsOpen}" aria-controls="session-instructions-body">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-      <span>How to perform</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      ${icon('info')}
+      <span>How to perform</span>${icon('chevron-down', { class: 'chev' })}
     </button>
     <div class="session-instructions-body" id="session-instructions-body">${instructions.map((step, index) => `<div class="session-instructions-step"><b>${index + 1}</b>${html(step)}</div>`).join('')}</div>
   </div>` : '';

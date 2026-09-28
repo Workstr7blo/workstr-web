@@ -4,6 +4,7 @@ import { formatTaxonomyLabel, TRAINING_LEVELS } from '../../core/training-taxono
 import type { Exercise } from '../../core/types';
 import type { RelayProgram } from '../../nostr/canon';
 import { html } from '../../app/format';
+import { icon as renderIcon, type IconName } from '../../app/icons';
 import { sheetToProgram } from './views';
 import {
   PROGRAM_FOCUS_LABELS,
@@ -44,15 +45,15 @@ const FILTER_LABELS: Record<ProgramFilterKey, string> = {
   goal: 'Goal', focus: 'Focus', format: 'Format', level: 'Level', equipment: 'Equipment'
 };
 
-const ICONS = {
-  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
-  sliders: '<path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2"/><circle cx="10" cy="16" r="2"/>',
-  plus: '<path d="M12 5v14M5 12h14"/>',
-  refresh: '<path d="M20 12a8 8 0 11-2.3-5.6"/><path d="M20 4v5h-5"/>'
+const ICONS: Record<string, IconName> = {
+  search: 'search',
+  sliders: 'sliders-horizontal',
+  plus: 'plus',
+  refresh: 'refresh-cw'
 };
 
 function icon(name: keyof typeof ICONS, cls = ''): string {
-  return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
+  return renderIcon(ICONS[name], { class: cls });
 }
 
 export function programFilterValues(state: AppState): ProgramFilters {
@@ -143,7 +144,7 @@ export function programActiveFilters(context: ProgramBrowser, state: AppState): 
   const filter = programFilterValues(state);
   const chips = (Object.keys(FILTER_LABELS) as ProgramFilterKey[])
     .filter((key) => filter[key])
-    .map((key) => `<button class="program-filter-chip" type="button" data-program-filter-remove="${key}" data-program-filter-context="${context}" aria-label="Remove ${html(FILTER_LABELS[key].toLowerCase())} filter ${html(programFilterLabel(filter[key]))}"><span>${html(programFilterLabel(filter[key]))}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`)
+    .map((key) => `<button class="program-filter-chip" type="button" data-program-filter-remove="${key}" data-program-filter-context="${context}" aria-label="Remove ${html(FILTER_LABELS[key].toLowerCase())} filter ${html(programFilterLabel(filter[key]))}"><span>${html(programFilterLabel(filter[key]))}</span>${renderIcon('x')}</button>`)
     .join('');
   if (!chips) return '';
   return `<div class="program-active-filters">${chips}<button class="program-filter-clear" type="button" data-program-filter-clear="${context}">Clear</button></div>`;

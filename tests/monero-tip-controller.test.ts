@@ -2,7 +2,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createMoneroTipController } from '../src/app/monero-tip-controller';
 import { moneroTipAddress, moneroTipButton } from '../src/features/sheets/monero-tip-view';
-import { PIGGY_BANK, tipPiggyIcon } from '../src/app/piggy-bank';
+import { tipPiggyIcon } from '../src/app/piggy-bank';
+import { ICON_PATHS } from '../src/app/icon-paths';
 import { MONERO_MARK } from '../src/app/monero-mark';
 import { programCard } from '../src/features/sheets/views';
 import { shellMarkup } from '../src/app/layout';
@@ -116,7 +117,7 @@ describe('Monero Tip on program cards', () => {
     const cta = card.slice(card.indexOf('monero-tip-cta'), card.indexOf('</button>'));
 
     expect(cta).toContain('tip-piggy-icon');
-    expect(cta).toContain(PIGGY_BANK);
+    expect(cta).toContain(ICON_PATHS['piggy-bank']);
     expect(cta).toContain(tipPiggyIcon(18));
     // The plus: attached to the pig, and a third of it at most.
     expect(cta).toMatch(/<circle cx="19.3" cy="4.7" r="3.2"\/>/);

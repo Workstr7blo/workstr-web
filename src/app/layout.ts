@@ -2,6 +2,7 @@ import type { AppState, View } from './state';
 import { settingsView } from './settings-view';
 import { accountChip, accountIdentity } from './account-chip';
 import { html } from './format';
+import { icon } from './icons';
 import { libraryPanel } from '../features/library/views';
 import { discoverPanel } from '../features/discover/views';
 import { historyCalendarPanel } from '../features/train/history-calendar';
@@ -15,14 +16,14 @@ import { tipJarNavIcon, tipJarView } from '../features/monero/tip-jar-view';
 import { tipJarStatus } from '../features/monero/tip-jar-state';
 
 const navItems: Array<{ view: View; label: string; icon: string }> = [
-  { view: 'exercises', label: 'Exercises', icon: '<path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/>' },
-  { view: 'workouts', label: 'Workouts', icon: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/>' },
-  { view: 'statistics', label: 'Statistics', icon: '<path d="M18 20V10M12 20V4M6 20v-6"/>' }
+  { view: 'exercises', label: 'Exercises', icon: icon('dumbbell') },
+  { view: 'workouts', label: 'Workouts', icon: icon('clipboard-list') },
+  { view: 'statistics', label: 'Statistics', icon: icon('chart-column') }
 ];
 
 // Training destinations share one icon shape; the Tip Jar carries its own status badge.
 function navItem(state: AppState, item: { view: View; label: string; icon: string }): string {
-  return `<div class="nav-item ${state.view === item.view ? 'active' : ''}" data-view="${item.view}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${item.icon}</svg><span>${item.label}</span></div>`;
+  return `<div class="nav-item ${state.view === item.view ? 'active' : ''}" data-view="${item.view}">${item.icon}<span>${item.label}</span></div>`;
 }
 
 // The whole app as one string: the frame with the current page already written into it.
@@ -84,7 +85,7 @@ function sessionOverlayMarkup(state: AppState): string {
       <div class="session-head-main">
         <div class="session-eyebrow">Live session</div>
         <div id="session-title" class="session-title">Workout</div>
-        <div class="session-meta-line"><span id="session-meta" class="session-meta">Exercise 1 of 1</span><span class="session-elapsed-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span id="session-elapsed" class="session-elapsed">00:00</span></span></div>
+        <div class="session-meta-line"><span id="session-meta" class="session-meta">Exercise 1 of 1</span><span class="session-elapsed-chip">${icon('clock')}<span id="session-elapsed" class="session-elapsed">00:00</span></span></div>
       </div>
       <button id="session-close" class="session-close-btn" type="button">End</button>
     </div>

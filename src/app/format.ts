@@ -4,6 +4,7 @@ import { equipmentKey, equipmentLabel, equipmentOptions, kitEquipmentKeys, match
 import type { Exercise } from '../core/types';
 import type { RelayProfile } from '../nostr/pool';
 import type { AppState } from './state';
+import { icon } from './icons';
 import { MOVEMENT_TYPES, normalizeMovementType, normalizeTrainingLevel, taxonomyOptions, TRAINING_LEVELS } from '../core/training-taxonomy';
 
 export function html(value: unknown): string {
@@ -55,7 +56,7 @@ export function authorPill(profile: RelayProfile | undefined, pubkey: string, { 
   return `<span class="author-pill${compact ? ' compact' : ''}" title="${html(title)}">${avatar}<span>${html(name)}</span></span>`;
 }
 
-export const EX_PLACEHOLDER = '<div class="card-placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>';
+export const EX_PLACEHOLDER = `<div class="card-placeholder">${icon('dumbbell', { size: 40 })}</div>`;
 
 export const difficultyBadgeClass = (difficulty?: string): string =>
   ({ beginner: 'diff-beginner', intermediate: 'diff-intermediate', advanced: 'diff-advanced' } as Record<string, string>)[normalizeTrainingLevel(difficulty)] || 'diff-unknown';
@@ -185,7 +186,7 @@ export function formatMinutes(seconds: number): string {
 export function exerciseImage(src?: string): string {
   return src
     ? `<img class="wk-ex-img" src="${html(src)}" alt="" loading="lazy" data-fallback="replace" data-fallback-tag="div" data-fallback-class="wk-ex-img placeholder">`
-    : `<div class="wk-ex-img placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4v16M18 4v16M6 12h12M2 8h4M18 8h4M2 16h4M18 16h4"/></svg></div>`;
+    : `<div class="wk-ex-img placeholder">${icon('dumbbell')}</div>`;
 }
 
 // Folds granular muscle names (e.g. "Lateral Deltoid") into the display group
