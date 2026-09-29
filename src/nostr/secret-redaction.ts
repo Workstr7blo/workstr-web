@@ -8,6 +8,10 @@ const HEX_SECRET_RE = /\b[0-9a-f]{64}\b/gi;
 const NSEC_RE = /nsec1[02-9ac-hj-np-z]+/gi;
 const SECRET_PARAM_RE = /(^|[?&\s])((?:secret|token|private_?key|nsec)=)[^&\s<>'"]+/gi;
 
+export interface SecretMaterialOptions {
+  allowPublicHex?: boolean;
+}
+
 export function redactSecrets(value: string): string {
   const withoutUris = value.replace(/nostr\+walletconnect:\/\/[^\s<>'"]+/gi, (match) => redactWalletConnectUri(match));
   return redactBareSecrets(withoutUris);
@@ -15,8 +19,17 @@ export function redactSecrets(value: string): string {
 
 // A string that names a wallet connection at all is refused, not only one `redactSecrets`
 // would change: a connection string with its secret mangled is still not something to publish.
-export function containsSecretMaterial(value: string): boolean {
-  return /walletconnect/i.test(value) || redactSecrets(value) !== value;
+export function containsSecretMaterial(value: string, options: SecretMaterialOptions = {}): boolean {
+  if (/walletconnect/i.test(value)) return true;
+  if (matches(NSEC_RE, value) || matches(SECRET_PARAM_RE, value)) return true;
+  return !options.allowPublicHex && matches(HEX_SECRET_RE, value);
+}
+
+function matches(pattern: RegExp, value: string): boolean {
+  pattern.lastIndex = 0;
+  const found = pattern.test(value);
+  pattern.lastIndex = 0;
+  return found;
 }
 
 function redactWalletConnectUri(input: string): string {

@@ -106,6 +106,23 @@ describe('buildCreatorProgramEvent', () => {
       }
     }
   });
+
+  it('allows public Nostr exercise addresses and image hashes while still blocking secret params', () => {
+    const operator = 'ef24246321e47dd16cec960d4d374703af78505d0e59c532b054b5060e372bd6';
+    const publicAddress = `33401:${operator}:workstr:exercise:alternate-hammer-curl`;
+    expect(() => buildCreatorProgramEvent(sheet({
+      exercises: [{
+        ...sheet().exercises[0],
+        exercise_slug: publicAddress,
+        image_url: `https://cdn.example.test/images/${'c'.repeat(64)}.png`
+      }],
+      blocks: [{ type: 'straight', rounds: 3, steps: [{ exerciseSlug: publicAddress, targetReps: '8-12' }] }]
+    }))).not.toThrow();
+
+    expect(() => buildCreatorProgramEvent(sheet({
+      exercises: [{ ...sheet().exercises[0], image_url: `https://cdn.example.test/photo.png?token=${NWC_HEX_SECRET}` }]
+    }))).toThrow('Creator program publish blocked');
+  });
 });
 
 describe('normalizeProgramPublishRelays', () => {

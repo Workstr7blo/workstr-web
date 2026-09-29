@@ -100,39 +100,57 @@ function exerciseAddress(row: PublishableProgram['exercises'][number]): string {
   return `workstr:exercise:${slug}`;
 }
 
-function assertNoSecretMaterial(value: unknown): void {
+function assertNoSecretMaterial(value: unknown, options: { allowPublicHex?: boolean } = {}): void {
   if (typeof value === 'string') {
-    if (containsSecretMaterial(value)) throw new Error(PUBLIC_SECRET_ERROR);
+    if (containsSecretMaterial(value, options)) throw new Error(PUBLIC_SECRET_ERROR);
     return;
   }
   if (Array.isArray(value)) {
-    for (const item of value) assertNoSecretMaterial(item);
+    for (const item of value) assertNoSecretMaterial(item, options);
     return;
   }
   if (value && typeof value === 'object') {
-    for (const item of Object.values(value)) assertNoSecretMaterial(item);
+    for (const item of Object.values(value)) assertNoSecretMaterial(item, options);
   }
 }
 
 function assertCreatorProgramPublicFieldsSafe(sheet: PublishableProgram): void {
   assertNoSecretMaterial({
-    slug: sheet.slug,
     name: sheet.name,
     notes: sheet.notes,
     difficulty: sheet.difficulty,
     tags: sheet.tags,
     exercises: sheet.exercises.map((row) => ({
-      exercise_slug: row.exercise_slug,
       exercise_name: row.exercise_name,
       muscle_group: row.muscle_group,
-      image_url: row.image_url,
       reps: row.reps,
       weight: row.weight,
       rest: row.rest,
       notes: row.notes
-    })),
-    blocks: sheet.blocks
+    }))
   });
+  assertNoSecretMaterial({
+    slug: sheet.slug,
+    exercises: sheet.exercises.map((row) => ({
+      exercise_slug: row.exercise_slug,
+      image_url: row.image_url
+    }))
+  }, { allowPublicHex: true });
+  for (const block of sheet.blocks || []) {
+    assertNoSecretMaterial({ type: block.type, rounds: block.rounds, restAfterRoundSec: 'restAfterRoundSec' in block ? block.restAfterRoundSec : undefined, totalDurationSec: 'totalDurationSec' in block ? block.totalDurationSec : undefined });
+    const groups = block.type === 'straight' ? [block.steps] : block.intervals.map((interval) => interval.steps);
+    if (block.type === 'emom') assertNoSecretMaterial(block.intervals.map((interval) => ({ durationSec: interval.durationSec })));
+    for (const steps of groups) {
+      assertNoSecretMaterial(steps.map((step) => ({
+        exerciseName: step.exerciseName,
+        targetReps: step.targetReps,
+        targetDurationSec: step.targetDurationSec,
+        weight: step.weight,
+        notes: step.notes
+      })));
+      assertNoSecretMaterial(steps.map((step) => ({ exerciseSlug: step.exerciseSlug })), { allowPublicHex: true });
+    }
+  }
 }
 
 function programMeta(sheet: PublishableProgram): Record<string, unknown> {

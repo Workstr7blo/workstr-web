@@ -140,6 +140,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed creator-program publishing incorrectly blocking public Nostr exercise addresses or image
+  URLs that contain 64-character public hashes. Wallet connection strings, `nsec` values and
+  secret/token query parameters are still refused before signing.
 - Fixed the Tip Jar's sync ring sitting empty for most of a catch-up and only moving at the very
   end. It now measures the blocks of the sync actually running - from where the wallet left off
   to the chain tip it is heading for - so it starts near empty, fills steadily as blocks are
