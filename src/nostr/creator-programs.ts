@@ -1,6 +1,6 @@
 import type { Event } from 'nostr-tools';
 import { SimplePool, verifyEvent } from 'nostr-tools';
-import { DEFAULT_PUBLIC_RELAYS } from './pool';
+import { DEFAULT_PUBLIC_RELAYS, withoutRetiredRelays } from './pool';
 
 // NIP-101e workout template. Named here so the signer permission list and the publisher
 // agree with the reader on what Workstr asks to sign.
@@ -66,7 +66,7 @@ export async function queryCreatorPrograms(limit: number, relays = DEFAULT_PUBLI
   try {
     const filter = { kinds: [CREATOR_PROGRAM_KIND], '#t': ['beastmode', 'workstr-program'], limit };
     const results = await Promise.allSettled(
-      relays.map((relay) => withTimeout(pool.querySync([relay], filter)))
+      withoutRetiredRelays(relays).map((relay) => withTimeout(pool.querySync([relay], filter)))
     );
     if (results.every((result) => result.status === 'rejected')) {
       throw new Error('no creator program relay reachable');

@@ -1,12 +1,12 @@
 import { SimplePool } from 'nostr-tools';
 import type { SignedNostrEvent } from '../signer/types';
-import { DEFAULT_PUBLIC_RELAYS, type RelayProfile } from './pool';
+import { DEFAULT_PUBLIC_RELAYS, withoutRetiredRelays, type RelayProfile } from './pool';
 
 const PROFILE_CACHE_PREFIX = 'workstr.profile.';
 const PROFILE_TIMEOUT_MS = 5000;
 
 export function profileRelays(configured: string[] = []): string[] {
-  return [...new Set([...configured, ...DEFAULT_PUBLIC_RELAYS].map((relay) => relay.trim()).filter(Boolean))];
+  return withoutRetiredRelays([...new Set([...configured, ...DEFAULT_PUBLIC_RELAYS].map((relay) => relay.trim()).filter(Boolean))]);
 }
 
 export function parseProfileEvent(pubkey: string, event: SignedNostrEvent): RelayProfile | null {

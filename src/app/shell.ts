@@ -10,7 +10,7 @@ import type { Exercise, WorkstrSettings } from '../core/types';
 import { displayWeightKg, formatWeightKg, normalizeWeightUnit, storeWeightInput } from '../core/units';
 import { addMonths, dateKeyFromDate, isDateKey, monthKeyOf } from '../core/dates';
 import { CANON_RELAYS, canonCacheSnapshot, fetchCanonExercises, fetchCanonPrograms, type RelayProgram } from '../nostr/canon';
-import type { RelayProfile } from '../nostr/pool';
+import { DEFAULT_PUBLIC_RELAYS, type RelayProfile } from '../nostr/pool';
 import { fetchProfile, profileRelays, readCachedProfile, writeCachedProfile } from '../nostr/profile';
 import { planProgramImport, programImportState } from '../nostr/programImport';
 import { repairOwnedProgramDuplicates } from '../nostr/program-ownership';
@@ -55,7 +55,7 @@ import { createProgramPublishController } from './program-publish-controller';
 import type { ShellHandle, ShellOptions } from './shell-types';
 const SESSION_KEY = 'workstr.currentPubkey';
 const OBSOLETE_SIGNER_TYPE_KEY = 'workstr.signerType';
-const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'off', publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'] };
+const DEFAULT_SETTINGS: WorkstrSettings = { unit: 'kg', paymentMode: 'off', publicRelays: [...DEFAULT_PUBLIC_RELAYS] };
 function profileName(profile: RelayProfile | null): string | null { return profile?.name?.trim() || profile?.nip05?.trim() || null; }
 
 export function renderShell(root: HTMLElement, options: ShellOptions = {}): ShellHandle {
