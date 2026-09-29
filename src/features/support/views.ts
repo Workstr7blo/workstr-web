@@ -2,10 +2,11 @@ import { OPERATOR_MONERO_ADDRESS } from '../../core/funding';
 import { looksLikeMoneroAddress } from '../../nostr/payment-targets';
 import { moneroQr } from '../../app/monero-mark';
 import { html, shortMoneroAddress } from '../../app/format';
+import { SETTINGS_ACCORDION, settingsSummary } from '../../app/settings-row';
 
 function supportCard(summary: string, body: string): string {
-  return `<details class="settings-category support-panel compact-support support-panel-monero support-standalone" data-settings-section="support">
-    <summary><span class="settings-category-copy"><strong>Support Workstr</strong><small>${html(summary)}</small></span></summary>
+  return `<details class="settings-category support-panel compact-support support-panel-monero support-standalone" name="${SETTINGS_ACCORDION}" data-settings-section="support">
+    ${settingsSummary({ icon: 'heart', title: 'Support Workstr', detail: summary })}
     <div class="settings-category-body">${body}</div>
   </details>`;
 }

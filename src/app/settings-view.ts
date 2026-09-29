@@ -12,6 +12,7 @@ import { backupPanel, backupPanelState } from '../features/backup/views';
 import { tipJarBackupSection } from '../features/monero/wallet-backup-view';
 import { deviceSecurityCard } from './device-vault-view';
 import { profileCard } from './profile-view';
+import { SETTINGS_ACCORDION, settingsSummary } from './settings-row';
 
 // Settings is read top to bottom by someone who is not thinking in features: who I am, how I
 // train, how I pay, how this device reaches my account, how I support this, and then the
@@ -90,8 +91,8 @@ function equipmentPreference(state: AppState): string {
 
 function trainingPreferencesCard(state: AppState): string {
   const unit = normalizeWeightUnit(state.settings.unit);
-  return `<details class="settings-category training-preferences-card" data-settings-section="training-preferences">
-    <summary><span class="settings-category-copy"><strong>Training Preferences</strong><small>${trainingSummary(state)}</small></span></summary>
+  return `<details class="settings-category training-preferences-card" name="${SETTINGS_ACCORDION}" data-settings-section="training-preferences">
+    ${settingsSummary({ icon: 'sliders-horizontal', title: 'Training Preferences', detail: trainingSummary(state) })}
     <div class="settings-category-body training-preferences-body">
       <div class="training-preference training-preference-row">
         <div class="training-preference-copy"><strong>Weight unit</strong><small>Choose how weights are displayed.</small></div>
@@ -109,16 +110,18 @@ function advancedCard(state: AppState): string {
   const secureContext = typeof window !== 'undefined' && window.isSecureContext;
   const workstrDiagnostics = `version: ${html(APP_VERSION)}\nsecure context: ${secureContext}\ncountdown audio: ${html(countdownAudioState())}\nidentity: ${html(state.pubkey ? displayIdentity(state) : 'local (this device only)')}\nidentity mode: ${html(identityMode)}\nrelay: ${html(relay)}\n${state.signInStatus ? html(state.signInStatus) : ''}`;
   const tipJarDiagnostics = state.pubkey ? moneroWalletDiagnostics(state) : '';
-  return `<details class="settings-category advanced-settings" data-settings-section="advanced">
-    <summary><span class="settings-category-copy"><strong>Advanced</strong><small>Diagnostics, relay, and technical state</small></span></summary>
+  // Diagnostics used to be a disclosure inside this disclosure. Opening Advanced is already
+  // the deliberate step; a second one only hid the one thing the card exists to show.
+  return `<details class="settings-category advanced-settings" name="${SETTINGS_ACCORDION}" data-settings-section="advanced">
+    ${settingsSummary({ icon: 'terminal', title: 'Advanced', detail: 'Diagnostics and app details' })}
     <div class="settings-category-body">
-      <details class="settings-inline-advanced settings-diagnostics">
-        <summary>Diagnostics</summary>
+      <section class="settings-subsection settings-diagnostics" aria-labelledby="settings-diagnostics-label">
+        <h3 class="settings-subsection-label" id="settings-diagnostics-label">Diagnostics</h3>
         <div class="settings-diagnostics-body">
           <div class="terminal-mini">${workstrDiagnostics}</div>
           ${tipJarDiagnostics}
         </div>
-      </details>
+      </section>
     </div>
   </details>`;
 }
@@ -140,7 +143,7 @@ export function settingsView(state: AppState): string {
     <p class="page-blurb">Profile, training and app preferences.</p>
     ${settingsGroup({ id: 'profile', label: 'Profile', cards: [profileCard(state)] })}
     ${settingsGroup({ id: 'training', label: 'Training', cards: trainingCards })}
-    ${settingsGroup({ id: 'tip-jar', label: 'Tip Jar', cards: tipJarCards })}
+    ${settingsGroup({ id: 'payments', label: 'Payments', cards: tipJarCards })}
     ${settingsGroup({ id: 'security-data', label: 'Security & Data', cards: securityCards })}
     ${signedIn ? supportPanel() : ''}
   </div>`;

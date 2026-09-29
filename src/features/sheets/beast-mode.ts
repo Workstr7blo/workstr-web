@@ -1,6 +1,7 @@
 import { sessionDayKey } from '../../core/dates';
 import { html } from '../../app/format';
 import type { AppState } from '../../app/state';
+import { SETTINGS_ACCORDION, settingsSummary } from '../../app/settings-row';
 
 type BeastModeCheckId = 'local-program' | 'completed-workouts' | 'local-days' | 'profile-picture';
 
@@ -81,8 +82,8 @@ export function beastModeSummary(state: BeastModeState): { label: string; progre
 
 export function beastModeSettingsCard(state: BeastModeState): string {
   const summary = beastModeSummary(state);
-  return `<details class="settings-category beast-mode-card" data-settings-section="beast-mode">
-    <summary><span class="settings-category-copy"><strong>Beast Mode</strong><small>${summary.progress}</small></span><span class="status-pill ${summary.unlocked ? 'ok' : ''}">${summary.label}</span></summary>
+  return `<details class="settings-category beast-mode-card" name="${SETTINGS_ACCORDION}" data-settings-section="beast-mode">
+    ${settingsSummary({ icon: 'flame', title: 'Beast Mode', detail: summary.progress, pill: { label: summary.label, ok: summary.unlocked } })}
     <div class="settings-category-body">
       <p class="section-help">Meet these local goals to publish creator programs. No manual approval.</p>
       ${beastModeChecklistMarkup(state)}

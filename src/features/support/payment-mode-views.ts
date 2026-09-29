@@ -1,4 +1,5 @@
 import { html } from '../../app/format';
+import { settingsIcon } from '../../app/settings-row';
 import { normalizePaymentMode } from '../../core/types';
 import type { AppState } from '../../app/state';
 import type { SignedNostrEvent } from '../../signer/types';
@@ -37,6 +38,7 @@ export function moneroTipsCard(state: AppState): string {
   const on = moneroTipsOn(state);
   return `<section class="settings-category monero-tips-card" data-settings-section="monero-tips">
     <div class="monero-tips-row">
+      ${settingsIcon('piggy-bank')}
       <span class="settings-category-copy"><strong id="monero-tips-label">Tip Jar</strong><small id="monero-tips-copy">${html(TIPS_HELP)}</small></span>
       <input type="checkbox" role="switch" id="monero-tips-toggle" class="settings-toggle" aria-labelledby="monero-tips-label" aria-describedby="monero-tips-copy"${on ? ' checked' : ''} />
     </div>

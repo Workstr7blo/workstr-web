@@ -8,6 +8,8 @@ import { nip19 } from 'nostr-tools';
 import type { AppState } from './state';
 import { html } from './format';
 import { AUTO_LOCK_OPTIONS, readAutoLockSetting } from './auto-lock';
+import { icon } from './icons';
+import { SETTINGS_ACCORDION, settingsSummary } from './settings-row';
 
 const SCOPE_NAMES: Record<string, string> = {
   'nostr.local-key': 'Your Nostr identity key',
@@ -168,7 +170,7 @@ export function deviceSecurityCard(state: AppState): string {
   const deviceRows = vaultProtected ? `
       <div class="security-setting-row security-setting-row--action">
         <div class="security-setting-copy"><strong>Device code</strong><small>Nine-digit code protecting this device.</small></div>
-        <button id="change-device-code" class="button small" type="button">Change</button>
+        <button id="change-device-code" class="button small settings-row-button" type="button">${icon('key')}<span>Change</span></button>
       </div>
       <div class="security-setting-row security-setting-row--select">
         <div class="security-setting-copy"><strong>Auto-lock</strong><small>Lock after inactivity; paused during live workouts.</small></div>
@@ -177,27 +179,27 @@ export function deviceSecurityCard(state: AppState): string {
   const accountRows = state.pubkey ? `
       <div class="security-setting-row security-setting-row--action">
         <div class="security-setting-copy"><strong>Other devices</strong><small>Connect another device.</small></div>
-        <button id="add-device-settings" class="button small" type="button">Add device</button>
+        <button id="add-device-settings" class="button small settings-row-button" type="button">${icon('smartphone')}<span>Add device</span></button>
       </div>
       ${vaultProtected ? `<div class="security-setting-row security-setting-row--action">
         <div class="security-setting-copy"><strong>This device</strong><small>Require the device code immediately.</small></div>
-        <button id="lock-workstr" class="button small" type="button">Lock now</button>
+        <button id="lock-workstr" class="button small settings-row-button" type="button">${icon('lock')}<span>Lock now</span></button>
       </div>` : ''}
-      <details class="security-account-actions">
-        <summary>Account actions</summary>
+      <section class="settings-subsection security-account-actions" aria-labelledby="security-account-label">
+        <h3 class="settings-subsection-label" id="security-account-label">Account</h3>
         <div class="security-account-actions-body">
           <div class="security-setting-row security-setting-row--action">
             <div class="security-setting-copy"><strong>Sign out</strong><small>Sign out while keeping this account's training data on this device.</small></div>
-            <button id="sign-out-settings" class="button small" type="button">Sign out</button>
+            <button id="sign-out-settings" class="button small settings-row-button" type="button">${icon('log-out')}<span>Sign out</span></button>
           </div>
           <div class="security-setting-row security-setting-row--action security-setting-row--danger">
             <div class="security-setting-copy"><strong>Remove local data</strong><small>Delete this account's training data from this device and sign out.</small></div>
-            <button id="remove-account-data" class="button danger small" type="button">Remove local data</button>
+            <button id="remove-account-data" class="button danger small settings-row-button" type="button">${icon('trash-2')}<span>Remove local data</span></button>
           </div>
         </div>
-      </details>` : '';
-  return `<details class="settings-category device-security-card security-devices-card" data-settings-section="security-devices">
-    <summary><span class="settings-category-copy"><strong>Security & devices</strong><small>Device code, auto-lock and account access</small></span><span class="status-pill ${vaultProtected ? 'ok' : ''}">${status}</span></summary>
+      </section>` : '';
+  return `<details class="settings-category device-security-card security-devices-card" name="${SETTINGS_ACCORDION}" data-settings-section="security-devices">
+    ${settingsSummary({ icon: 'shield-check', title: 'Security & devices', detail: 'Device code, auto-lock, devices', pill: { label: status, ok: vaultProtected } })}
     <div class="settings-category-body security-settings-list">${deviceRows}${accountRows}</div>
   </details>`;
 }

@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 const styleCss = readFileSync(resolve(__dirname, '../src/style.css'), 'utf8');
 const referenceCss = readFileSync(resolve(__dirname, '../src/workstr-reference.css'), 'utf8');
-const css = `${styleCss}\n${referenceCss}`;
+const settingsCss = readFileSync(resolve(__dirname, '../src/settings.css'), 'utf8');
 
 describe('Settings hierarchy styles', () => {
   it('dims the Settings backdrop without removing the shared grid', () => {
@@ -13,12 +13,14 @@ describe('Settings hierarchy styles', () => {
     expect(styleCss).toContain('isolation: isolate');
   });
 
-  it('uses compact labels instead of icon-heavy section anchors', () => {
-    expect(styleCss).toMatch(/\.settings-group\s*\{\s*margin-top:\s*22px;/);
-    expect(styleCss).toMatch(/\.settings-category > summary\s*\{\s*min-height:\s*54px;\s*padding:\s*9px 12px;/);
-    expect(styleCss).not.toContain('grid-template-columns: 32px minmax(0, 1fr)');
-    expect(styleCss).not.toContain('border: 1px solid rgba(var(--accent-rgb), .58)');
-    expect(styleCss).not.toContain('text-shadow: 0 0 18px');
+  // Every card header leads with an icon tile and ends in a Lucide chevron, and an open
+  // card pins its header so a long body never loses its name.
+  it('gives every card header an icon tile, a chevron, and a pinned open state', () => {
+    expect(settingsCss).toContain('grid-template-columns: 34px minmax(0, 1fr) auto 18px;');
+    expect(settingsCss).toMatch(/\.settings-category\[open\] > summary \{[^}]*position: sticky;/);
+    expect(settingsCss).toContain('.settings-category[open] > summary .settings-category-chevron { transform: rotate(180deg);');
+    // The old text glyph chevrons are gone from every stylesheet.
+    for (const sheet of [styleCss, referenceCss, settingsCss]) expect(sheet).not.toContain("content: '\\203A'");
   });
 
   it('keeps group containers restrained and internal dividers quiet', () => {
@@ -27,19 +29,15 @@ describe('Settings hierarchy styles', () => {
     expect(styleCss).not.toContain('0 0 30px rgba(var(--accent-rgb), .14)');
   });
 
-  it('gives Security rows dedicated responsive classes instead of account-row mobile layout', () => {
-    expect(css).toContain('.security-settings-list');
-    expect(css).toContain('.security-setting-row');
-    expect(css).toContain('.security-account-actions');
-    expect(referenceCss).toContain('.security-setting-row { grid-template-columns: minmax(0, 1fr) max-content; align-items: center; }');
-    expect(referenceCss).toContain('.security-setting-row--select, .security-setting-row--danger { grid-template-columns: minmax(0, 1fr); align-items: stretch; }');
-    expect(referenceCss).not.toContain('.account-row { align-items: center; flex-direction: row; }');
+  it('draws every in-card action as one row shape with its control on the right', () => {
+    expect(settingsCss).toContain('.settings-row,\n.security-setting-row,\n.training-preference {');
+    expect(settingsCss).toContain('.settings-row-button');
+    expect(settingsCss).toContain('.security-setting-row--select { grid-template-columns: minmax(0, 1fr); align-items: stretch; }');
   });
 
-  it('keeps Support standalone and compact while reserving payment treatment for the expanded body', () => {
-    expect(styleCss).toContain('.support-standalone { margin-top: 18px; padding: 0;');
-    expect(styleCss).toContain('.support-standalone::after { display: none; }');
-    expect(styleCss).toContain('.support-standalone[open]');
+  it('frames Support like a group without the payment glow', () => {
+    expect(settingsCss).toContain('.support-standalone {');
+    expect(settingsCss).toContain('.support-standalone::after { display: none; }');
     expect(styleCss).not.toContain('.settings-group-cards--support .support-panel');
   });
 });

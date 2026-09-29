@@ -6,6 +6,8 @@
 // Markup only. The cryptography is in `wallet-backup.ts` and the workflow is in
 // `src/app/tip-jar-backup-controller.ts`.
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
+import { settingsButton, settingsRow } from '../../app/settings-row';
 import type { AppState } from '../../app/state';
 import type { MoneroWalletUiState, TipJarBackupUiState } from './types';
 import { TIP_JAR_BACKUP_EXTENSION, TIP_JAR_BACKUP_MIN_PASSWORD } from './wallet-backup';
@@ -109,14 +111,13 @@ export function tipJarBackupBody(state: AppState): string {
   }
   const stored = storedWallet(state.moneroWallet);
   if (!stored && !checked(state.moneroWallet)) return '<p class="section-help">Checking this device for a Tip Jar…</p>';
-  const actions = stored
-    ? `<button class="data-sync-row data-sync-action-row" type="button" id="tip-jar-backup-export"><span class="data-sync-row-copy"><strong>Create encrypted backup</strong><small>Save Tip Jar information to an encrypted ${TIP_JAR_BACKUP_EXTENSION} file.</small></span></button><button class="data-sync-row data-sync-action-row" type="button" id="tip-jar-backup-restore"><span class="data-sync-row-copy"><strong>Restore from backup</strong><small>Choose an encrypted Tip Jar backup file.</small></span></button>`
-    : '<button class="data-sync-row data-sync-action-row" type="button" id="tip-jar-backup-restore"><span class="data-sync-row-copy"><strong>Restore from backup</strong><small>Choose an encrypted Tip Jar backup file.</small></span></button>';
+  const exported = html(lastExportLabel(ui.exportedAt).replace('Last exported', 'Last backup:'));
+  const exportRow = stored
+    ? settingsRow('Back up Tip Jar', `Encrypted .${TIP_JAR_BACKUP_EXTENSION} file. ${exported}.`, settingsButton('tip-jar-backup-export', 'Back up', 'download'))
+    : '';
+  const restoreRow = settingsRow('Restore Tip Jar', stored ? 'Replace this wallet from an encrypted backup file.' : 'From an encrypted backup file or a recovery phrase.', settingsButton('tip-jar-backup-restore', 'Restore', 'upload'));
   const panel = ui.panel === 'export' && stored ? exportForm(ui) : ui.panel === 'restore' ? restoreForm(ui, stored) : '';
-  const intro = stored ? html(lastExportLabel(ui.exportedAt).replace('Last exported', 'Last backup:')) : 'Restore one from a backup file or a recovery phrase.';
-  return `<p class="section-help">Create or restore an encrypted backup of your Tip Jar information.</p>
-    <div class="data-sync-detail-actions">${actions}</div>
-    <p class="section-help">${intro}</p>
+  return `<div class="data-sync-detail-actions">${exportRow}${restoreRow}</div>
     ${panel}
     ${message(ui)}`;
 }
@@ -124,13 +125,10 @@ export function tipJarBackupBody(state: AppState): string {
 export function tipJarBackupSection(state: AppState): string {
   const ui = tipJarBackupState(state);
   const stored = storedWallet(state.moneroWallet);
-  return `<details class="data-sync-panel tip-jar-backup-group">
-        <summary class="data-sync-row data-sync-disclosure-row"><span class="data-sync-row-copy"><strong>Tip Jar data</strong><small>Encrypted backup and restore</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></summary>
-        <div class="data-sync-panel-body" id="tip-jar-backup-body">${tipJarBackupBody(state)}</div>
-      </details>
-      <details class="data-sync-panel tip-jar-backup-group tip-jar-recovery tip-jar-recovery-group"${ui.advanced ? ' open' : ''}>
-        <summary class="data-sync-row data-sync-disclosure-row"><span class="data-sync-row-copy"><strong>Advanced recovery</strong><small>Recovery phrase and restore height</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></summary>
-        <div class="data-sync-panel-body">${advancedRecoveryBody(state, ui, stored)}</div>
+  return `<div class="tip-jar-backup-group" id="tip-jar-backup-body">${tipJarBackupBody(state)}</div>
+      <details class="settings-reveal tip-jar-backup-group tip-jar-recovery tip-jar-recovery-group"${ui.advanced ? ' open' : ''}>
+        <summary>${icon('key')}<span class="settings-row-copy"><strong>Advanced recovery</strong><small>Recovery phrase and restore height</small></span><span class="settings-category-chevron" aria-hidden="true">${icon('chevron-down')}</span></summary>
+        <div class="settings-reveal-body">${advancedRecoveryBody(state, ui, stored)}</div>
       </details>`;
 }
 
@@ -139,7 +137,7 @@ export function tipJarBackupSection(state: AppState): string {
 // section is not mounted, which is every view except Settings.
 export function updateTipJarBackupSection(root: ParentNode, state: AppState): boolean {
   const body = root.querySelector('#tip-jar-backup-body');
-  const recovery = root.querySelector('.tip-jar-recovery .data-sync-panel-body');
+  const recovery = root.querySelector('.tip-jar-recovery .settings-reveal-body');
   if (!body && !recovery) return false;
   if (body) body.innerHTML = tipJarBackupBody(state);
   if (recovery) recovery.innerHTML = advancedRecoveryBody(state, tipJarBackupState(state), storedWallet(state.moneroWallet));
