@@ -113,7 +113,7 @@ export class EmomSessionController {
       weightDisplay: this.ctx.weightDisplay,
       unitLabel: this.ctx.unitLabel,
       onStart: () => { unlockCountdownAudio(); void this.start(); },
-      onLog: (slot, stepIndex, button) => { void this.logStep(slot, stepIndex, button); },
+      onLog: (slot, stepIndex, button) => { unlockCountdownAudio(); void this.logStep(slot, stepIndex, button); },
       bindControls: () => this.bindControls()
     });
   }
