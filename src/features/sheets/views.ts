@@ -5,7 +5,7 @@ import { displayWeightKg, normalizeWeightUnit } from '../../core/units';
 import type { SheetWithExercises } from '../../db/store';
 import { OPERATOR_PUBKEY, type RelayProgram } from '../../nostr/canon';
 import type { AppState } from '../../app/state';
-import { authorPill, displayPubkey, exerciseImage, formatMinutes, html, programMuscleLabel } from '../../app/format';
+import { authorPill, displayPubkey, formatMinutes, html, programMuscleLabel } from '../../app/format';
 import { icon } from '../../app/icons';
 import { paintBodyMapSvg } from '../../app/bodymap';
 import { programSummary } from './program-labels';
@@ -301,7 +301,6 @@ export function programBody(program: RelayProgram, state: AppState): string {
     const full = resolveProgramExercise(member, state.exercises);
     const name = programExerciseName(member, full);
     const muscle = programMuscleLabel(member.muscleGroup || full?.muscle_group || inferProgramMuscle(name));
-    const image = exerciseImage(full?.image_url || member.imageUrl);
     const placement = strengthMembers.has(member) ? null : takePlacement(member);
     const weightValue = displayWeightKg(member.weight, unit);
     const weight = weightValue != null ? ` @ ${html(String(weightValue))}` : '';
@@ -329,7 +328,6 @@ export function programBody(program: RelayProgram, state: AppState): string {
     return `<div class="wk-ex-item" data-exitem="${html(program.address)}-${index}">
       <div class="wk-ex-header" data-toggle-exitem="${html(program.address)}-${index}">
         <span class="wk-ex-index">${String(index + 1).padStart(2, '0')}</span>
-        ${image}
         <div class="wk-ex-info">
           <div class="wk-ex-name">${html(name)}</div>
           <div class="wk-ex-short">${short}</div>
@@ -368,7 +366,7 @@ export function programBody(program: RelayProgram, state: AppState): string {
   const plan = emomBlocks.length
     ? `<div class="program-timeline">${emomBlocks.map((block, index) => `<span><strong>${formatMinutes(emomBlockDurationSec(block))}</strong><small>Section ${index + 1}</small></span>`).join('')}</div>`
     : '';
-  const overview = `<div class="program-preview"><div class="program-preview-main"><strong>${total}</strong><span>${html(focus)}</span></div>${plan}</div>`;
+  const overview = `<div class="program-preview"><div class="program-preview-main"><span class="program-preview-icon" aria-hidden="true">${icon('clock')}</span><div class="program-preview-copy"><strong>${total}</strong><span>${html(focus)}</span></div></div>${plan}</div>`;
 
   // Strength first, then EMOM: the same order the live runner trains them in.
   return `${overview}${strengthSection}${emomSection}

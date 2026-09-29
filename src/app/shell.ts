@@ -15,7 +15,7 @@ import { fetchProfile, profileRelays, readCachedProfile, writeCachedProfile } fr
 import { planProgramImport, programImportState } from '../nostr/programImport';
 import { repairOwnedProgramDuplicates } from '../nostr/program-ownership';
 import type { ActiveSession, AppState, SubView, View } from './state';
-import { EX_PLACEHOLDER, exerciseImage, exerciseSourceLabel, filterExercises, formatMinutes, html } from './format';
+import { filterExercises } from './format';
 import { accountIdentity, updateAccountIdentity } from './account-chip';
 import { appView, pageOverlays, shellFrame, updateNavigation } from './layout';
 import { bindProgramBrowser } from './program-browser-controller';

@@ -218,14 +218,15 @@ describe('sheetToProgram', () => {
   it('adds a local program Publish action that stays available for locked users', () => {
     const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets: [baseSheet], finishedSessions: [], pubkey: null, profilePicture: null } as unknown as AppState);
     expect(card).toContain('data-publish-program="local:7"');
-    expect(card).toContain('>Publish</button>');
+    expect(card).toContain('<strong>Publish</strong>');
+    expect(card).toContain('<span>Publish</span>');
     // Available, but not the lead action while Beast Mode is locked.
-    expect(/<button class="([^"]*)"[^>]*data-publish-program="local:7"/.exec(card)?.[1]).toBe('button small');
+    expect(/<button class="([^"]*)"[^>]*data-publish-program="local:7"/.exec(card)?.[1]).toBe('button small program-action-button');
   });
   it('marks the local Publish action primary when Beast Mode is unlocked', () => {
     const completed = [1, 2, 3, 4, 5].map((id) => ({ id, sheetName: `S${id}`, startedAt: `2026-08-0${Math.min(id, 3)}T10:00:00`, finishedAt: `2026-08-0${Math.min(id, 3)}T10:30:00`, exercises: [], sets: [] }));
     const card = programCard(sheetToProgram(baseSheet), { exercises: [], settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets: [baseSheet], finishedSessions: completed, pubkey: 'f'.repeat(64), profilePicture: 'https://example.com/avatar.png' } as unknown as AppState);
-    expect(card).toContain('button primary small');
+    expect(card).toContain('button small program-action-button primary');
     expect(card).toContain('data-publish-program="local:7"');
   });
   it('labels the source by whether the sheet is published', () => {
@@ -374,14 +375,16 @@ describe('publication status on program cards', () => {
   it('shows a never-published program as local with Publish', () => {
     const card = programCard(sheetToProgram(source), appState(source));
     expect(card).not.toContain('workout-card-status');
-    expect(card).toContain('>Publish</button>');
+    expect(card).toContain('<strong>Publish</strong>');
+    expect(card).toContain('data-publish-program="local:7"');
   });
 
   it('shows an unchanged publication as published with no publish action', () => {
     const sheet = publishedSheet();
     const card = programCard(sheetToProgram(sheet), appState(sheet));
     expect(card).not.toContain('workout-card-status');
-    expect(card).toContain('disabled>Published</button>');
+    expect(card).toContain('<strong>Published</strong>');
+    expect(card).toContain('<span>Published</span>');
     expect(card).not.toContain('data-publish-program');
     expect(card).toContain('data-edit-sheet="7"');
     expect(card).toContain('data-del-sheet="7"');
@@ -392,7 +395,8 @@ describe('publication status on program cards', () => {
     const card = programCard(sheetToProgram(sheet), appState(sheet));
     expect(card).toContain('<div class="workout-card-status">Unpublished changes</div>');
     expect(card).toContain('data-publish-program="local:7"');
-    expect(card).toContain('>Publish update</button>');
+    expect(card).toContain('<strong>Publish update</strong>');
+    expect(card).toContain('<span>Publish update</span>');
   });
 
   it('keeps someone else import labelled in library', () => {
@@ -405,13 +409,16 @@ describe('publication status on program cards', () => {
 
   it('marks the user own relay program as Yours in Discover, never Import', () => {
     const actions = programActions(relay(), appState(publishedSheet()));
-    expect(actions).toContain('disabled>Yours</button>');
+    expect(actions).toContain('<strong>Yours</strong>');
+    expect(actions).toContain('<span>Yours</span>');
     expect(actions).not.toContain('Import');
-    expect(programActions(relay(), appState({ ...publishedSheet(), notes: 'edited' }))).toContain('disabled>Yours · Unpublished changes</button>');
+    expect(programActions(relay(), appState({ ...publishedSheet(), notes: 'edited' }))).toContain('<span>Yours · Unpublished changes</span>');
   });
 
   it('still offers Import for another author program', () => {
-    expect(programActions(relay('b'.repeat(64)), appState(publishedSheet()))).toContain('>Import</button>');
+    const actions = programActions(relay('b'.repeat(64)), appState(publishedSheet()));
+    expect(actions).toContain('<strong>Import program</strong>');
+    expect(actions).toContain('<span>Import</span>');
   });
 });
 
@@ -431,14 +438,17 @@ describe('Delete from relays action', () => {
 
   it('is offered on a published Programs card and never on a local-only one', () => {
     const published = { ...base, nostr_pubkey: ME, nostr_address: address };
-    expect(programActions(sheetToProgram(published), appState([published]))).toContain('data-delete-program="local:7">Delete from relays</button>');
+    const actions = programActions(sheetToProgram(published), appState([published]));
+    expect(actions).toContain('data-delete-program="local:7"');
+    expect(actions).toContain('<strong>Delete from relays</strong>');
     expect(programActions(sheetToProgram(base), appState([base]))).not.toContain('data-delete-program');
   });
 
   it('is offered on your own relay copy in Discover, linked or not', () => {
     const orphan = programActions(relayCopy(), appState([]));
     expect(orphan).toContain(`data-delete-program="${address}"`);
-    expect(orphan).toContain('>Import</button>');
+    expect(orphan).toContain('<strong>Import program</strong>');
+    expect(orphan).toContain('<span>Import</span>');
     const linked = { ...base, nostr_pubkey: ME, nostr_address: address };
     expect(programActions(relayCopy(), appState([linked]))).toContain(`data-delete-program="${address}"`);
   });
@@ -449,7 +459,7 @@ describe('Delete from relays action', () => {
   });
 });
 
-describe('program card exercise pictures', () => {
+describe('program card exercise rows', () => {
   const saved: SheetWithExercises = {
     id: 7, slug: 'cardio', name: 'Cardio', notes: '', difficulty: 'beginner', tags: [], is_temporary: false,
     created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
@@ -460,12 +470,14 @@ describe('program card exercise pictures', () => {
   };
   const state = (exercises: Exercise[]) => ({ exercises, settings: { unit: 'kg' }, expandedProgramAddress: 'local:7', sheets: [saved], finishedSessions: [], pubkey: null, profilePicture: null } as unknown as AppState);
 
-  it('shows the exercise current picture over the one the program saved', () => {
+  it('keeps expanded rows text-first without tiny exercise thumbnails', () => {
     const card = programCard(sheetToProgram(saved), state([ex({ slug: 'mountain-climbers', name: 'Mountain Climbers', image_url: 'https://x/new.png' })]));
-    expect(card).toContain('src="https://x/new.png"');
+    expect(card).toContain('Mountain Climbers');
+    expect(card).toContain('Ghost Move');
+    expect(card).not.toContain('wk-ex-img');
+    expect(card).not.toContain('src="https://x/new.png"');
     expect(card).not.toContain('src="https://x/old.png"');
-    // An exercise the library does not have keeps the picture the program saved.
-    expect(card).toContain('src="https://x/ghost.png"');
+    expect(card).not.toContain('src="https://x/ghost.png"');
   });
 });
 
