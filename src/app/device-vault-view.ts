@@ -57,42 +57,65 @@ function feedback({ error, busy }: VaultFormOptions): string {
   return error ? `<p class="auth-error" role="alert">${html(error)}</p>` : '';
 }
 
-function lockCard(title: string, body: string): string {
-  return `<div class="vault-lock-card" role="dialog" aria-modal="true" aria-labelledby="vault-lock-title">
-    <div class="page-title" id="vault-lock-title">${html(title)}</div>
+interface LockCardOptions {
+  iconName?: 'lock' | 'shield-check' | 'key' | 'trash-2';
+  eyebrow?: string;
+  tone?: 'normal' | 'danger';
+}
+
+function lockMetaRow(): string {
+  return `<div class="vault-lock-meta" aria-label="Device vault protections">
+    <span>${icon('shield-check')}Local-only key vault</span>
+    <span>${icon('key')}Nine-digit device code</span>
+  </div>`;
+}
+
+function lockCard(title: string, body: string, options: LockCardOptions = {}): string {
+  const iconName = options.iconName || 'lock';
+  const tone = options.tone === 'danger' ? ' vault-lock-card--danger' : '';
+  return `<div class="vault-lock-card${tone}" role="dialog" aria-modal="true" aria-labelledby="vault-lock-title">
+    <div class="vault-lock-hero">
+      <span class="vault-lock-icon" aria-hidden="true">${icon(iconName)}</span>
+      <div class="vault-lock-title-copy">
+        <span class="vault-lock-eyebrow">${html(options.eyebrow || 'Device vault')}</span>
+        <div class="page-title" id="vault-lock-title">${html(title)}</div>
+      </div>
+    </div>
     ${body}
   </div>`;
 }
 
 export function unlockScreenMarkup(options: VaultFormOptions = {}): string {
   const disabled = Boolean(options.busy);
-  return lockCard('Unlock Workstr', `<p class="section-help">Enter your nine-digit device code.</p>
+  return lockCard('Unlock Workstr', `<p class="section-help vault-lock-lede">Enter your nine-digit device code. Your identity and Tip Jar secrets stay sealed until this device is unlocked.</p>
+    ${lockMetaRow()}
     <form id="vault-unlock-form" class="device-pin-form" novalidate>
       ${pinField('unlock', 'Device code', disabled)}
       ${feedback(options)}
-      <div class="web-empty-actions"><button id="vault-unlock" class="button primary" type="submit"${disabled ? ' disabled' : ''}>Unlock</button></div>
+      <div class="web-empty-actions vault-lock-actions"><button id="vault-unlock" class="button primary" type="submit"${disabled ? ' disabled' : ''}>${icon('lock')}<span>Unlock</span></button></div>
     </form>
-    <button id="vault-forgot" class="auth-link-button" type="button"${disabled ? ' disabled' : ''}>Forgot your device code?</button>`);
+    <button id="vault-forgot" class="auth-link-button" type="button"${disabled ? ' disabled' : ''}>Forgot your device code?</button>`, { iconName: 'lock' });
 }
 
 // Lists what a reset destroys by name, so the confirmation stays honest once the vault holds
 // more than the Nostr key - a wallet seed that was never backed up is money, not a sign-in.
 export function forgotScreenMarkup(secrets: string[]): string {
   const list = secrets.length ? `<ul class="device-vault-scopes">${secrets.map((name) => `<li>${html(name)}</li>`).join('')}</ul>` : '';
-  return lockCard('Forgot your device code?', `<p class="section-help">Your code cannot be recovered. You can reset the encrypted vault on this device and restore your identity using your recovery key or another trusted device.</p>
+  return lockCard('Forgot your device code?', `<p class="section-help vault-lock-lede">Your code cannot be recovered. Reset only if you are ready to restore from a recovery key or another trusted device.</p>
     ${list ? `<p class="section-help">Resetting deletes from this device:</p>${list}` : ''}
     <p class="section-help">Your training data on this device is kept.</p>
-    <div class="web-empty-actions">
-      <button id="vault-reset" class="button danger" type="button">Reset device vault</button>
+    <div class="web-empty-actions vault-lock-actions">
+      <button id="vault-reset" class="button danger" type="button">${icon('trash-2')}<span>Reset device vault</span></button>
       <button id="vault-reset-cancel" class="button" type="button">Cancel</button>
-    </div>`);
+    </div>`, { iconName: 'trash-2', tone: 'danger', eyebrow: 'Vault recovery' });
 }
 
 export function protectIntroMarkup(error: string | null = null): string {
-  return lockCard('Protect this device', `<p class="section-help">Create a nine-digit device code to protect your Workstr identity on this device.</p>
+  return lockCard('Protect this device', `<p class="section-help vault-lock-lede">Create a device code so this browser can seal your Workstr identity before the app opens.</p>
+    ${lockMetaRow()}
     ${error ? `<p class="auth-error" role="alert">${html(error)}</p>` : ''}
-    <div class="web-empty-actions"><button id="vault-protect-start" class="button primary" type="button">Create device code</button></div>
-    <button id="vault-protect-restore" class="auth-link-button" type="button">Use my recovery key instead</button>`);
+    <div class="web-empty-actions vault-lock-actions"><button id="vault-protect-start" class="button primary" type="button">${icon('shield-check')}<span>Create device code</span></button></div>
+    <button id="vault-protect-restore" class="auth-link-button" type="button">Use my recovery key instead</button>`, { iconName: 'shield-check' });
 }
 
 function newPinFields(disabled: boolean): string {
@@ -101,15 +124,15 @@ function newPinFields(disabled: boolean): string {
 
 export function protectCreateMarkup(options: VaultFormOptions = {}): string {
   const disabled = Boolean(options.busy);
-  return lockCard('Create a device code', `<p class="section-help">You will enter it each time Workstr opens. It never leaves this device and cannot be recovered, so keep your recovery key too.</p>
+  return lockCard('Create a device code', `<p class="section-help vault-lock-lede">You will enter it each time Workstr opens. It never leaves this device and cannot be recovered, so keep your recovery key too.</p>
     <form id="vault-protect-form" class="device-pin-form" novalidate>
       ${newPinFields(disabled)}
       ${feedback(options)}
-      <div class="web-empty-actions">
-        <button id="vault-protect-submit" class="button primary" type="submit"${disabled ? ' disabled' : ''}>Protect this device</button>
+      <div class="web-empty-actions vault-lock-actions">
+        <button id="vault-protect-submit" class="button primary" type="submit"${disabled ? ' disabled' : ''}>${icon('shield-check')}<span>Protect this device</span></button>
         <button id="vault-protect-back" class="button" type="button"${disabled ? ' disabled' : ''}>Back</button>
       </div>
-    </form>`);
+    </form>`, { iconName: 'key' });
 }
 
 // Shown in the modal while an account is being created, restored or received. The identity

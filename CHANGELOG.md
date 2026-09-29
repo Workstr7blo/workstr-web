@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Revamped the device-vault lock screen with the same high-end card language as Settings and
+  Tip Jar: Lucide icon tiles, a stronger sealed-vault backdrop, clearer protection labels and
+  icon-led primary actions.
+
 - Reworked the Settings layout. Every card now has an icon, and the open card keeps its
   header pinned to the top of the screen while you scroll, so you can always see which
   section you are in. Only one card is open at a time. Export and Import training data are

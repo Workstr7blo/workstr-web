@@ -6,7 +6,7 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import { createDeviceVaultController } from '../src/app/device-vault-controller';
 import { UNLOCK_BACKOFF_KEY, unlockDelayMs } from '../src/app/device-vault-backoff';
 import { bindPinFields, readPinField } from '../src/app/device-pin-input';
-import { deviceSecurityCard, pinField, vaultScopeName } from '../src/app/device-vault-view';
+import { deviceSecurityCard, pinField, protectIntroMarkup, unlockScreenMarkup, vaultScopeName } from '../src/app/device-vault-view';
 import { createDeviceVault, type DeviceVault } from '../src/security/device-vault';
 import { generateLocalAccount, NOSTR_LOCAL_KEY_SCOPE, saveLocalAccount } from '../src/signer/local-key';
 import { clearLocalSecret, loadLocalSecret, saveLocalSecret } from '../src/signer/local-key-storage';
@@ -108,6 +108,24 @@ describe('device code boxes', () => {
     expect(readPinField(document.body, 'code')).toBe('12');
     paste('000123456');
     expect(readPinField(document.body, 'code')).toBe('000123456');
+  });
+});
+
+describe('lock screen design', () => {
+  it('uses the shared Lucide icon system and names the vault protections', () => {
+    document.body.innerHTML = unlockScreenMarkup();
+    const card = document.querySelector('.vault-lock-card') as HTMLElement;
+    expect(card.querySelector('.vault-lock-icon [data-icon="lock"]')).toBeTruthy();
+    expect(card.querySelectorAll('.vault-lock-meta [data-icon]')).toHaveLength(2);
+    expect(card.querySelector('.vault-lock-meta [data-icon="shield-check"]')).toBeTruthy();
+    expect(card.querySelector('.vault-lock-meta [data-icon="key"]')).toBeTruthy();
+    expect(card.querySelector('#vault-unlock [data-icon="lock"]')).toBeTruthy();
+    expect(card.textContent).toContain('Local-only key vault');
+    expect(card.textContent).toContain('Nine-digit device code');
+
+    document.body.innerHTML = protectIntroMarkup();
+    expect(document.querySelector('.vault-lock-icon [data-icon="shield-check"]')).toBeTruthy();
+    expect(document.querySelector('#vault-protect-start [data-icon="shield-check"]')).toBeTruthy();
   });
 });
 
