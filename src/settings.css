@@ -179,6 +179,65 @@
   .security-setting-row--select { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
 }
 
+/* Profile card. Always open, so it has no header: the identity row is its header, with the
+   rarely needed Refresh as an icon in its corner. Facts are rows like every other card's,
+   and the form ends in Cancel and Save side by side. */
+.profile-card-body { gap: 14px; padding: 16px; }
+.profile-identity, .profile-photo { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; }
+.profile-copy { gap: 3px; }
+.profile-copy strong { font: 800 17px/1.2 Inter, ui-sans-serif, sans-serif; letter-spacing: -.01em; }
+.profile-icon-button { width: 40px; height: 40px; min-height: 40px; padding: 0; display: inline-grid; place-items: center; border-color: transparent; background: transparent; box-shadow: none; color: var(--muted); }
+.profile-icon-button svg { width: 18px; height: 18px; }
+.profile-icon-button:hover { color: var(--text); }
+.profile-identity > .profile-icon-button, .profile-photo > .profile-icon-button { align-self: start; }
+
+.profile-facts { border-top: 1px solid var(--border); }
+.profile-facts > div { align-items: center; padding: 12px 0 0; border: 0; border-radius: 0; background: none; }
+.profile-facts dt { color: var(--text); font: 700 14px/1.25 Inter, ui-sans-serif, sans-serif; }
+.profile-facts dd { color: var(--muted); font-size: 12.5px; }
+.profile-actions .button { flex: 0 0 auto; }
+
+.profile-photo-copy { min-width: 0; display: grid; gap: 3px; }
+.profile-photo-copy strong { color: var(--text); font: 700 14px/1.25 Inter, ui-sans-serif, sans-serif; }
+.profile-photo-copy small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.profile-field > span { font-weight: 700; }
+.profile-field > small { color: var(--muted); font-weight: 400; font-size: 12.5px; }
+.profile-npub-row { gap: 6px; padding: 4px 4px 4px 12px; border: 1px solid var(--border); border-radius: 13px; background: rgba(0,0,0,.2); }
+.profile-npub-full { font-size: 12px; }
+
+.profile-advanced { border-top: 1px solid var(--border); }
+.profile-advanced-toggle {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--purple-2);
+  font: inherit;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+  cursor: pointer;
+}
+.profile-advanced-toggle::after { content: none; }
+.profile-advanced-toggle > svg { width: 18px; height: 18px; }
+.profile-advanced-toggle:focus-visible { outline: 2px solid var(--purple-2); outline-offset: 2px; border-radius: 8px; }
+.profile-advanced-toggle[aria-expanded="true"] .settings-category-chevron { transform: rotate(180deg); color: var(--purple-2); }
+.profile-advanced-panel { padding: 0 0 4px 30px; }
+
+.profile-form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 4px; border-top: 1px solid var(--border); }
+.profile-form-actions .button { width: 100%; margin-top: 10px; }
+.profile-confirm .profile-form-actions { border-top: 0; padding-top: 0; }
+
+@media (max-width: 430px) {
+  .profile-card-body { padding: 14px; }
+  .profile-advanced-panel { padding-left: 0; }
+}
+
 @media (max-width: 430px) {
   .settings-category > summary { gap: 10px; padding: 11px 12px; }
   .settings-category-body, .security-settings-list { padding-inline: 14px; }

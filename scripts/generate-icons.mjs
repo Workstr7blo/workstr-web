@@ -33,6 +33,7 @@ const ICONS = [
   'heart',
   'info',
   'key',
+  'link',
   'lock',
   'log-out',
   'pause',

@@ -134,7 +134,12 @@ describe('the Settings Profile card', () => {
       app.click('#profile-edit');
       expect(app.$('#profile-card')?.dataset.profileMode).toBe('edit');
       expect(app.$('#profile-photo-button')).toBeTruthy();
-      expect(app.$('#profile-change-photo')?.textContent).toBe('Change photo');
+      // The photo is the one control for changing it; there is no second button beside it.
+      expect(app.$('#profile-photo-button')?.getAttribute('aria-label')).toBe('Change photo');
+      expect(app.$('#profile-change-photo')).toBeNull();
+      // Save sits beside Cancel, and Refresh is the corner icon, not a third full-width button.
+      expect(Array.from(app.$('.profile-form-actions')!.querySelectorAll('button'), (b) => b.id)).toEqual(['profile-cancel', 'profile-save']);
+      expect(app.$('#profile-refresh svg[data-icon="refresh-cw"]')).toBeTruthy();
       expect(app.$<HTMLInputElement>('#profile-photo-input')?.accept).toBe('image/*');
       expect(app.$<HTMLInputElement>('#profile-display-name')?.value).toBe('Settebello');
       expect(app.$<HTMLInputElement>('#profile-address')?.value).toBe(ADDRESS);
@@ -401,7 +406,7 @@ describe('the Settings Profile card', () => {
       app.click('#profile-edit');
       app.choose(photo());
       await vi.waitFor(() => expect(app.status()).toContain('Could not upload the photo'));
-      expect(app.status()).toContain('Advanced');
+      expect(app.status()).toContain('Photo from a link');
       expect(app.state.profile.draft?.picture).toBe(OLD_PICTURE);
       expect(app.$('#profile-card')?.dataset.profileMode).toBe('edit');
       expect(app.saveDisabled()).toBe(true);

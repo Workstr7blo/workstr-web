@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Tip Jar backup, Diagnostics and account actions no longer sit behind collapses of their own
   inside a card. The Tip Jar switch now sits under a Payments heading.
 
+- Tidied the Profile card. Your npub no longer shows twice when you have no display name,
+  Refresh profile is a small icon in the card's corner, and the Monero address reads like the
+  other settings rows. While editing, tap the photo to change it, copy your npub with the copy
+  icon, find the image URL option under Photo from a link, and Save changes sits beside Cancel.
+
 ### Added
 
 - Added Auto-lock under Settings, Access & Security, Device security. Workstr locks after 15
