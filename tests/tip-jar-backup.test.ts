@@ -160,13 +160,13 @@ describe('the Tip Jar backup section in Data & Sync', () => {
     // authority, and nothing here offers to put them in one artifact.
     expect(body).toContain('id="export-data"');
     expect(body).toContain('id="tip-jar-backup-export"');
-    expect(body).toContain('Tip Jar data');
+    expect(body).toContain('Back up Tip Jar');
   });
 
   it('offers nothing while the device vault is locked, and only Restore with no wallet', () => {
     expect(tipJarBackupBody(state({ deviceVault: 'locked' }))).toContain('Unlock Workstr');
     const empty = state({}, { status: 'missing', stored: false });
-    expect(tipJarBackupBody(empty)).toContain('Restore one from a backup file or a recovery phrase.');
+    expect(tipJarBackupBody(empty)).toContain('From an encrypted backup file or a recovery phrase.');
     expect(tipJarBackupBody(empty)).not.toContain('id="tip-jar-backup-export"');
     expect(tipJarBackupBody(empty)).toContain('id="tip-jar-backup-restore"');
     // Storage has not answered yet: nothing that reads or writes a wallet is offered.

@@ -1,4 +1,5 @@
 import './style.css';
+import './settings.css';
 import { renderShell } from './app/shell';
 import { installImageFallbacks } from './app/image-fallback';
 

@@ -497,7 +497,7 @@ describe('shell', () => {
     expect(settings?.querySelector('#auto-backup')).toBeNull();
     expect(settings?.textContent).not.toContain('Create sync account');
     expect(settings?.textContent).not.toContain('Use Account above');
-    expect(settings?.textContent).toContain('Manual backup');
+    expect(settings?.textContent).toContain('Export and import training data');
     expect(settings?.textContent).toContain('0 selected');
     await drainBoot(shell);
   });

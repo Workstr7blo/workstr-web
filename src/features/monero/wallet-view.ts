@@ -40,8 +40,8 @@ function statusLabel(wallet: MoneroWalletUiState, snapshot: MoneroWalletSnapshot
 function diagnostics(wallet: MoneroWalletUiState): string {
   const snapshot = wallet.snapshot ?? undefined;
   const sync = snapshot?.sync;
-  return `<details class="settings-inline-advanced monero-wallet-diagnostics">
-    <summary>Tip Jar</summary>
+  return `<section class="settings-subsection monero-wallet-diagnostics" aria-labelledby="monero-wallet-diagnostics-label">
+    <h3 class="settings-subsection-label" id="monero-wallet-diagnostics-label">Tip Jar</h3>
     <div class="monero-wallet-diagnostics-body">
       <div class="settings-subtle-row"><span>Wallet height</span><strong>${html(String(sync?.height ?? '—'))}</strong></div>
       <div class="settings-subtle-row"><span>Node height</span><strong>${html(String(sync?.daemonHeight ?? '—'))}</strong></div>
@@ -49,7 +49,7 @@ function diagnostics(wallet: MoneroWalletUiState): string {
       <div class="settings-subtle-row"><span>Network</span><strong>${html(snapshot?.metadata.network ?? '—')}</strong></div>
       <div class="settings-subtle-row"><span>Node</span><strong>${html(nodeLabel(snapshot))}</strong></div>
     </div>
-  </details>`;
+  </section>`;
 }
 
 export function moneroWalletDiagnostics(state: AppState): string {

@@ -2,6 +2,8 @@ import type { BackupSettings } from '../../core/types';
 import type { SyncProgress, SyncStatus } from '../../sync/engine';
 import type { AppState } from '../../app/state';
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
+import { SETTINGS_ACCORDION, settingsButton, settingsRow, settingsSummary } from '../../app/settings-row';
 
 export interface BackupPanelState {
   signedIn: boolean;
@@ -54,8 +56,8 @@ export function statusPill(state: BackupPanelState): { label: string; ok: boolea
 // the state is read from.
 export function backupSummary(state: BackupPanelState): string {
   return state.signedIn
-    ? 'Back up, sync, and move your Workstr data'
-    : 'Manual backup for this device';
+    ? 'Sync, backups, export and import'
+    : 'Export and import training data';
 }
 
 const PHASE_LABEL: Record<SyncProgress['phase'], string> = {
@@ -120,8 +122,8 @@ export function backupPanelState(state: AppState, tipJarBackup = ''): BackupPane
 export function backupPanel(state: BackupPanelState): string {
   const pill = statusPill(state);
   const summary = backupSummary(state);
-  return `<details class="settings-category data-sync-card" data-settings-section="sync">
-    <summary><span class="settings-category-copy"><strong>Data &amp; Sync</strong><small>${html(summary)}</small></span><span class="status-pill ${pill.ok ? 'ok' : ''}">${html(pill.label)}</span></summary>
+  return `<details class="settings-category data-sync-card" name="${SETTINGS_ACCORDION}" data-settings-section="sync">
+    ${settingsSummary({ icon: 'database', title: 'Data & Sync', detail: summary, pill })}
     <div class="settings-category-body">${backupCardBody(state)}</div>
   </details>`;
 }
@@ -131,18 +133,15 @@ export function backupPanel(state: BackupPanelState): string {
 // reader had the card expanded - is not part of this.
 export function backupCardBody(state: BackupPanelState): string {
   const localOnly = state.backup?.localOnlyHistoryCount ?? 0;
-  const trainingDataPanel = `<details class="data-sync-panel data-sync-training-panel">
-        <summary class="data-sync-row data-sync-disclosure-row"><span class="data-sync-row-copy"><strong>Training data</strong><small>Export or import workout history</small></span><span class="data-sync-chevron" aria-hidden="true">›</span></summary>
-        <div class="data-sync-panel-body" id="data-sync-training-detail">
-          <p class="section-help">Create a portable copy of your workout history or restore training from an existing Workstr export. The file uses Workstr's JSON backup format.</p>
-          <button class="data-sync-row data-sync-action-row" id="export-data" type="button"><span class="data-sync-row-copy"><strong>Export training data</strong><small>Download all local workouts from this device.</small></span></button>
-          <button class="data-sync-row data-sync-action-row" id="import-data" type="button"><span class="data-sync-row-copy"><strong>Import training data</strong><small>Choose a Workstr JSON export, then confirm before changes are applied.</small></span></button>
+  // Export and Import are the two actions this card is most often opened for, so they are
+  // buttons on the card's surface - not rows of text behind a second disclosure.
+  const backupsSection = `<section class="data-sync-section settings-subsection" aria-labelledby="data-sync-backups">
+        <h3 class="settings-subsection-label" id="data-sync-backups">Backups</h3>
+        <div class="data-sync-training-panel">
+          ${settingsRow('Export training data', 'Download a JSON file of every workout on this device.', settingsButton('export-data', 'Export', 'download'))}
+          ${settingsRow('Import training data', 'Choose a Workstr JSON file. You confirm before anything changes.', settingsButton('import-data', 'Import', 'upload'))}
           <input id="import-file" type="file" accept="application/json,.json" hidden />
         </div>
-      </details>`;
-  const backupsSection = `<section class="data-sync-section" aria-labelledby="data-sync-backups">
-        <div class="data-sync-section-label" id="data-sync-backups">Backups</div>
-        ${trainingDataPanel}
         ${state.signedIn ? state.tipJarBackup ?? '' : ''}
       </section>`;
   if (!state.signedIn) return backupsSection;
@@ -154,16 +153,16 @@ export function backupCardBody(state: BackupPanelState): string {
     : 'Protect new training across devices.';
   const syncAction = state.enabled
     ? `<label class="data-sync-toggle"><input type="checkbox" id="auto-backup" role="switch" aria-label="Auto-sync training data" checked /><span class="data-sync-toggle-track" aria-hidden="true"><span class="data-sync-toggle-knob"></span></span></label>`
-    : '<button id="enable-sync" class="button small">Turn on sync</button>';
+    : settingsButton('enable-sync', 'Turn on sync', 'refresh-cw');
   const live = state.enabled
-    ? `<div class="data-sync-row data-sync-status-row" id="backup-status"><span class="settings-live-label">${html(statusLine(state))}</span><button id="sync-now" class="button small" ${state.sync.state === 'syncing' ? 'disabled' : ''}>Sync now</button>${progressMarkup(state.sync.progress)}</div>${eraLine}`
+    ? `<div class="settings-row data-sync-status-row" id="backup-status"><span class="settings-live-label">${html(statusLine(state))}</span><button id="sync-now" class="button small settings-row-button" type="button" ${state.sync.state === 'syncing' ? 'disabled' : ''}>${icon('refresh-cw')}<span>Sync now</span></button>${progressMarkup(state.sync.progress)}</div>${eraLine}`
     : '';
   const olderNote = state.enabled && localOnly > 0
     ? `<p class="section-help">Those older workouts stay on this device and are included when you export JSON.</p>`
     : '';
-  const syncSection = `<section class="data-sync-section sync-control-group" aria-labelledby="data-sync-training-sync">
-        <div class="data-sync-section-label" id="data-sync-training-sync">Training sync</div>
-        <div class="data-sync-row sync-control-row"><span class="data-sync-row-copy"><strong>Auto-sync</strong><small>${state.enabled ? 'Keep training current automatically.' : html(syncCopy)}</small></span><span class="data-sync-row-control">${syncAction}</span></div>
+  const syncSection = `<section class="data-sync-section settings-subsection sync-control-group" aria-labelledby="data-sync-training-sync">
+        <h3 class="settings-subsection-label" id="data-sync-training-sync">Training sync</h3>
+        ${settingsRow('Auto-sync', state.enabled ? 'Keep training current automatically.' : syncCopy, syncAction, 'sync-control-row')}
         ${live}
         ${olderNote}
       </section>`;

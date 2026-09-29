@@ -58,7 +58,30 @@ const cardTitles = (root: HTMLElement): string[] =>
 
 describe('the Settings page', () => {
   it('reads as four functional groups in the order a person thinks in', () => {
-    expect(groupLabels(render(signedIn()))).toEqual(['Profile', 'Training', 'Tip Jar', 'Security & Data']);
+    expect(groupLabels(render(signedIn()))).toEqual(['Profile', 'Training', 'Payments', 'Security & Data']);
+  });
+
+  it('gives every card one header shape and opens one card at a time', () => {
+    const root = render(signedIn({ deviceVault: 'unlocked' } as Partial<AppState>));
+    const cards = Array.from(root.querySelectorAll<HTMLDetailsElement>('details.settings-category'));
+    expect(cards.length).toBeGreaterThanOrEqual(6);
+    for (const card of cards) {
+      const summary = card.querySelector(':scope > summary') as HTMLElement;
+      expect(summary.querySelector('.settings-category-icon svg[data-icon]'), card.className).toBeTruthy();
+      expect(summary.querySelector('.settings-category-chevron [data-icon="chevron-down"]'), card.className).toBeTruthy();
+      expect(card.getAttribute('name'), card.className).toBe('settings-card');
+    }
+  });
+
+  it('puts Export and Import on the Data & Sync card as labelled buttons, not nested disclosures', () => {
+    const card = render(signedIn({ deviceVault: 'unlocked' } as Partial<AppState>)).querySelector('.data-sync-card') as HTMLElement;
+    const exportButton = card.querySelector('button#export-data') as HTMLButtonElement;
+    const importButton = card.querySelector('button#import-data') as HTMLButtonElement;
+    expect(exportButton.textContent?.trim()).toBe('Export');
+    expect(exportButton.querySelector('[data-icon="download"]')).toBeTruthy();
+    expect(importButton.textContent?.trim()).toBe('Import');
+    expect(importButton.querySelector('[data-icon="upload"]')).toBeTruthy();
+    expect(exportButton.closest('details')).toBe(card);
   });
 
   it('orders the cards within each group', () => {
@@ -77,7 +100,7 @@ describe('the Settings page', () => {
     expect(groupOf('.device-security-card')).toBe('Security & Data');
     expect(groupOf('.training-preferences-card')).toBe('Training');
     expect(groupOf('.beast-mode-card')).toBe('Training');
-    expect(groupOf('.monero-tips-card')).toBe('Tip Jar');
+    expect(groupOf('.monero-tips-card')).toBe('Payments');
     expect(root.querySelector('.monero-wallet-card')).toBeNull();
     expect(root.querySelector('.support-panel')?.closest('.settings-group')).toBeNull();
     expect(groupOf('.data-sync-card')).toBe('Security & Data');
@@ -151,7 +174,7 @@ describe('the Settings page', () => {
 
   it('keeps local-only Data & Sync focused on manual backup', () => {
     const card = render().querySelector('.data-sync-card') as HTMLElement;
-    expect(card.querySelector('summary .settings-category-copy small')?.textContent).toBe('Manual backup for this device');
+    expect(card.querySelector('summary .settings-category-copy small')?.textContent).toBe('Export and import training data');
     expect(card.querySelector('summary .status-pill')?.textContent).toBe('local');
     expect(card.querySelector('.data-sync-section')).toBeTruthy();
     expect(card.querySelector('#export-data')).toBeTruthy();
@@ -182,7 +205,7 @@ describe('the Settings page', () => {
       expect(card.querySelector('#monero-tips-label')?.textContent).toBe('Tip Jar');
       expect(card.querySelector('#monero-tips-copy')?.textContent).toBe('Send and receive tips in Workstr.');
       expect(card.querySelector('input[type="text"]')).toBeNull();
-      expect(card.closest('.settings-group')?.querySelector('.settings-group-label')?.textContent).toBe('Tip Jar');
+      expect(card.closest('.settings-group')?.querySelector('.settings-group-label')?.textContent).toBe('Payments');
     });
 
     // The public address is the Profile's. The switch neither shows nor edits it, and says
@@ -217,14 +240,14 @@ describe('the Settings page', () => {
       expect(paymentGroup.querySelector('#monero-wallet-create, #monero-wallet-open, #monero-wallet-recheck')).toBeNull();
     });
 
-    it('moves Tip Jar wallet telemetry into collapsed Advanced diagnostics', () => {
+    it('moves Tip Jar wallet telemetry into the collapsed Advanced card, one disclosure deep', () => {
       const root = off({ deviceVault: 'unlocked', moneroWallet: { status: 'ready', stored: true, snapshot: tipJarSnapshot() } });
       const advanced = root.querySelector('.advanced-settings') as HTMLDetailsElement;
-      const diagnostics = advanced.querySelector('.settings-diagnostics') as HTMLDetailsElement;
-      const tipJar = diagnostics.querySelector('.monero-wallet-diagnostics') as HTMLDetailsElement;
-      expect(diagnostics.open).toBe(false);
-      expect(tipJar.open).toBe(false);
-      expect(tipJar.querySelector('summary')?.textContent).toBe('Tip Jar');
+      const diagnostics = advanced.querySelector('.settings-diagnostics') as HTMLElement;
+      const tipJar = diagnostics.querySelector('.monero-wallet-diagnostics') as HTMLElement;
+      expect(advanced.open).toBe(false);
+      expect(advanced.querySelectorAll('details')).toHaveLength(0);
+      expect(tipJar.querySelector('.settings-subsection-label')?.textContent).toBe('Tip Jar');
       expect(tipJar.textContent).toContain('Wallet height');
       expect(tipJar.textContent).toContain('3766916');
       expect(tipJar.textContent).toContain('Node height');

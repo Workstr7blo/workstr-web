@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Reworked the Settings layout. Every card now has an icon, and the open card keeps its
+  header pinned to the top of the screen while you scroll, so you can always see which
+  section you are in. Only one card is open at a time. Export and Import training data are
+  now real buttons on the Data & Sync card, not text rows behind a second collapse, and the
+  Tip Jar backup, Diagnostics and account actions no longer sit behind collapses of their own
+  inside a card. The Tip Jar switch now sits under a Payments heading.
+
 ### Added
 
 - Added Auto-lock under Settings, Access & Security, Device security. Workstr locks after 15

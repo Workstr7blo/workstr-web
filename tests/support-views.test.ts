@@ -82,7 +82,7 @@ describe('the Support Workstr card', () => {
     expect(broken).toContain('Monero support is temporarily unavailable.');
     expect(broken).toContain('class="support-status"');
     expect(broken).not.toContain('monero:');
-    expect(broken).not.toContain('<svg');
+    expect(broken).not.toContain('support-monero-qr');
     expect(broken).not.toContain('Copy address');
   });
 });

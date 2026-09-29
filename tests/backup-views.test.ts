@@ -44,8 +44,8 @@ describe('status pill', () => {
   it('keeps the collapsed data summary meaningful before account setup', () => {
     // Not the pill's words. It used to return `statusPill().label` unchanged, so the card
     // printed the same state twice on one line and told the reader nothing about the card.
-    expect(backupSummary(panelState({ signedIn: false, enabled: false }))).toBe('Manual backup for this device');
-    expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).toBe('Back up, sync, and move your Workstr data');
+    expect(backupSummary(panelState({ signedIn: false, enabled: false }))).toBe('Export and import training data');
+    expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).toBe('Sync, backups, export and import');
     expect(backupSummary(panelState({ sync: { state: 'idle', pending: 3 } }))).not.toBe(statusPill(panelState({ sync: { state: 'idle', pending: 3 } })).label);
   });
 
@@ -113,14 +113,14 @@ describe('the panel', () => {
     expect(html).toContain('id="export-data"');
     expect(html).toContain('id="import-data"');
     expect(html).toContain('Backups');
-    expect(html).toContain('Training data');
+    expect(html).toContain('Export training data');
   });
 
   it('keeps signed-out Data & Sync to manual backup only', () => {
     const html = backupPanel(panelState({ signedIn: false, enabled: false }));
-    expect(html).toContain('Manual backup for this device');
+    expect(html).toContain('Export and import training data');
     expect(html).toContain('Backups');
-    expect(html).toContain('Training data');
+    expect(html).toContain('Export training data');
     expect(html).toContain('id="export-data"');
     expect(html).toContain('id="import-data"');
     expect(html).not.toContain('Sign in to protect new training');
@@ -148,7 +148,7 @@ describe('the panel', () => {
   });
 
   it('disables sync-now while a sync is already running', () => {
-    expect(backupPanel(panelState({ sync: { state: 'syncing', pending: 0 } }))).toContain('id="sync-now" class="button small" disabled');
+    expect(backupPanel(panelState({ sync: { state: 'syncing', pending: 0 } }))).toMatch(/id="sync-now"[^>]*\sdisabled/);
   });
 
   it('escapes a relay error rather than rendering it as markup', () => {
