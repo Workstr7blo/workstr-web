@@ -55,6 +55,14 @@ describe('send rules', () => {
     expect(sendReadiness(state({ deviceVault: 'locked' } as Partial<AppState>)).ok).toBe(false);
     expect(sendReadiness(state({}, undefined, false))).toMatchObject({ ok: false, reason: expect.stringMatching(/syncing/) });
     expect(sendReadiness(state({}, { atomicBalance: '5', atomicUnlockedBalance: '0' }))).toMatchObject({ ok: false, reason: expect.stringMatching(/10 confirmations/) });
+    // A wallet mid-sync is open: the reason is the sync, never "not open yet". An errored wallet
+    // is not open, whatever its last snapshot said.
+    const syncing = state();
+    syncing.moneroWallet = { ...syncing.moneroWallet!, status: 'syncing' };
+    expect(sendReadiness(syncing)).toMatchObject({ ok: false, reason: expect.stringMatching(/still syncing/) });
+    const offline = state({}, undefined, false);
+    offline.moneroWallet = { ...offline.moneroWallet!, status: 'error' };
+    expect(sendReadiness(offline)).toMatchObject({ ok: false, reason: 'Your Tip Jar is not open yet.' });
     expect(sendReadiness(state({}, { atomicBalance: '0', atomicUnlockedBalance: '0' }))).toMatchObject({ ok: false, reason: expect.stringMatching(/empty/) });
   });
 

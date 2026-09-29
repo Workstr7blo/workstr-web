@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   other settings rows. While editing, tap the photo to change it, copy your npub with the copy
   icon, find the image URL option under Photo from a link, and Save changes sits beside Cancel.
 
+- Reworked the Tip Jar page. The balance card shows the Tip Jar's state as a chip, the balance
+  with a smaller XMR unit, how much is still confirming, and a progress bar while it catches
+  up with the Monero network. When Send is unavailable, the reason is shown under it instead of
+  a greyed-out button. Receive and Send carry direction icons, and Recent activity shows signed
+  amounts on the right with the direction as a badge on each avatar. The off, set-up and locked
+  screens use the same icon cards as Settings.
+
 ### Added
 
 - Added Auto-lock under Settings, Access & Security, Device security. Workstr locks after 15
@@ -153,6 +160,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Settings destination explicit with a neutral gear icon.
 
 ### Fixed
+
+- Fixed the Tip Jar saying "Your Tip Jar is not open yet" while it was syncing. It now says it
+  is still syncing and that sending is available once it has caught up.
 
 - Fixed Refresh profile failing with "Could not read your Monero address (no relay could be
   reached…)". Workstr asked relay.nostr.band, which no longer answers, and asked all relays as
