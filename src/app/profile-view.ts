@@ -13,6 +13,14 @@ import { anyProfileDirty, isSafeAvatarUrl, normalizeProfileField, type ProfileEd
 // editing starts from a visible, labelled Edit profile action and nowhere else.
 const PENCIL = icon('pencil', { size: 16 });
 const CAMERA = icon('camera', { size: 16 });
+const COPY = icon('copy', { size: 16 });
+
+// Refresh is rare and never the reason someone opened the card, so it is an icon in the
+// card's corner in both modes rather than a button the size of Edit profile. The name stays
+// in the markup for assistive technology and as a tooltip.
+function refreshButton(disabled: boolean): string {
+  return `<button id="profile-refresh" class="button quiet profile-icon-button" type="button" title="Refresh profile"${disabled ? ' disabled' : ''}>${icon('refresh-cw')}<span class="sr-only">Refresh profile</span></button>`;
+}
 
 function fullNpub(pubkey: string): string {
   try { return nip19.npubEncode(pubkey); } catch { return pubkey; }
@@ -52,19 +60,24 @@ function localProfile(): string {
 function viewProfile(state: AppState): string {
   const profile = state.profile;
   const busy = Boolean(busyMessage(profile, state));
+  const name = displayIdentity(state);
+  const npub = displayNpub(state.pubkey || '');
+  // With no display name the title already is the npub; printing it a second time under
+  // itself reads as a rendering fault, not as information.
+  const npubLine = name === npub ? '' : `<small class="profile-npub">${html(npub)}</small>`;
   return `<div class="profile-card-body">
       <div class="profile-identity">
         <span class="profile-avatar-wrap">${avatarFace('profile-avatar', accountIdentity(state))}</span>
         <span class="profile-copy">
-          <strong class="profile-name" id="profile-card-title">${html(displayIdentity(state))}</strong>
-          <small class="profile-npub">${html(displayNpub(state.pubkey || ''))}</small>
+          <strong class="profile-name" id="profile-card-title">${html(name)}</strong>
+          ${npubLine}
         </span>
+        ${refreshButton(busy)}
       </div>
       <dl class="profile-facts"><div><dt>Monero address</dt><dd class="profile-address">${addressSummary(state)}</dd></div></dl>
       ${statusLine(profile, state)}
       <div class="profile-actions">
         <button id="profile-edit" class="button" type="button"${profile.status === 'loading' || state.monero.status === 'loading' ? ' disabled' : ''}>${PENCIL}<span>Edit profile</span></button>
-        <button id="profile-refresh" class="button quiet" type="button"${busy ? ' disabled' : ''}>Refresh profile</button>
       </div>
     </div>`;
 }
@@ -90,37 +103,39 @@ function editProfile(state: AppState, advancedOpen: boolean): string {
         <div class="profile-form-actions"><button id="profile-refresh-confirm" class="button danger" type="button">Discard and refresh</button><button id="profile-refresh-keep" class="button" type="button">Keep editing</button></div>
       </div>`
     : '';
+  // The photo is changed from the photo itself: one target, marked with a camera, instead of
+  // the picture and a Change photo button beside it doing the same thing.
   return `<form class="profile-card-body profile-form" id="profile-form" novalidate>
       <div class="profile-photo">
         <button id="profile-photo-button" class="profile-photo-button" type="button" aria-label="Change photo"${disabled}>${photoPreview(state, normalizeProfileField(draft.picture))}</button>
-        <button id="profile-change-photo" class="button small" type="button"${disabled}>${profile.uploading ? 'Uploading…' : 'Change photo'}</button>
+        <span class="profile-photo-copy"><strong>Profile photo</strong><small>${profile.uploading ? 'Uploading…' : 'Tap the photo to choose a new one.'}</small></span>
+        ${refreshButton(busy)}
         <input id="profile-photo-input" type="file" accept="image/*" hidden />
       </div>
       <label class="profile-field"><span>Display name</span>
         <input id="profile-display-name" type="text" autocomplete="nickname" maxlength="80" value="${html(draft.displayName)}"${profile.saving ? ' disabled' : ''} />
       </label>
       <div class="profile-field"><span id="profile-npub-label">npub</span>
-        <div class="profile-npub-row"><code class="profile-npub-full" aria-labelledby="profile-npub-label">${html(npub)}</code><button id="profile-copy-npub" class="button small" type="button" data-npub="${html(npub)}">Copy</button></div>
+        <div class="profile-npub-row"><code class="profile-npub-full" aria-labelledby="profile-npub-label">${html(npub)}</code><button id="profile-copy-npub" class="button quiet profile-icon-button" type="button" title="Copy npub" data-npub="${html(npub)}">${COPY}<span class="sr-only">Copy</span></button></div>
       </div>
       <label class="profile-field"><span>Monero payment address</span>
         <input id="profile-address" class="profile-address-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Starts with 4 or 8" value="${html(draft.address)}"${profile.saving ? ' disabled' : ''} />
         <small>Leave it empty and save to remove your address.</small>
       </label>
       <div class="profile-advanced">
-        <button id="profile-advanced-toggle" class="profile-advanced-toggle" type="button" aria-expanded="${advancedOpen}" aria-controls="profile-advanced-panel">Advanced</button>
+        <button id="profile-advanced-toggle" class="profile-advanced-toggle" type="button" aria-expanded="${advancedOpen}" aria-controls="profile-advanced-panel">${icon('link')}<span class="settings-row-copy"><strong>Photo from a link</strong><small>Use an image you host yourself</small></span><span class="settings-category-chevron" aria-hidden="true">${icon('chevron-down')}</span></button>
         <div id="profile-advanced-panel" class="profile-advanced-panel"${advancedOpen ? '' : ' hidden'}>
-          <label class="profile-field"><span>Avatar URL</span>
+          <label class="profile-field"><span>Image URL</span>
             <input id="profile-avatar-url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://" value="${html(draft.picture)}"${disabled} />
-            <small>A direct https:// link to an image you host yourself or on another media host.</small>
+            <small>A direct https:// link to an image.</small>
           </label>
         </div>
       </div>
       ${statusLine(profile, state)}
       ${confirm}
       <div class="profile-form-actions">
-        <button id="profile-save" class="button primary" type="submit"${canSave ? '' : ' disabled'}>Save changes</button>
         <button id="profile-cancel" class="button" type="button"${profile.saving ? ' disabled' : ''}>Cancel</button>
-        <button id="profile-refresh" class="button quiet" type="button"${busy ? ' disabled' : ''}>Refresh profile</button>
+        <button id="profile-save" class="button primary" type="submit"${canSave ? '' : ' disabled'}>Save changes</button>
       </div>
     </form>`;
 }

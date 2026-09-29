@@ -176,10 +176,10 @@ export function createProfileController(ctx: ProfileControllerContext) {
     } catch (error) {
       if (controller.signal.aborted) return;
       const reason = error instanceof MediaUploadError ? error.message : publishFailureReason(error);
-      state.profile = { ...state.profile, message: `Could not upload the photo: ${reason}. Your current photo is unchanged. Try again, or enter an image URL under Advanced.`, messageKind: 'bad' };
+      state.profile = { ...state.profile, message: `Could not upload the photo: ${reason}. Your current photo is unchanged. Try again, or use Photo from a link.`, messageKind: 'bad' };
     } finally {
       if (upload === controller) upload = null;
-      if (!controller.signal.aborted) { set({ uploading: false }); focus('profile-change-photo'); }
+      if (!controller.signal.aborted) { set({ uploading: false }); focus('profile-photo-button'); }
     }
   }
 
@@ -261,8 +261,7 @@ export function createProfileController(ctx: ProfileControllerContext) {
       case 'profile-refresh': void refresh(); break;
       case 'profile-refresh-confirm': void refresh(true); break;
       case 'profile-refresh-keep': set({ confirmRefresh: false }); focus('profile-save'); break;
-      case 'profile-photo-button':
-      case 'profile-change-photo': root.querySelector<HTMLInputElement>('#profile-photo-input')?.click(); break;
+      case 'profile-photo-button': root.querySelector<HTMLInputElement>('#profile-photo-input')?.click(); break;
       case 'profile-copy-npub': copyNpub(target); break;
       case 'profile-advanced-toggle': toggleAdvanced(target); break;
     }

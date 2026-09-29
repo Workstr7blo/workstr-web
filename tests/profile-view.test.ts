@@ -25,6 +25,14 @@ describe('the Profile card markup', () => {
     expect(card.querySelector('#profile-card-title')?.textContent).toBe('Trainer');
   });
 
+  it('shows the npub once, not under an identical title, when there is no display name', () => {
+    const named = render();
+    expect(named.querySelector('.profile-npub')?.textContent).toMatch(/^npub1/);
+    const unnamed = render({ profileName: null } as Partial<AppState>);
+    expect(unnamed.querySelector('#profile-card-title')?.textContent).toMatch(/^npub1/);
+    expect(unnamed.querySelector('.profile-npub')).toBeNull();
+  });
+
   it('gives the editor labelled controls, a disclosure with its state, and a live region', () => {
     const root = render({ profile: { status: 'ready', editing: true, baseline: { displayName: 'Trainer', picture: '', address: '' }, draft: { displayName: 'Trainer', picture: '', address: '' } } } as Partial<AppState>);
     expect(root.querySelector('#profile-photo-button')?.getAttribute('aria-label')).toBe('Change photo');
