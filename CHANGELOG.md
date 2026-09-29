@@ -154,6 +154,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed Refresh profile failing with "Could not read your Monero address (no relay could be
+  reached…)". Workstr asked relay.nostr.band, which no longer answers, and asked all relays as
+  one query, so a single slow or busy relay could fail the whole lookup. Each relay is now asked
+  on its own and any one answer is enough, relay.nostr.band is dropped (also from settings saved
+  by older versions), and relay.primal.net and relay.nos.social are read instead. Profile and
+  address lookups now finish in about a second instead of five.
+
 - Fixed EMOM countdown audio only playing for the first interval on browsers that interrupt audio
   between cues; logging an interval now refreshes the audio session from that tap.
 - Fixed creator-program publishing incorrectly blocking public Nostr exercise addresses or image

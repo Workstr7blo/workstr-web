@@ -1,6 +1,6 @@
 import { SimplePool } from 'nostr-tools';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../signer/types';
-import { DEFAULT_PUBLIC_RELAYS } from './pool';
+import { DEFAULT_PUBLIC_RELAYS, withoutRetiredRelays } from './pool';
 import { fetchLatestReplaceable, publishToRelays, withTimeout, type ReplaceablePool } from './replaceable-event';
 
 // NIP-A3 public payment targets. `kind:10133` is a replaceable event whose `payto` tags
@@ -31,7 +31,7 @@ export interface PublishPaymentTargetResult {
 }
 
 export function paymentTargetRelays(configured: string[] = []): string[] {
-  return [...new Set([...configured, ...DEFAULT_PUBLIC_RELAYS].map((relay) => relay.trim()).filter(Boolean))];
+  return withoutRetiredRelays([...new Set([...configured, ...DEFAULT_PUBLIC_RELAYS].map((relay) => relay.trim()).filter(Boolean))]);
 }
 
 function isMoneroMethod(value: unknown): boolean {

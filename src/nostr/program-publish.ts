@@ -7,7 +7,7 @@ import type { SheetWithExercises } from '../db/store';
 import type { SignedNostrEvent, Signer, UnsignedNostrEvent } from '../signer/types';
 import { CREATOR_PROGRAM_D_PREFIX, CREATOR_PROGRAM_KIND } from './creator-programs';
 import { containsSecretMaterial } from './secret-redaction';
-import { DEFAULT_PUBLIC_RELAYS } from './pool';
+import { DEFAULT_PUBLIC_RELAYS, withoutRetiredRelays } from './pool';
 
 const SIGN_TIMEOUT_MS = 120000;
 const PUBLISH_TIMEOUT_MS = 8000;
@@ -76,7 +76,7 @@ function isPublicProgramRelay(relay: string): boolean {
 }
 
 export function normalizeProgramPublishRelays(relays: string[] = DEFAULT_PUBLIC_RELAYS): string[] {
-  return dedupe(relays).filter(isPublicProgramRelay);
+  return withoutRetiredRelays(dedupe(relays)).filter(isPublicProgramRelay);
 }
 
 // What a creator program event is built from. A saved sheet satisfies it, and so does an

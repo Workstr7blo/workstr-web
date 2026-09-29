@@ -8,6 +8,7 @@ import { slugify } from '../core/ids';
 import { BODYWEIGHT_ADDRESS, SETTINGS_ADDRESS, sessionAddress, sheetAddress } from '../sync/addresses';
 import { syncedSettings } from '../sync/records';
 import { SyncAwareStore } from './sync-store';
+import { DEFAULT_PUBLIC_RELAYS } from '../nostr/pool';
 
 export type ExerciseDraft = Omit<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'> &
   Partial<Pick<Exercise, 'id' | 'created_at' | 'updated_at' | 'status' | 'source_type' | 'favourite'>>;
@@ -344,7 +345,7 @@ export class WorkstrStore extends SyncAwareStore {
   async getSettings(): Promise<WorkstrSettings> {
     const stored = (await this.db.get('settings', 'settings')) as Partial<WorkstrSettings> | undefined;
     return {
-      publicRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'],
+      publicRelays: [...DEFAULT_PUBLIC_RELAYS],
       ...stored,
       unit: normalizeWeightUnit(stored?.unit),
       paymentMode: normalizePaymentMode(stored?.paymentMode)

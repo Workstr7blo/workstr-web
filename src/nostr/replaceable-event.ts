@@ -27,30 +27,49 @@ export function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: st
   });
 }
 
+export interface ReplaceableLookupPool {
+  ensureRelay(relay: string, options?: { connectionTimeout?: number }): Promise<unknown>;
+  get(relays: string[], filter: Record<string, unknown>): Promise<unknown>;
+  close(relays: string[]): void;
+}
+
 /**
  * The author's latest event of one replaceable kind, or null when the relays that answered
  * hold none.
  *
- * Connections are opened first, and explicitly. `pool.get` resolves null both when the author
- * publishes no event and when not one relay could be reached, and the caller must not confuse
- * those: a browser that is simply offline would otherwise be told the user has no event, and
- * the next publish would overwrite the one it never managed to read.
+ * Every relay is connected to and asked on its own, and the lookup succeeds when any one of
+ * them answers. Asking all of them in one query made the slowest relay decide the outcome: one
+ * that accepted the connection but never finished answering timed the whole lookup out, and
+ * one that refused a second simultaneous connection - which a Refresh opens, for the profile
+ * and the payment targets at once - could leave nothing reached. Now those relays only drop
+ * out.
+ *
+ * It still rejects when not one relay answered. `pool.get` resolves null both when the author
+ * publishes no event and when nobody could be reached, and the caller must not confuse those:
+ * a browser that is simply offline would otherwise be told the user has no event, and the
+ * next publish would overwrite the one it never managed to read.
  */
-export async function fetchLatestReplaceable(relays: string[], kind: number, pubkey: string, timeoutMs: number, what: string): Promise<SignedNostrEvent | null> {
-  const pool = new SimplePool();
+export async function fetchLatestReplaceable(
+  relays: string[],
+  kind: number,
+  pubkey: string,
+  timeoutMs: number,
+  what: string,
+  poolFactory: () => ReplaceableLookupPool = () => new SimplePool()
+): Promise<SignedNostrEvent | null> {
+  const pool = poolFactory();
   try {
-    const connections = await Promise.allSettled(relays.map((relay) => withTimeout(
-      pool.ensureRelay(relay, { connectionTimeout: timeoutMs }),
-      timeoutMs,
-      `${relay} did not answer`
-    )));
-    const reachable = relays.filter((_relay, index) => connections[index].status === 'fulfilled');
-    if (!reachable.length) throw new Error(`no relay could be reached for the ${what} lookup`);
-    return await withTimeout(
-      pool.get(reachable, { kinds: [kind], authors: [pubkey] }) as Promise<SignedNostrEvent | null>,
-      timeoutMs,
-      `${what} lookup timed out`
-    );
+    const answers = await Promise.allSettled(relays.map(async (relay) => {
+      await withTimeout(pool.ensureRelay(relay, { connectionTimeout: timeoutMs }), timeoutMs, `${relay} did not answer`);
+      return await withTimeout(pool.get([relay], { kinds: [kind], authors: [pubkey] }) as Promise<SignedNostrEvent | null>, timeoutMs, `${relay}: ${what} lookup timed out`);
+    }));
+    const answered = answers.filter((answer): answer is PromiseFulfilledResult<SignedNostrEvent | null> => answer.status === 'fulfilled');
+    if (!answered.length) throw new Error(`no relay could be reached for the ${what} lookup`);
+    // Relays can disagree about which event is current; the newest wins, as a relay's own
+    // replacement rule would have it.
+    return answered.reduce<SignedNostrEvent | null>((newest, { value }) => (
+      value && (!newest || (value.created_at || 0) > (newest.created_at || 0)) ? value : newest
+    ), null);
   } finally {
     pool.close(relays);
   }
