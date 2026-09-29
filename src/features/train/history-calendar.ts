@@ -65,14 +65,17 @@ function summaryCards(model: HistoryModel): string {
   const monthName = model.monthLabel.split(' ')[0];
   const cards = [
     {
+      icon: 'dumbbell' as const,
       value: String(workoutsInMonth),
       label: `workout${workoutsInMonth === 1 ? '' : 's'} in ${monthName}`
     },
     {
+      icon: 'flame' as const,
       value: String(activeWeekStreak),
       label: `active week${activeWeekStreak === 1 ? '' : 's'} in a row`
     },
     {
+      icon: 'clock' as const,
       value: daysSinceLatest == null ? '—' : String(daysSinceLatest),
       label: daysSinceLatest == null
         ? 'no workout logged yet'
@@ -80,8 +83,9 @@ function summaryCards(model: HistoryModel): string {
     }
   ];
   return `<div class="history-cards">${cards.map((card) => `<div class="history-card">
-    <div class="history-card-value">${html(card.value)}</div>
-    <div class="history-card-label">${html(card.label)}</div>
+    <div class="history-card-icon">${icon(card.icon)}</div>
+    <div class="history-card-copy"><div class="history-card-value">${html(card.value)}</div>
+    <div class="history-card-label">${html(card.label)}</div></div>
   </div>`).join('')}</div>`;
 }
 
