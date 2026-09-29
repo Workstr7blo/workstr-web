@@ -8,6 +8,13 @@ import type { RelayProgram } from '../src/nostr/canon';
 import type { WorkstrStore } from '../src/db/store';
 import { sessionDetail } from '../src/features/train/views';
 
+const { unlockCountdownAudioMock } = vi.hoisted(() => ({ unlockCountdownAudioMock: vi.fn() }));
+
+vi.mock('../src/features/train/countdown-audio', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/features/train/countdown-audio')>(),
+  unlockCountdownAudio: unlockCountdownAudioMock
+}));
+
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 function makeState(store: WorkstrStore): AppState {
@@ -128,6 +135,7 @@ describe('session runner', () => {
   let toasts: string[];
 
   beforeEach(() => {
+    unlockCountdownAudioMock.mockClear();
     document.body.innerHTML = '<div id="app"></div>';
     root = document.getElementById('app') as HTMLElement;
     const fake = fakeStore();
@@ -544,10 +552,13 @@ describe('session runner', () => {
     expect(root.querySelector('.emom-log-field')?.textContent).toContain('Actual reps');
     expect(root.querySelector('.emom-log-primary')?.textContent).toBe('Log interval');
     expect(root.querySelector('#emom-work-ring-fg')).toBeTruthy();
+    expect(unlockCountdownAudioMock).toHaveBeenCalledTimes(1);
+    unlockCountdownAudioMock.mockClear();
     const step = root.querySelector<HTMLElement>('[data-emom-step="0"]')!;
     (step.querySelector('[data-emom-reps]') as HTMLInputElement).value = '9';
     (step.querySelector('[data-log-emom]') as HTMLButtonElement).click();
     await tick();
+    expect(unlockCountdownAudioMock).toHaveBeenCalledTimes(1);
     expect(sets).toHaveLength(1);
     expect(sets[0]).toMatchObject({ reps: 9, duration_sec: 20, round_index: 0, interval_index: 0, step_index: 0 });
     expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(false);

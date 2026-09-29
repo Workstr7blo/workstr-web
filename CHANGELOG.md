@@ -140,6 +140,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed EMOM countdown audio only playing for the first interval on browsers that interrupt audio
+  between cues; logging an interval now refreshes the audio session from that tap.
 - Fixed creator-program publishing incorrectly blocking public Nostr exercise addresses or image
   URLs that contain 64-character public hashes. Wallet connection strings, `nsec` values and
   secret/token query parameters are still refused before signing.
