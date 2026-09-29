@@ -40,4 +40,12 @@ describe('Settings hierarchy styles', () => {
     expect(settingsCss).toContain('.support-standalone::after { display: none; }');
     expect(styleCss).not.toContain('.settings-group-cards--support .support-panel');
   });
+
+  it('gives the device vault lock screen the same icon-tile and premium card language', () => {
+    expect(styleCss).toContain('.vault-lock-hero {');
+    expect(styleCss).toContain('.vault-lock-icon {');
+    expect(styleCss).toContain('.vault-lock-meta {');
+    expect(styleCss).toMatch(/\.vault-lock-card\s*\{[^}]*box-shadow: 0 28px 70px/);
+    expect(styleCss).toMatch(/\.vault-lock-actions \.button\s*\{[^}]*gap: 8px/);
+  });
 });

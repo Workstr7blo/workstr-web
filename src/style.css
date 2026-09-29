@@ -218,16 +218,122 @@
 /* The device vault's lock layer is opaque and sits above every other layer - the modal and the
    rest-timer overlay (9999) included - so nothing can be read behind it. The controller marks
    everything beside it inert, so nothing can be reached either. */
-.vault-lock { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 20px 16px; overflow-y: auto; background: rgb(var(--void-rgb)); }
+.vault-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 20px 16px;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(var(--accent-rgb), .24), transparent 34%),
+    radial-gradient(circle at 82% 0%, rgba(var(--accent-line-rgb), .20), transparent 30%),
+    linear-gradient(145deg, rgb(var(--void-rgb)), rgb(var(--void-deep-rgb)));
+}
+.vault-lock::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(var(--accent-line-rgb), .055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--accent-line-rgb), .055) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(circle at center, black, transparent 72%);
+}
 .vault-lock[hidden] { display: none; }
-.vault-lock-card { width: min(440px, 100%); padding: 24px; border: 1px solid var(--border-hot); border-radius: 22px; background: rgba(var(--surface-rgb), .97); }
+.vault-lock-card {
+  position: relative;
+  width: min(460px, 100%);
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--accent-line-rgb), .32);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(var(--surface-raised-rgb), .96), rgba(var(--surface-rgb), .96)),
+    rgba(var(--surface-rgb), .98);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, .52), 0 0 50px rgba(var(--accent-rgb), .12);
+}
+.vault-lock-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--purple-2), rgba(var(--accent-line-rgb), .65));
+}
+.vault-lock-card--danger { border-color: rgba(var(--danger-rgb, 255, 64, 107), .42); }
+.vault-lock-card--danger::before { background: linear-gradient(90deg, var(--danger-soft, #ff6b8b), var(--accent)); }
+.vault-lock-hero {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 8px 6px 14px;
+}
+.vault-lock-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(var(--accent-line-rgb), .28);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(var(--accent-rgb), .24), rgba(var(--accent-rgb), .08));
+  color: var(--purple-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.vault-lock-icon svg { width: 24px; height: 24px; }
+.vault-lock-title-copy { min-width: 0; display: grid; gap: 3px; }
+.vault-lock-eyebrow { color: var(--purple-2); font: 800 11px/1 Inter, ui-sans-serif, sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+.vault-lock-card .page-title { margin: 0; font-size: clamp(26px, 7vw, 34px); line-height: .98; letter-spacing: -.04em; }
+.vault-lock-lede { margin: 0 6px 14px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.vault-lock-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.vault-lock-meta span {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px;
+  border: 1px solid rgba(var(--accent-line-rgb), .18);
+  border-radius: 13px;
+  background: rgba(var(--void-rgb), .28);
+  color: var(--muted);
+  font: 750 11.5px/1.2 Inter, ui-sans-serif, sans-serif;
+}
+.vault-lock-meta svg { width: 15px; height: 15px; flex: none; color: var(--purple-2); }
 .device-pin-form { margin-top: 14px; }
 .device-pin { min-width: 0; margin: 0 0 14px; padding: 0; border: 0; }
 .device-pin legend { margin-bottom: 8px; padding: 0; color: var(--muted); font: 800 12px/1.2 inherit; }
-.device-pin-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: 300px; }
-.device-pin-group { min-width: 0; text-align: center; font: 800 20px/1.2 ui-monospace, monospace; letter-spacing: .3em; -webkit-text-security: disc; }
+.device-pin-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.device-pin-group {
+  min-width: 0;
+  min-height: 54px;
+  border-color: rgba(var(--accent-line-rgb), .28);
+  border-radius: 15px;
+  background: rgba(var(--void-rgb), .32);
+  text-align: center;
+  font: 800 20px/1.2 ui-monospace, monospace;
+  letter-spacing: .3em;
+  -webkit-text-security: disc;
+}
+.device-pin-group:focus { border-color: rgba(var(--accent-line-rgb), .58); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), .14); }
+.vault-lock-actions { margin-top: 16px; }
+.vault-lock-actions .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
+.vault-lock-actions .button svg { width: 17px; height: 17px; }
 .device-vault-identity { margin-top: 10px; }
 .device-vault-scopes { margin: 0 0 12px; padding-left: 20px; color: var(--text); }
+@media (max-width: 430px) {
+  .vault-lock-card { padding: 16px; border-radius: 24px; }
+  .vault-lock-hero { grid-template-columns: 44px minmax(0, 1fr); padding-inline: 2px; }
+  .vault-lock-icon { width: 44px; height: 44px; border-radius: 14px; }
+  .vault-lock-meta { grid-template-columns: minmax(0, 1fr); }
+  .vault-lock-actions .button { width: 100%; }
+}
 .backup-live { margin-top: 8px; }
 .backup-live .section-help { margin-bottom: 8px; }
 .backup-progress { height: 7px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.075); border: 1px solid rgba(var(--accent-line-rgb), .12); }
