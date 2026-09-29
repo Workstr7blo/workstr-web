@@ -71,8 +71,11 @@ export function sendReadiness(state: AppState): SendReadiness {
   if (state.deviceVault !== 'unlocked') return { ok: false, reason: 'Unlock Workstr to send from your Tip Jar.' };
   const wallet = state.moneroWallet;
   const snapshot = wallet?.snapshot;
-  if (!snapshot || wallet?.status !== 'ready') return { ok: false, reason: 'Your Tip Jar is not open yet.' };
-  if (!snapshot.sync?.synchronized) return { ok: false, reason: 'Your Tip Jar is still syncing. Sending is available once it has caught up.' };
+  if (!snapshot) return { ok: false, reason: 'Your Tip Jar is not open yet.' };
+  // A syncing wallet is open and catching up. Saying "not open yet" there sent people looking
+  // for a button to open it, when the only thing to do is wait for the sync shown above.
+  if (wallet?.status === 'syncing' || (wallet?.status === 'ready' && !snapshot.sync?.synchronized)) return { ok: false, reason: 'Your Tip Jar is still syncing. Sending is available once it has caught up.' };
+  if (wallet?.status !== 'ready') return { ok: false, reason: 'Your Tip Jar is not open yet.' };
   const available = snapshot.balance?.atomicUnlockedBalance ?? '0';
   if (BigInt(available) <= 0n) {
     return { ok: false, reason: BigInt(snapshot.balance?.atomicBalance ?? '0') > 0n

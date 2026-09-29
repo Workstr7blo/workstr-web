@@ -127,7 +127,7 @@ describe('shell', () => {
     item.click();
     expect(shell.state.view).toBe('tipjar');
     expect(item.classList.contains('active')).toBe(true);
-    expect(root.querySelector('#page-tipjar')?.textContent).toContain('Tip Jar is off.');
+    expect(root.querySelector('#page-tipjar')?.textContent).toContain('Tip Jar is off');
     root.querySelector<HTMLButtonElement>('#tip-jar-enable')?.click();
     await vi.waitFor(() => expect(document.documentElement.getAttribute('data-payment-mode')).toBe('monero'));
     expect(shell.state.settings.paymentMode).toBe('monero');

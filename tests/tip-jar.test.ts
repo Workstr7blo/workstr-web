@@ -193,7 +193,7 @@ describe('Tip Jar page', () => {
 
   it('offers only an Enable action while off', () => {
     const root = page(state({ settings: { unit: 'kg', paymentMode: 'off', publicRelays: [] } } as Partial<AppState>));
-    expect(root.textContent).toContain('Tip Jar is off.');
+    expect(root.textContent).toContain('Tip Jar is off');
     expect(root.querySelector('#tip-jar-enable')?.textContent).toBe('Enable Tip Jar');
     expect(root.textContent).not.toMatch(/restore height|daemon|NIP-A3|kind:10133/i);
   });
@@ -252,7 +252,21 @@ describe('Tip Jar page', () => {
     expect(root.querySelector('#tip-jar-publish')).toBeNull();
     expect(root.querySelector('[data-view="settings"]')).toBeNull();
     expect(root.textContent).not.toMatch(/Receiving tips|Recovery phrase|not available yet/);
-    expect(root.querySelector('#tip-jar-send')?.hasAttribute('aria-describedby')).toBe(false);
+    // Sendable: the reason line exists for the button to point at, but says nothing.
+    expect(root.querySelector('#tip-jar-send')?.hasAttribute('disabled')).toBe(false);
+    expect(root.querySelector<HTMLElement>('#tip-jar-send-note')?.hidden).toBe(true);
+  });
+
+  it('says why Send is unavailable, and how much is still confirming', () => {
+    const syncing = page(state({}, { status: 'syncing', stored: true, syncProgress: 0.42, syncLive: true, snapshot: snapshot({ height: 3_740_000, daemonHeight: 3_763_000, synchronized: false }) }));
+    expect(syncing.querySelector('#tip-jar-send')?.hasAttribute('disabled')).toBe(true);
+    expect(syncing.querySelector('#tip-jar-send-note')?.textContent).toContain('still syncing');
+    expect(syncing.querySelector('.tip-jar-sync-bar')?.getAttribute('aria-valuenow')).toBe('42');
+    const confirming = snapshot(synced);
+    confirming.balance = { atomicBalance: '24000000000', atomicUnlockedBalance: '14000000000' };
+    const root = page(state({}, { status: 'ready', stored: true, snapshot: confirming }));
+    expect(root.querySelector('#tip-jar-balance-note')?.textContent).toBe('0.01 XMR is still confirming and can be sent in about 20 minutes.');
+    expect(root.querySelector('.tip-jar-sync-bar')).toBeNull();
   });
 
   it('asks to set up a wallet only when the account has none', () => {

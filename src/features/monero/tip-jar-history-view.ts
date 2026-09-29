@@ -82,18 +82,19 @@ function activityRow(record: TipJarActivity, state: AppState, now: Date): string
   const status = stateWord(record);
   // The row is read as one sentence; the arrow and the layout are for sighted readers only.
   const sentence = `${spoken}, ${day.spoken} at ${time}${status ? `. ${status}` : ''}.`;
+  // Money in is signed and takes the payment colour, money out is signed and quiet: the sign
+  // is how a wallet list is scanned, and it keeps the amount column readable without the arrow.
+  // The arrow stays, as a badge on the avatar, for the direction at a glance.
   return `<li class="tip-jar-activity-row" data-direction="${record.direction}" data-state="${record.state}">
     <span class="sr-only">${html(sentence)}</span>
-    <span class="tip-jar-activity-arrow" aria-hidden="true">${icon(record.direction === 'out' ? ARROW_OUT : ARROW_IN, { class: 'tip-jar-activity-arrow-icon' })}</span>
-    <span aria-hidden="true">${avatar}</span>
+    <span class="tip-jar-activity-who" aria-hidden="true">${avatar}<span class="tip-jar-activity-arrow">${icon(record.direction === 'out' ? ARROW_OUT : ARROW_IN, { class: 'tip-jar-activity-arrow-icon' })}</span></span>
     <span class="tip-jar-activity-main" aria-hidden="true">
       <span class="tip-jar-activity-name">${html(name)}</span>
-      <span class="tip-jar-activity-amount">${html(xmrAmount(record.amountAtomic))}</span>
       ${context ? `<span class="tip-jar-activity-context">${html(context)}</span>` : ''}
+      <span class="tip-jar-activity-when"><span>${html(day.shown)}</span> <span>${html(time)}</span></span>
     </span>
-    <span class="tip-jar-activity-when" aria-hidden="true">
-      <span>${html(day.shown)}</span>
-      <span>${html(time)}</span>
+    <span class="tip-jar-activity-figure" aria-hidden="true">
+      <span class="tip-jar-activity-value"><span class="tip-jar-activity-sign">${record.direction === 'out' ? '−' : '+'}</span><span class="tip-jar-activity-amount">${html(xmrAmount(record.amountAtomic))}</span></span>
       ${status ? `<span class="tip-jar-activity-state">${html(status)}</span>` : ''}
     </span>
   </li>`;

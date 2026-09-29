@@ -260,7 +260,8 @@ and patch it directly, which is also why a page render can leave it standing.
   thousand blocks behind a three-million-block chain is 99.97% along it and nowhere near caught
   up (#266). Until scanning starts the icon is `data-live="off"` and the ring stays the faint
   track, and the runtime's own percentage is the fallback for a runtime that reports no useful
-  heights. Raw block heights stay in the Settings wallet card's diagnostics. The page is balance, Receive, Send and Recent
+  heights. Raw block heights stay in the Settings wallet card's diagnostics. The page is balance (with the still-confirming amount, a sync bar while
+  catching up, and the reason Send is unavailable, all patched in place by `updateTipJarPage`), Receive, Send and Recent
   activity; whether tips reach this wallet and the backup live in Settings (#263). Receive is the
   code, one shortened line of address with a copy glyph, Copy address, and one line of help; both
   copy controls carry the whole address however little of it the row shows (#268).
