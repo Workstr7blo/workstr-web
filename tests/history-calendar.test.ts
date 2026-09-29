@@ -125,6 +125,7 @@ describe('history summary cards', () => {
     expect(labels[0]).toBe('workouts in August');
     expect(labels[1]).toBe('active weeks in a row');
     expect(labels[2]).toBe('you trained today');
+    expect(doc.querySelectorAll('.history-card-icon svg')).toHaveLength(3);
   });
 
   it('handles an empty history without pretending there is a streak', () => {

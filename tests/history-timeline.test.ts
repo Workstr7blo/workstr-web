@@ -151,6 +151,8 @@ describe('session card contents', () => {
     trained.startedAt = at(2026, 8, 19, 11);
     const doc = parse(workoutHistory(state([trained]), now));
     expect(doc.querySelector('.workout-card-name')?.textContent).toBe('Push Day');
+    expect(doc.querySelector('.history-session-status')?.textContent).toBe('Receipt');
+    expect(doc.querySelector('.history-session-focus')?.textContent).toContain('completed workout');
     const meta = doc.querySelector('.workout-card-meta')?.textContent || '';
     expect(meta).toContain('1h 0m');
     expect(meta).not.toContain('1440 kg volume');
@@ -163,6 +165,7 @@ describe('session card contents', () => {
     const doc = parse(workoutHistory(state([session(7, at(2026, 8, 19))], { expandedSessionId: 7, pubkey: 'ab'.repeat(32) }), now));
     expect(doc.querySelector('[data-toggle-session="7"]')).not.toBeNull();
     expect(doc.querySelector('.session-receipt-summary')?.textContent).toContain('Sets');
+    expect(doc.querySelectorAll('.session-action-row')).toHaveLength(2);
     expect(doc.querySelector('.session-detail-index')?.textContent).toBe('01');
     expect(doc.querySelector('.repeat-workout-action')?.getAttribute('data-repeat-session')).toBe('7');
     expect(doc.querySelector('[data-publish-session="7"]')).not.toBeNull();

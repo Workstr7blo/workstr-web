@@ -3,6 +3,7 @@ import type { Exercise } from '../../core/types';
 import { formatWeightKg, type WeightUnit } from '../../core/units';
 import { sessionExercises, type ActiveSession, type SessionSetLog } from '../../app/state';
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
 import { repeatBlockedReason } from './repeat-workout';
 
 export function workoutVolume(session: ActiveSession): number {
@@ -49,10 +50,10 @@ export function sessionMuscleGroupNames(session: ActiveSession, exercises: Exerc
 }
 
 export function publishSummaryButton(session: ActiveSession, canPublish: boolean, publishing = false, size = 'small', publishingLabel = 'Waiting for signer...'): string {
-  if (session.nostrEventId) return `<button class="button ${size}" disabled title="Summary already published to Nostr">Published</button>`;
-  if (publishing) return `<button class="button primary ${size}" disabled>${html(publishingLabel)}</button>`;
-  if (!canPublish) return `<button class="button primary ${size}" disabled title="Sign in with your Nostr signer in Settings to publish">Publish summary</button>`;
-  return `<button class="button primary ${size}" data-publish-session="${session.id}">Publish summary</button>`;
+  if (session.nostrEventId) return `<button class="button ${size}" disabled title="Summary already published to Nostr">${icon('check')}<span>Published</span></button>`;
+  if (publishing) return `<button class="button primary ${size}" disabled>${icon('upload')}<span>${html(publishingLabel)}</span></button>`;
+  if (!canPublish) return `<button class="button primary ${size}" disabled title="Sign in with your Nostr signer in Settings to publish">${icon('upload')}<span>Publish summary</span></button>`;
+  return `<button class="button primary ${size}" data-publish-session="${session.id}">${icon('upload')}<span>Publish summary</span></button>`;
 }
 
 // Repeating is the main thing you come to a finished workout to do, so it leads the action
@@ -61,8 +62,12 @@ export function publishSummaryButton(session: ActiveSession, canPublish: boolean
 export function repeatWorkoutButton(session: ActiveSession): string {
   const blocked = repeatBlockedReason(session);
   return blocked
-    ? `<button class="button small repeat-workout-action" disabled title="${html(blocked)}">Repeat workout</button>`
-    : `<button class="button primary small repeat-workout-action" data-repeat-session="${session.id}">Repeat workout</button>`;
+    ? `<button class="button small repeat-workout-action" disabled title="${html(blocked)}">${icon('refresh-cw')}<span>Repeat workout</span></button>`
+    : `<button class="button primary small repeat-workout-action" data-repeat-session="${session.id}">${icon('refresh-cw')}<span>Repeat workout</span></button>`;
+}
+
+function sessionActionRow(title: string, detail: string, control: string, extraClass = ''): string {
+  return `<div class="session-action-row${extraClass ? ` ${extraClass}` : ''}"><span class="session-action-copy"><strong>${html(title)}</strong><small>${html(detail)}</small></span><span class="session-action-control">${control}</span></div>`;
 }
 
 export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPublish = false, publishing = false, publishingLabel = 'Waiting for signer...'): string {
@@ -99,8 +104,8 @@ export function sessionDetail(session: ActiveSession, unit: WeightUnit, canPubli
     ${summary}
     ${rows || '<p class="empty" style="padding:6px 0 12px">No sets were logged in this session.</p>'}
     <div class="workout-card-actions session-actions">
-      ${repeatWorkoutButton(session)}
-      ${publishSummaryButton(session, canPublish, publishing, 'small', publishingLabel)}
+      ${sessionActionRow('Repeat workout', 'Run this finished workout again.', repeatWorkoutButton(session), 'session-action-row--lead')}
+      ${sessionActionRow('Publish summary', 'Share this completed session to Nostr.', publishSummaryButton(session, canPublish, publishing, 'small', publishingLabel))}
     </div>
     <!-- Deleting is destructive and rarely what you came for, so it sits behind a
          disclosure rather than beside publish. Native <details> keeps it keyboard

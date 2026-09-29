@@ -180,7 +180,7 @@ function workoutsView(state: AppState): string {
       <div class="program-list" id="program-discover-list">${programListMarkup('discover', state)}</div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">
-      <div class="panel"><div class="panel-head"><span>Workout history</span></div><p class="section-help">Your training month at a glance, then every session below.</p>${historyCalendarPanel(state)}${workoutHistory(state)}</div>
+      <div class="panel history-panel"><div class="history-hero"><div class="history-hero-icon">${icon('clipboard-list')}</div><div class="history-hero-copy"><span>Training history</span><p>Month rhythm, session receipts, and repeatable workouts.</p></div></div>${historyCalendarPanel(state)}${workoutHistory(state)}</div>
     </div>
     <div class="sub-panel ${active === 'recovery' ? 'active' : ''}" id="sub-workouts-recovery">
       ${recoveryView(state)}

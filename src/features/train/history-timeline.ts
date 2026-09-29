@@ -13,6 +13,7 @@ function sessionCard(session: ActiveSession, state: AppState, unit: WeightUnit):
   const exerciseCount = new Set(doneSets.map((set) => set.exerciseSlug)).size || session.exercises.length;
   const meta = [formatSessionDate(session.finishedAt || session.startedAt), sessionDuration(session)].filter(Boolean).join(' · ');
   const volumeLabel = volume > 0 ? `${Math.round(displayWeightKg(volume, unit) || 0)} ${unit}` : '';
+  const duration = sessionDuration(session);
   const stats = [
     `${doneSets.length} set${doneSets.length === 1 ? '' : 's'}`,
     `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}`,
@@ -22,12 +23,14 @@ function sessionCard(session: ActiveSession, state: AppState, unit: WeightUnit):
   const { primary, secondary } = sessionMuscleSets(session, state.exercises);
   const map = paintBodyMapSvg(primary, secondary);
   const expanded = state.expandedSessionId === session.id;
+  const status = session.nostrEventId ? 'Published' : 'Receipt';
   return `<div class="workout-card history-session-card ${expanded ? 'expanded' : ''}" data-session="${session.id}">
     <div class="workout-card-header" data-toggle-session="${session.id}">
       <div class="workout-card-map ${map ? 'has-map' : ''}" data-session-map="${session.id}">${map || icon('clock')}</div>
       <div class="workout-card-info">
-        <div class="workout-card-name">${html(session.sheetName || 'Freestyle')}</div>
+        <div class="history-session-top"><div class="workout-card-name">${html(session.sheetName || 'Freestyle')}</div><span class="history-session-status">${status}</span></div>
         <div class="workout-card-meta">${meta}</div>
+        ${duration ? `<div class="history-session-focus"><span>${icon('clock')}</span>${html(duration)} completed workout</div>` : ''}
         <div class="history-stat-row">${stats}</div>
         ${groups.length ? `<div class="workout-card-muscles">${html(groups.join(' · '))}</div>` : ''}
       </div>
