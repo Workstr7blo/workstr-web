@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { exerciseImage } from '../src/app/format';
 import type { AppState } from '../src/app/state';
 import type { Exercise } from '../src/core/types';
 import { discoverCardHtml } from '../src/features/discover/views';
@@ -56,10 +55,9 @@ describe('exercise image frames', () => {
     expectContained('.detail-img img');
   });
 
-  it('keeps program and builder thumbnails square at their sizes and contains them', () => {
-    const row = declarations('.wk-ex-img');
-    expect([row.get('width'), row.get('height')]).toEqual(['40px', '40px']);
-    expectContained('.wk-ex-img', '.wk-ex-img:not(.placeholder)');
+  it('keeps program rows text-first and builder thumbnails square and contained', () => {
+    const css = SOURCES.map((file) => readFileSync(resolve(root, file), 'utf8')).join('\n');
+    expect(css).not.toContain('.wk-ex-img');
     const builder = declarations('.wex-img');
     expect([builder.get('width'), builder.get('height')]).toEqual(['48px', '48px']);
     expectContained('.wex-img', '.wex-img:not(.placeholder)');
@@ -73,10 +71,9 @@ describe('exercise image frames', () => {
 
   // Black belongs to a real picture. A placeholder keeps its own quiet background and icon.
   it('never paints a placeholder black', () => {
-    for (const selector of ['.wk-ex-img.placeholder', '.wex-img.placeholder', '.detail-img.placeholder', '.session-ex-image.wide.placeholder']) {
+    for (const selector of ['.wex-img.placeholder', '.detail-img.placeholder', '.session-ex-image.wide.placeholder']) {
       expect(declarations(selector).get('background'), selector).not.toBe('#000');
     }
-    expect(declarations('.wk-ex-img').get('background')).not.toBe('#000');
     expect(declarations('.wex-img').get('background')).not.toBe('#000');
   });
 
@@ -100,11 +97,6 @@ describe('exercise image markup', () => {
       expect(card).toContain('class="card-photo" src="https://i.nostr.build/jack.png?w=360"');
       expect(card).toContain('data-fallback="remove"');
     }
-  });
-
-  it('keeps the row thumbnail fallback', () => {
-    expect(exerciseImage('')).toContain('wk-ex-img placeholder');
-    expect(exerciseImage('https://x/y.png')).toContain('data-fallback="replace" data-fallback-tag="div" data-fallback-class="wk-ex-img placeholder"');
   });
 
   it('draws the hero once, responsive, named, and falls back to the placeholder', () => {

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Polished workout program cards. Expanded program rows now drop tiny exercise thumbnails so
+  the sequence reads cleaner on phones, the program preview uses a premium clock summary, and
+  Start, Publish, Import, Edit and Delete are now labelled Lucide action rows instead of a
+  crowded button grid.
+
 - Revamped the device-vault lock screen with the same high-end card language as Settings and
   Tip Jar: Lucide icon tiles, a stronger sealed-vault backdrop, clearer protection labels and
   icon-led primary actions.
