@@ -155,4 +155,52 @@ describe('countdown audio playback', () => {
     listeners.forEach((listener) => listener());
     expect(frequencies).toEqual([1175]);
   });
+
+  it('lets a tap resume even while an earlier resume attempt is still hanging', async () => {
+    const context = mockContext('suspended', () => new Promise<void>(() => {}), []);
+    vi.stubGlobal('AudioContext', class MockAudioContext { constructor() { return context; } });
+    const audio = await import('../src/features/train/countdown-audio');
+    audio.resumeCountdownAudio();
+    audio.unlockCountdownAudio();
+    expect(context.resume).toHaveBeenCalledTimes(1);
+    audio.playCountdownCue('short');
+    expect(context.resume).toHaveBeenCalledTimes(1);
+    audio.unlockCountdownAudio();
+    expect(context.resume).toHaveBeenCalledTimes(2);
+  });
+
+  it('never creates a context outside a gesture', async () => {
+    const created = vi.fn();
+    vi.stubGlobal('AudioContext', class MockAudioContext { constructor() { created(); } });
+    const audio = await import('../src/features/train/countdown-audio');
+    audio.resumeCountdownAudio();
+    expect(created).not.toHaveBeenCalled();
+    expect(audio.countdownAudioState()).toBe('not started');
+  });
+
+  it('starts a fresh context on the first tap after the page was hidden', async () => {
+    const first = { ...mockContext('running', () => Promise.resolve(), []), close: vi.fn(() => Promise.resolve()) };
+    const second = { ...mockContext('running', () => Promise.resolve(), []), close: vi.fn(() => Promise.resolve()) };
+    const contexts = [first, second];
+    vi.stubGlobal('AudioContext', class MockAudioContext { constructor() { return contexts.shift() as object; } });
+    let visibility = 'visible';
+    const doc = new EventTarget() as EventTarget & { visibilityState: string };
+    Object.defineProperty(doc, 'visibilityState', { get: () => visibility });
+    vi.stubGlobal('document', doc);
+    const audio = await import('../src/features/train/countdown-audio');
+    audio.unlockCountdownAudio();
+    audio.unlockCountdownAudio();
+    expect(first.close).not.toHaveBeenCalled();
+
+    visibility = 'hidden';
+    doc.dispatchEvent(new Event('visibilitychange'));
+    visibility = 'visible';
+    doc.dispatchEvent(new Event('visibilitychange'));
+    audio.resumeCountdownAudio();
+    expect(first.close).not.toHaveBeenCalled();
+
+    audio.unlockCountdownAudio();
+    expect(first.close).toHaveBeenCalledTimes(1);
+    expect(contexts).toEqual([]);
+  });
 });

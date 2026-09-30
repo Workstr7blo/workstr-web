@@ -4,7 +4,7 @@ import { programMuscleLabel } from './format';
 import { inferProgramMuscle, programExerciseName, resolveProgramExercise } from '../features/sheets/views';
 import type { RelayProgram } from '../nostr/canon';
 import { emomClockSnapshot } from '../features/train/emom-clock';
-import { CountdownCueGuard, unlockCountdownAudio } from '../features/train/countdown-audio';
+import { CountdownCueGuard, resumeCountdownAudio, unlockCountdownAudio } from '../features/train/countdown-audio';
 import { effectiveSessionStartedAt, isEmomSession, preEmomElapsedSec, readEmomClock, standardSessionExercises } from '../features/train/session-logic';
 import type { ActiveSession, AppState, SessionExercise } from './state';
 import type { Signer } from '../signer/types';
@@ -158,8 +158,9 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
   }
 
   // An interrupted audio context only reliably revives inside a user gesture, and
-  // the start button is long gone by round two. Any touch in the session will do.
-  root.addEventListener('pointerdown', (event) => {
+  // the start button is long gone by round two. Any tap in the session will do.
+  // `click`, not `pointerdown`: iOS does not treat a touch pointerdown as a gesture.
+  root.addEventListener('click', (event) => {
     if (!state.activeSession) return;
     const overlay = root.querySelector('#session-overlay');
     if (!overlay?.classList.contains('open')) return;
@@ -171,7 +172,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
     if (document.visibilityState !== 'visible') return;
     if (state.activeSession && root.querySelector('#session-overlay')?.classList.contains('open')) {
       void requestSessionWakeLock();
-      unlockCountdownAudio();
+      resumeCountdownAudio();
     }
     standard.reconcileRest();
     if (emomPhaseMounted && emom.active) emom.reconcileClocks();

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed the last-five-seconds countdown beeps staying silent on iPhone. A touch in the session
+  woke the audio on `pointerdown`, which iOS does not count as a tap, so the audio could stay
+  locked. It now wakes on the tap itself. The first tap after the app returns from the
+  background starts fresh audio, because iOS can return audio that reports it is playing but
+  stays silent. The beeps are also louder, so a phone speaker can be heard in a gym.
+
 ### Changed
 
 - Polished the Exercises tab to match Workouts. Library and Discover open with a Lucide

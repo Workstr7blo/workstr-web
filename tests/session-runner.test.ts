@@ -552,13 +552,13 @@ describe('session runner', () => {
     expect(root.querySelector('.emom-log-field')?.textContent).toContain('Actual reps');
     expect(root.querySelector('.emom-log-primary')?.textContent).toBe('Log interval');
     expect(root.querySelector('#emom-work-ring-fg')).toBeTruthy();
-    expect(unlockCountdownAudioMock).toHaveBeenCalledTimes(1);
+    expect(unlockCountdownAudioMock).toHaveBeenCalled();
     unlockCountdownAudioMock.mockClear();
     const step = root.querySelector<HTMLElement>('[data-emom-step="0"]')!;
     (step.querySelector('[data-emom-reps]') as HTMLInputElement).value = '9';
     (step.querySelector('[data-log-emom]') as HTMLButtonElement).click();
     await tick();
-    expect(unlockCountdownAudioMock).toHaveBeenCalledTimes(1);
+    expect(unlockCountdownAudioMock).toHaveBeenCalled();
     expect(sets).toHaveLength(1);
     expect(sets[0]).toMatchObject({ reps: 9, duration_sec: 20, round_index: 0, interval_index: 0, step_index: 0 });
     expect(root.querySelector('#session-rest-overlay')?.classList.contains('show')).toBe(false);

@@ -27,6 +27,8 @@ let audioContext: AudioContext | null = null;
 let pendingCue: CountdownCue | null = null;
 let resumePending: Promise<void> | null = null;
 let keepAlive: AudioBufferSourceNode | null = null;
+let rebuildOnGesture = false;
+let watchingVisibility = false;
 
 // A resume() that never settles must not disable cues for the rest of the
 // workout, so the in-flight guard is dropped even if the promise hangs.
@@ -90,14 +92,15 @@ function playTone(cue: CountdownCue): void {
   if (!audioContext || audioContext.state !== 'running') return;
   const now = audioContext.currentTime;
   const final = cue === 'final';
-  const duration = final ? 0.65 : 0.09;
+  const duration = final ? 0.65 : 0.15;
   const oscillator = audioContext.createOscillator();
   const gain = audioContext.createGain();
   oscillator.type = 'sine';
   oscillator.frequency.setValueAtTime(final ? 1175 : 880, now);
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(final ? 0.18 : 0.1, now + 0.012);
-  if (final) gain.gain.exponentialRampToValueAtTime(0.13, now + 0.28);
+  // Loud enough to cut through a gym on a phone speaker; a pure sine this short does not clip.
+  gain.gain.exponentialRampToValueAtTime(final ? 0.8 : 0.6, now + 0.012);
+  if (final) gain.gain.exponentialRampToValueAtTime(0.55, now + 0.28);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
   oscillator.connect(gain);
   gain.connect(audioContext.destination);
@@ -107,8 +110,10 @@ function playTone(cue: CountdownCue): void {
   oscillator.stop(now + duration);
 }
 
-function resumeAudioContext(): void {
-  if (!audioContext || audioContext.state === 'running' || resumePending) return;
+// `fromGesture` skips the in-flight guard: a tap is the one moment a resume is
+// allowed to succeed, so it must not wait out an earlier attempt that never will.
+function resumeAudioContext(fromGesture = false): void {
+  if (!audioContext || audioContext.state === 'running' || (resumePending && !fromGesture)) return;
   const attempt = audioContext.resume().then(() => {
     if (resumePending !== attempt) return;
     resumePending = null;
@@ -125,20 +130,45 @@ function resumeAudioContext(): void {
   setTimeout(() => { if (resumePending === attempt) resumePending = null; }, RESUME_LATCH_MS);
 }
 
-// Safe to call on any user gesture during a session, not just the start button:
-// a real gesture is the only thing that reliably revives an interrupted context.
+// iOS can hand back a context from the background that reports `running` yet
+// plays nothing, so the first tap after the page was hidden starts a fresh one.
+function watchVisibility(): void {
+  if (watchingVisibility || typeof document === 'undefined') return;
+  watchingVisibility = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') rebuildOnGesture = true;
+  });
+}
+
+// Call only from a real user activation (click, touchend, keydown). WebKit does
+// not count a touch pointerdown, and a context created there stays suspended.
 export function unlockCountdownAudio(): void {
   const AudioContextCtor = audioContextConstructor();
   if (!AudioContextCtor) return;
   try {
-    if (!audioContext || audioContext.state === 'closed') {
+    watchVisibility();
+    if (audioContext && (rebuildOnGesture || audioContext.state === 'closed' || (audioContext.state as string) === 'interrupted')) {
+      const stale = audioContext;
+      audioContext = null;
+      keepAlive = null;
+      resumePending = null;
+      if (stale.state !== 'closed') void stale.close().catch(() => {});
+    }
+    rebuildOnGesture = false;
+    if (!audioContext) {
       audioContext = new AudioContextCtor();
       watchAudioContext(audioContext);
     }
-    resumeAudioContext();
+    resumeAudioContext(true);
     primeAudioContext();
     if (audioContext.state === 'running') startKeepAlive();
   } catch { /* Audio cues are an optional enhancement. */ }
+}
+
+// Outside a gesture a resume may still work (the platform ended an interruption),
+// but nothing here rebuilds the context: one made without a tap stays silent.
+export function resumeCountdownAudio(): void {
+  try { resumeAudioContext(); } catch { /* Optional enhancement. */ }
 }
 
 export function countdownAudioState(): string {
