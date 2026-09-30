@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Polished the Exercises tab to match Workouts. Library and Discover open with a Lucide
+  header - library counts, or the catalog status - the favorite star is a real icon that
+  fills gold, Import/Update/In library and the selection bar carry icons, and an empty search
+  shows a full-width panel instead of text squeezed into one column. The exercise detail
+  sheet gets icon stat tiles, icon section headings, an icon close button and icon actions.
+
 - Polished the Workouts Recovery tab to match History: a recovery header with a readiness
   ring, Lucide tiles for groups ready, groups recovering and time until the next group is
   full, a sentence naming what still needs rest, status-iconed muscle rows showing when each

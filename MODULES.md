@@ -74,7 +74,8 @@ and patch it directly, which is also why a page render can leave it standing.
 | Body-weight UI and calculations | `src/features/progress/views.ts` | `src/db/store.ts`, `src/core/units.ts` | `tests/progress-views.test.ts`, `tests/store.test.ts` |
 | Recovery calculation and body map | `src/features/recovery/recovery.ts` | `views.ts`, `src/app/bodymap.ts`, `src/core/muscles.ts` | `tests/recovery.test.ts` |
 | Quick Workout generation | `src/features/recovery/quickWorkout.ts` | recovery module, `src/app/preferences-controller.ts` | `tests/recovery.test.ts`, relevant shell/session tests |
-| Exercise cards shared by Library and Discover: photo, name, muscle and level line | `src/app/exercise-card.ts` | `src/features/library/views.ts`, `src/features/discover/views.ts` | `tests/exercise-cards.test.ts` |
+| Exercise detail sheet markup (Library and Discover): stats, muscles, instructions, favorite/import actions | `src/app/exercise-detail-view.ts` | `src/app/catalog-controller.ts` (opens it, paints the muscle map, binds actions) | `tests/shell.test.ts`, browser verification |
+| Exercise cards and the tab hero shared by Library and Discover: photo, name, muscle and level line | `src/app/exercise-card.ts` | `src/features/library/views.ts`, `src/features/discover/views.ts` | `tests/exercise-cards.test.ts` |
 | Exercise library UI | `src/features/library/views.ts` | shell library handlers, `src/app/format.ts`, `src/db/store.ts` | `tests/equipment-views.test.ts`, `tests/shell.test.ts`, `tests/store.test.ts` |
 | Discover exercise/program UI | `src/features/discover/views.ts` | `src/nostr/canon.ts`, `programImport.ts`, shell import handlers | `tests/discover.test.ts`, `tests/canon.test.ts`, `tests/programImport.test.ts` |
 | Catalog event parsing/fetch/cache | `src/nostr/canon.ts`, `src/nostr/creator-programs.ts` | `src/nostr/pool.ts`, `src/core/types.ts` | `tests/canon.test.ts` |

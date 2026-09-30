@@ -2,7 +2,7 @@ import type { Exercise } from '../core/types';
 import { responsiveImageUrl } from '../core/media';
 import { formatTaxonomyLabel, normalizeTrainingLevel, TRAINING_LEVELS } from '../core/training-taxonomy';
 import { EX_PLACEHOLDER, html } from './format';
-import { icon } from './icons';
+import { icon, type IconName } from './icons';
 
 // The one exercise card Library and Discover both draw, so the two cannot drift apart. It says
 // what the exercise is, what it trains and what level it suits; source, movement type, secondary
@@ -57,4 +57,13 @@ export function exerciseCard({ exercise, keyAttribute, classes = '', selectable 
         ${footer}
       </div>
     </div>`;
+}
+
+// The header both exercise tabs open with, in the same shape as the Workouts tab heroes.
+// `detail` is trusted markup: a view passes counts, or the status line the shell patches.
+export function exerciseBrowseHero(name: IconName, title: string, copy: string, detail = ''): string {
+  return `<div class="exercise-hero">
+    <div class="exercise-hero-icon">${icon(name)}</div>
+    <div class="exercise-hero-copy"><span>${html(title)}</span><p>${html(copy)}</p>${detail ? `<div class="exercise-hero-stats">${detail}</div>` : ''}</div>
+  </div>`;
 }

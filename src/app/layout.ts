@@ -65,7 +65,7 @@ export function shellFrame(state: AppState, page = '', overlays = ''): string {
     </main>
     <div id="page-overlays">${overlays}</div>
     ${sessionOverlayMarkup(state)}
-    <div id="modal" class="modal"><div class="modal-card"><button id="modal-close" class="modal-close" type="button">×</button><div id="modal-content"></div></div></div>
+    <div id="modal" class="modal"><div class="modal-card"><button id="modal-close" class="modal-close" type="button" aria-label="Close">${icon('x')}</button><div id="modal-content"></div></div></div>
     <div id="toast"></div>
     <div id="vault-lock" class="vault-lock" hidden></div>`;
 }
