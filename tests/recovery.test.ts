@@ -121,6 +121,23 @@ describe('recoveryView', () => {
   });
 });
 
+describe('recoveryView polish', () => {
+  it('uses Lucide icons for the header, tiles and row status', () => {
+    const markup = recoveryView(appState({ finishedSessions: [makeSession(hoursAgo(36), 'bench-press', 'Chest')] }));
+    expect(markup).toContain('data-icon="heart-pulse"');
+    expect(markup).toContain('class="recovery-ring');
+    expect(markup.match(/class="recovery-stat /g)).toHaveLength(2);
+    expect(markup).toContain('class="rstatus"><svg');
+  });
+
+  it('names the groups that still need time instead of repeating the count', () => {
+    const markup = recoveryView(appState({ finishedSessions: [makeSession(hoursAgo(12), 'bench-press', 'Chest')] }));
+    expect(markup).toContain('Chest still needs time.');
+    expect(markup).toContain('until Chest is full');
+    expect(markup).toContain('12h ago');
+  });
+});
+
 describe('quickWorkoutPanel', () => {
   it('uses compact action copy', () => {
     const markup = quickWorkoutPanel(appState());

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Polished the Workouts Recovery tab to match History: a recovery header with a readiness
+  ring, Lucide tiles for groups ready, groups recovering and time until the next group is
+  full, a sentence naming what still needs rest, status-iconed muscle rows showing when each
+  was last trained, Fresh muscles as chips, and a Quick Workout card with a segmented length
+  picker, numbered exercises and icon Swap/Remove/Start actions.
+
 - Polished the Workouts History tab with a premium training-history header, glass calendar,
   Lucide summary tiles, receipt-style completed-session cards, and labelled Repeat/Publish
   action rows while keeping delete behind More actions.
