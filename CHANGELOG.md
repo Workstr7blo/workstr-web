@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Polished the live session to match the other tabs. The target under the exercise photo is
+  now three icon tiles (sets, reps or time, rest), the set sheet has an icon heading and
+  Done/Current/Upcoming marks, finished exercises show a check on the rail, and every action
+  (Log set, Prev, Next, Finish, Start EMOM, Add set, Skip rest, -15s/+15s) carries a Lucide
+  icon. On a phone, End becomes a close icon so the session clock stays on the title line.
+  EMOM gets phase icons, an icon-tile card before the clock starts and when it completes,
+  and an icon-led Next up. The finish recap's stats lead with icons like other stat tiles.
+
 - Polished the Exercises tab to match Workouts. Library and Discover open with a Lucide
   header - library counts, or the catalog status - the favorite star is a real icon that
   fills gold, Import/Update/In library and the selection bar carry icons, and an empty search

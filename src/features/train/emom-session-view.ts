@@ -1,5 +1,5 @@
 import { html } from '../../app/format';
-import { icon } from '../../app/icons';
+import { icon, type IconName } from '../../app/icons';
 import type { ActiveSession, SessionExercise, SessionSetLog } from '../../app/state';
 import type { EmomBlock, TrainingStep } from '../../core/types';
 import { emomDurationSec, type EmomPosition, type EmomSlot } from './emom';
@@ -62,6 +62,24 @@ function heroMedia(exercise: SessionExercise | undefined, name: string): string 
   return sessionHeroMedia(exercise, name);
 }
 
+const PHASE_ICONS: Record<string, IconName> = { paused: 'pause', work: 'flame', recovery: 'heart-pulse', interval: 'timer' };
+
+// The labelled-action pattern the standard footer uses; icons add no text to the name.
+function action(name: IconName, label: string): string {
+  return `${icon(name)}<span>${label}</span>`;
+}
+
+// The icon-tile card the other tabs open with, for the moments between intervals.
+function transitionCard(name: IconName, label: string, headline: string, detail: string, body: string, complete = false): string {
+  return `<div class="emom-transition${complete ? ' complete' : ''}">
+    <div class="emom-transition-head">
+      <span class="emom-transition-icon">${icon(name)}</span>
+      <span class="emom-transition-copy"><span class="emom-transition-label">${label}</span><strong>${headline}</strong><small>${detail}</small></span>
+    </div>
+    <p>${body}</p>
+  </div>`;
+}
+
 // Phase, clock and interval metadata as one band under the hero: the timer belongs to the
 // exercise on screen rather than to a dashboard card of its own. Work and recovery differ by
 // wording and by ring colour, never by colour alone.
@@ -77,14 +95,14 @@ function statusBand(slot: EmomSlot, position: EmomPosition, timerPhase: EmomTime
     ? `<circle class="emom-work-ring-bg" cx="60" cy="60" r="42" stroke-width="6"/><circle id="emom-work-ring-fg" class="emom-work-ring-fg" cx="60" cy="60" r="42" stroke-width="6" stroke-dasharray="${WORK_RING}" stroke-dashoffset="${WORK_RING * (1 - timerPhase.secondsRemaining / timerPhase.durationSec)}"/>`
     : '';
   return `<div class="emom-status ${mode}">
-    <div class="emom-phase-label">${phase}</div>
+    <div class="emom-phase-label">${icon(PHASE_ICONS[mode])}<span>${phase}</span></div>
     <div class="rest-timer-wrap emom-timer-wrap">
       <svg class="rest-ring" viewBox="0 0 120 120" aria-hidden="true"><circle class="rest-ring-bg" cx="60" cy="60" r="54" stroke-width="8"/><circle id="emom-ring-fg" class="rest-ring-fg" cx="60" cy="60" r="54" stroke-width="8" stroke-dasharray="${INTERVAL_RING}" stroke-dashoffset="${INTERVAL_RING * (1 - position.secondsRemaining / slot.durationSec)}"/>${workRings}</svg>
       <div class="emom-countdown" id="emom-countdown" role="timer" aria-label="Seconds remaining">${timerPhase?.secondsRemaining ?? position.secondsRemaining}</div>
     </div>
     <div class="emom-status-meta">
-      <span>${target} · every ${seconds(slot.durationSec)}</span>
-      <span><b id="emom-interval-countdown">${position.secondsRemaining}</b><span class="unit">s</span> left · ${slot.index + 1}/${slotCount}</span>
+      <span>${icon('target')}${target} · every ${seconds(slot.durationSec)}</span>
+      <span>${icon('clock')}<b id="emom-interval-countdown">${position.secondsRemaining}</b><span class="unit">s</span> left · ${slot.index + 1}/${slotCount}</span>
     </div>
   </div>`;
 }
@@ -117,7 +135,7 @@ interface LogPanelInput {
 function logPanel(input: LogPanelInput): string {
   const { logged } = input;
   const head = `<div class="emom-log-head">
-    <span class="emom-log-title ${logged ? 'done' : ''}">${logged ? 'Logged' : 'Log this interval'}</span>
+    <span class="emom-log-title ${logged ? 'done' : ''}">${icon(logged ? 'circle-check' : 'pencil')}${logged ? 'Logged' : 'Log this interval'}</span>
     ${input.showStep ? `<span class="emom-log-step">${html(input.name)} · ${html(stepTarget(input.step))}</span>` : ''}
   </div>`;
   if (logged) {
@@ -133,15 +151,18 @@ function logPanel(input: LogPanelInput): string {
       <label class="emom-log-field"><span>Actual reps</span><input class="session-set-input" data-emom-reps type="number" inputmode="numeric" placeholder="reps"></label>
       <label class="emom-log-field"><span>Load ${html(input.unit)}</span><input class="session-set-input" data-emom-weight type="number" inputmode="decimal" step="0.5" placeholder="${html(input.unit)}"></label>
     </div>
-    <button class="session-log-btn emom-log-primary" data-log-emom="${input.stepIndex}" type="button" aria-label="Log interval">Log interval</button>${input.instructions}
+    <button class="session-log-btn emom-log-primary" data-log-emom="${input.stepIndex}" type="button" aria-label="Log interval">${action('check', 'Log interval')}</button>${input.instructions}
   </section>`;
 }
 
 function nextUp(nextSlot: EmomSlot | undefined, nextStep: TrainingStep | undefined): string {
   return `<div class="emom-next-card">
-    <span>Next up</span>
-    <strong>${nextStep ? html(nextStep.exerciseName || nextStep.exerciseSlug) : 'Finish session'}</strong>
-    <small>${nextSlot ? `Minute ${nextSlot.minuteIndex + 1} · ${nextSlot.durationSec}s interval` : 'Workout complete'}</small>
+    <span class="emom-next-icon">${icon(nextStep ? 'arrow-right' : 'flag')}</span>
+    <span class="emom-next-copy">
+      <span>Next up</span>
+      <strong>${nextStep ? html(nextStep.exerciseName || nextStep.exerciseSlug) : 'Finish session'}</strong>
+      <small>${nextSlot ? `Minute ${nextSlot.minuteIndex + 1} · ${nextSlot.durationSec}s interval` : 'Workout complete'}</small>
+    </span>
   </div>`;
 }
 
@@ -173,13 +194,10 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
     meta.textContent = `EMOM · ${minutes} min · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}`;
     nav.innerHTML = '';
     body.innerHTML = `${firstStep ? heroMedia(findExercise(firstStep.exerciseSlug), stepName(firstStep, findExercise(firstStep.exerciseSlug))) : ''}
-      <div class="emom-transition">
-        <span class="emom-transition-label">EMOM next</span>
-        <strong>${minutes} min · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}</strong>
-        <small>${firstStep ? `Opens on ${html(stepName(firstStep, findExercise(firstStep.exerciseSlug)))}` : 'Ready when you are'}</small>
-        <p>${input.mixed ? 'Strength section done. ' : ''}The clock starts when you are ready. Actual reps are logged separately from each timed target.</p>
-      </div>`;
-    footer.innerHTML = '<button class="session-emom-btn" id="emom-start" type="button">Start EMOM</button>';
+      ${transitionCard('timer', 'EMOM next', `${minutes} min · ${schedule.length} interval${schedule.length === 1 ? '' : 's'}`,
+        firstStep ? `Opens on ${html(stepName(firstStep, findExercise(firstStep.exerciseSlug)))}` : 'Ready when you are',
+        `${input.mixed ? 'Strength section done. ' : ''}The clock starts when you are ready. Actual reps are logged separately from each timed target.`)}`;
+    footer.innerHTML = `<button class="session-emom-btn" id="emom-start" type="button">${action('play', 'Start EMOM')}</button>`;
     root.querySelector('#emom-start')?.addEventListener('click', input.onStart);
     input.bindControls();
     return;
@@ -188,13 +206,9 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
     const lastSlot = schedule.at(-1);
     meta.textContent = 'EMOM complete';
     nav.innerHTML = lastSlot ? input.minuteNav(lastSlot, true) : '';
-    body.innerHTML = `<div class="emom-transition complete">
-      <span class="emom-transition-label">EMOM complete</span>
-      <strong>${Math.ceil(emomDurationSec(schedule) / 60)} min completed</strong>
-      <small>${schedule.length} interval${schedule.length === 1 ? '' : 's'}</small>
-      <p>Review your logged work, then finish the session.</p>
-    </div>`;
-    footer.innerHTML = '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>';
+    body.innerHTML = transitionCard('award', 'EMOM complete', `${Math.ceil(emomDurationSec(schedule) / 60)} min completed`,
+      `${schedule.length} interval${schedule.length === 1 ? '' : 's'}`, 'Review your logged work, then finish the session.', true);
+    footer.innerHTML = `<button class="session-finish-btn" id="finish-session" type="button">${action('flag', 'Finish session')}</button>`;
     input.bindControls();
     return;
   }
@@ -224,7 +238,7 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
   const upcoming = slot.steps.map((step, stepIndex) => {
     if (loggable[stepIndex]) return '';
     const logged = session.sets.find((set) => set.blockIndex === slot.blockIndex && set.roundIndex === slot.roundIndex && set.intervalIndex === slot.intervalIndex && set.stepIndex === stepIndex);
-    return `<div class="emom-upcoming-step ${logged ? 'done' : ''}"><b>${html(stepName(step, findExercise(step.exerciseSlug)))}</b><span>${logged ? 'Logged' : html(stepTarget(step))}</span></div>`;
+    return `<div class="emom-upcoming-step ${logged ? 'done' : ''}"><b>${icon(logged ? 'circle-check' : 'clock')}${html(stepName(step, findExercise(step.exerciseSlug)))}</b><span>${logged ? 'Logged' : html(stepTarget(step))}</span></div>`;
   }).join('');
   const nextSlot = schedule[slot.index + 1];
   body.innerHTML = `<div class="emom-live-layout ${input.paused ? 'paused' : ''}">
@@ -236,7 +250,7 @@ export function renderEmomSessionView(input: EmomSessionViewInput): void {
   </div>`;
   footer.innerHTML = `<button class="session-pause-btn" id="emom-pause" type="button" aria-label="${input.paused ? 'Resume EMOM' : 'Pause EMOM'}">${input.paused
     ? `${icon('play', { filled: true })}Resume`
-    : `${icon('pause', { filled: true })}Pause`}</button><button class="session-finish-early" id="finish-session" type="button">Finish early</button>`;
+    : `${icon('pause', { filled: true })}Pause`}</button><button class="session-finish-early" id="finish-session" type="button">${action('flag', 'Finish early')}</button>`;
   root.querySelectorAll<HTMLButtonElement>('[data-log-emom]').forEach((button) => button.addEventListener('click', () => input.onLog(slot, Number(button.dataset.logEmom), button)));
   input.bindControls();
 }

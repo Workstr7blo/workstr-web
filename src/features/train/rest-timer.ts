@@ -1,4 +1,5 @@
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
 import { CountdownCueGuard, playCountdownCue } from './countdown-audio';
 import { restSecondsRemaining } from './session-logic';
 
@@ -26,7 +27,7 @@ export class RestTimer {
     this.period += 1;
     this.autoAdvance = autoAdvance;
     const nextUp = this.root.querySelector('#rest-nextup');
-    if (nextUp) nextUp.innerHTML = nextExerciseName ? `Next up: <b>${html(nextExerciseName)}</b>` : '';
+    if (nextUp) nextUp.innerHTML = nextExerciseName ? `${icon('arrow-right')}<span>Next up: <b>${html(nextExerciseName)}</b></span>` : '';
     this.updateView();
     this.cue();
     window.clearInterval(this.timer);

@@ -704,7 +704,14 @@
 .session-meta-line { margin-top: 6px; gap: 8px; }
 .session-meta { letter-spacing: .04em; }
 .session-elapsed-chip { padding: 4px 9px; }
-.session-close-btn { padding: 10px 13px; }
+.session-close-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 13px; }
+.session-close-btn svg { width: 15px; height: 15px; }
+/* On a phone the header line needs the room, so End becomes its icon; the label stays for
+   screen readers rather than moving to an aria-label. */
+@media (max-width: 480px) {
+  .session-close-btn { padding: 11px; }
+  .session-close-btn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+}
 .session-body { padding-top: 10px; }
 
 /* Exercise rail as a connected track. Each button keeps `data-jump-ex` and a 44px tap
@@ -748,15 +755,19 @@
 .session-ex-image.wide:not(.placeholder) { background: #000; }
 .session-ex-image.wide.placeholder { aspect-ratio: auto; height: 54px; min-height: 0; border-style: dashed; box-shadow: none; }
 
-/* Target: one line under the media, not a card. */
-.session-target-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 13px; border-bottom: 1px solid rgba(var(--accent-line-rgb), .12); }
-.session-target-label { display: inline-flex; align-items: center; gap: 7px; flex: none; color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
-.session-target-label::before { content: ''; width: 9px; height: 9px; border-radius: 50%; border: 2px solid currentColor; }
-.session-target-row .session-ex-target { margin: 0; font-size: 11px; }
+/* Target: three icon tiles under the media, the same tile the Recovery and History tabs use. */
+.session-body .session-ex-target { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding-bottom: 14px; border-bottom: 1px solid rgba(var(--accent-line-rgb), .12); font: inherit; letter-spacing: 0; text-transform: none; }
+.session-target-tile { min-width: 0; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; padding: 9px; border: 1px solid rgba(var(--accent-line-rgb), .14); border-radius: 14px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .08), rgba(255,255,255,.018)); }
+.session-target-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 10px; color: var(--purple-2); background: rgba(var(--accent-rgb), .12); }
+.session-target-icon svg { width: 16px; height: 16px; }
+.session-target-copy { min-width: 0; display: grid; gap: 3px; }
+.session-target-copy b { overflow: hidden; color: var(--text); font: 850 16px/1 Inter, ui-sans-serif, sans-serif; letter-spacing: -.02em; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.session-target-copy small { color: var(--muted); font-size: 11px; line-height: 1; }
 
 /* The set sheet. */
 .session-set-plan { display: grid; gap: 0; margin-top: 14px; }
-.session-sets-label { color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.session-sets-label { display: inline-flex; align-items: center; gap: 8px; color: var(--text); font: 850 15px/1 Inter, ui-sans-serif, sans-serif; letter-spacing: -.02em; }
+.session-sets-label svg { width: 16px; height: 16px; color: var(--purple-2); }
 .session-set-row { display: grid; grid-template-columns: 38px minmax(0,1fr) minmax(0,1fr) 62px; gap: 10px; align-items: center; }
 .session-set-columns { padding: 12px 0 6px; color: var(--dim); font: 900 9px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
 .session-set-columns span { text-align: center; }
@@ -765,7 +776,8 @@
 .session-set-block + .session-set-block { border-top: 1px solid rgba(var(--accent-line-rgb), .09); }
 .session-set-num { width: 38px; height: 38px; border-radius: 11px; font-size: 14px; }
 .session-set-value { min-width: 0; text-align: center; color: var(--text); font: 800 16px/1 ui-monospace, monospace; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.session-set-state { text-align: right; color: var(--dim); font: 900 9px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.session-set-state { display: grid; justify-items: end; gap: 5px; text-align: right; color: var(--dim); font: 900 9px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.session-set-state svg { width: 15px; height: 15px; }
 
 /* Completed: quiet. Green marks the row, but as an outline rather than a fill — a finished
    exercise is a column of these, and solid blocks would out-shout the set being worked. The
@@ -791,6 +803,8 @@
 .session-set-input { width: 100%; height: 48px; padding: 0 6px; font-size: 18px; }
 .session-set-state.current { color: var(--accent-pale); }
 .session-current-hints { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 9px 0 0 48px; color: var(--dim); font: 800 11px/1.3 ui-monospace, monospace; }
+.session-current-hints span { display: inline-flex; align-items: center; gap: 5px; }
+.session-current-hints svg { width: 13px; height: 13px; flex: none; }
 .session-current-hints span:last-child { color: var(--bitcoin-gold); }
 
 /* Upcoming: readable, not competing. */
@@ -798,13 +812,21 @@
 .session-set-block.upcoming .session-set-value { color: var(--muted); font-weight: 700; opacity: .8; }
 
 .session-ex-complete { display: flex; align-items: baseline; justify-content: center; gap: 9px; margin-top: 10px; padding: 9px 12px; border: 1px solid rgba(var(--success-rgb), .28); border-radius: 12px; background: rgba(var(--success-rgb), .07); }
-.session-ex-complete span { color: var(--success-green); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.session-ex-complete { align-items: center; }
+.session-ex-complete span { display: inline-flex; align-items: center; gap: 6px; color: var(--success-green); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.session-ex-complete svg { width: 14px; height: 14px; }
 .session-ex-complete strong { color: var(--muted); font: 700 12px/1 ui-monospace, monospace; }
 
-.session-add-set { justify-self: start; margin-top: 12px; padding: 9px 13px; }
+.session-add-set { justify-self: start; display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; padding: 9px 13px; }
+.session-add-set svg { width: 14px; height: 14px; }
 .session-instructions { margin-top: 14px; }
 .session-instructions-toggle { width: 100%; border: 0; border-radius: 0; background: transparent; padding: 12px 14px; text-align: left; }
 .session-footer { padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+/* Every footer action is icon plus label, the program cards' labelled-action pattern. */
+.session-footer button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; }
+.session-footer button svg { width: 17px; height: 17px; flex: none; }
+.session-ex-pip svg { width: 15px; height: 15px; }
+.session-track-arrow svg { width: 16px; height: 16px; }
 /* Keep the action bar over the same 720px column the sheet uses, so a wide PWA window does
    not stretch Log set across the whole desktop. */
 @media (min-width: 800px) {
@@ -859,6 +881,16 @@
 .emom-status.recovery .emom-work-ring-fg { stroke: var(--success-green); }
 .emom-status-meta { flex: 1 1 150px; display: grid; gap: 6px; padding-left: 13px; border-left: 1px solid rgba(var(--accent-line-rgb), .14); color: var(--muted); font: 800 10px/1.2 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
 .emom-status-meta b { color: var(--text); font-weight: 900; font-variant-numeric: tabular-nums; }
+/* Inline, not flex: the line mixes text with lowercase unit spans that must stay in flow. */
+.emom-status-meta svg { width: 13px; height: 13px; margin-right: 6px; vertical-align: -2px; color: var(--purple-2); }
+.emom-upcoming-step svg { width: 13px; height: 13px; flex: none; color: var(--purple-2); }
+.emom-log-primary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; }
+.emom-log-primary svg { width: 17px; height: 17px; flex: none; }
+.emom-upcoming-step.done svg { color: var(--success-green); }
+.emom-phase-label { display: inline-flex; align-items: center; gap: 6px; }
+.emom-phase-label svg { width: 14px; height: 14px; }
+.emom-log-title { display: inline-flex; align-items: center; gap: 7px; }
+.emom-log-title svg { width: 14px; height: 14px; }
 .emom-status-meta .unit { text-transform: lowercase; }
 
 /* The interval being logged: the EMOM counterpart of the standard runner's active set row,
@@ -882,18 +914,26 @@
 
 /* Other movements in the same interval: named and targeted, but nothing to press yet. */
 .emom-upcoming-step { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(var(--accent-line-rgb), .09); }
-.emom-upcoming-step b { min-width: 0; color: var(--muted); font: 700 14px/1.15 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.01em; }
+.emom-upcoming-step b { min-width: 0; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font: 700 14px/1.15 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.01em; }
 .emom-upcoming-step span { flex: none; color: var(--dim); font: 800 10px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
 .emom-upcoming-step.done b, .emom-upcoming-step.done span { color: var(--dim); }
 
-.emom-next-card { display: grid; gap: 5px; padding: 12px 0 0; border-top: 1px solid rgba(var(--accent-line-rgb), .12); }
-.emom-next-card span { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.emom-next-card { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px 0 0; border-top: 1px solid rgba(var(--accent-line-rgb), .12); }
+.emom-next-icon { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid rgba(var(--accent-line-rgb), .22); border-radius: 12px; color: var(--purple-2); background: rgba(var(--accent-rgb), .1); }
+.emom-next-icon svg { width: 19px; height: 19px; }
+.emom-next-copy { min-width: 0; display: grid; gap: 5px; }
+.emom-next-copy > span { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
 .emom-next-card strong { font: 800 18px/1.05 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.03em; }
 .emom-next-card small { color: var(--muted); font: 800 11px/1 ui-monospace, monospace; }
 
 /* Start and finish. Both ends of the section read the same way, so the handoff into the
    clock and the handoff out of it are recognisably one screen. */
 .emom-transition { display: grid; gap: 7px; }
+.emom-transition-head { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: center; gap: 13px; padding: 13px; border: 1px solid rgba(var(--accent-line-rgb), .16); border-radius: 17px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .12), rgba(var(--void-rgb), .2)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+.emom-transition-icon { width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid rgba(var(--accent-line-rgb), .24); border-radius: 14px; color: var(--purple-2); background: rgba(var(--accent-rgb), .12); box-shadow: 0 0 22px rgba(var(--accent-rgb), .16); }
+.emom-transition.complete .emom-transition-icon { color: var(--success-green); border-color: rgba(var(--success-rgb), .32); background: rgba(var(--success-rgb), .1); box-shadow: 0 0 22px rgba(var(--success-rgb), .14); }
+.emom-transition-icon svg { width: 23px; height: 23px; }
+.emom-transition-copy { min-width: 0; display: grid; gap: 6px; }
 .emom-transition-label { color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
 .emom-transition.complete .emom-transition-label { color: var(--success-green); }
 .emom-transition strong { font: 800 clamp(22px, 5vw, 30px)/1.05 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.035em; }
@@ -1409,3 +1449,19 @@
   .tip-jar-status[data-tip-jar="syncing"]::before { animation: none; }
   .tip-jar-sync-bar > span, .tip-jar-receive-chevron { transition: none; }
 }
+
+/* Rest overlay: icon-led label and next-up line, icon controls. */
+.rest-label { display: inline-flex; align-items: center; gap: 8px; }
+.rest-label svg { width: 15px; height: 15px; }
+.rest-nextup { display: inline-flex; align-items: center; gap: 7px; }
+.rest-nextup svg { width: 14px; height: 14px; color: var(--purple-2); }
+.rest-adjust-btn, .rest-skip-btn { display: inline-flex; align-items: center; gap: 6px; }
+.rest-adjust-btn svg, .rest-skip-btn svg { width: 15px; height: 15px; }
+
+/* Finish recap: stat tiles lead with their icon like every other tab's tiles. */
+.summary-stat .ss-icon { width: 30px; height: 30px; display: grid; place-items: center; margin-bottom: 10px; border-radius: 10px; color: var(--purple-2); background: rgba(var(--accent-rgb), .12); }
+.summary-stat .ss-icon svg { width: 16px; height: 16px; }
+.summary-section-title { display: inline-flex; align-items: center; gap: 8px; flex: none; white-space: nowrap; }
+.summary-section-title svg { width: 15px; height: 15px; color: var(--purple-2); }
+.summary-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.summary-action svg { width: 16px; height: 16px; flex: none; }

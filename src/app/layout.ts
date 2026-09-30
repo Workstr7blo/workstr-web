@@ -87,7 +87,7 @@ function sessionOverlayMarkup(state: AppState): string {
         <div id="session-title" class="session-title">Workout</div>
         <div class="session-meta-line"><span id="session-meta" class="session-meta">Exercise 1 of 1</span><span class="session-elapsed-chip">${icon('clock')}<span id="session-elapsed" class="session-elapsed">00:00</span></span></div>
       </div>
-      <button id="session-close" class="session-close-btn" type="button">End</button>
+      <button id="session-close" class="session-close-btn" type="button">${icon('x')}<span>End</span></button>
     </div>
     <div class="session-progress"><div id="session-progress-fill" class="session-progress-fill"></div></div>
     <div id="session-ex-nav" class="session-ex-nav"></div>
@@ -95,10 +95,10 @@ function sessionOverlayMarkup(state: AppState): string {
     <div id="session-body" class="session-body"></div>
     <div id="session-footer" class="session-footer"></div>
     <div id="session-rest-overlay" class="session-rest-overlay">
-      <div class="rest-label">Rest</div>
+      <div class="rest-label">${icon('hourglass')}<span>Rest</span></div>
       <div class="rest-timer-wrap"><svg class="rest-ring" viewBox="0 0 120 120"><circle class="rest-ring-bg" cx="60" cy="60" r="54" stroke-width="8"/><circle id="rest-ring-fg" class="rest-ring-fg" cx="60" cy="60" r="54" stroke-width="8" stroke-dasharray="339.3" stroke-dashoffset="0"/></svg><div id="session-rest-val" class="rest-timer-val">90</div></div>
       <div id="rest-nextup" class="rest-nextup"></div>
-      <div class="rest-adjust-btns"><button class="rest-adjust-btn" data-rest-adjust="-15" type="button">-15s</button><button class="rest-skip-btn" id="rest-skip" type="button">Skip Rest</button><button class="rest-adjust-btn" data-rest-adjust="15" type="button">+15s</button></div>
+      <div class="rest-adjust-btns"><button class="rest-adjust-btn" data-rest-adjust="-15" type="button" aria-label="Rest 15 seconds less">${icon('minus')}<span>15s</span></button><button class="rest-skip-btn" id="rest-skip" type="button">${icon('skip-forward')}<span>Skip rest</span></button><button class="rest-adjust-btn" data-rest-adjust="15" type="button" aria-label="Rest 15 seconds more">${icon('plus')}<span>15s</span></button></div>
     </div>
   </div>`;
 }
