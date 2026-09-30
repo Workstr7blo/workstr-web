@@ -527,11 +527,14 @@
 /* The one line that replaced a row per untrained muscle. Ten rows reading
    "Fresh / not logged recently" was most of the tab's height. */
 .recovery-fresh-summary {
-  display: grid; gap: 5px; padding: 11px 13px;
-  border: 1px solid var(--border); border-radius: 13px; background: rgba(255, 255, 255, .022);
+  display: grid; gap: 9px; padding: 12px 13px;
+  border: 1px solid rgba(var(--accent-line-rgb), .12); border-radius: 13px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), .06), rgba(var(--void-rgb), .14));
 }
-.recovery-fresh-summary strong { color: var(--dim); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
-.recovery-fresh-summary span { color: var(--text); font-size: 13px; font-weight: 700; line-height: 1.45; }
+.recovery-fresh-summary strong { display: flex; align-items: center; gap: 7px; color: var(--purple-2); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.recovery-fresh-summary strong svg { width: 14px; height: 14px; }
+.recovery-fresh-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.recovery-fresh-chips span { padding: 6px 9px; border: 1px solid rgba(var(--accent-line-rgb), .14); border-radius: 999px; color: var(--text); background: rgba(255, 255, 255, .03); font-size: 12px; font-weight: 700; line-height: 1; }
 .recovery-fresh-summary small { color: var(--dim); font-size: 11px; }
 
 /* .bars, .dist and .list each set their own `display`, which beats the `hidden` attribute's

@@ -13,15 +13,18 @@ import * as lucide from 'lucide';
 // makes "which icon is this" answerable without reading the renderer.
 
 const ICONS = [
+  'activity',
   'arrow-down-left',
   'arrow-up-right',
   'award',
+  'battery-charging',
   'camera',
   'chart-column',
   'check',
   'chevron-down',
   'chevron-left',
   'chevron-right',
+  'circle-check',
   'clipboard-list',
   'clock',
   'copy',
@@ -31,8 +34,11 @@ const ICONS = [
   'file-text',
   'flame',
   'heart',
+  'heart-pulse',
+  'hourglass',
   'info',
   'key',
+  'leaf',
   'link',
   'lock',
   'log-out',
@@ -46,15 +52,19 @@ const ICONS = [
   'search',
   'settings',
   'shield-check',
+  'shuffle',
   'sliders-horizontal',
   'smartphone',
+  'sparkles',
   'square-check',
   'star',
   'terminal',
+  'timer',
   'trash-2',
   'upload',
   'user-round',
-  'x'
+  'x',
+  'zap'
 ];
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
