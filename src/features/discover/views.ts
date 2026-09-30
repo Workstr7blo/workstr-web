@@ -2,7 +2,8 @@ import type { Exercise } from '../../core/types';
 import type { AppState } from '../../app/state';
 import type { GridCard } from '../../app/card-grid';
 import { html } from '../../app/format';
-import { exerciseCard } from '../../app/exercise-card';
+import { exerciseBrowseHero, exerciseCard } from '../../app/exercise-card';
+import { icon } from '../../app/icons';
 import { activeFacetCount, exerciseActiveFilters, exerciseQuery, exerciseResults, exerciseToolbar } from '../../app/exercise-browser';
 
 export type DiscoverImportState = 'new' | 'in-library' | 'update';
@@ -23,9 +24,9 @@ export function discoverImportState(exercise: Exercise, library: Exercise[]): Di
 
 function importButton(exercise: Exercise, importState: DiscoverImportState): string {
   const address = html(exercise.nostr_address || exercise.slug);
-  if (importState === 'in-library') return `<button class="button discover-import" data-import-address="${address}" disabled>In library</button>`;
-  if (importState === 'update') return `<button class="button primary discover-import" data-import-address="${address}">Update</button>`;
-  return `<button class="button primary discover-import" data-import-address="${address}">Import</button>`;
+  if (importState === 'in-library') return `<button class="button small discover-import" data-import-address="${address}" disabled>${icon('check')}<span>In library</span></button>`;
+  if (importState === 'update') return `<button class="button primary small discover-import" data-import-address="${address}">${icon('refresh-cw')}<span>Update</span></button>`;
+  return `<button class="button primary small discover-import" data-import-address="${address}">${icon('download')}<span>Import</span></button>`;
 }
 
 export function discoverCardHtml(exercise: Exercise, state: AppState): string {
@@ -51,9 +52,9 @@ export function discoverImportable(list: Exercise[], library: Exercise[]): Exerc
 export function discoverPanel(state: AppState): string {
   const sel = state.discoverSelect;
   return `<div class="discover-exercise-panel">
+    ${exerciseBrowseHero('download', 'Workstr catalog', 'Import copies an exercise into your library, where you can edit it.', `<span class="discover-status-line">${icon('database')}<span id="discover-status" class="discover-status">${html(state.exerciseStatus)}</span></span>`)}
     ${exerciseToolbar('discover', state)}
     ${exerciseActiveFilters('discover', state)}
-    <div id="discover-status" class="discover-status">${html(state.exerciseStatus)}</div>
     <div id="discover-grid" class="ex-grid discover-exercise-grid${sel.active ? ' selecting' : ''}">${discoverGrid(state)}</div>
   </div>`;
 }

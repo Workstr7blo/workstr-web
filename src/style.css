@@ -596,9 +596,65 @@
 .card-level.level-intermediate::before { background: var(--bitcoin-gold); }
 .card-level.level-advanced::before { background: var(--danger-red); }
 /* A 40px target for the star without a taller name row: the extra size is negative margin. */
-.library-panel .card-name .fav { display: grid; place-items: center; min-width: 40px; min-height: 40px; margin: -11px -11px -11px 0; font-size: 18px; }
+.library-panel .card-name .fav { display: grid; place-items: center; min-width: 40px; min-height: 40px; margin: -11px -11px -11px 0; }
 .favourites-toggle.on { color: var(--bitcoin-gold); }
 .favourites-toggle.on svg { fill: currentColor; }
+/* Exercises tab heroes: the same header the Workouts History and Recovery tabs open with. */
+.exercise-hero { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: center; gap: 13px; margin-bottom: 14px; padding: 13px; border: 1px solid rgba(var(--accent-line-rgb), .16); border-radius: 17px; background: radial-gradient(circle at 12% -30%, rgba(var(--accent-rgb), .2), transparent 16rem), linear-gradient(135deg, rgba(var(--accent-rgb), .12), rgba(var(--void-rgb), .2)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+.exercise-hero-icon { width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid rgba(var(--accent-line-rgb), .24); border-radius: 14px; color: var(--purple-2); background: rgba(var(--accent-rgb), .12); box-shadow: 0 0 22px rgba(var(--accent-rgb), .16); }
+.exercise-hero-icon svg { width: 23px; height: 23px; }
+.exercise-hero-copy { min-width: 0; display: grid; gap: 5px; }
+.exercise-hero-copy > span { color: var(--text); font: 850 18px/1.05 Inter, ui-sans-serif, sans-serif; letter-spacing: -.03em; }
+.exercise-hero-copy p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.exercise-hero-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.exercise-hero-stats > span { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 5px 8px; border: 1px solid rgba(var(--accent-line-rgb), .16); border-radius: 999px; color: var(--muted); background: rgba(var(--void-rgb), .22); font: 750 10.5px/1.2 ui-monospace, monospace; }
+.exercise-hero-stats strong { color: var(--text); font-weight: 900; }
+.exercise-hero-stats svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--purple-2); }
+.discover-status-line .discover-status { display: inline-block; min-height: 0; margin: 0; color: inherit; font: inherit; }
+.discover-status-line .discover-status::first-letter { text-transform: uppercase; }
+
+/* On a phone the grid is what the tab is for: the hero drops its sentence and keeps the facts. */
+@media (max-width: 430px) {
+  .exercise-hero { grid-template-columns: 40px minmax(0, 1fr); gap: 11px; margin-bottom: 12px; padding: 10px 11px; }
+  .exercise-hero-icon { width: 40px; height: 40px; border-radius: 12px; }
+  .exercise-hero-icon svg { width: 20px; height: 20px; }
+  .exercise-hero-copy > span { font-size: 16px; }
+  .exercise-hero-copy p { display: none; }
+  .exercise-hero-stats { gap: 5px; margin-top: 2px; }
+  .exercise-hero-stats > span { padding: 4px 7px; font-size: 10px; }
+}
+
+/* The favourite star is a Lucide glyph now, filled in gold when on. */
+.card-name .fav svg { width: 18px; height: 18px; }
+.card-name .fav:hover { color: var(--bitcoin-gold); }
+.card-name .fav.on svg { filter: drop-shadow(0 0 6px rgba(247, 147, 26, .45)); }
+
+.discover-import { gap: 7px; min-height: 38px; }
+.discover-import svg { width: 15px; height: 15px; flex: 0 0 auto; }
+
+/* Empty results read as a panel across the whole grid, not text squeezed into one column. */
+.ex-grid > .empty, .library-panel > #ex-empty { grid-column: 1 / -1; margin-top: 16px; padding: 22px 18px; border: 1px dashed rgba(var(--accent-line-rgb), .26); border-radius: 16px; background: rgba(var(--void-rgb), .16); color: var(--muted); text-align: center; line-height: 1.55; }
+.ex-grid > .empty { margin-top: 0; }
+.library-panel > #ex-empty p { margin: 0 0 6px; }
+.library-panel > #ex-empty .button { margin-top: 10px; }
+
+.bulk-bar .button svg { width: 15px; height: 15px; flex: 0 0 auto; }
+
+/* Exercise detail sheet */
+.modal-close { width: 36px; height: 36px; margin: 0 0 8px 10px; display: grid; place-items: center; padding: 0; border: 1px solid rgba(var(--accent-line-rgb), .18); border-radius: 12px; background: rgba(var(--void-rgb), .4); color: var(--muted); }
+.modal-close:hover { border-color: var(--border-hot); color: var(--text); }
+.modal-close svg { width: 18px; height: 18px; }
+.sets-item { display: grid; justify-items: center; gap: 0; border-color: rgba(var(--accent-line-rgb), .16); background: linear-gradient(135deg, rgba(var(--accent-rgb), .1), rgba(var(--void-rgb), .22)); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+.sets-icon { width: 30px; height: 30px; display: grid; place-items: center; margin-bottom: 9px; border-radius: 10px; color: var(--purple-2); background: rgba(var(--accent-rgb), .12); }
+.sets-icon svg { width: 16px; height: 16px; }
+.detail-section-head > span { display: inline-flex; align-items: center; gap: 8px; }
+.detail-section-head svg { width: 15px; height: 15px; color: var(--purple-2); }
+.detail-muscle-map { border-color: rgba(var(--accent-line-rgb), .14); }
+.detail-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.detail-actions .button { gap: 8px; min-height: 44px; }
+.detail-actions .button svg { width: 16px; height: 16px; flex: 0 0 auto; }
+#ex-detail-fav[aria-pressed="true"] svg { color: var(--bitcoin-gold); }
+
 .detail-source { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 12px; color: var(--muted); font-size: 13px; }
 .detail-source > span:first-child { color: var(--dim); font: 700 10px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; }
 

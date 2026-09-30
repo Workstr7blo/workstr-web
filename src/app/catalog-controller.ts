@@ -6,15 +6,13 @@ import { planProgramImport, programImportState } from '../nostr/programImport';
 import { planLibraryCatalogUpdates } from '../nostr/library-updates';
 import { findOwnedProgramSource, relayBaselineIdentity, sheetDraftWithIdentity } from '../nostr/program-ownership';
 import { fetchAuthorMoneroPaymentTargets } from '../nostr/payment-targets';
-import { discoverImportState } from '../features/discover/views';
 import { moneroMode } from '../features/sheets/monero-tip-view';
 import { paintBodyMapSvg } from './bodymap';
-import { authorPill, EX_PLACEHOLDER, exerciseSourceLabel, html } from './format';
-import { formatTaxonomyLabel, normalizeMovementType, normalizeTrainingLevel } from '../core/training-taxonomy';
+import { discoverImportState } from '../features/discover/views';
+import { exerciseDetailMarkup, exerciseDetailMuscles, favouriteButtonContent } from './exercise-detail-view';
 import { programSurfaceMounted, updateDiscoverExercises, updateExerciseCatalogStatus, updateProgramCatalogStatus } from './catalog-surfaces';
 import type { RenderOptions } from './root-rebuild';
 import type { AppState } from './state';
-import { responsiveImageUrl } from '../core/media';
 
 export interface CatalogControllerContext {
   root: HTMLElement;
@@ -187,48 +185,8 @@ async function refreshDiscoverProfiles(): Promise<void> {
 // Sign out returns to the anonymous local account; the identity's database
 // stays on the device unless explicitly removed.
 function openExerciseDetail(exercise: Exercise, source: 'library' | 'discover'): void {
-  const src = exercise.image_url || '';
-  const muscles = (exercise.muscles || []).filter(Boolean);
-  const equipment = (exercise.equipment || []).filter(Boolean);
-  const tags = (exercise.tags || []).filter(Boolean);
-  const pills = (list: string[]) => list.map((item) => `<span class="tag-pill">${html(item)}</span>`).join('');
-  const muscleList = muscles.length ? muscles : (exercise.muscle_group ? [exercise.muscle_group] : []);
-  const sourceLabel = exerciseSourceLabel(exercise);
-  const instructions = (exercise.instructions || []).map((line) => line.trim()).filter(Boolean);
-  const normalize = (text: string) => text.replace(/\s+/g, ' ').trim().toLowerCase();
-  // Canon events carry instructions in the event content; older imports have that
-  // same text copied into description — show it only when it adds something.
-  const description = (exercise.description || '').trim();
-  const showDescription = description && normalize(description) !== normalize(instructions.join(' '));
-  const importState = discoverImportState(exercise, state.library);
-  const importLabel = importState === 'update' ? 'Update' : importState === 'in-library' ? 'In library' : 'Import';
-  const importCls = importState === 'in-library' ? '' : 'primary';
-  // What the compact card leaves out is here: the source and, for a Nostr exercise, who published it.
-  const sourceName = ({ ai: 'AI', manual: 'Manual' } as Record<string, string>)[sourceLabel] || sourceLabel;
-  const creator = exercise.nostr_pubkey ? authorPill(state.authorProfiles?.[exercise.nostr_pubkey], exercise.nostr_pubkey, { compact: true }) : '';
-  const favouriteLabel = (on: boolean) => on ? '★ Remove from favorites' : '☆ Add to favorites';
-  const actions = source === 'library'
-    ? `<button class="button" id="ex-detail-fav" type="button" aria-pressed="${exercise.favourite}">${favouriteLabel(exercise.favourite)}</button><button class="button quiet danger" id="ex-detail-delete">Delete</button>`
-    : `<button class="button ${importCls}" id="ex-import"${importState === 'in-library' ? ' disabled' : ''}>${importLabel}</button>`;
-  openModal(`
-    <div class="detail-img${src ? '' : ' placeholder'}">${src ? `<img src="${html(responsiveImageUrl(src, 720))}" alt="" loading="lazy" decoding="async" data-fallback="parent-placeholder">` : EX_PLACEHOLDER}</div>
-    <h3 class="detail-title">${html(exercise.name)}</h3>
-    <div class="detail-badges">
-      ${exercise.difficulty ? `<span class="badge diff">${html(formatTaxonomyLabel(normalizeTrainingLevel(exercise.difficulty)))}</span>` : ''}
-      ${exercise.category ? `<span class="badge cat">${html(formatTaxonomyLabel(normalizeMovementType(exercise.category)))}</span>` : ''}
-    </div>
-    <div class="detail-source"><span>Source</span>${html(sourceName)}${creator}</div>
-    ${showDescription ? `<p class="detail-desc">${html(description)}</p>` : ''}
-    <div class="sets-info">
-      <div class="sets-item"><div class="val">${exercise.default_sets ?? 3}</div><div class="lbl">Sets</div></div>
-      <div class="sets-item"><div class="val">${html(String(exercise.default_reps || '8-12'))}</div><div class="lbl">Reps</div></div>
-      <div class="sets-item"><div class="val">${exercise.default_rest ?? 90}s</div><div class="lbl">Rest</div></div>
-    </div>
-    ${muscleList.length ? `<div class="subsection-head"><span>Target muscles</span></div><div class="tag-row">${pills(muscleList)}</div><div id="detail-muscle-map" class="detail-muscle-map"></div>` : ''}
-    ${equipment.length ? `<div class="subsection-head"><span>Equipment</span></div><div class="tag-row">${pills(equipment)}</div>` : ''}
-    ${tags.length ? `<div class="subsection-head"><span>Tags</span></div><div class="tag-row">${pills(tags)}</div>` : ''}
-    ${instructions.length ? `<div class="subsection-head"><span>Instructions</span></div><ol class="instruction-list">${instructions.map((line) => `<li>${html(line)}</li>`).join('')}</ol>` : ''}
-    <div class="form-actions">${actions}</div>`);
+  const muscleList = exerciseDetailMuscles(exercise);
+  openModal(exerciseDetailMarkup(exercise, source, state));
   if (muscleList.length) {
     const primary = canonMuscle(exercise.muscle_group || '') || canonMuscle(muscleList[0]);
     const primarySet = new Set<string>(primary ? [primary] : []);
@@ -241,7 +199,7 @@ function openExerciseDetail(exercise: Exercise, source: 'library' | 'discover'):
     await toggleFavourite(exercise.slug);
     // The page behind the modal is redrawn; the modal is not, so its button is written in place.
     const on = state.library.find((entry) => entry.slug === exercise.slug)?.favourite ?? false;
-    button.textContent = favouriteLabel(on);
+    button.innerHTML = favouriteButtonContent(on);
     button.setAttribute('aria-pressed', String(on));
   });
   root.querySelector('#ex-detail-delete')?.addEventListener('click', async () => {

@@ -228,9 +228,9 @@ export function exerciseSelectionBar(state: AppState): string {
     const chosen = state.librarySelect.slugs;
     const allSelected = list.length > 0 && list.every((exercise) => chosen.has(exercise.slug));
     return `<div class="bulk-bar open" role="group" aria-label="Selected exercises">
-      <button class="button small" id="lib-select-all" type="button">${allSelected ? 'Clear all' : 'Select all'}</button>
-      <button class="button quiet small" id="lib-delete-selected" type="button"${chosen.size ? '' : ' disabled'}>Delete (${chosen.size})</button>
-      <button class="button small" id="lib-select-cancel" type="button">Done</button>
+      <button class="button small" id="lib-select-all" type="button">${renderIcon('square-check')}<span class="bulk-label">${allSelected ? 'Clear all' : 'Select all'}</span></button>
+      <button class="button danger small" id="lib-delete-selected" type="button"${chosen.size ? '' : ' disabled'}>${renderIcon('trash-2')}<span class="bulk-label">Delete (${chosen.size})</span></button>
+      <button class="button small" id="lib-select-cancel" type="button">${renderIcon('check')}<span>Done</span></button>
     </div>`;
   }
   const owned = new Set(state.library.map((exercise) => exercise.nostr_address || exercise.slug));
@@ -238,8 +238,8 @@ export function exerciseSelectionBar(state: AppState): string {
   const chosen = state.discoverSelect.addresses;
   const allSelected = importable.length > 0 && importable.every((exercise) => chosen.has(exercise.nostr_address || exercise.slug));
   return `<div class="bulk-bar open" role="group" aria-label="Selected exercises">
-    <button class="button small" id="discover-select-all" type="button">${allSelected ? 'Clear all' : 'Select all'}</button>
-    <button class="button primary small" id="discover-import-selected" type="button"${chosen.size ? '' : ' disabled'}>Import (${chosen.size})</button>
-    <button class="button small" id="discover-select-cancel" type="button">Done</button>
+    <button class="button small" id="discover-select-all" type="button">${renderIcon('square-check')}<span class="bulk-label">${allSelected ? 'Clear all' : 'Select all'}</span></button>
+    <button class="button primary small" id="discover-import-selected" type="button"${chosen.size ? '' : ' disabled'}>${renderIcon('download')}<span class="bulk-label">Import (${chosen.size})</span></button>
+    <button class="button small" id="discover-select-cancel" type="button">${renderIcon('check')}<span>Done</span></button>
   </div>`;
 }

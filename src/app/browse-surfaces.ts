@@ -58,11 +58,12 @@ function updateExerciseSelectionBar(root: ParentNode, state: AppState, view: Exe
   const allSelected = discover
     ? discoverAllSelected(visible, state)
     : visible.length > 0 && visible.every((exercise) => state.librarySelect.slugs.has(exercise.slug));
-  selectAll.textContent = allSelected ? 'Clear all' : 'Select all';
+  // The label is its own span so writing it keeps the button's icon.
+  (selectAll.querySelector('.bulk-label') || selectAll).textContent = allSelected ? 'Clear all' : 'Select all';
   const chosen = discover ? state.discoverSelect.addresses.size : state.librarySelect.slugs.size;
   const action = root.querySelector<HTMLButtonElement>(discover ? '#discover-import-selected' : '#lib-delete-selected');
   if (!action) return;
-  action.textContent = `${discover ? 'Import' : 'Delete'} (${chosen})`;
+  (action.querySelector('.bulk-label') || action).textContent = `${discover ? 'Import' : 'Delete'} (${chosen})`;
   action.disabled = chosen === 0;
 }
 

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { AppState } from '../src/app/state';
 import { exerciseMetaLine } from '../src/app/exercise-card';
 import type { Exercise } from '../src/core/types';
-import { discoverCardHtml } from '../src/features/discover/views';
-import { exerciseCardHtml } from '../src/features/library/views';
+import { discoverCardHtml, discoverPanel } from '../src/features/discover/views';
+import { exerciseCardHtml, libraryPanel } from '../src/features/library/views';
 
 const exercise = (extra: Partial<Exercise> = {}): Exercise => ({
   slug: 'air-bike', name: 'Air Bike', muscle_group: 'Core', difficulty: 'beginner', category: 'strength',
@@ -30,7 +30,7 @@ describe('Library exercise card', () => {
     expect(card).toContain('>Air Bike</span>');
     expect(card).toContain('<span class="muscle">Core</span><span class="card-level level-beginner">Beginner</span>');
     expect(card).toContain('data-fav="air-bike" aria-pressed="false" aria-label="Add Air Bike to favorites"');
-    expect(card).toContain('>☆</button>');
+    expect(card).toMatch(/<svg class="fav-icon" data-icon="star"[^>]*fill="none"/);
     expectNoRetiredLabels(card);
   });
 
@@ -38,7 +38,7 @@ describe('Library exercise card', () => {
     const card = exerciseCardHtml(exercise({ favourite: true }));
     expect(card).toContain('class="fav on"');
     expect(card).toContain('aria-pressed="true" aria-label="Remove Air Bike from favorites"');
-    expect(card).toContain('>★</button>');
+    expect(card).toMatch(/<svg class="fav-icon" data-icon="star"[^>]*fill="currentColor"/);
   });
 
   it('keeps the selection tick while selecting', () => {
@@ -54,7 +54,7 @@ describe('Discover exercise card', () => {
     expect(card).toContain('<span class="card-level level-beginner">Beginner</span>');
     expect(card).toContain('data-import-address="33401:op:workstr:exercise:air-bike"');
     expect(card).not.toContain('data-fav');
-    expect(card).not.toContain('★');
+    expect(card).not.toContain('fav-icon');
     expectNoRetiredLabels(card);
   });
 
@@ -80,5 +80,29 @@ describe('exerciseMetaLine', () => {
   it('shows an unrecognised level in words with no colour of its own', () => {
     expect(exerciseMetaLine(exercise({ difficulty: 'Beast Mode' }))).toContain('<span class="card-level">Beast Mode</span>');
     expect(exerciseMetaLine(exercise({ difficulty: 'Advanced' }))).toContain('level-advanced');
+  });
+});
+
+const browseState = (extra: Partial<AppState> = {}): AppState => ({
+  ...discoverState, filter: '', exFilter: {}, discoverFilter: {}, settings: { ownedEquipment: [] }, discoverExercises: [],
+  librarySelect: { active: false, slugs: new Set() }, exerciseFilterSheet: null, exerciseStatus: 'loaded 0 Workstr exercises', ...extra
+} as unknown as AppState);
+
+describe('Exercises tab heroes', () => {
+  it('opens Library with whole-library counts', () => {
+    const markup = libraryPanel(browseState({ library: [exercise({ favourite: true }), exercise({ slug: 'plank', name: 'Plank' })] }));
+    expect(markup).toContain('class="exercise-hero"');
+    expect(markup).toContain('<strong>2</strong> exercises');
+    expect(markup).toContain('<strong>1</strong> favorite');
+    expect(markup).toContain('<strong>1</strong> muscle</span>');
+  });
+
+  it('keeps the catalog status line inside the Discover hero, under the id the shell patches', () => {
+    const markup = discoverPanel(browseState());
+    expect(markup).toMatch(/class="exercise-hero"[\s\S]*id="discover-status"/);
+  });
+
+  it('labels import actions with icons', () => {
+    expect(discoverCardHtml(exercise(), discoverState)).toContain('data-icon="download"');
   });
 });
