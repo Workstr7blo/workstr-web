@@ -1131,9 +1131,19 @@
   .history-cal-title { font-size: 13px; }
   .history-cal-nav { width: 34px; height: 34px; flex-basis: 34px; }
   .history-cal-today { min-height: 34px; padding: 0 10px; }
-  .history-card { padding: 9px 6px; }
-  .history-card { grid-template-columns: 1fr; text-align: center; place-items: center; }
   .history-card-value { font-size: 18px; }
+}
+
+@media (max-width: 430px) {
+  /* Phone-width stat tiles are three columns wide, so the icon cannot steal a text column.
+     Stack the icon above the number and give the label the whole card width. */
+  .history-cal-title { font-size: 14px; }
+  .history-cal-nav { width: 36px; height: 36px; flex-basis: 36px; }
+  .history-cal-today { min-height: 36px; padding: 0 10px; }
+  .history-card { grid-template-columns: 1fr; place-items: center; gap: 7px; padding: 11px 8px; text-align: center; }
+  .history-card-icon { width: 34px; height: 34px; }
+  .history-card-copy { display: grid; justify-items: center; }
+  .history-card-label { max-width: 8.5em; }
 }
 
 /* History timeline: date groupings, the selected-day filter bar, and the disclosure that
