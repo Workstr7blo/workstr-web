@@ -24,6 +24,7 @@ and patch it directly, which is also why a page render can leave it standing.
 | Concern | Start here | Usually read next | Tests |
 |---|---|---|---|
 | Boot and application coordination | `src/main.ts`, `src/app/shell.ts` | `src/app/state.ts`, `src/app/layout.ts` | `tests/shell.test.ts` |
+| Asking before a destructive action: the in-app confirm dialog that replaced `window.confirm` | `src/app/confirm-dialog.ts` | every controller that deletes, discards, resets or replaces (they `await confirmAction`) | `tests/confirm-dialog.test.ts`; controller tests mock `confirmAction` |
 | Applying a shipped PWA update without interrupting anyone | `src/app/update-controller.ts` | `src/app/pwa.ts`, `public/sw.js`, `docs/device-vault-architecture.md` (why an unlocked vault delays it) | `tests/pwa.test.ts`, production-build browser validation |
 | Identity, signer connection, and adoption | `src/app/identity-controller.ts` | `src/signer/types.ts`, `src/db/adopt.ts` | `tests/shell.test.ts`, `tests/adopt.test.ts`, browser verification |
 | Local account keys and where the secret lives | `src/signer/local-key.ts` | `src/security/device-vault.ts`, `src/signer/local-key-storage.ts` (the pre-vault store, read only to migrate out of) | `tests/local-key-signer.test.ts`, `tests/local-key-migration.test.ts`, `tests/local-key-storage.test.ts` |

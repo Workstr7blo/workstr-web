@@ -11,6 +11,10 @@ import { createDeviceVault, type DeviceVault } from '../src/security/device-vaul
 import { generateLocalAccount, NOSTR_LOCAL_KEY_SCOPE, saveLocalAccount } from '../src/signer/local-key';
 import { clearLocalSecret, loadLocalSecret, saveLocalSecret } from '../src/signer/local-key-storage';
 import type { AppState } from '../src/app/state';
+import { confirmAction } from '../src/app/confirm-dialog';
+
+vi.mock('../src/app/confirm-dialog', () => ({ confirmAction: vi.fn(async () => true) }));
+const confirmMock = vi.mocked(confirmAction);
 
 const PIN = '314159265';
 const OTHER_PIN = '271828182';
@@ -259,11 +263,13 @@ describe('launch', () => {
     expect(h.onUnlocked).toHaveBeenCalledWith('boot');
     expect(h.modalContent().textContent).toContain(nip19.npubEncode(getPublicKey(other)).slice(0, 12));
 
-    vi.stubGlobal('confirm', vi.fn(() => false));
+    confirmMock.mockClear().mockResolvedValue(false);
     h.modalContent().querySelector<HTMLElement>('#vault-legacy-remove')!.click();
+    await vi.waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+    await Promise.resolve();
     expect(await loadLocalSecret()).toBe(bytesToHex(other));
 
-    vi.stubGlobal('confirm', vi.fn(() => true));
+    confirmMock.mockResolvedValue(true);
     h.modalContent().querySelector<HTMLElement>('#vault-legacy-remove')!.click();
     await vi.waitFor(() => expect(h.toast).toHaveBeenCalledWith('Old identity key removed.'));
     expect(await loadLocalSecret()).toBeNull();
@@ -284,11 +290,13 @@ describe('forgotten code', () => {
     expect(vaultScopeName(`monero.hot-wallet.${'ab'.repeat(32)}`)).toBe('Monero hot wallet secret');
     expect(vaultScopeName(`monero.hot-wallet-data.${'ab'.repeat(32)}`)).toBe('Monero wallet sync data');
 
-    vi.stubGlobal('confirm', vi.fn(() => false));
+    confirmMock.mockClear().mockResolvedValue(false);
     h.lock().querySelector<HTMLElement>('#vault-reset')!.click();
+    await vi.waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining(vaultScopeName(NOSTR_LOCAL_KEY_SCOPE)) })));
+    await Promise.resolve();
     expect(await vault.exists()).toBe(true);
 
-    vi.stubGlobal('confirm', vi.fn(() => true));
+    confirmMock.mockResolvedValue(true);
     h.lock().querySelector<HTMLElement>('#vault-reset')!.click();
     await vi.waitFor(() => expect(h.onReset).toHaveBeenCalled());
     expect(await vault.exists()).toBe(false);

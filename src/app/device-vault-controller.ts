@@ -28,6 +28,7 @@ import {
 } from './device-vault-view';
 import { bindPinFields, INVALID_PIN, readNewPin, readPinField } from './device-pin-input';
 import { createUnlockBackoff } from './device-vault-backoff';
+import { confirmAction } from './confirm-dialog';
 
 export type UnlockReason = 'boot' | 'relock';
 
@@ -179,8 +180,8 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
     openModal(unmovedLegacyKeyModalMarkup(pubkey ? shortNpub(pubkey) : null));
     const host = modalHost();
     host.querySelector('#vault-legacy-later')?.addEventListener('click', closeModal);
-    host.querySelector('#vault-legacy-remove')?.addEventListener('click', () => {
-      if (!window.confirm('Remove the old identity key from this device? Without its recovery key that account cannot be recovered.')) return;
+    host.querySelector('#vault-legacy-remove')?.addEventListener('click', async () => {
+      if (!(await confirmAction({ title: 'Remove the old identity key?', message: 'Without its recovery key that account cannot be recovered.', confirmLabel: 'Remove key', icon: 'key' }))) return;
       clearLocalSecret().then(() => { closeModal(); ctx.toast('Old identity key removed.'); }, () => ctx.toast('The old identity key could not be removed.', 'bad'));
     });
   }
@@ -190,9 +191,9 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
     const names = [...new Set(scopes.map(vaultScopeName))];
     const host = showLock(forgotScreenMarkup(names));
     host?.querySelector('#vault-reset-cancel')?.addEventListener('click', () => showUnlock(reason));
-    host?.querySelector('#vault-reset')?.addEventListener('click', () => {
-      const listed = names.length ? ` This deletes ${names.join(', ')} from this device.` : '';
-      if (!window.confirm(`Reset the device vault?${listed} This cannot be undone.`)) return;
+    host?.querySelector('#vault-reset')?.addEventListener('click', async () => {
+      const listed = names.length ? `This deletes ${names.join(', ')} from this device. ` : '';
+      if (!(await confirmAction({ title: 'Reset the device vault?', message: `${listed}This cannot be undone.`, confirmLabel: 'Reset vault', icon: 'trash-2' }))) return;
       void resetVault();
     });
   }
@@ -214,8 +215,8 @@ export function createDeviceVaultController(ctx: DeviceVaultControllerContext) {
   function showProtect(error: string | null = null): void {
     const host = showLock(protectIntroMarkup(error));
     host?.querySelector('#vault-protect-start')?.addEventListener('click', () => showProtectCreate());
-    host?.querySelector('#vault-protect-restore')?.addEventListener('click', () => {
-      if (!window.confirm('Remove the stored identity from this device and restore it with your recovery key instead? Without that key the account cannot be recovered.')) return;
+    host?.querySelector('#vault-protect-restore')?.addEventListener('click', async () => {
+      if (!(await confirmAction({ title: 'Restore with your recovery key?', message: 'The stored identity is removed from this device so you can restore it with your recovery key. Without that key the account cannot be recovered.', confirmLabel: 'Remove and restore', icon: 'key' }))) return;
       void resetVault();
     });
   }

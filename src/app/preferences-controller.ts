@@ -12,6 +12,7 @@ import { getQuickWorkout } from '../features/recovery/quickWorkout';
 import { html } from './format';
 import type { RenderOptions } from './root-rebuild';
 import type { ActiveSession, AppState } from './state';
+import { confirmAction } from './confirm-dialog';
 
 export interface PreferencesControllerContext {
   root: HTMLElement;
@@ -135,7 +136,7 @@ function bindRecoveryControls(): void {
 
 async function deleteSession(id: number): Promise<void> {
   if (!state.store || !id) return;
-  if (!window.confirm('Delete this session? All logged sets will be permanently removed from your history and stats.')) return;
+  if (!(await confirmAction({ title: 'Delete this session?', message: 'All logged sets will be permanently removed from your history and stats.', confirmLabel: 'Delete session', icon: 'trash-2' }))) return;
   await state.store.deleteSession(id);
   if (state.expandedSessionId === id) state.expandedSessionId = null;
   state.finishedSessions = await loadFinishedSessions();

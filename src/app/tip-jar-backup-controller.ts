@@ -9,6 +9,7 @@ import {
 import { tipJarBackupState, updateTipJarBackupSection } from '../features/monero/wallet-backup-view';
 import type { MoneroWalletRestoreRequest, TipJarBackupUiState } from '../features/monero/types';
 import type { AppState } from './state';
+import { confirmAction } from './confirm-dialog';
 
 // Device-local and never synced: it records when this device last wrote a backup file, which
 // is the only thing Workstr can honestly say about it. Whether the file still exists, or the
@@ -28,7 +29,7 @@ export interface TipJarBackupControllerContext {
   // Hands a restored backup's creator context back to Tip Jar activity.
   activity?: { restoreFromBackup(records: TipJarBackupPayload['activity']): Promise<void> };
   // Replacing a wallet that already holds money is never a side effect of picking a file.
-  confirmReplace?(): boolean;
+  confirmReplace?(): boolean | Promise<boolean>;
   now?(): Date;
   // Opens a save dialog for the finished file. Replaced in tests, which have no download.
   save?(filename: string, contents: string): void;
@@ -53,9 +54,12 @@ export function createTipJarBackupController(ctx: TipJarBackupControllerContext)
   const { root, state, toast } = ctx;
   const now = ctx.now ?? (() => new Date());
   const save = ctx.save ?? downloadFile;
-  const confirmReplace = ctx.confirmReplace ?? (() => window.confirm(
-    'Restoring this backup replaces the Tip Jar wallet stored on this device. Anything still in the current Tip Jar is only recoverable from its own recovery phrase. Replace it?'
-  ));
+  const confirmReplace = ctx.confirmReplace ?? (() => confirmAction({
+    title: 'Replace this Tip Jar?',
+    message: 'Restoring replaces the Tip Jar wallet stored on this device. Anything still in the current Tip Jar is only recoverable from its own recovery phrase.',
+    confirmLabel: 'Replace Tip Jar',
+    icon: 'piggy-bank'
+  }));
 
   function exportedAtKey(): string {
     return `${EXPORTED_AT_KEY}.${state.pubkey ?? 'local'}`;
@@ -135,7 +139,7 @@ export function createTipJarBackupController(ctx: TipJarBackupControllerContext)
     } catch (error) {
       return set({ busy: false, message: reason(error), messageKind: 'bad' });
     }
-    if (replacing && !confirmReplace()) return set({ busy: false, message: 'Restore cancelled. The Tip Jar on this device is unchanged.' });
+    if (replacing && !(await confirmReplace())) return set({ busy: false, message: 'Restore cancelled. The Tip Jar on this device is unchanged.' });
     if (await applyRestore(restore, 'Tip Jar restored.')) await ctx.activity?.restoreFromBackup(activity).catch(() => undefined);
   }
 
@@ -155,7 +159,7 @@ export function createTipJarBackupController(ctx: TipJarBackupControllerContext)
     // A toast rather than a repaint, which would wipe the phrase the user just pasted.
     if (height === null) return toast('Restore height must be a whole block number, or blank', 'bad');
     const replacing = Boolean(state.moneroWallet?.stored || state.moneroWallet?.snapshot);
-    if (replacing && !confirmReplace()) return;
+    if (replacing && !(await confirmReplace())) return;
     set({ advanced: true, busy: true, message: 'Restoring from your recovery phrase…', messageKind: undefined });
     await applyRestore({ seed, restoreHeight: height, replace: replacing }, 'Tip Jar restored from your recovery phrase.');
   }

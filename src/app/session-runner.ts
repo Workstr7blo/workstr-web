@@ -12,6 +12,7 @@ import { createSessionSummary } from '../features/train/session-summary';
 import { repeatBlockedReason, repeatSeed, type RepeatSeed } from '../features/train/repeat-workout';
 import { EmomSessionController } from '../features/train/emom-session-controller';
 import { StandardSessionController } from '../features/train/standard-session-controller';
+import { confirmAction } from './confirm-dialog';
 
 // Shared shell collaborators the session runner leans on. Identity (getActiveSigner)
 // and the generic modal live in the shell; the weight formatters follow the current
@@ -230,7 +231,7 @@ export function createSessionRunner(ctx: SessionRunnerContext): SessionRunner {
 
   async function cancelActiveSession(): Promise<void> {
     if (!state.activeSession) return closeSessionOverlay();
-    if (!window.confirm('End and discard this session? Logged sets will be deleted.')) return;
+    if (!(await confirmAction({ title: 'Discard this session?', message: 'The workout ends and every set logged in it is deleted.', confirmLabel: 'Discard session', cancelLabel: 'Keep training', icon: 'trash-2' }))) return;
     if (state.store) await state.store.deleteSession(state.activeSession.id);
     state.activeSession = null;
     closeSessionOverlay();
