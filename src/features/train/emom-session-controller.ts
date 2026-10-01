@@ -1,3 +1,4 @@
+import { icon } from '../../app/icons';
 import type { AppState, ActiveSession, SessionSetLog } from '../../app/state';
 import { normalizeWeightUnit, storeWeightInput } from '../../core/units';
 import type { EmomBlock } from '../../core/types';
@@ -278,6 +279,6 @@ export class EmomSessionController {
       return `<button class="session-ex-dot ${cls}" data-emom-seek="${candidate.startsAtSec}" type="button" aria-label="Go to minute ${candidate.minuteIndex + 1} of ${minutes.length}${state}"${isCurrent ? ' aria-current="step"' : ''}><span class="session-ex-pip">${candidate.minuteIndex + 1}</span></button>`;
     }).join('');
     if (minutes.length <= MINUTE_WINDOW) return pips;
-    return `<button class="session-track-arrow" data-emom-window="-1" type="button" aria-label="Show previous minutes" ${this.roundWindowStart === 0 ? 'disabled' : ''}>&lsaquo;</button>${pips}<button class="session-track-arrow" data-emom-window="1" type="button" aria-label="Show next minutes" ${this.roundWindowStart >= maxStart ? 'disabled' : ''}>&rsaquo;</button>`;
+    return `<button class="session-track-arrow" data-emom-window="-1" type="button" aria-label="Show previous minutes" ${this.roundWindowStart === 0 ? 'disabled' : ''}>${icon('chevron-left')}</button>${pips}<button class="session-track-arrow" data-emom-window="1" type="button" aria-label="Show next minutes" ${this.roundWindowStart >= maxStart ? 'disabled' : ''}>${icon('chevron-right')}</button>`;
   }
 }

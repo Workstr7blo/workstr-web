@@ -1,5 +1,5 @@
 import { html } from '../../app/format';
-import { icon } from '../../app/icons';
+import { icon, type IconName } from '../../app/icons';
 import type { ActiveSession, SessionExercise, SessionSetLog } from '../../app/state';
 import type { SupersetTransition } from './session-logic';
 import { sessionHeroMedia } from './session-hero';
@@ -47,6 +47,21 @@ export function updateStandardSessionProgress(root: HTMLElement, session: Active
   if (fill) fill.style.width = `${percent}%`;
 }
 
+// The icon sits above the word so the narrow state column keeps its width on a phone.
+function setState(name: IconName, label: string, cls = '', attrs = ''): string {
+  return `<span class="session-set-state${cls ? ` ${cls}` : ''}"${attrs}>${icon(name)}${label}</span>`;
+}
+
+function targetTile(name: IconName, value: string, label: string): string {
+  return `<div class="session-target-tile"><span class="session-target-icon">${icon(name)}</span><span class="session-target-copy"><b>${value}</b><small>${label}</small></span></div>`;
+}
+
+// Footer actions carry an icon beside their label, the same labelled-action pattern as the
+// program cards. Icons add no text, so a button's name is still exactly its label.
+function action(name: IconName, label: string, after = false): string {
+  return after ? `<span>${label}</span>${icon(name)}` : `${icon(name)}<span>${label}</span>`;
+}
+
 function isTimedTarget(target: string): boolean {
   return /\b\d+\s*(?:-\s*\d+\s*)?(?:s|sec|secs|second|seconds)\b/i.test(target);
 }
@@ -65,7 +80,7 @@ function doneSetRow(entry: SetPlanEntry, sheet: SetSheet): string {
       <div class="session-set-num done" data-set-num="${entry.index}">${entry.index + 1}</div>
       <div class="session-set-value logged">${done.reps ?? '—'}</div>
       <div class="session-set-value logged">${html(weight || '—')}</div>
-      <span class="session-set-state done" data-set-log-btn="${entry.index}">Done</span>
+      ${setState('circle-check', 'Done', 'done', ` data-set-log-btn="${entry.index}"`)}
     </div>
   </div>`;
 }
@@ -73,7 +88,7 @@ function doneSetRow(entry: SetPlanEntry, sheet: SetSheet): string {
 function activeSetRow(entry: SetPlanEntry, sheet: SetSheet, unit: string): string {
   const hintSet = entry.previous || entry.carried;
   const hints = hintSet
-    ? `<div class="session-current-hints"><span>Previous ${html(sheet.formatSetHint(hintSet))}</span><span>${sheet.suggestedSetHint(hintSet, sheet.targetReps)}</span></div>`
+    ? `<div class="session-current-hints"><span>${icon('repeat')}Previous ${html(sheet.formatSetHint(hintSet))}</span><span>${icon('sparkles')}${sheet.suggestedSetHint(hintSet, sheet.targetReps)}</span></div>`
     : '';
   const repsPlaceholder = sheet.targetReps || String(hintSet?.reps ?? '');
   return `<div class="session-set-block active" data-set-block="${entry.index}" role="listitem" aria-label="Set ${entry.index + 1} of ${sheet.setCount}, current">
@@ -87,7 +102,7 @@ function activeSetRow(entry: SetPlanEntry, sheet: SetSheet, unit: string): strin
         <span class="sr-only">Load in ${html(unit)} for set ${entry.index + 1}</span>
         <input class="session-set-input" data-session-weight="${entry.index}" type="number" inputmode="decimal" step="0.5" placeholder="${html(entry.defaultWeight || '—')}" value="${html(entry.defaultWeight)}">
       </label>
-      <span class="session-set-state current">Current</span>
+      ${setState('target', 'Current', 'current')}
     </div>${hints}
   </div>`;
 }
@@ -99,7 +114,7 @@ function upcomingSetRow(entry: SetPlanEntry, sheet: SetSheet): string {
       <div class="session-set-num" data-set-num="${entry.index}">${entry.index + 1}</div>
       <div class="session-set-value">${html(planTarget)}</div>
       <div class="session-set-value">${html(entry.defaultWeight || '—')}</div>
-      <span class="session-set-state">Upcoming</span>
+      ${setState('clock', 'Upcoming')}
     </div>
   </div>`;
 }
@@ -120,7 +135,7 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
     nav.classList.remove('session-ex-track');
     nav.innerHTML = '';
     body.innerHTML = '<div class="empty">This session has no exercises yet.</div>';
-    footer.innerHTML = '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>';
+    footer.innerHTML = `<button class="session-finish-btn" id="finish-session" type="button">${action('flag', 'Finish session')}</button>`;
     input.bindControls();
     return;
   }
@@ -132,7 +147,6 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   const targetReps = exercise.reps || '';
   const targetValue = targetReps || 'free';
   const timed = isTimedTarget(targetValue);
-  const targetUnit = timed ? '' : ' reps';
   const unit = input.unitLabel();
   const logged = session.sets.filter((set) => set.exerciseSlug === slug);
   // The exercise rail is one connected track, so each button is a pip on it rather than a
@@ -143,7 +157,8 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
     const complete = input.loggedSetCount(candidate.exerciseSlug) >= target;
     const cls = index === exerciseIndex ? 'current' : complete ? 'done' : '';
     const state = index === exerciseIndex ? ', current' : complete ? ', done' : '';
-    return `<button class="session-ex-dot ${cls}" data-jump-ex="${index}" type="button" aria-label="Exercise ${index + 1} of ${exercises.length}${state}"${index === exerciseIndex ? ' aria-current="step"' : ''}><span class="session-ex-pip">${index + 1}</span></button>`;
+    const pip = cls === 'done' ? icon('check') : String(index + 1);
+    return `<button class="session-ex-dot ${cls}" data-jump-ex="${index}" type="button" aria-label="Exercise ${index + 1} of ${exercises.length}${state}"${index === exerciseIndex ? ' aria-current="step"' : ''}><span class="session-ex-pip">${pip}</span></button>`;
   }).join('');
   const activeSetIndex = Math.max(0, Array.from({ length: setCounts[slug] }, (_, index) => index).find((index) => !logged.find((set) => Number(set.setNumber) === index + 1)) ?? setCounts[slug] - 1);
   const allSetsDone = input.loggedSetCount(slug) >= setCounts[slug];
@@ -192,34 +207,35 @@ export function renderStandardSessionView(input: StandardSessionViewInput): void
   const media = sessionHeroMedia(exercise, name);
   body.innerHTML = `<h2 class="sr-only">${html(name)}</h2>
     ${media}
-    <div class="session-target-row">
-      <span class="session-target-label">Target</span>
-      <div class="session-ex-target"><b>${targetSets}</b> sets <span class="dot"></span> <b>${html(targetValue)}</b>${targetUnit} <span class="dot"></span> <b>${restSec}s</b> rest</div>
+    <div class="session-ex-target" aria-label="Target">
+      ${targetTile('layers', String(targetSets), targetSets === 1 ? 'set' : 'sets')}
+      ${targetTile(timed ? 'timer' : 'repeat', html(targetValue), timed ? 'time' : 'reps')}
+      ${targetTile('hourglass', `${restSec}s`, 'rest')}
     </div>
     <section class="session-set-plan" aria-label="Sets for ${html(name)}">
-      <div class="session-sets-label">Sets</div>
+      <div class="session-sets-label">${icon('list-ordered')}<span>Sets</span></div>
       <div class="session-set-row session-set-columns" aria-hidden="true"><span></span><span>${timed ? 'Time' : 'Reps'}</span><span>Load ${html(unit)}</span><span></span></div>
       <div class="session-sets" role="list">${rows}</div>
-      ${allSetsDone ? `<div class="session-ex-complete"><span>Exercise complete</span><strong>${setCounts[slug]} set${setCounts[slug] === 1 ? '' : 's'} logged</strong></div>` : ''}
-      <button class="session-add-set" data-add-session-set="${html(slug)}" type="button">+ Add set</button>
+      ${allSetsDone ? `<div class="session-ex-complete"><span>${icon('circle-check')}Exercise complete</span><strong>${setCounts[slug]} set${setCounts[slug] === 1 ? '' : 's'} logged</strong></div>` : ''}
+      <button class="session-add-set" data-add-session-set="${html(slug)}" type="button">${icon('plus')}<span>Add set</span></button>
     </section>${instructionsMarkup}`;
   const isLast = exerciseIndex >= exercises.length - 1;
   const nextLabel = input.superset && !input.superset.roundComplete ? 'Next move' : 'Next exercise';
-  const prev = exerciseIndex > 0 ? `<button class="session-prev-btn" data-jump-ex="${exerciseIndex - 1}" type="button">Prev</button>` : '';
-  const logCurrent = current && !allSetsDone ? `<button class="session-next-btn session-log-primary" data-session-log="${html(slug)}" data-set-index="${current.index}" data-set-log-btn="${current.index}" data-rest="${restSec}" type="button">Log set ${current.index + 1}</button>` : '';
+  const prev = exerciseIndex > 0 ? `<button class="session-prev-btn" data-jump-ex="${exerciseIndex - 1}" type="button">${action('chevron-left', 'Prev')}</button>` : '';
+  const logCurrent = current && !allSetsDone ? `<button class="session-next-btn session-log-primary" data-session-log="${html(slug)}" data-set-index="${current.index}" data-set-log-btn="${current.index}" data-rest="${restSec}" type="button">${action('check', `Log set ${current.index + 1}`)}</button>` : '';
   // The EMOM section is the next page of the same workout, so on the last strength card it
   // takes the advance slot outright. Offered early it is a shortcut, so it sits beside Next.
-  const handoffEarly = input.startEmom && !(allSetsDone && isLast) ? '<button class="session-emom-btn" id="start-emom-section" type="button">Start EMOM</button>' : '';
+  const handoffEarly = input.startEmom && !(allSetsDone && isLast) ? `<button class="session-emom-btn" id="start-emom-section" type="button">${action('timer', 'Start EMOM')}</button>` : '';
   const advance = !allSetsDone
     ? logCurrent
     : input.startEmom && isLast
-      ? '<button class="session-emom-btn" id="start-emom-section" type="button">Next: EMOM</button>'
+      ? `<button class="session-emom-btn" id="start-emom-section" type="button">${action('timer', 'Next: EMOM')}</button>`
       : isLast
-        ? '<button class="session-finish-btn" id="finish-session" type="button">Finish session</button>'
-        : `<button class="session-next-btn" data-jump-ex="${exerciseIndex + 1}" type="button">${nextLabel}</button>`;
+        ? `<button class="session-finish-btn" id="finish-session" type="button">${action('flag', 'Finish session')}</button>`
+        : `<button class="session-next-btn" data-jump-ex="${exerciseIndex + 1}" type="button">${action('chevron-right', nextLabel, true)}</button>`;
   // Stopping here abandons the EMOM section, so it is the exception rather than a peer of
   // the handoff — same wording and weight as the EMOM half's own early exit.
-  const finishEarly = input.emomPending && isLast ? '<button class="session-finish-early" id="finish-session" type="button">Finish early</button>' : '';
+  const finishEarly = input.emomPending && isLast ? `<button class="session-finish-early" id="finish-session" type="button">${action('flag', 'Finish early')}</button>` : '';
   footer.innerHTML = `${prev}${handoffEarly}${advance}${finishEarly}`;
   input.bindControls();
 }

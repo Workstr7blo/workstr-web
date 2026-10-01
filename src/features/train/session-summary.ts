@@ -1,6 +1,6 @@
 import { normalizeWeightUnit } from '../../core/units';
 import { html } from '../../app/format';
-import { icon } from '../../app/icons';
+import { icon, type IconName } from '../../app/icons';
 import type { ActiveSession, AppState, SessionExercise } from '../../app/state';
 import { fetchCanonPrograms, type RelayProgram } from '../../nostr/canon';
 import { publishWorkoutSummary } from '../../nostr/share';
@@ -70,11 +70,13 @@ export function createSessionSummary(ctx: SessionSummaryContext): SessionSummary
     }
     state.publishingSessionId = session.id;
     state.publishingStatus = 'Waiting for signer...';
-    if (button) { button.disabled = true; button.textContent = state.publishingStatus; }
+    // Progress goes into the label so the recap's upload icon stays; other callers pass a plain button.
+    const statusLabel = button?.querySelector('.summary-action-label') || button;
+    if (button && statusLabel) { button.disabled = true; statusLabel.textContent = state.publishingStatus; }
     let message: { text: string; kind: 'ok' | 'bad' };
     const setStatus = (text: string): void => {
       state.publishingStatus = text;
-      if (button?.isConnected) button.textContent = text;
+      if (button?.isConnected && statusLabel) statusLabel.textContent = text;
     };
     const label = (stage: string): string => ({
       'preparing-image': 'Preparing muscle map...',
@@ -91,10 +93,10 @@ export function createSessionSummary(ctx: SessionSummaryContext): SessionSummary
       await state.store?.markSessionPublished(session.id, result.event.id);
       const inHistory = state.finishedSessions.find((item) => item.id === session.id);
       if (inHistory) inHistory.nostrEventId = result.event.id;
-      if (button?.isConnected) button.textContent = 'Published';
+      if (button?.isConnected && statusLabel) statusLabel.textContent = 'Published';
       message = { text: `Summary published to ${result.okRelays.length} relay${result.okRelays.length === 1 ? '' : 's'}`, kind: 'ok' };
     } catch (error) {
-      if (button?.isConnected) { button.disabled = false; button.textContent = 'Publish summary'; }
+      if (button?.isConnected && statusLabel) { button.disabled = false; statusLabel.textContent = 'Publish summary'; }
       message = { text: `Publish failed: ${(error as Error).message}`, kind: 'bad' };
     }
     state.publishingSessionId = null;
@@ -106,23 +108,23 @@ export function createSessionSummary(ctx: SessionSummaryContext): SessionSummary
   function render(session: ActiveSession): void {
     const doneSets = session.sets.filter((set) => set.done);
     const volume = Math.round(doneSets.reduce((sum, set) => sum + (Number(set.reps) || 0) * (Number(set.weight) || 0), 0));
-    const stats = [
-      { val: durationLabel(sessionDurationSeconds(session)), label: 'Duration' },
-      { val: doneSets.length, label: 'Sets' },
-      { val: volume > 0 ? `${Math.round(ctx.wDisplay(volume) ?? 0)} ${ctx.unitLabel()}` : '—', label: 'Volume' },
-      { val: new Set(doneSets.map((set) => set.exerciseSlug)).size, label: 'Exercises' }
+    const stats: Array<{ val: string | number; label: string; icon: IconName }> = [
+      { val: durationLabel(sessionDurationSeconds(session)), label: 'Duration', icon: 'clock' },
+      { val: doneSets.length, label: 'Sets', icon: 'list-ordered' },
+      { val: volume > 0 ? `${Math.round(ctx.wDisplay(volume) ?? 0)} ${ctx.unitLabel()}` : '—', label: 'Volume', icon: 'dumbbell' },
+      { val: new Set(doneSets.map((set) => set.exerciseSlug)).size, label: 'Exercises', icon: 'layers' }
     ];
     ctx.openModal(`
       <div class="summary-hero">
         <div class="sh-medal">${icon('award')}</div>
         <div class="sh-copy"><strong>${html(session.sheetName || 'Freestyle')}</strong><small>nicely done — here's the recap</small></div>
       </div>
-      <div class="summary-stats">${stats.map((item) => `<div class="summary-stat"><div class="ss-val">${html(String(item.val))}</div><div class="ss-label">${item.label}</div></div>`).join('')}</div>
-      <div class="subsection-head"><span>Vs last time</span><small>working-set volume per exercise</small></div>
+      <div class="summary-stats">${stats.map((item) => `<div class="summary-stat"><span class="ss-icon">${icon(item.icon)}</span><div class="ss-val">${html(String(item.val))}</div><div class="ss-label">${item.label}</div></div>`).join('')}</div>
+      <div class="subsection-head"><span class="summary-section-title">${icon('chart-column')}<span>Vs last time</span></span><small>working-set volume per exercise</small></div>
       <div class="summary-compare"><div class="empty">First local web session — comparison appears after you repeat this workout.</div></div>
       <div class="form-actions">
-        ${state.pubkey ? '<button class="button primary" id="finish-publish" type="button">Publish summary</button>' : '<button class="button primary" id="finish-publish" type="button" disabled title="Sign in with your Nostr signer in Settings to publish">Publish summary</button>'}
-        <button class="button quiet" id="finish-done" type="button">Done</button>
+        <button class="button primary summary-action" id="finish-publish" type="button"${state.pubkey ? '' : ' disabled title="Sign in with your Nostr signer in Settings to publish"'}>${icon('upload')}<span class="summary-action-label">Publish summary</span></button>
+        <button class="button quiet summary-action" id="finish-done" type="button">${icon('check')}<span>Done</span></button>
       </div>`);
     root.querySelector('#finish-publish')?.addEventListener('click', (event) => { void publish(session, event.currentTarget as HTMLButtonElement); });
     root.querySelector('#finish-done')?.addEventListener('click', ctx.closeModal);
