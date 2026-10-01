@@ -44,4 +44,13 @@ describe('the account choice screen', () => {
     expect(local.classList.contains('button')).toBe(false);
     expect(root.lastElementChild?.contains(local)).toBe(true);
   });
+
+  it('draws every chevron with Lucide rather than a text glyph', () => {
+    const root = render();
+    for (const chevron of Array.from(root.querySelectorAll('.account-path-chevron'))) {
+      expect(chevron.querySelector('[data-icon="chevron-right"]')).toBeTruthy();
+      expect(chevron.textContent?.trim()).toBe('');
+    }
+    expect(root.querySelector('.account-flow-head [data-icon="user-round"]')).toBeTruthy();
+  });
 });

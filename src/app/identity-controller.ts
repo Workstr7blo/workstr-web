@@ -1,12 +1,13 @@
 import { copyNamespace, deleteNamespace, LOCAL_NAMESPACE, namespaceHasUserData } from '../db/adopt';
 import { clearLocalKey, createCachedLocalKeySigner, exportLocalNsec, generateLocalAccount, parseRecoveryKey, type LocalAccountKey } from '../signer/local-key';
-import { accountChoiceMarkup } from './account-choice-view';
+import { accountBackButton, accountChoiceMarkup, accountFlowHead, accountNote } from './account-choice-view';
 import { createDevicePairingController } from './device-pairing-controller';
 import { WORKSTR_RELAY_URL } from '../sync/engine';
 import { forgetAutoApprove } from '../signer/auto-approve';
 import type { Signer } from '../signer/types';
 import type { AppState } from './state';
 import { html } from './format';
+import { icon } from './icons';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const OBSOLETE_SIGNER_KEYS = ['workstr.signerType', 'workstr.nip46.clientSecret', 'workstr.nip46.connection', 'workstr.nip46.grantedPerms'];
@@ -80,11 +81,12 @@ async function adoptLocalAndOpen(pubkey: string): Promise<void> {
 }
 
 function askAdoptChoice(pubkey: string): void {
-  openModal(`<div class="page-title">Existing account data</div>
-    <p class="section-help">This identity already has Workstr data on this device. Pick the dataset to continue with — the two are never merged. Keeping this device's data replaces the identity's copy on this device.</p>
+  openModal(`${accountFlowHead('database', 'Existing account data')}
+    <p class="section-help">This identity already has Workstr data on this device. Pick the dataset to continue with.</p>
+    ${accountNote('info', "The two are never merged. Keeping this device's data replaces the identity's copy on this device.", 'warn')}
     <div class="web-empty-actions">
-      <button id="adopt-keep-device" class="button primary">Keep this device's data</button>
-      <button id="adopt-use-account" class="button">Use the account's data</button>
+      <button id="adopt-keep-device" class="button primary" type="button">${icon('smartphone')}<span>Keep this device's data</span></button>
+      <button id="adopt-use-account" class="button" type="button">${icon('user-round')}<span>Use the account's data</span></button>
     </div>`);
   root.querySelector('#adopt-keep-device')?.addEventListener('click', () => { closeModal(); void adoptLocalAndOpen(pubkey); });
   root.querySelector('#adopt-use-account')?.addEventListener('click', () => { closeModal(); void openAndRender(pubkey); });
@@ -153,17 +155,18 @@ async function protectAndSignIn(account: LocalAccountKey): Promise<void> {
 
 function showRecoveryKeyModal(account: LocalAccountKey): void {
   const { nsec } = account;
-  openModal(`<div class="page-title">Save your recovery key</div>
-    <p class="section-help">This key restores your encrypted training data on another device. Workstr cannot recover it for you. Store it in a password manager and never share it.</p>
+  openModal(`${accountFlowHead('key', 'Save your recovery key', 'New account')}
+    <p class="section-help">This key restores your encrypted training data on another device. Store it in a password manager.</p>
+    ${accountNote('triangle-alert', 'Workstr cannot recover it for you, and anyone holding it has your account. Never share it.', 'warn')}
     <div class="terminal-mini recovery-key-box">${html(nsec)}</div>
     <div class="web-empty-actions">
-      <button id="copy-recovery-key" class="button" type="button">Copy recovery key</button>
-      <button id="continue-local-account" class="button primary" type="button">I saved it</button>
+      <button id="copy-recovery-key" class="button" type="button">${icon('copy')}<span>Copy recovery key</span></button>
+      <button id="continue-local-account" class="button primary" type="button">${icon('arrow-right')}<span>I saved it</span></button>
     </div>
-    <p class="section-help">Next you choose a device code. Workstr keeps this key only on this device, encrypted under that code.</p>`);
+    ${accountNote('shield-check', 'Next you choose a device code. Workstr keeps this key only on this device, encrypted under that code.', 'ok')}`);
   root.querySelector('#copy-recovery-key')?.addEventListener('click', (event) => {
     void navigator.clipboard.writeText(nsec);
-    (event.currentTarget as HTMLButtonElement).textContent = 'Copied';
+    (event.currentTarget as HTMLButtonElement).innerHTML = `${icon('check')}<span>Copied</span>`;
   });
   root.querySelector('#continue-local-account')?.addEventListener('click', () => { void protectAndSignIn(account); });
 }
@@ -171,14 +174,14 @@ function showRecoveryKeyModal(account: LocalAccountKey): void {
 function showRestoreLocalAccountModal(input = '', error: string | null = null): void {
   // Reached from the account choice screen, so it offers the way back to it. Closing the
   // modal and reopening it to change your mind is not a way back.
-  openModal(`<button id="account-back" class="auth-back-button" type="button">← Back</button>
-    <div class="page-title">Restore with recovery key</div>
+  openModal(`${accountBackButton()}
+    ${accountFlowHead('file-text', 'Restore with recovery key')}
     <p class="section-help">Paste an nsec recovery key. It is kept on this device, encrypted under your device code, so sync can run without signer prompts.</p>
-    <textarea id="local-key-input" class="auth-key-input" rows="4" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="nsec1...">${html(input)}</textarea>
-    ${error ? `<p class="auth-error" role="alert">Recovery key error: ${html(error)}</p>` : ''}
-    <p class="section-help">Only use this on a device you trust.</p>
+    <textarea id="local-key-input" class="auth-key-input" rows="4" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="nsec1..." aria-label="Recovery key">${html(input)}</textarea>
+    ${error ? `<p class="auth-error account-note danger" role="alert">${icon('circle-alert')}<span>Recovery key error: ${html(error)}</span></p>` : ''}
+    ${accountNote('shield-check', 'Only use this on a device you trust.')}
     <div class="web-empty-actions">
-      <button id="restore-local-key" class="button primary" type="button">Use this key</button>
+      <button id="restore-local-key" class="button primary" type="button">${icon('key')}<span>Use this key</span></button>
     </div>`);
   const keyInput = root.querySelector<HTMLTextAreaElement>('#local-key-input');
   if (input && keyInput) {

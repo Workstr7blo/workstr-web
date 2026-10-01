@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Polished the account and pairing screens: create, restore, existing-data and every
+  device-pairing step open with an icon head naming the flow, warnings and reassurances are
+  toned callouts instead of plain paragraphs, errors carry an alert icon, actions lead with
+  icons, and Back and the account path chevrons are Lucide icons rather than text glyphs.
+  Workouts Discover gains the Creator programs header with its relay status, matching
+  Exercise Discover, and the Beast Mode checklist marks its checks with Lucide icons.
+
 - Polished the Statistics tab to match Workouts: Training and Body each open with an icon
   hero, the streak, sessions and volume tiles lead with Lucide icons, the date range is a
   segmented pill, every section has an icon heading, the best week or month is highlighted

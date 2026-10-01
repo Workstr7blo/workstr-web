@@ -1,5 +1,6 @@
 import { sessionDayKey } from '../../core/dates';
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
 import type { AppState } from '../../app/state';
 import { SETTINGS_ACCORDION, settingsSummary } from '../../app/settings-row';
 
@@ -62,7 +63,7 @@ export function beastModeEligibility(state: BeastModeState): BeastModeEligibilit
 export function beastModeChecklistMarkup(state: BeastModeState): string {
   const eligibility = beastModeEligibility(state);
   const rows = eligibility.checks.map((check) => `<li class="beast-mode-check ${check.passed ? 'ok' : 'locked'}" data-beast-mode-check="${check.id}">
-    <span class="beast-mode-check-icon" aria-hidden="true">${check.passed ? '✓' : '•'}</span>
+    <span class="beast-mode-check-icon" aria-hidden="true">${icon(check.passed ? 'check' : 'circle')}</span>
     <span><strong>${html(check.label)}</strong><small>${html(check.detail)}</small></span>
   </li>`).join('');
   return `<div class="beast-mode-checklist ${eligibility.unlocked ? 'unlocked' : 'locked'}" data-beast-mode-state="${eligibility.unlocked ? 'unlocked' : 'locked'}">

@@ -159,5 +159,7 @@ describe('Beast Mode checklist markup', () => {
     }));
 
     expect(markup).toContain('data-beast-mode-state="unlocked"');
+    expect(markup).toContain('data-icon="check"');
+    expect(markup).not.toContain('✓');
   });
 });
