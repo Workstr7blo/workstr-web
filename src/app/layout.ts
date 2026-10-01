@@ -83,9 +83,8 @@ function sessionOverlayMarkup(state: AppState): string {
     <div class="session-bg"></div>
     <div class="session-header">
       <div class="session-head-main">
-        <div class="session-eyebrow">Live session</div>
         <div id="session-title" class="session-title">Workout</div>
-        <div class="session-meta-line"><span id="session-meta" class="session-meta">Exercise 1 of 1</span><span class="session-elapsed-chip">${icon('clock')}<span id="session-elapsed" class="session-elapsed">00:00</span></span></div>
+        <div class="session-meta-line"><span id="session-meta" class="session-meta">Exercise 1 of 1</span><span class="session-elapsed-chip"><span class="session-live-dot" aria-hidden="true"></span><span class="sr-only">Live session, elapsed </span><span id="session-elapsed" class="session-elapsed">00:00</span></span></div>
       </div>
       <button id="session-close" class="session-close-btn" type="button">${icon('x')}<span>End</span></button>
     </div>
