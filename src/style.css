@@ -1008,8 +1008,59 @@
 
 .builder-picker { margin-top: 8px; max-height: 264px; overflow-y: auto; border: 1px solid var(--border); border-radius: 14px; scrollbar-width: thin; }
 .modal-card:has(.program-builder) { width: min(700px, 100%); padding: 24px; scrollbar-color: var(--sovereign-purple) transparent; }
-.program-builder { display: grid; gap: 0; }
-.program-builder h3 { margin-bottom: 4px; font-size: 24px; }
+/* A block, not a grid: a grid is its own formatting context and shrank beside the modal's
+   floated close button for its whole height. Now only the hero card sits beside it. */
+.program-builder { display: block; }
+.builder-hero { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: center; gap: 13px; padding: 13px; border: 1px solid rgba(var(--accent-line-rgb), .16); border-radius: 17px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .12), rgba(var(--void-rgb), .2)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+.builder-hero-icon { width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid rgba(var(--accent-line-rgb), .24); border-radius: 14px; color: var(--purple-2); background: rgba(var(--accent-rgb), .12); box-shadow: 0 0 22px rgba(var(--accent-rgb), .16); }
+.builder-hero-icon svg { width: 23px; height: 23px; }
+.builder-hero-copy { min-width: 0; display: grid; gap: 5px; }
+.program-builder .builder-hero-copy h3 { margin: 0; font: 850 20px/1.05 Inter, ui-sans-serif, sans-serif; letter-spacing: -.03em; }
+.builder-hero-copy p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+/* Section headings read like the other tabs': an icon and a sentence-case title. */
+.builder-head > span { display: inline-flex; align-items: center; gap: 8px; flex: none; color: var(--text); font: 850 15px/1.1 Inter, ui-sans-serif, sans-serif; letter-spacing: -.02em; text-transform: none; }
+.builder-head > span svg { width: 16px; height: 16px; color: var(--purple-2); }
+/* The aside goes under its heading rather than squeezing beside it. */
+.program-builder .builder-head:has(small) { flex-direction: column; align-items: flex-start; gap: 6px; }
+.program-builder .builder-head small { color: var(--muted); font: 500 12.5px/1.4 Inter, ui-sans-serif, sans-serif; letter-spacing: 0; text-transform: none; }
+.goal-chip { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.goal-chip svg { width: 15px; height: 15px; flex: none; }
+.builder-auto-labels > span { display: inline-flex; align-items: center; gap: 6px; }
+.builder-auto-labels > span svg { width: 13px; height: 13px; color: var(--purple-2); }
+.builder-save, .emom-add-section { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.builder-save svg, .emom-add-section svg { width: 16px; height: 16px; flex: none; }
+.emom-section-exercise-head .button.small { display: inline-flex; align-items: center; gap: 5px; }
+.emom-section-exercise-head .button.small svg { width: 13px; height: 13px; }
+.wex-move-btn svg { width: 14px; height: 14px; }
+.wex-remove svg { width: 15px; height: 15px; }
+.emom-rx-move { display: grid; place-items: center; }
+.emom-rx-move svg { width: 18px; height: 18px; }
+.emom-section-actions button { display: grid; place-items: center; }
+.emom-section-actions button svg { width: 15px; height: 15px; }
+.emom-section-header { justify-content: flex-start; }
+.emom-section-header .emom-section-title { flex: 1; }
+.emom-section-icon { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 10px; color: var(--purple-2); background: rgba(var(--accent-rgb), .12); }
+.emom-section-icon svg { width: 16px; height: 16px; }
+.builder-empty { display: flex; align-items: center; gap: 10px; padding: 14px; border: 1px dashed rgba(var(--accent-line-rgb), .24); border-radius: 14px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.builder-empty svg { width: 18px; height: 18px; flex: none; color: var(--purple-2); }
+.emom-section-exercises .builder-empty { margin-top: 4px; }
+.emom-section-header .emom-section-title span { white-space: normal; }
+.program-builder .form-actions .builder-save { flex: 1; min-height: 50px; }
+/* On a phone the strength row stacks: picture, name and remove on top, the four numbers
+   in one even row, then ordering and the superset link. Side by side, the numbers wrapped
+   into two rows and left the picture column empty beneath it. */
+@media (max-width: 560px) {
+  .program-builder .wex-row { grid-template-columns: 44px 44px minmax(0, 1fr) auto; grid-template-areas: "img name name remove" "params params params params" "order order toggle toggle"; gap: 10px 12px; }
+  .program-builder .wex-info { display: contents; }
+  .program-builder .wex-img { grid-area: img; width: 44px; height: 44px; }
+  .program-builder .wex-name { grid-area: name; }
+  .program-builder .wex-remove { grid-area: remove; }
+  .program-builder .wex-params { grid-area: params; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 0; }
+  .program-builder .wex-param-input, .program-builder .wex-param-input.reps { width: 100%; }
+  .program-builder .wex-move-btns { grid-area: order; display: flex; gap: 6px; }
+  .program-builder .wex-move-btn { flex: none; width: 38px; height: 32px; }
+  .program-builder .wex-superset-toggle { grid-area: toggle; justify-self: end; margin-top: 0; }
+}
 .program-builder-basics { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
 .program-builder-basics .span-2 { grid-column: 1 / -1; }
 .program-builder label { gap: 7px; }
@@ -1047,7 +1098,6 @@
 .emom-library-picker button { display: block; width: 100%; min-height: 36px; padding: 9px 11px; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--text); text-align: left; font: 700 13px/1.25 inherit; cursor: pointer; }
 .emom-library-picker button:last-child { border-bottom: 0; }
 .emom-library-picker button:hover { background: rgba(var(--accent-rgb), .14); color: var(--purple-2); }
-.emom-section-empty { padding: 10px 0 3px; }
 .emom-rx-list { display: grid; border: 1px solid rgba(var(--accent-line-rgb), .12); border-radius: 11px; overflow: hidden; background: rgba(0,0,0,.14); }
 /* A move card: its minute and the trash on one line, the name under it, then the target beside the
    order buttons. Stacked rather than squeezed into one row, so nothing overlaps on a narrow phone. */
@@ -1078,7 +1128,7 @@
 .emom-program-summary, .program-section-summary { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; color: var(--muted); font-size: 12px; }
 .emom-program-summary strong, .program-section-summary strong { width: 100%; color: var(--text); }
 @media (max-width: 820px) { .program-builder-basics { grid-template-columns: 1fr 1fr; } .program-builder-basics .span-2 { grid-column: 1 / -1; } }
-@media (max-width: 680px) { .modal-card:has(.program-builder) { padding: 12px; } .program-builder h3 { font-size: 21px; } .program-builder-basics { grid-template-columns: 1fr; gap: 10px; } .program-builder-basics .span-2 { grid-column: auto; } .program-builder .subsection-head { margin-top: 16px; margin-bottom: 8px; } .emom-section-header { padding: 8px 9px; } .emom-section-settings { padding: 7px 9px; } .emom-section-exercises { padding: 7px 9px 9px; } .emom-section-settings small { display: none; } .emom-rx-target { grid-template-columns: 78px 52px; } .emom-rx-type { width: 78px; } .emom-rx-value, .emom-rx-open { width: 52px; } }
+@media (max-width: 680px) { .modal-card:has(.program-builder) { padding: 12px; } .program-builder .builder-hero-copy h3 { font-size: 19px; } .program-builder-basics { grid-template-columns: 1fr; gap: 10px; } .program-builder-basics .span-2 { grid-column: auto; } .program-builder .subsection-head { margin-top: 16px; margin-bottom: 8px; } .emom-section-header { padding: 8px 9px; } .emom-section-settings { padding: 7px 9px; } .emom-section-exercises { padding: 7px 9px 9px; } .emom-section-settings small { display: none; } .emom-rx-target { grid-template-columns: 78px 52px; } .emom-rx-type { width: 78px; } .emom-rx-value, .emom-rx-open { width: 52px; } }
 @media (max-width: 390px) { .modal-card:has(.program-builder) { padding: 10px; } .emom-rx-name strong { font-size: 13px; } .emom-rx-target { grid-template-columns: 74px 48px; gap: 4px; } .emom-rx-type { width: 74px; font-size: 11px; } .emom-rx-value, .emom-rx-open { width: 48px; } }
 .discover-import { justify-content: center; text-align: center; }
 .ex-grid.selecting .ex-card.unselectable { opacity: .45; }
@@ -1108,6 +1158,9 @@
 }
 .equip-option:has(input:focus-visible) { outline: 2px solid var(--purple-2); outline-offset: 2px; }
 .wex-superset-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 9px;
   padding: 6px 9px;
   border: 1px solid var(--border);
@@ -1117,6 +1170,8 @@
   font: 700 10px/1 ui-monospace, monospace;
   cursor: pointer;
 }
+
+.wex-superset-toggle svg { width: 12px; height: 12px; }
 
 .wex-superset-toggle.active,
 .session-superset-badge {

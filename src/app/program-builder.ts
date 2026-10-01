@@ -6,7 +6,7 @@ import { emomBlockDurationSec } from '../core/emom-blocks';
 import { emomBlocksFromBuilder, PROGRAM_GOALS, programDisplayTags, selectedProgramGoals, straightBlocksFromBuilder, type BuilderState } from '../features/sheets/views';
 import { editablePublicationIdentity, type PublicationIdentity } from '../nostr/program-ownership';
 import { html } from './format';
-import { icon } from './icons';
+import { icon, type IconName } from './icons';
 import { formatTaxonomyLabel, normalizeTrainingLevel, TRAINING_LEVELS } from '../core/training-taxonomy';
 import type { AppState } from './state';
 
@@ -131,33 +131,46 @@ async function open(sheet: SheetWithExercises | null = null): Promise<void> {
   renderModal();
 }
 
+const GOAL_ICONS: Record<string, IconName> = {
+  strength: 'dumbbell', hypertrophy: 'biceps-flexed', conditioning: 'heart-pulse',
+  mobility: 'person-standing', endurance: 'repeat', recovery: 'leaf'
+};
+
+// The icon-led section heading the other tabs use; the explanatory line stays a quiet aside.
+function builderHead(name: IconName, label: string, aside = ''): string {
+  return `<div class="subsection-head builder-head"><span>${icon(name)}<span>${label}</span></span>${aside ? `<small>${aside}</small>` : ''}</div>`;
+}
+
 function renderModal(): void {
   const current = builder;
   if (!current) return;
   const difficultyOptions = ['', ...TRAINING_LEVELS].map((difficulty) => `<option value="${html(difficulty)}" ${current.difficulty === difficulty ? 'selected' : ''}>${difficulty ? html(formatTaxonomyLabel(difficulty)) : 'Choose level'}</option>`).join('');
   const goals = selectedProgramGoals(current.tags);
-  const goalChips = PROGRAM_GOALS.map((goal) => `<button class="goal-chip ${goals.includes(goal) ? 'active' : ''}" type="button" data-goal="${html(goal)}" aria-pressed="${goals.includes(goal) ? 'true' : 'false'}">${html(formatTaxonomyLabel(goal))}</button>`).join('');
+  const goalChips = PROGRAM_GOALS.map((goal) => `<button class="goal-chip ${goals.includes(goal) ? 'active' : ''}" type="button" data-goal="${html(goal)}" aria-pressed="${goals.includes(goal) ? 'true' : 'false'}">${GOAL_ICONS[goal] ? icon(GOAL_ICONS[goal]) : ''}<span>${html(formatTaxonomyLabel(goal))}</span></button>`).join('');
   const autoLabelMarkup = builderAutoLabelMarkup(current);
   openModal(`
     <div class="program-builder">
-    <h3>${current.sheetId ? 'Edit program' : 'New program'}</h3>
+    <div class="builder-hero">
+      <span class="builder-hero-icon">${icon(current.sheetId ? 'pencil' : 'clipboard-list')}</span>
+      <div class="builder-hero-copy"><h3>${current.sheetId ? 'Edit program' : 'New program'}</h3><p>Name it, choose how it runs, then add exercises.</p></div>
+    </div>
     <div class="form-grid program-builder-basics">
       <label class="span-2">Name<input id="sheet-name" value="${html(current.name)}" placeholder="Push Day" /></label>
       <label class="span-2">Description<input id="sheet-desc" value="${html(current.desc)}" placeholder="optional" /></label>
       <label>Difficulty<select id="sheet-difficulty">${difficultyOptions}</select></label>
       <label>Training mode<select id="sheet-mode"><option value="normal" ${current.mode === 'normal' ? 'selected' : ''}>Normal sets</option><option value="emom" ${current.mode === 'emom' ? 'selected' : ''}>EMOM</option><option value="mixed" ${current.mode === 'mixed' ? 'selected' : ''}>Mixed sections</option></select></label>
     </div>
-    <div class="builder-goals"><div class="subsection-head"><span>Goal</span><small>Choose up to two. Workstr detects split and equipment.</small></div><div class="builder-goal-grid">${goalChips}</div></div>
-    <div class="builder-auto-labels"><span>Auto labels</span><div id="builder-auto-label-values">${autoLabelMarkup}</div></div>
+    <div class="builder-goals">${builderHead('target', 'Goal', 'Choose up to two. Workstr detects split and equipment.')}<div class="builder-goal-grid">${goalChips}</div></div>
+    <div class="builder-auto-labels"><span>${icon('sparkles')}Auto labels</span><div id="builder-auto-label-values">${autoLabelMarkup}</div></div>
     ${current.mode !== 'emom'
-      ? `<div class="subsection-head"><span>Add normal exercises from your library</span></div>
+      ? `${builderHead('list-plus', 'Add from your library')}
         <div class="builder-search-wrap"><input id="builder-search" class="builder-search" placeholder="Filter your library..." autocomplete="off" /></div>
         <div id="builder-picker" class="builder-picker"></div>
-        <div class="subsection-head"><span>Normal strength section</span></div>`
-      : `<div class="subsection-head"><span>EMOM sections</span></div>`}
+        ${builderHead('dumbbell', current.mode === 'mixed' ? 'Strength section' : 'Exercises')}`
+      : builderHead('timer', 'EMOM sections')}
     <div id="builder-rows" class="builder-rows"></div>
-    ${current.mode !== 'normal' ? '<button class="button emom-add-section" id="add-emom-section" type="button">+ Add EMOM section</button>' : ''}
-    <div class="form-actions"><button class="button primary" id="sheet-save" type="button">${current.sheetId ? 'Save program' : 'Create program'}</button></div>
+    ${current.mode !== 'normal' ? `<button class="button emom-add-section" id="add-emom-section" type="button">${icon('plus')}<span>Add EMOM section</span></button>` : ''}
+    <div class="form-actions"><button class="button primary builder-save" id="sheet-save" type="button">${icon('check')}<span>${current.sheetId ? 'Save program' : 'Create program'}</span></button></div>
     </div>`);
   renderRows();
   root.querySelector('#sheet-name')?.addEventListener('input', (event) => { current.name = (event.target as HTMLInputElement).value; });

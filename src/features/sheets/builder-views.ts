@@ -37,8 +37,8 @@ function prescriptionRowMarkup(row: BuilderRow, index: number, position: number,
       ${targetType !== 'open' ? `<input class="emom-rx-value" aria-label="${targetType === 'reps' ? 'Repetitions' : 'Work seconds'} for ${name}" type="number" min="1" max="${targetType === 'seconds' ? 60 : 999}" data-f="targetValue" data-target-type="${targetType}" value="${html(String(targetValue))}">` : '<span class="emom-rx-open">open</span>'}
     </div>
     <div class="emom-rx-order">
-      <button class="emom-rx-move" type="button" data-move="${index}" data-dir="-1" aria-label="Move ${name} up" ${position === 0 ? 'disabled' : ''}>↑</button>
-      <button class="emom-rx-move" type="button" data-move="${index}" data-dir="1" aria-label="Move ${name} down" ${position === count - 1 ? 'disabled' : ''}>↓</button>
+      <button class="emom-rx-move" type="button" data-move="${index}" data-dir="-1" aria-label="Move ${name} up" ${position === 0 ? 'disabled' : ''}>${icon('chevron-up')}</button>
+      <button class="emom-rx-move" type="button" data-move="${index}" data-dir="1" aria-label="Move ${name} down" ${position === count - 1 ? 'disabled' : ''}>${icon('chevron-down')}</button>
     </div>
   </div>`;
 }
@@ -48,10 +48,11 @@ function strengthRowMarkup(row: BuilderRow, index: number, current: BuilderState
   const img = src
     ? `<img class="wex-img" src="${html(responsiveImageUrl(src, 240))}" alt="" loading="lazy" decoding="async" data-fallback="replace" data-fallback-tag="div" data-fallback-class="wex-img placeholder">`
     : `<div class="wex-img placeholder">${icon('dumbbell')}</div>`;
+  const name = html(row.exerciseName);
   return `<div class="wex-row" data-i="${index}">
     <div class="wex-move-btns">
-      <button class="wex-move-btn" type="button" data-move="${index}" data-dir="-1" title="Move up">↑</button>
-      <button class="wex-move-btn" type="button" data-move="${index}" data-dir="1" title="Move down">↓</button>
+      <button class="wex-move-btn" type="button" data-move="${index}" data-dir="-1" aria-label="Move ${name} up" title="Move up">${icon('chevron-up')}</button>
+      <button class="wex-move-btn" type="button" data-move="${index}" data-dir="1" aria-label="Move ${name} down" title="Move down">${icon('chevron-down')}</button>
     </div>
     ${img}
     <div class="wex-info">
@@ -62,9 +63,9 @@ function strengthRowMarkup(row: BuilderRow, index: number, current: BuilderState
         <div class="wex-param-group"><div class="wex-param-label">${unit}</div><input class="wex-param-input" type="number" min="0" step="0.5" data-f="weight" placeholder="—" value="${row.weight != null ? displayWeightKg(row.weight, unit) : ''}"></div>
         <div class="wex-param-group"><div class="wex-param-label">Rest</div><input class="wex-param-input" type="number" min="0" step="5" data-f="restSec" value="${row.restSec}"></div>
       </div>
-      ${index > 0 ? `<button class="wex-superset-toggle ${row.supersetWithPrevious ? 'active' : ''}" type="button" data-toggle-superset="${index}" aria-pressed="${row.supersetWithPrevious ? 'true' : 'false'}">${row.supersetWithPrevious ? 'Linked in superset' : 'Pair with previous'}</button>` : ''}
+      ${index > 0 ? `<button class="wex-superset-toggle ${row.supersetWithPrevious ? 'active' : ''}" type="button" data-toggle-superset="${index}" aria-pressed="${row.supersetWithPrevious ? 'true' : 'false'}">${icon('link')}<span>${row.supersetWithPrevious ? 'Linked in superset' : 'Pair with previous'}</span></button>` : ''}
     </div>
-    <button class="wex-remove" type="button" data-rm="${index}" title="Remove">✕</button>
+    <button class="wex-remove" type="button" data-rm="${index}" aria-label="Remove ${name}" title="Remove">${TRASH}</button>
   </div>`;
 }
 
@@ -76,13 +77,14 @@ function emomSectionsMarkup(current: BuilderState): string {
     const rows = current.rows.map((row, index) => ({ row, index })).filter(({ row }) => row.sectionIndex === sectionIndex);
     const sectionActions = current.emomSections.length > 1
       ? `<div class="emom-section-actions">
-          <button type="button" data-move-section="${sectionIndex}" data-dir="-1" title="Move section up" ${sectionIndex === 0 ? 'disabled' : ''}>↑</button>
-          <button type="button" data-move-section="${sectionIndex}" data-dir="1" title="Move section down" ${sectionIndex === current.emomSections.length - 1 ? 'disabled' : ''}>↓</button>
-          <button type="button" data-remove-section="${sectionIndex}" title="Remove section">✕</button>
+          <button type="button" data-move-section="${sectionIndex}" data-dir="-1" title="Move section up" aria-label="Move section ${sectionIndex + 1} up" ${sectionIndex === 0 ? 'disabled' : ''}>${icon('chevron-up')}</button>
+          <button type="button" data-move-section="${sectionIndex}" data-dir="1" title="Move section down" aria-label="Move section ${sectionIndex + 1} down" ${sectionIndex === current.emomSections.length - 1 ? 'disabled' : ''}>${icon('chevron-down')}</button>
+          <button type="button" data-remove-section="${sectionIndex}" title="Remove section" aria-label="Remove section ${sectionIndex + 1}">${TRASH}</button>
         </div>`
       : '';
     return `<section class="emom-section-card" data-section="${sectionIndex}">
       <div class="emom-section-header">
+        <span class="emom-section-icon">${icon('timer')}</span>
         <div class="emom-section-title"><strong>Section ${sectionIndex + 1}</strong><span>${html(emomSectionSummary(section, rows.length))}</span></div>
         ${sectionActions}
       </div>
@@ -90,11 +92,11 @@ function emomSectionsMarkup(current: BuilderState): string {
         <label class="emom-duration-inline"><span>Total duration</span><input data-section-field="durationMin" type="number" min="1" max="999" aria-label="Total duration of section ${sectionIndex + 1} in minutes" value="${section.durationMin}"><strong>min</strong></label>
       </div>
       <div class="emom-section-exercises">
-        <div class="emom-section-exercise-head"><span>Moves</span><button class="button small" type="button" data-toggle-section-picker="${sectionIndex}">+ Add move</button></div>
+        <div class="emom-section-exercise-head"><span>Moves</span><button class="button small" type="button" data-toggle-section-picker="${sectionIndex}">${icon('plus')}<span>Add move</span></button></div>
         <p class="emom-section-help">One move begins each minute, in the order shown.</p>
         ${section.splitMinutes ? '<p class="emom-section-note">Moves that shared a minute now each start their own minute. Save to keep this order.</p>' : ''}
         <div class="emom-library-picker" data-section-picker="${sectionIndex}" hidden>${exerciseOptions.replaceAll('SECTION_INDEX', String(sectionIndex)) || '<div class="empty">Your library is empty.</div>'}</div>
-        ${rows.length ? `<div class="emom-rx-list">${rows.map(({ row, index }, position) => prescriptionRowMarkup(row, index, position, rows.length)).join('')}</div>` : '<div class="empty emom-section-empty">Add at least one move to this section.</div>'}
+        ${rows.length ? `<div class="emom-rx-list">${rows.map(({ row, index }, position) => prescriptionRowMarkup(row, index, position, rows.length)).join('')}</div>` : `<div class="builder-empty emom-section-empty">${icon('list-plus')}<span>Add at least one move to this section.</span></div>`}
       </div>
     </section>`;
   }).join('')}</div>`;
@@ -107,7 +109,7 @@ export function builderRowsMarkup(current: BuilderState, unit: WeightUnit): stri
   const strengthRows = current.rows.map((row, index) => ({ row, index })).filter(({ row }) => row.sectionIndex < 0);
   const strengthMarkup = strengthRows.length
     ? strengthRows.map(({ row, index }) => strengthRowMarkup(row, index, current, unit)).join('')
-    : '<div class="empty" style="padding:8px 0">No normal exercises yet. Search above to add.</div>';
+    : `<div class="builder-empty">${icon('dumbbell')}<span>No exercises yet. Pick from your library above to add one.</span></div>`;
   if (current.mode === 'normal') return strengthMarkup;
-  return `<div class="normal-section-list">${strengthMarkup}</div><div class="subsection-head"><span>EMOM sections</span></div>${emomSectionsMarkup(current)}`;
+  return `<div class="normal-section-list">${strengthMarkup}</div><div class="subsection-head builder-head"><span>${icon('timer')}<span>EMOM sections</span></span></div>${emomSectionsMarkup(current)}`;
 }
