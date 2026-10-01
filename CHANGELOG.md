@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Polished the Statistics tab to match Workouts: Training and Body each open with an icon
+  hero, the streak, sessions and volume tiles lead with Lucide icons, the date range is a
+  segmented pill, every section has an icon heading, the best week or month is highlighted
+  with its volume named, personal records are ranked with a trophy for the top lift, body
+  weight tiles show the direction of change, and entries delete from a labelled trash icon.
+
 - Polished the program builder. It opens with an icon header card, and its fields now use the
   full width of the sheet: they had stopped short of the close button all the way down. Goal,
   Add from your library, Exercises and EMOM sections get icon headings, goals carry icons,

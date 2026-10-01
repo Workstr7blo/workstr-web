@@ -39,7 +39,7 @@ describe('bodyChartMarkup', () => {
 describe('bodyView', () => {
   it('shows the empty state with no entries, and shows it once', () => {
     const out = bodyView(bodyState([]));
-    expect(out).toContain('id="body-empty" class="empty" style="display:"');
+    expect(out).toContain('id="body-empty" class="empty stats-empty" style="display:"');
     // The list used to carry a second "No entries yet." of its own, about 400px below the
     // first one, so an empty Body said it twice.
     expect(out.match(/No entries yet/g)).toHaveLength(1);
@@ -75,6 +75,20 @@ describe('bodyView', () => {
     expect(out).toContain('<div class="body-card-val">72.0</div>'); // current = latest by date
     expect(out).toContain('<div class="body-card-val">71.0</div>'); // 7-day avg = (70+72)/2
     expect(out).toContain('+2.0'); // total change since first
+  });
+
+  it('leads tiles, headings and row actions with Lucide icons', () => {
+    const out = bodyView(bodyState([
+      { id: 7, date: '2026-01-10', weight_kg: 72 },
+      { id: 6, date: '2026-01-01', weight_kg: 70 }
+    ] as BodyWeightEntry[]));
+    expect(out).toContain('class="body-card up"');
+    expect(out).toContain('data-icon="trending-up"');
+    expect(out).toContain('data-icon="history"');
+    // Delete is an icon now, so the button has to name what it removes.
+    expect(out).toContain('data-del-body="7" aria-label="Delete 72 kg on 2026-01-10"');
+    expect(out).toContain('data-icon="trash-2"');
+    expect(out).not.toContain('>×</button>');
   });
 
   it('renders BMI when height is set and goal progress when a target is set', () => {
@@ -189,6 +203,16 @@ describe('trainingStatsView date range', () => {
   it('names the bucket on the volume heading', () => {
     expect(withRange('4w')).toContain('Weekly volume');
     expect(withRange('1y')).toContain('Monthly volume');
+  });
+
+  it('puts an icon on every tile and heading, and marks the record holder', () => {
+    const out = withRange('all');
+    for (const name of ['flame', 'calendar-check', 'weight', 'chart-column', 'biceps-flexed', 'trophy']) {
+      expect(out, name).toContain(`data-icon="${name}"`);
+    }
+    expect(out).toContain('id="stat-streak-flame"');
+    expect(out).toContain('stats-record top-1');
+    expect(out).toContain('class="bar peak"');
   });
 
   it('keeps the records heading honest about being all-time', () => {
