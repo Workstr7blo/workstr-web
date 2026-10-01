@@ -114,12 +114,17 @@ describe('the send sheet', () => {
     expect(walletApi.prepareTransfer).toHaveBeenCalledWith({ address: CREATOR_ADDRESS, amountAtomic: '5000000000' });
     // Nothing has been broadcast from the amount or review steps.
     expect(walletApi.relayTransfer).not.toHaveBeenCalled();
+    // The irreversible warning is a toned callout, and confirm says what it does with an icon.
+    expect(root.querySelector('.monero-send-note.warn')?.textContent).toContain('cannot be reversed');
+    expect(root.querySelector('[data-send-action="confirm"] [data-icon="send"]')).toBeTruthy();
     const review = Object.fromEntries([...root.querySelectorAll('.monero-send-review > div')].map((row) => [row.querySelector('dt')!.textContent, row.querySelector('dd')!.textContent]));
     expect(review).toEqual({ Send: '0.005 XMR', To: 'Settebello', Address: '8CCCCC…CCCCCC', 'Network fee': '0.00003072 XMR', Total: '0.00503072 XMR' });
     click(root, '[data-send-action="confirm"]');
     await vi.waitFor(() => expect(root.querySelector('#monero-send-title')?.textContent).toBe('Tip sent'));
     expect(walletApi.relayTransfer).toHaveBeenCalledTimes(1);
     expect(root.querySelector('.monero-send-txid code')?.textContent).toBe('f9a000…00073c');
+    expect(root.querySelector('.monero-send-head [data-icon="circle-check"]')).toBeTruthy();
+    expect(root.querySelector('.monero-send-result [data-icon="circle-check"]')).toBeTruthy();
     expect(activity.recordOutgoing).toHaveBeenCalledWith(expect.objectContaining({
       txid: 'f9a0000000000000000000000000000000000000000000000000000000073c', amountAtomic: '5000000000', feeAtomic: '30720000',
       recipientAddress: CREATOR_ADDRESS, recipientPubkey: CREATOR, program: { address: '33402:x:5x5', name: '5x5 Strength' }

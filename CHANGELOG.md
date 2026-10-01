@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Polished the Monero send and tip sheet: each step opens with a payment-toned icon head,
+  the balance, fee warning and confirmation timing are icon-led callouts, errors carry an
+  alert icon, and Review, Back, Send and Done lead with icons. The sheet now uses the full
+  width of the modal instead of shrinking beside its close button.
+
 - Polished the account and pairing screens: create, restore, existing-data and every
   device-pairing step open with an icon head naming the flow, warnings and reassurances are
   toned callouts instead of plain paragraphs, errors carry an alert icon, actions lead with

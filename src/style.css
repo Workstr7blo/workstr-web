@@ -40,7 +40,10 @@
 
 /* The Tip Jar send sheet: amount, review, result. Orange stays on the payment actions and the
    total; the rest is the ordinary modal. */
-.monero-send { display: grid; gap: 14px; }
+.monero-send { display: block; }
+/* Block rather than grid: a grid is its own formatting context, so the whole sheet used to
+   shrink beside the modal's floated close button. Now only the head row sits beside it. */
+section.monero-send > * + * { margin-top: 14px; }
 .monero-send-title { margin: 0; }
 .monero-send-recipient { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .monero-send-avatar { display: grid; flex: none; width: 44px; height: 44px; place-items: center; overflow: hidden; border-radius: 50%; background: rgba(var(--accent-rgb), .14); font-weight: 800; }
@@ -1615,3 +1618,21 @@
 @media (prefers-reduced-motion: reduce) { .pairing-progress span { animation: none; width: 100%; opacity: .5; } }
 .beast-mode-check-icon svg { width: 11px; height: 11px; stroke-width: 3; }
 .beast-mode-check.locked .beast-mode-check-icon svg { width: 7px; height: 7px; fill: currentColor; }
+
+/* Send and tip sheet: a payment-toned icon head, icon-led notes and buttons. Payment colour
+   stays on this sheet because it is where money moves. */
+.monero-send-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.monero-send-head-icon { width: 42px; height: 42px; flex: none; display: grid; place-items: center; border: 1px solid rgba(var(--payment-rgb), .32); border-radius: 13px; color: var(--payment-accent); background: rgba(var(--payment-rgb), .12); box-shadow: 0 0 20px var(--payment-glow); }
+.monero-send-head-icon svg { width: 21px; height: 21px; }
+.monero-send-head .monero-send-title { font-size: clamp(22px, 6vw, 30px); line-height: 1.05; }
+.monero-send-available { display: flex; align-items: center; gap: 8px; }
+.monero-send-available svg { width: 15px; height: 15px; flex: none; color: var(--payment-accent); }
+.monero-send-note { --tone-rgb: var(--accent-rgb); --tone: var(--purple-2); display: flex; align-items: flex-start; gap: 9px; margin: 0; padding: 10px 12px; border: 1px solid rgba(var(--tone-rgb), .2); border-radius: 12px; background: rgba(var(--tone-rgb), .07); color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.monero-send-note.warn { --tone-rgb: 247, 147, 26; --tone: var(--bitcoin-gold); }
+.monero-send-note svg { width: 16px; height: 16px; flex: none; margin-top: 1px; color: var(--tone); }
+.monero-send-error { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border: 1px solid rgba(var(--danger-rgb), .28); border-radius: 12px; background: rgba(var(--danger-rgb), .08); font-weight: 700; line-height: 1.45; }
+.monero-send-error svg, .monero-send-result svg { width: 17px; height: 17px; flex: none; margin-top: 2px; }
+.monero-send-result.ok { display: flex; align-items: flex-start; gap: 9px; color: var(--success-green); }
+.monero-send-result.ok span { color: var(--text); }
+.monero-send-actions .button { display: inline-flex; align-items: center; gap: 8px; }
+.monero-send-actions .button svg { width: 16px; height: 16px; flex: none; }
