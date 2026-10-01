@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Polished the program builder. It opens with an icon header card, and its fields now use the
+  full width of the sheet: they had stopped short of the close button all the way down. Goal,
+  Add from your library, Exercises and EMOM sections get icon headings, goals carry icons,
+  and reordering, removing, Add move, Add EMOM section and Create/Save program use Lucide
+  icons instead of typed arrows, crosses and plus signs. On a phone a strength exercise now
+  stacks: picture, name and remove on top, sets/reps/load/rest in one row, then ordering and
+  the superset link. EMOM sections show their full summary instead of cutting it off.
+
 - Polished the live session to match the other tabs. The target under the exercise photo is
   now three icon tiles (sets, reps or time, rest), the set sheet has an icon heading and
   Done/Current/Upcoming marks, finished exercises show a check on the rail, and every action
