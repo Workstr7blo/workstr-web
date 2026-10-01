@@ -12,6 +12,7 @@ import { quickWorkoutPanel, recoveryView } from '../features/recovery/views';
 import { programCard, sheetToProgram } from '../features/sheets/views';
 import { programActiveFilters, programFilterSheet, programMatcher, programToolbar, type ProgramBrowser } from '../features/sheets/program-browser';
 import { exerciseFilterSheet, exerciseSelectionBar } from './exercise-browser';
+import { exerciseBrowseHero } from './exercise-card';
 import { tipJarNavIcon, tipJarView } from '../features/monero/tip-jar-view';
 import { tipJarStatus } from '../features/monero/tip-jar-state';
 
@@ -159,7 +160,7 @@ export function programListMarkup(context: ProgramBrowser, state: AppState): str
   }
   const programs = state.programs.filter(matches);
   return programs.map((program) => programCard(program, state, { showPayment: true })).join('')
-    || `<div class="empty">${state.programs.length ? 'No relay programs match. Refresh or clear a filter.' : 'Relay programs published by Workstr and Beast Mode creators appear here. Importing one adds a local copy to your Programs library, which is what you edit and run.'}</div>`;
+    || `<div class="empty">${state.programs.length ? 'No relay programs match. Refresh or clear a filter.' : 'Relay programs published by Workstr and Beast Mode creators appear here.'}</div>`;
 }
 
 function workoutsView(state: AppState): string {
@@ -173,9 +174,9 @@ function workoutsView(state: AppState): string {
       <div class="program-list" id="programs-list">${programListMarkup('programs', state)}</div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
+      ${exerciseBrowseHero('compass', 'Creator programs', 'Import copies a program into Programs, where you can edit and run it.', `<span class="discover-status-line">${icon('database')}<span id="program-status" class="discover-status">${html(programStatusLine(state))}</span></span>`)}
       ${programToolbar('discover', state)}
       ${programActiveFilters('discover', state)}
-      <div id="program-status" class="terminal-mini">${html(programStatusLine(state))}</div>
       <div class="program-list" id="program-discover-list">${programListMarkup('discover', state)}</div>
     </div>
     <div class="sub-panel ${active === 'history' ? 'active' : ''}" id="sub-workouts-history">

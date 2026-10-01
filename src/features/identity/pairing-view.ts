@@ -10,106 +10,105 @@
 //                     cryptographic check passes for one of those
 import { renderSVG } from 'uqr';
 import { html } from '../../app/format';
+import { icon } from '../../app/icons';
+import { accountFlowHead, accountNote } from '../../app/account-choice-view';
 
 const shortNpub = (npub: string) => `${npub.slice(0, 12)}…${npub.slice(-6)}`;
 
+const EYEBROW = 'Device pairing';
+const cancelButton = (label = 'Cancel', primary = false) => `<button id="pairing-cancel" class="button${primary ? ' primary' : ''}" type="button">${label}</button>`;
+
 export function qrMarkup(uri: string, expiresInSeconds: number): string {
-  return `<div class="page-title">Add this device</div>
+  return `${accountFlowHead('qr-code', 'Add this device', EYEBROW)}
     <p class="section-help">On your other Workstr device, open Settings, choose Add another device, and scan this code.</p>
     <div class="signer-qr pairing-qr" data-pairing-uri="${html(uri)}">${renderSVG(uri, { border: 2 })}</div>
-    <p class="section-help" data-pairing-countdown>This code expires in ${Math.max(0, Math.round(expiresInSeconds / 60))} minutes.</p>
-    <p class="section-help">The code carries no private key. A photograph of it is not enough to take your account.</p>
-    <div class="web-empty-actions">
-      <button id="pairing-cancel" class="button" type="button">Cancel</button>
-    </div>`;
+    <div class="account-notes">
+      ${accountNote('clock', `This code expires in ${Math.max(0, Math.round(expiresInSeconds / 60))} minutes.`, 'info', ' data-pairing-countdown')}
+      ${accountNote('shield-check', 'The code carries no private key. A photograph of it is not enough to take your account.', 'ok')}
+    </div>
+    <div class="web-empty-actions">${cancelButton()}</div>`;
 }
 
 export function waitingMarkup(): string {
-  return `<div class="page-title">Waiting for approval</div>
+  return `${accountFlowHead('hourglass', 'Waiting for approval', EYEBROW)}
     <p class="section-help">Approve the transfer on your other device. You can leave this screen open.</p>
-    <div class="web-empty-actions">
-      <button id="pairing-cancel" class="button" type="button">Cancel</button>
-    </div>`;
+    <div class="pairing-progress" aria-hidden="true"><span></span></div>
+    <div class="web-empty-actions">${cancelButton()}</div>`;
 }
 
 export function scannerMarkup(): string {
-  return `<div class="page-title">Scan the code</div>
+  return `${accountFlowHead('scan-line', 'Scan the code', EYEBROW)}
     <p class="section-help">Point this device at the code shown on the device you are adding.</p>
     <video id="pairing-video" class="pairing-video" playsinline muted></video>
-    <div class="web-empty-actions">
-      <button id="pairing-cancel" class="button" type="button">Cancel</button>
-    </div>`;
+    <div class="web-empty-actions">${cancelButton()}</div>`;
 }
 
 // Deliberately blunt. Someone who did not start this needs to understand what approving
 // does before they tap, and "grant access" would understate it: this copies the key.
 export function approvalMarkup(): string {
-  return `<div class="page-title">Add another Workstr device?</div>
+  return `${accountFlowHead('triangle-alert', 'Add another Workstr device?', EYEBROW, 'warn')}
     <p class="section-help">This will copy your recovery key to the device showing that code, giving it full access to your account and training data.</p>
-    <p class="section-help">Only approve this if you are holding that device and you started this yourself. Nobody from Workstr will ever ask you to scan a code.</p>
+    ${accountNote('triangle-alert', 'Only approve this if you are holding that device and you started this yourself. Nobody from Workstr will ever ask you to scan a code.', 'warn')}
     <div class="web-empty-actions">
-      <button id="pairing-approve" class="button primary" type="button">Approve transfer</button>
-      <button id="pairing-cancel" class="button" type="button">Cancel</button>
+      <button id="pairing-approve" class="button primary" type="button">${icon('send')}<span>Approve transfer</span></button>
+      ${cancelButton()}
     </div>`;
 }
 
 export function sendingMarkup(): string {
-  return `<div class="page-title">Sending</div>
-    <p class="section-help">Encrypting and sending to the new device.</p>`;
+  return `${accountFlowHead('send', 'Sending', EYEBROW)}
+    <p class="section-help">Encrypting and sending to the new device.</p>
+    <div class="pairing-progress" aria-hidden="true"><span></span></div>`;
 }
 
 export function sentMarkup(): string {
-  return `<div class="page-title">Device added</div>
+  return `${accountFlowHead('circle-check', 'Device added', EYEBROW, 'ok')}
     <p class="section-help">The new device has your account. Nothing further to do here.</p>
     <div class="web-empty-actions">
-      <button id="pairing-done" class="button primary" type="button">Done</button>
+      <button id="pairing-done" class="button primary" type="button">${icon('check')}<span>Done</span></button>
     </div>`;
 }
 
 // The account name is the point of this screen, not a flourish: it is where someone would
 // notice they had been handed an account that is not theirs.
 export function successMarkup(npub: string): string {
-  return `<div class="page-title">Signed in</div>
+  return `${accountFlowHead('circle-check', 'Signed in', EYEBROW, 'ok')}
     <p class="section-help">This device now uses your Workstr account.</p>
     <div class="terminal-mini recovery-key-box">${html(shortNpub(npub))}</div>
-    <p class="section-help">Check this matches the account on your other device. If it does not, sign out and do not use this device.</p>
+    ${accountNote('info', 'Check this matches the account on your other device. If it does not, sign out and do not use this device.', 'warn')}
     <div class="web-empty-actions">
-      <button id="pairing-done" class="button primary" type="button">Continue</button>
+      <button id="pairing-done" class="button primary" type="button">${icon('arrow-right')}<span>Continue</span></button>
     </div>`;
 }
 
 export function expiredMarkup(): string {
-  return `<div class="page-title">This transfer request expired</div>
+  return `${accountFlowHead('clock', 'This transfer request expired', EYEBROW, 'warn')}
     <p class="section-help">Codes are short-lived on purpose. Generate a new one to try again.</p>
     <div class="web-empty-actions">
-      <button id="pairing-restart" class="button primary" type="button">Generate new code</button>
-      <button id="pairing-cancel" class="button" type="button">Close</button>
+      <button id="pairing-restart" class="button primary" type="button">${icon('refresh-cw')}<span>Generate new code</span></button>
+      ${cancelButton('Close')}
     </div>`;
 }
 
 export function errorMarkup(message: string): string {
-  return `<div class="page-title">Transfer failed</div>
-    <p class="auth-error" role="alert">${html(message)}</p>
+  return `${accountFlowHead('circle-alert', 'Transfer failed', EYEBROW, 'danger')}
+    <p class="auth-error account-note danger" role="alert">${icon('circle-alert')}<span>${html(message)}</span></p>
     <div class="web-empty-actions">
-      <button id="pairing-restart" class="button primary" type="button">Try again</button>
-      <button id="pairing-cancel" class="button" type="button">Close</button>
+      <button id="pairing-restart" class="button primary" type="button">${icon('refresh-cw')}<span>Try again</span></button>
+      ${cancelButton('Close')}
     </div>`;
 }
 
 // Shown on the trusted device when the account it holds is not one it can transfer.
 export function externalSignerMarkup(): string {
-  return `<div class="page-title">This account uses an external signer</div>
+  return `${accountFlowHead('key', 'This account uses an external signer', EYEBROW)}
     <p class="section-help">Workstr does not hold the private key for this account, so it cannot copy it to another device. Connect the same signer there instead.</p>
-    <div class="web-empty-actions">
-      <button id="pairing-cancel" class="button primary" type="button">Close</button>
-    </div>`;
+    <div class="web-empty-actions">${cancelButton('Close', true)}</div>`;
 }
 
 // Shown on the trusted device when its key is behind a locked device vault.
 export function lockedMarkup(): string {
-  return `<div class="page-title">Unlock Workstr first</div>
+  return `${accountFlowHead('lock', 'Unlock Workstr first', EYEBROW)}
     <p class="section-help">This device's identity is locked. Unlock Workstr with your device code, then add the other device.</p>
-    <div class="web-empty-actions">
-      <button id="pairing-cancel" class="button primary" type="button">Close</button>
-    </div>`;
+    <div class="web-empty-actions">${cancelButton('Close', true)}</div>`;
 }

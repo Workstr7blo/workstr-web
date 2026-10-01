@@ -256,4 +256,12 @@ describe('restore modal', () => {
     expect(modal.querySelector<HTMLTextAreaElement>('#local-key-input')!.value).toBe('nsec1notarealkey');
     expect(h.protectLocalAccount).not.toHaveBeenCalled();
   });
+
+  it('goes back with an icon button, not a text arrow', () => {
+    const h = harness();
+    createIdentityController(h.ctx).startRestoreLocalAccount();
+    const back = h.modal().querySelector('#account-back')!;
+    expect(back.querySelector('[data-icon="arrow-left"]')).toBeTruthy();
+    expect(back.textContent?.trim()).toBe('Back');
+  });
 });

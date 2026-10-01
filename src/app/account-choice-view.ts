@@ -1,4 +1,5 @@
-import { icon } from './icons';
+import { html } from './format';
+import { icon, type IconName } from './icons';
 
 // The account modal, as markup only. Every action behind it already exists in
 // `identity-controller.ts`, which binds these ids; this file decides nothing about identity
@@ -42,12 +43,35 @@ function pathRow(path: AccountPath): string {
       <strong>${path.title}${path.recommended ? '<span class="account-path-badge">Recommended</span>' : ''}</strong>
       <small>${path.blurb}</small>
     </span>
-    <span class="account-path-chevron" aria-hidden="true">›</span>
+    <span class="account-path-chevron" aria-hidden="true">${icon('chevron-right')}</span>
   </button>`;
 }
 
+export type AccountNoteTone = 'info' | 'warn' | 'danger' | 'ok';
+
+/**
+ * The head every account and pairing modal opens with: an icon tile, a quiet eyebrow naming
+ * the flow, and the title. Same shape as the device vault's lock card, so the steps between
+ * choosing an account and setting a device code read as one sequence.
+ */
+export function accountFlowHead(name: IconName, title: string, eyebrow = 'Workstr account', tone: AccountNoteTone = 'info'): string {
+  return `<div class="account-flow-head ${tone}">
+    <span class="account-flow-icon" aria-hidden="true">${icon(name)}</span>
+    <div class="account-flow-title"><span class="account-flow-eyebrow">${html(eyebrow)}</span><div class="page-title">${html(title)}</div></div>
+  </div>`;
+}
+
+// `body` is markup, not text: callers escape what they interpolate into it.
+export function accountNote(name: IconName, body: string, tone: AccountNoteTone = 'info', attributes = ''): string {
+  return `<p class="account-note ${tone}"${attributes}>${icon(name)}<span>${body}</span></p>`;
+}
+
+export function accountBackButton(): string {
+  return `<button id="account-back" class="auth-back-button" type="button">${icon('arrow-left')}<span>Back</span></button>`;
+}
+
 export function accountChoiceMarkup(): string {
-  return `<div class="page-title">Workstr account</div>
+  return `${accountFlowHead('user-round', 'Workstr account', 'Sign in')}
     <p class="section-help">Use Workstr locally, or create a Workstr account to keep your training available across devices.</p>
     <div class="account-create">
       <span class="account-create-icon" aria-hidden="true">${PATH_ICONS.key}</span>
