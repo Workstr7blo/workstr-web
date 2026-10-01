@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Workouts' first tab is now Library, pairing with Discover the way Exercises does, and it
+  opens with the same header as the Exercise library: a Program library card counting your
+  programs, how many you have published and the exercises they use, above the search, filter
+  and New program row. Prompts and toasts that said "Programs" now say "your Library".
+
 - Destructive actions now ask in an in-app dialog instead of the browser's system prompt:
   deleting a program, exercise or session, deleting a program from relays, discarding a live
   session, removing data on sign-out, replacing the Tip Jar, and the device vault's reset and

@@ -79,7 +79,7 @@ export function createProgramPublishController(ctx: ProgramPublishControllerCont
       : relayCopy ? { address: relayCopy.address, eventId: relayCopy.eventId || undefined } : null;
     if (!target) { toast('Program not found', 'bad'); return; }
     const name = sheet?.name || relayCopy?.name || 'this program';
-    const keeps = state.sheets.some((item) => item.nostr_address === target.address) ? ' It stays in Programs on this device.' : '';
+    const keeps = state.sheets.some((item) => item.nostr_address === target.address) ? ' It stays in your Library on this device.' : '';
     if (!(await confirmAction({ title: `Delete ${name} from public relays?`, message: `Relays that honour deletion requests stop serving it, but one that already copied it may keep it.${keeps}`, confirmLabel: 'Delete from relays', icon: 'trash-2' }))) return;
     const signer = await getSigner();
     if (!signer) { toast('Sign in before deleting programs from relays.', 'bad'); return; }

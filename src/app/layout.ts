@@ -13,6 +13,7 @@ import { programCard, sheetToProgram } from '../features/sheets/views';
 import { programActiveFilters, programFilterSheet, programMatcher, programToolbar, type ProgramBrowser } from '../features/sheets/program-browser';
 import { exerciseFilterSheet, exerciseSelectionBar } from './exercise-browser';
 import { exerciseBrowseHero } from './exercise-card';
+import { ownsPublishedSheet } from '../nostr/program-ownership';
 import { tipJarNavIcon, tipJarView } from '../features/monero/tip-jar-view';
 import { tipJarStatus } from '../features/monero/tip-jar-state';
 
@@ -122,10 +123,13 @@ export function appView(state: AppState): string {
   return exercisesView(state);
 }
 
-function subTabs(parent: View, active: string, tabs: string[]): string {
+// A tab is its label, keyed by the label lowercased, unless it names its own key - which is
+// how Workouts says Library while the stored sub-view stays `programs`.
+export function subTabs(parent: View, active: string, tabs: Array<string | { label: string; value: string }>): string {
   return `<div class="sub-tabs">${tabs.map((tab) => {
-    const value = tab.toLowerCase();
-    return `<div class="sub-tab ${active === value ? 'active' : ''}" data-parent="${parent}" data-subtab="${value}">${html(tab)}</div>`;
+    const label = typeof tab === 'string' ? tab : tab.label;
+    const value = typeof tab === 'string' ? tab.toLowerCase() : tab.value;
+    return `<div class="sub-tab ${active === value ? 'active' : ''}" data-parent="${parent}" data-subtab="${value}">${html(label)}</div>`;
   }).join('')}</div>`;
 }
 
@@ -149,6 +153,17 @@ export function programStatusLine(state: AppState): string {
   return state.programStatus || 'program relay cache not loaded yet';
 }
 
+// Whole-library figures, as on Exercises: a filter change writes only the list, so a count
+// that followed the filter would go stale under it. Adding, deleting or publishing renders.
+export function programLibraryHero(state: AppState): string {
+  const total = state.sheets.length;
+  const published = state.sheets.filter((sheet) => ownsPublishedSheet(sheet, state.pubkey)).length;
+  const exercises = new Set(state.sheets.flatMap((sheet) => sheet.exercises.map((entry) => entry.exercise_slug || entry.exercise_name || ''))).size;
+  const stat = (name: 'clipboard-list' | 'upload' | 'dumbbell', value: number, one: string, many: string) => `<span>${icon(name)}<strong>${value}</strong> ${value === 1 ? one : many}</span>`;
+  return exerciseBrowseHero('clipboard-list', 'Program library', 'Your own programs: run them, edit them, publish them.',
+    `${stat('clipboard-list', total, 'program', 'programs')}${stat('upload', published, 'published', 'published')}${stat('dumbbell', exercises, 'exercise', 'exercises')}`);
+}
+
 // The cards of one program list, written on their own when a filter changes. Card clicks
 // are delegated to the list element, so replacing what is inside it costs no listeners.
 export function programListMarkup(context: ProgramBrowser, state: AppState): string {
@@ -167,14 +182,15 @@ function workoutsView(state: AppState): string {
   const active = state.subState.workouts;
   return `<div class="page active" id="page-workouts">
     <div class="page-title">Workouts</div>
-    ${subTabs('workouts', active, ['Programs', 'Discover', 'History', 'Recovery'])}
+    ${subTabs('workouts', active, [{ label: 'Library', value: 'programs' }, 'Discover', 'History', 'Recovery'])}
     <div class="sub-panel ${active === 'programs' ? 'active' : ''}" id="sub-workouts-programs">
+      ${programLibraryHero(state)}
       ${programToolbar('programs', state)}
       ${programActiveFilters('programs', state)}
       <div class="program-list" id="programs-list">${programListMarkup('programs', state)}</div>
     </div>
     <div class="sub-panel ${active === 'discover' ? 'active' : ''}" id="sub-workouts-discover">
-      ${exerciseBrowseHero('compass', 'Creator programs', 'Import copies a program into Programs, where you can edit and run it.', `<span class="discover-status-line">${icon('database')}<span id="program-status" class="discover-status">${html(programStatusLine(state))}</span></span>`)}
+      ${exerciseBrowseHero('compass', 'Creator programs', 'Import copies a program into your Library, where you can edit and run it.', `<span class="discover-status-line">${icon('database')}<span id="program-status" class="discover-status">${html(programStatusLine(state))}</span></span>`)}
       ${programToolbar('discover', state)}
       ${programActiveFilters('discover', state)}
       <div class="program-list" id="program-discover-list">${programListMarkup('discover', state)}</div>
