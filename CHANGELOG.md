@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed the live session scrolling on iPhone. A hidden personal-record toast held a 28px gap
+  under the exercise rail. The "Live session" line is now a pulsing dot in the clock chip,
+  the exercise rail is slimmer, and the set sheet's spacing is tighter. A three-set exercise
+  now fits on one screen, with the exercise photo, the sets, Add set and How to perform all
+  visible above Log set.
+
 - Fixed the last-five-seconds countdown beeps staying silent on iPhone. A touch in the session
   woke the audio on `pointerdown`, which iOS does not count as a tap, so the audio could stay
   locked. It now wakes on the tap itself. The first tap after the app returns from the

@@ -880,13 +880,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--border-hot); box
 
 .session-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: calc(24px + env(safe-area-inset-top)) clamp(20px, 4vw, 34px) 18px; border-bottom: 1px solid rgba(var(--accent-line-rgb), .12); background: rgba(var(--void-rgb), .66); backdrop-filter: blur(18px); }
 .session-head-main { min-width: 0; }
-.session-eyebrow { color: var(--purple-2); font: 800 10px/1 ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 9px; }
-.session-eyebrow::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--success-green); box-shadow: 0 0 10px var(--success-green); animation: live-pulse 1.8s ease-in-out infinite; }
 .session-title { font: 800 clamp(22px, 4.5vw, 32px)/1 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.04em; }
 .session-meta-line { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
 .session-meta { color: var(--muted); font: 800 11px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
 .session-elapsed-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: rgba(0,0,0,.3); color: var(--text); }
-.session-elapsed-chip svg { width: 13px; height: 13px; color: var(--bitcoin-gold); }
 .session-elapsed { font: 800 13px/1 ui-monospace, monospace; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 /* Ending a session early is the runner's one destructive control, so it carries the same
    danger pane as `.button.danger` rather than red literals of its own. */

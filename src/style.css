@@ -699,7 +699,12 @@
 .session-progress-fill { min-width: 4px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .session-header { align-items: center; padding-top: calc(10px + env(safe-area-inset-top)); padding-bottom: 9px; }
-.session-eyebrow { margin-bottom: 6px; font-size: 9px; letter-spacing: .16em; }
+/* The live marker rides in the clock chip instead of an eyebrow line of its own: one line
+   less header, and the pulse sits next to the number it is counting. */
+.session-live-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--success-green); box-shadow: 0 0 10px var(--success-green); animation: live-pulse 1.8s ease-in-out infinite; }
+/* The PR toast floats over the body. Every overlay child is made relative so it stacks over
+   the grid backdrop, which put the hidden toast back in the column as a 28px gap. */
+.session-overlay > .pr-toast { position: absolute; }
 .session-title { font-size: clamp(22px, 5vw, 30px); }
 .session-meta-line { margin-top: 6px; gap: 8px; }
 .session-meta { letter-spacing: .04em; }
@@ -712,15 +717,15 @@
   .session-close-btn { padding: 11px; }
   .session-close-btn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
 }
-.session-body { padding-top: 10px; }
+.session-body { padding-top: 6px; padding-bottom: 12px; }
 
 /* Exercise rail as a connected track. Each button keeps `data-jump-ex` and a 44px tap
    target; the pip is the visible mark and the connector is drawn back to the previous
    button's centre, so the rail reads as progress instead of loose tiles. */
-.session-ex-nav.session-ex-track { gap: 0; width: 100%; max-width: 720px; margin-inline: auto; padding-top: 6px; padding-bottom: 8px; border-bottom: 0; overflow: visible; }
+.session-ex-nav.session-ex-track { gap: 0; width: 100%; max-width: 720px; margin-inline: auto; padding-top: 2px; padding-bottom: 2px; border-bottom: 0; overflow: visible; }
 .session-ex-track .session-ex-dot {
   flex: 1 1 0; display: grid; place-items: center; position: relative;
-  width: auto; height: auto; min-width: 34px; min-height: 44px;
+  width: auto; height: auto; min-width: 34px; min-height: 36px;
   border: 0; border-radius: 0; background: none; box-shadow: none; transform: none;
 }
 .session-ex-track .session-ex-dot::before {
@@ -732,9 +737,9 @@
 .session-ex-track .session-ex-dot.current::before { background: linear-gradient(90deg, rgba(var(--success-rgb), .5), rgba(var(--accent-rgb), .8)); }
 .session-ex-pip {
   position: relative; z-index: 1; display: grid; place-items: center;
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 24px; height: 24px; border-radius: 50%;
   border: 1px solid rgba(var(--accent-line-rgb), .24); background: var(--void);
-  color: var(--dim); font: 900 12px/1 ui-monospace, monospace;
+  color: var(--dim); font: 900 11px/1 ui-monospace, monospace;
   transition: color .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
 .session-ex-track .session-ex-dot:hover .session-ex-pip { border-color: var(--border-hot); color: var(--text); }
@@ -742,7 +747,7 @@
 .session-ex-track .session-ex-dot:focus-visible .session-ex-pip { outline: 2px solid var(--accent-soft); outline-offset: 3px; }
 .session-ex-track .session-ex-dot.done .session-ex-pip { color: #04140d; border-color: transparent; background: linear-gradient(135deg, var(--success-green), #36e0a0); }
 .session-ex-track .session-ex-dot.current .session-ex-pip {
-  width: 32px; height: 32px; color: var(--on-accent); border-color: transparent;
+  width: 28px; height: 28px; color: var(--on-accent); border-color: transparent;
   background: linear-gradient(135deg, var(--sovereign-purple), var(--accent-deep));
   box-shadow: 0 0 0 4px rgba(var(--accent-rgb), .14), 0 0 20px rgba(var(--accent-rgb), .45);
 }
@@ -751,13 +756,13 @@
    missing image costs a line rather than a screenful. */
 /* The hero stays 16:7 so the timer and logging controls keep their place; 4:3 art letterboxes
    on black instead of losing hands, feet and the floor ring to the crop. */
-.session-ex-image.wide { aspect-ratio: 16 / 7; height: auto; margin: 0 0 14px; border-radius: 18px; object-fit: contain; object-position: center; }
+.session-ex-image.wide { aspect-ratio: 16 / 7; height: auto; margin: 0 0 10px; border-radius: 18px; object-fit: contain; object-position: center; }
 .session-ex-image.wide:not(.placeholder) { background: #000; }
 .session-ex-image.wide.placeholder { aspect-ratio: auto; height: 54px; min-height: 0; border-style: dashed; box-shadow: none; }
 
 /* Target: three icon tiles under the media, the same tile the Recovery and History tabs use. */
-.session-body .session-ex-target { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding-bottom: 14px; border-bottom: 1px solid rgba(var(--accent-line-rgb), .12); font: inherit; letter-spacing: 0; text-transform: none; }
-.session-target-tile { min-width: 0; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; padding: 9px; border: 1px solid rgba(var(--accent-line-rgb), .14); border-radius: 14px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .08), rgba(255,255,255,.018)); }
+.session-body .session-ex-target { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding-bottom: 10px; border-bottom: 1px solid rgba(var(--accent-line-rgb), .12); font: inherit; letter-spacing: 0; text-transform: none; }
+.session-target-tile { min-width: 0; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid rgba(var(--accent-line-rgb), .14); border-radius: 14px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .08), rgba(255,255,255,.018)); }
 .session-target-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 10px; color: var(--purple-2); background: rgba(var(--accent-rgb), .12); }
 .session-target-icon svg { width: 16px; height: 16px; }
 .session-target-copy { min-width: 0; display: grid; gap: 3px; }
@@ -765,11 +770,11 @@
 .session-target-copy small { color: var(--muted); font-size: 11px; line-height: 1; }
 
 /* The set sheet. */
-.session-set-plan { display: grid; gap: 0; margin-top: 14px; }
+.session-set-plan { display: grid; gap: 0; margin-top: 10px; }
 .session-sets-label { display: inline-flex; align-items: center; gap: 8px; color: var(--text); font: 850 15px/1 Inter, ui-sans-serif, sans-serif; letter-spacing: -.02em; }
 .session-sets-label svg { width: 16px; height: 16px; color: var(--purple-2); }
 .session-set-row { display: grid; grid-template-columns: 38px minmax(0,1fr) minmax(0,1fr) 62px; gap: 10px; align-items: center; }
-.session-set-columns { padding: 12px 0 6px; color: var(--dim); font: 900 9px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.session-set-columns { padding: 8px 0 4px; color: var(--dim); font: 900 9px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
 .session-set-columns span { text-align: center; }
 .session-sets { display: grid; gap: 0; }
 .session-set-block { min-width: 0; padding: 9px 0; border: 0; border-radius: 0; background: transparent; }
@@ -817,15 +822,15 @@
 .session-ex-complete svg { width: 14px; height: 14px; }
 .session-ex-complete strong { color: var(--muted); font: 700 12px/1 ui-monospace, monospace; }
 
-.session-add-set { justify-self: start; display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; padding: 9px 13px; }
+.session-add-set { justify-self: start; display: inline-flex; align-items: center; gap: 7px; margin-top: 8px; padding: 9px 13px; }
 .session-add-set svg { width: 14px; height: 14px; }
-.session-instructions { margin-top: 14px; }
+.session-instructions { margin-top: 10px; }
 .session-instructions-toggle { width: 100%; border: 0; border-radius: 0; background: transparent; padding: 12px 14px; text-align: left; }
-.session-footer { padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+.session-footer { padding-top: 8px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 /* Every footer action is icon plus label, the program cards' labelled-action pattern. */
 .session-footer button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; }
 .session-footer button svg { width: 17px; height: 17px; flex: none; }
-.session-ex-pip svg { width: 15px; height: 15px; }
+.session-ex-pip svg { width: 13px; height: 13px; }
 .session-track-arrow svg { width: 16px; height: 16px; }
 /* Keep the action bar over the same 720px column the sheet uses, so a wide PWA window does
    not stretch Log set across the whole desktop. */
@@ -975,15 +980,14 @@
 
 @media (max-width: 430px) {
   .session-header { padding: calc(8px + env(safe-area-inset-top)) 18px 8px !important; }
-  .session-eyebrow { margin-bottom: 5px; font-size: 8px; }
   .session-title { font-size: 24px; }
   .session-meta-line { margin-top: 5px; }
   .session-meta { font-size: 10px; }
   .session-elapsed-chip { padding: 3px 8px; }
-  .session-body { padding-left: 18px !important; padding-right: 18px !important; padding-top: 8px; }
-  .session-ex-nav { padding: 5px 18px !important; gap: 7px; }
+  .session-body { padding-left: 18px !important; padding-right: 18px !important; padding-top: 6px; }
+  .session-ex-nav { padding: 2px 18px !important; gap: 7px; }
   .session-ex-dot { width: 30px !important; height: 30px !important; border-radius: 9px; font-size: 12px; }
-  .session-ex-track .session-ex-dot { width: auto !important; height: auto !important; min-width: 30px; min-height: 44px; }
+  .session-ex-track .session-ex-dot { width: auto !important; height: auto !important; min-width: 30px; min-height: 36px; }
   /* Phase, ring and metadata still fit one line at 375px; the ring gives up the least,
      because it is what is read from arm's length. */
   .emom-status { gap: 10px; }
