@@ -1,4 +1,5 @@
 import { html } from '../../app/format';
+import { icon, type IconName } from '../../app/icons';
 import type { MoneroSendRecipient, MoneroSendState } from './types';
 import { shortAddress, shortTxid, TIP_PRESETS, xmrExact, xmrInputText } from './wallet-send';
 import { xmrAmount } from './wallet-view';
@@ -41,7 +42,16 @@ export interface MoneroTipStartView {
 }
 
 function errorLine(state: MoneroSendState): string {
-  return state.error ? `<p class="monero-send-error" role="alert">${html(state.error)}</p>` : '';
+  return state.error ? `<p class="monero-send-error" role="alert">${icon('circle-alert')}<span>${html(state.error)}</span></p>` : '';
+}
+
+// `body` is markup: callers escape what they put in it.
+function note(name: IconName, body: string, tone: 'info' | 'warn' = 'info'): string {
+  return `<p class="monero-send-note ${tone}">${icon(name)}<span>${body}</span></p>`;
+}
+
+function labelled(name: IconName, label: string): string {
+  return `${icon(name)}<span>${label}</span>`;
 }
 
 function amountStep(state: MoneroSendState, availableAtomic: string): string {
@@ -54,7 +64,7 @@ function amountStep(state: MoneroSendState, availableAtomic: string): string {
       <textarea id="monero-send-address" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"${busy ? ' disabled' : ''}>${html(state.addressText)}</textarea>
     </label>`;
   return `<form id="monero-send-form" class="monero-send-form" novalidate>
-    <p class="monero-send-available">Available <strong>${html(xmrExact(availableAtomic))}</strong></p>
+    <p class="monero-send-available">${icon('wallet')}<span>Available <strong>${html(xmrExact(availableAtomic))}</strong></span></p>
     ${address}
     ${presets}
     <label class="monero-send-field">Amount
@@ -63,7 +73,7 @@ function amountStep(state: MoneroSendState, availableAtomic: string): string {
     ${errorLine(state)}
     <div class="monero-send-actions">
       <button class="button" type="button" data-send-action="close"${busy ? ' disabled' : ''}>Cancel</button>
-      <button class="button payment" type="submit"${busy ? ' disabled' : ''}>${busy ? 'Calculating fee…' : 'Review'}</button>
+      <button class="button payment" type="submit"${busy ? ' disabled' : ''}>${busy ? 'Calculating fee…' : labelled('arrow-right', 'Review')}</button>
     </div>
   </form>`;
 }
@@ -84,10 +94,10 @@ function reviewRows(state: MoneroSendState): string {
 function reviewStep(state: MoneroSendState): string {
   const sending = state.step === 'sending';
   return `${reviewRows(state)}
-    <p class="section-help">${sending ? 'Sending. Keep Workstr open until this finishes.' : 'Signed on this device. A Monero transfer cannot be reversed once it is sent.'}</p>
+    ${sending ? note('hourglass', 'Sending. Keep Workstr open until this finishes.') : note('triangle-alert', 'Signed on this device. A Monero transfer cannot be reversed once it is sent.', 'warn')}
     <div class="monero-send-actions">
-      <button class="button" type="button" data-send-action="back"${sending ? ' disabled' : ''}>Back</button>
-      <button class="button payment" type="button" data-send-action="confirm"${sending ? ' disabled' : ''}>${sending ? 'Sending…' : isTip(state) ? 'Send tip' : 'Send'}</button>
+      <button class="button" type="button" data-send-action="back"${sending ? ' disabled' : ''}>${labelled('arrow-left', 'Back')}</button>
+      <button class="button payment" type="button" data-send-action="confirm"${sending ? ' disabled' : ''}>${sending ? 'Sending…' : labelled('send', isTip(state) ? 'Send tip' : 'Send')}</button>
     </div>`;
 }
 
@@ -95,17 +105,31 @@ function sentStep(state: MoneroSendState): string {
   const prepared = state.prepared;
   const amount = prepared ? xmrExact(prepared.amountAtomic) : '';
   const to = state.recipient?.name ? ` to ${state.recipient.name}` : '';
-  return `<p class="monero-send-result" role="status">${html(amount)} sent${html(to)}.</p>
+  return `<p class="monero-send-result ok" role="status">${icon('circle-check')}<span>${html(amount)} sent${html(to)}.</span></p>
     <div class="monero-send-txid"><span>Transaction</span><code title="${html(state.txid || '')}">${html(shortTxid(state.txid || ''))}</code></div>
-    <p class="section-help">It shows under Recent activity in your Tip Jar and is final once the network confirms it, usually within 20 minutes.</p>
-    <div class="monero-send-actions"><button class="button payment" type="button" data-send-action="close">Done</button></div>`;
+    ${note('clock', 'It shows under Recent activity in your Tip Jar and is final once the network confirms it, usually within 20 minutes.')}
+    <div class="monero-send-actions"><button class="button payment" type="button" data-send-action="close">${labelled('check', 'Done')}</button></div>`;
 }
 
 // Only a broadcast whose outcome is unknown ends here - a transfer that could not be built goes
 // back to the amount. The node may have taken it, so there is no way to send it again from here.
 function failedStep(state: MoneroSendState): string {
-  return `<p class="monero-send-error" role="alert">${html(state.error || 'The transfer did not go through.')}</p>
+  return `<p class="monero-send-error" role="alert">${icon('circle-alert')}<span>${html(state.error || 'The transfer did not go through.')}</span></p>
     <div class="monero-send-actions"><button class="button payment" type="button" data-send-action="close">Close</button></div>`;
+}
+
+function headIcon(state: MoneroSendState): IconName {
+  switch (state.step) {
+    case 'review':
+    case 'sending': return 'shield-check';
+    case 'sent': return 'circle-check';
+    case 'failed': return 'circle-alert';
+    default: return isTip(state) ? 'piggy-bank' : 'send';
+  }
+}
+
+function sheetHead(id: string, text: string, name: IconName): string {
+  return `<div class="monero-send-head"><span class="monero-send-head-icon" aria-hidden="true">${icon(name)}</span><h2 class="page-title monero-send-title" id="${id}">${html(text)}</h2></div>`;
 }
 
 function title(state: MoneroSendState): string {
@@ -127,7 +151,7 @@ export function moneroSendBody(state: MoneroSendState, availableAtomic: string):
     : reviewStep(state);
   // The review names the recipient in its own To row, so the header block is not repeated there.
   const reviewing = state.step === 'review' || state.step === 'sending';
-  return `<h2 class="page-title monero-send-title" id="monero-send-title">${html(title(state))}</h2>
+  return `${sheetHead('monero-send-title', title(state), headIcon(state))}
     ${reviewing ? '' : recipientBlock(state)}
     ${step}`;
 }
@@ -145,11 +169,11 @@ function tipStartActions(view: MoneroTipStartView): string {
 export function moneroTipStartSheet(view: MoneroTipStartView): string {
   const headerState: MoneroSendState = { id: view.id, step: 'amount', recipient: view.recipient, amountText: '', addressText: '' };
   return `<section class="monero-send monero-tip-start" id="monero-tip-start" data-tip-start-id="${view.id}" aria-labelledby="monero-tip-start-title">
-    <h2 class="page-title monero-send-title" id="monero-tip-start-title">${html(view.title)}</h2>
+    ${sheetHead('monero-tip-start-title', view.title, 'piggy-bank')}
     ${recipientBlock(headerState)}
     <p class="monero-send-result" role="status">${html(view.lead)}</p>
-    <p class="section-help">${html(view.help)}</p>
-    ${view.detail ? `<p class="monero-send-available">${html(view.detail)}</p>` : ''}
+    ${note('info', html(view.help))}
+    ${view.detail ? `<p class="monero-send-available">${icon('wallet')}<span>${html(view.detail)}</span></p>` : ''}
     ${tipStartActions(view)}
   </section>`;
 }

@@ -93,6 +93,7 @@ const ICONS = [
   'upload',
   'user-plus',
   'user-round',
+  'wallet',
   'weight',
   'x',
   'zap'
