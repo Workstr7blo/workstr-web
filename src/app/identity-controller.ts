@@ -8,6 +8,7 @@ import type { Signer } from '../signer/types';
 import type { AppState } from './state';
 import { html } from './format';
 import { icon } from './icons';
+import { confirmAction } from './confirm-dialog';
 
 const SESSION_KEY = 'workstr.currentPubkey';
 const OBSOLETE_SIGNER_KEYS = ['workstr.signerType', 'workstr.nip46.clientSecret', 'workstr.nip46.connection', 'workstr.nip46.grantedPerms'];
@@ -48,7 +49,7 @@ async function signOut(): Promise<void> {
 async function signOutAndRemoveData(): Promise<void> {
   const pubkey = state.pubkey;
   if (!pubkey) return;
-  if (!window.confirm("Remove this identity's training data from this device and sign out? This cannot be undone.")) return;
+  if (!(await confirmAction({ title: 'Remove data and sign out?', message: "This identity's training data is removed from this device and you are signed out. This cannot be undone.", confirmLabel: 'Remove and sign out', icon: 'log-out' }))) return;
   state.store?.close();
   state.store = null;
   await deleteNamespace(pubkey);

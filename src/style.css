@@ -1636,3 +1636,20 @@ section.monero-send > * + * { margin-top: 14px; }
 .monero-send-result.ok span { color: var(--text); }
 .monero-send-actions .button { display: inline-flex; align-items: center; gap: 8px; }
 .monero-send-actions .button svg { width: 16px; height: 16px; flex: none; }
+
+/* The in-app confirm (src/app/confirm-dialog.ts). The dialog itself has no padding, so a
+   click whose target is the dialog element is always a click on the backdrop. */
+.confirm-dialog { width: min(420px, calc(100vw - 32px)); max-width: none; margin: auto; padding: 0; border: 0; background: transparent; color: var(--text); overflow: visible; }
+.confirm-dialog:not([open]) { display: none; }
+.confirm-dialog::backdrop { background: rgba(var(--void-rgb), .72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.confirm-dialog-card { --tone: var(--purple-2); --tone-rgb: var(--accent-rgb); display: grid; gap: 14px; padding: 20px; border: 1px solid rgba(var(--accent-line-rgb), .3); border-radius: 20px; background: linear-gradient(180deg, rgba(var(--tone-rgb), .08), transparent 60%), rgba(var(--surface-rgb), .98); box-shadow: 0 24px 60px rgba(0,0,0,.55); animation: confirm-in .16s ease-out; }
+.confirm-dialog.danger .confirm-dialog-card { --tone: var(--danger-red); --tone-rgb: var(--danger-rgb); }
+.confirm-dialog-head { display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: center; gap: 12px; }
+.confirm-dialog-icon { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(var(--tone-rgb), .32); border-radius: 13px; color: var(--tone); background: rgba(var(--tone-rgb), .12); }
+.confirm-dialog-icon svg { width: 21px; height: 21px; }
+.confirm-dialog-title { margin: 0; font: 850 19px/1.2 Inter, ui-sans-serif, sans-serif; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.confirm-dialog-message { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.confirm-dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.confirm-dialog-actions .button { justify-content: center; min-width: 0; min-height: 46px; line-height: 1.15; text-align: center; }
+@keyframes confirm-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .confirm-dialog-card { animation: none; } }

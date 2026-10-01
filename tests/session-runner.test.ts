@@ -7,6 +7,10 @@ import type { AppState } from '../src/app/state';
 import type { RelayProgram } from '../src/nostr/canon';
 import type { WorkstrStore } from '../src/db/store';
 import { sessionDetail } from '../src/features/train/views';
+import { confirmAction } from '../src/app/confirm-dialog';
+
+vi.mock('../src/app/confirm-dialog', () => ({ confirmAction: vi.fn(async () => true) }));
+const confirmMock = vi.mocked(confirmAction);
 
 const { unlockCountdownAudioMock } = vi.hoisted(() => ({ unlockCountdownAudioMock: vi.fn() }));
 
@@ -439,7 +443,7 @@ describe('session runner', () => {
   });
 
   it('leaves the source history intact when a repeated session is cancelled', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirm = confirmMock.mockResolvedValue(true);
     const source = {
       id: 42, sheetName: 'Push Pull', startedAt: '2026-08-18T10:00:00Z', finishedAt: '2026-08-18T10:40:00Z',
       exercises: [{ exerciseSlug: 'bench-press', exerciseName: 'Bench Press', sets: 2, reps: '8', restSec: 60 }],
@@ -457,7 +461,7 @@ describe('session runner', () => {
     expect(deleted).toEqual([repeatedId]);
     expect(state.finishedSessions).toEqual([source]);
     expect(source.sets).toHaveLength(1);
-    confirm.mockRestore();
+    confirm.mockClear();
   });
 
   it('finishes the session and opens the recap modal', async () => {
@@ -478,7 +482,7 @@ describe('session runner', () => {
   });
 
   it('keeps a session when cancel is dismissed and deletes it when confirmed', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const confirm = confirmMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     await runner.startTrainingSession(oneExerciseProgram());
 
     (root.querySelector('#session-close') as HTMLButtonElement).click();
@@ -492,7 +496,7 @@ describe('session runner', () => {
     expect(deleted).toEqual([1]);
     expect(state.activeSession).toBeNull();
     expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(false);
-    confirm.mockRestore();
+    confirm.mockClear();
   });
 
   // The shell holds its rebuild back while the overlay is open, so everything the session
@@ -522,7 +526,7 @@ describe('session runner', () => {
   });
 
   it('repaints the app behind the overlay when the session is cancelled', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirm = confirmMock.mockResolvedValue(true);
     const context = makeContext(root, state, toasts);
     const renders: number[] = [];
     const counted = { ...context, render: () => { renders.push(1); context.render(); } };
@@ -536,7 +540,7 @@ describe('session runner', () => {
     expect(renders).toHaveLength(1);
     expect(state.activeSession).toBeNull();
     expect(root.querySelector('#session-overlay')?.classList.contains('open')).toBe(false);
-    confirm.mockRestore();
+    confirm.mockClear();
   });
 
   it('starts an EMOM clock and logs actual reps without opening normal rest', async () => {
@@ -709,14 +713,14 @@ describe('session runner', () => {
   });
 
   it('asks for end confirmation only once after repeated EMOM renders', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const confirm = confirmMock.mockResolvedValue(false);
     await runner.startTrainingSession(emomProgram());
     (root.querySelector('#emom-start') as HTMLButtonElement).click();
     await tick();
     (root.querySelector('#session-close') as HTMLButtonElement).click();
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(state.activeSession).toBeTruthy();
-    confirm.mockRestore();
+    confirm.mockClear();
   });
 
   it('keeps elapsed time at zero until EMOM starts, then aligns both clocks', async () => {

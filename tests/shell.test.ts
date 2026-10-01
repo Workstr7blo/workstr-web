@@ -11,6 +11,10 @@ import { fetchProfile } from '../src/nostr/profile';
 import { LOCAL_NAMESPACE } from '../src/db/adopt';
 import { WorkstrStore } from '../src/db/store';
 import { clearLocalSecret, LEGACY_LOCAL_KEY_STORAGE, loadLocalSecret } from '../src/signer/local-key-storage';
+import { confirmAction } from '../src/app/confirm-dialog';
+
+vi.mock('../src/app/confirm-dialog', () => ({ confirmAction: vi.fn(async () => true) }));
+const confirmMock = vi.mocked(confirmAction);
 
 // Boot and settings-view rendering kick off background relay fetches unrelated to this file's
 // assertions. `tests/setup.ts` now blocks every non-loopback socket, so an unmocked one fails
@@ -79,10 +83,10 @@ async function startGuardSession(name: string): Promise<{ root: HTMLElement; she
 // tests that follow. Ending the session also stops the elapsed and rest intervals, which
 // would otherwise tick into the next test's jsdom.
 async function endSession(root: HTMLElement, shell: ShellHandle, sheetId: number): Promise<void> {
-  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const confirm = confirmMock.mockResolvedValue(true);
   root.querySelector<HTMLElement>('#session-close')?.click();
   await waitFor(() => !root.querySelector('#session-overlay')?.classList.contains('open'), 'the session overlay to close');
-  confirm.mockRestore();
+  confirm.mockClear();
   await shell.state.store?.deleteSheet(sheetId);
   await drainBoot(shell);
 }

@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Destructive actions now ask in an in-app dialog instead of the browser's system prompt:
+  deleting a program, exercise or session, deleting a program from relays, discarding a live
+  session, removing data on sign-out, replacing the Tip Jar, and the device vault's reset and
+  key-removal prompts. Each names the action on its button, opens above the live session and
+  lock screen, focuses Cancel, and is dismissed by Escape or a tap outside.
+
 - Polished the Monero send and tip sheet: each step opens with a payment-toned icon head,
   the balance, fee warning and confirmation timing are icon-led callouts, errors carry an
   alert icon, and Review, Back, Send and Done lead with icons. The sheet now uses the full

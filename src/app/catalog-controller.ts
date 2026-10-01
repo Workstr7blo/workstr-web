@@ -13,6 +13,7 @@ import { exerciseDetailMarkup, exerciseDetailMuscles, favouriteButtonContent } f
 import { programSurfaceMounted, updateDiscoverExercises, updateExerciseCatalogStatus, updateProgramCatalogStatus } from './catalog-surfaces';
 import type { RenderOptions } from './root-rebuild';
 import type { AppState } from './state';
+import { confirmAction } from './confirm-dialog';
 
 export interface CatalogControllerContext {
   root: HTMLElement;
@@ -282,7 +283,7 @@ async function importProgram(program: RelayProgram, button: HTMLButtonElement | 
 
 async function deleteExerciseFromLibrary(exercise: Exercise): Promise<boolean> {
   if (!state.store || !exercise.id) return false;
-  if (!window.confirm(`Delete "${exercise.name}" from your library? Programs and logged sessions keep their own copies.`)) return false;
+  if (!(await confirmAction({ title: `Delete ${exercise.name}?`, message: 'It is removed from your library. Programs and logged sessions keep their own copies.', confirmLabel: 'Delete exercise', icon: 'trash-2' }))) return false;
   await state.store.deleteExercise(exercise.id);
   await reloadLibrary();
   render();
@@ -294,7 +295,7 @@ async function deleteSelectedExercises(): Promise<void> {
   if (!state.store) return;
   const slugs = [...state.librarySelect.slugs];
   if (!slugs.length) return;
-  if (!window.confirm(`Delete ${slugs.length} exercise${slugs.length === 1 ? '' : 's'} from your library? Programs and logged sessions keep their own copies.`)) return;
+  if (!(await confirmAction({ title: `Delete ${slugs.length} exercise${slugs.length === 1 ? '' : 's'}?`, message: 'They are removed from your library. Programs and logged sessions keep their own copies.', confirmLabel: 'Delete', icon: 'trash-2' }))) return;
   for (const slug of slugs) {
     const exercise = state.library.find((entry) => entry.slug === slug);
     if (exercise?.id) await state.store.deleteExercise(exercise.id);

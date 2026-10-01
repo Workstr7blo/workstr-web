@@ -5,6 +5,7 @@ import { sheetToProgram } from '../features/sheets/views';
 import type { ProgramBrowser } from '../features/sheets/program-browser';
 import { renderProgramResults, updateProgramFilterSheet } from './browse-surfaces';
 import type { AppState } from './state';
+import { confirmAction } from './confirm-dialog';
 
 export interface ProgramListContext {
   root: HTMLElement;
@@ -74,10 +75,10 @@ export function createProgramList(ctx: ProgramListContext) {
       event.stopPropagation();
       const sheet = state.sheets.find((item) => item.id === Number(button.dataset.delSheet));
       // Deleting never reaches relays, so a published program must not read as retracted.
-      const prompt = sheet && ownsPublishedSheet(sheet, state.pubkey)
-        ? 'Delete this program from this device? It stays published on public relays and can still appear in Discover.'
-        : 'Delete this program?';
-      if (!state.store || !window.confirm(prompt)) return;
+      const message = sheet && ownsPublishedSheet(sheet, state.pubkey)
+        ? 'It is removed from this device only. It stays published on public relays and can still appear in Discover.'
+        : 'It is removed from Programs on this device.';
+      if (!state.store || !(await confirmAction({ title: `Delete ${sheet?.name || 'this program'}?`, message, confirmLabel: 'Delete program', icon: 'trash-2' }))) return;
       await state.store.deleteSheet(Number(button.dataset.delSheet) || 0);
       state.sheets = await state.store.listSheets();
       render();

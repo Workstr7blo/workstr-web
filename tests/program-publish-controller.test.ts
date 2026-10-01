@@ -4,6 +4,10 @@ import type { AppState } from '../src/app/state';
 import { createProgramPublishController } from '../src/app/program-publish-controller';
 import type { SheetWithExercises, WorkstrStore } from '../src/db/store';
 import type { Signer } from '../src/signer/types';
+import { confirmAction } from '../src/app/confirm-dialog';
+
+vi.mock('../src/app/confirm-dialog', () => ({ confirmAction: vi.fn(async () => true) }));
+const confirmMock = vi.mocked(confirmAction);
 
 const { publishCreatorProgramMock } = vi.hoisted(() => ({
   publishCreatorProgramMock: vi.fn()
@@ -202,7 +206,7 @@ describe('deleting a program from relays', () => {
   const deletion = { event: { id: 'd'.repeat(64), pubkey: ME, created_at: 2, kind: 5, tags: [], content: '', sig: '' }, okRelays: ['wss://nos.lol'], failedRelays: [] };
 
   function setup(partial: Partial<AppState>, confirmed = true) {
-    vi.spyOn(window, 'confirm').mockReturnValue(confirmed);
+    confirmMock.mockResolvedValue(confirmed);
     const deleteCreatorProgram = vi.fn(async (..._args: unknown[]) => deletion);
     const persistCanonCache = vi.fn(async () => {});
     const toast = vi.fn();
@@ -235,7 +239,7 @@ describe('deleting a program from relays', () => {
     expect(app.deleteCreatorProgram).toHaveBeenCalledWith(expect.anything(), { address, eventId: 'e'.repeat(64) }, expect.any(Array), expect.any(Object));
     expect(store.saveSheet).toHaveBeenCalledWith(expect.objectContaining({ name: 'Push Day', nostr_address: undefined, nostr_event_id: undefined }), 7);
     expect(app.appState.programs).toEqual([]);
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('It stays in Programs on this device.'));
+    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('It stays in Programs on this device.') }));
   });
 
   it('does nothing when the confirmation is cancelled', async () => {

@@ -7,6 +7,7 @@ import type { PublishCreatorProgramResult } from '../nostr/program-publish';
 import { redactSecrets } from '../nostr/secret-redaction';
 import type { Signer } from '../signer/types';
 import type { AppState } from './state';
+import { confirmAction } from './confirm-dialog';
 
 export interface ProgramPublishControllerContext {
   root: HTMLElement;
@@ -79,7 +80,7 @@ export function createProgramPublishController(ctx: ProgramPublishControllerCont
     if (!target) { toast('Program not found', 'bad'); return; }
     const name = sheet?.name || relayCopy?.name || 'this program';
     const keeps = state.sheets.some((item) => item.nostr_address === target.address) ? ' It stays in Programs on this device.' : '';
-    if (!window.confirm(`Delete ${name} from public relays? Relays that honour deletion requests stop serving it, but one that already copied it may keep it.${keeps}`)) return;
+    if (!(await confirmAction({ title: `Delete ${name} from public relays?`, message: `Relays that honour deletion requests stop serving it, but one that already copied it may keep it.${keeps}`, confirmLabel: 'Delete from relays', icon: 'trash-2' }))) return;
     const signer = await getSigner();
     if (!signer) { toast('Sign in before deleting programs from relays.', 'bad'); return; }
     try {
