@@ -239,7 +239,7 @@ describe('deleting a program from relays', () => {
     expect(app.deleteCreatorProgram).toHaveBeenCalledWith(expect.anything(), { address, eventId: 'e'.repeat(64) }, expect.any(Array), expect.any(Object));
     expect(store.saveSheet).toHaveBeenCalledWith(expect.objectContaining({ name: 'Push Day', nostr_address: undefined, nostr_event_id: undefined }), 7);
     expect(app.appState.programs).toEqual([]);
-    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('It stays in Programs on this device.') }));
+    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('It stays in your Library on this device.') }));
   });
 
   it('does nothing when the confirmation is cancelled', async () => {

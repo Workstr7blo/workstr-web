@@ -78,19 +78,19 @@ function localProgramActions(program: RelayProgram, state: AppState): string {
 
 export function programActions(program: RelayProgram, state: AppState): string {
   if (isLocalProgram(program)) return localProgramActions(program, state);
-  // The user's own publication is edited from Programs; the relay copy is only ever a status.
+  // The user's own publication is edited from Library; the relay copy is only ever a status.
   const owned = findOwnedProgramSource(program, state.sheets, state.pubkey);
   const retract = authoredByActiveAccount(program, state) ? deleteFromRelaysRow(program.address) : '';
   if (owned) {
     const label = sheetPublicationState(owned, state.pubkey) === 'changed' ? 'Yours · Unpublished changes' : 'Yours';
-    return `${disabledAction(label, 'Edit this program from your local Programs library.', 'check')}${retract}`;
+    return `${disabledAction(label, 'Edit this program from your Library.', 'check')}${retract}`;
   }
   const importState = programImportState(program, state.sheets, state.pubkey);
   return (importState === 'in-library'
     ? disabledAction('In library', 'This program is already saved locally.', 'check')
     : actionRow(
       importState === 'update' ? 'Update local copy' : 'Import program',
-      importState === 'update' ? 'Refresh your local copy with the relay version.' : 'Add a local copy to your Programs library.',
+      importState === 'update' ? 'Refresh your local copy with the relay version.' : 'Add a local copy to your Library.',
       actionButton(importState === 'update' ? 'Update' : 'Import', 'download', `data-import-program="${html(program.address)}"`, 'primary'),
       'program-action-row--lead'
     )) + retract;

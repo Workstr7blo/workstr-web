@@ -210,7 +210,7 @@ describe('importing your own published program', () => {
       exercises: [expect.objectContaining({ exercise_slug: 'burpee', sets: 10 })]
     }), 4);
     expect(app.store.upsertExercise).not.toHaveBeenCalled();
-    expect(app.toast).toHaveBeenCalledWith('This is your published program. It is already in Programs.');
+    expect(app.toast).toHaveBeenCalledWith('This is your published program. It is already in your Library.');
   });
 
   it('writes nothing when the local sheet already carries the address', async () => {
@@ -219,7 +219,7 @@ describe('importing your own published program', () => {
     await app.controller.importProgram(relay, null);
 
     expect(app.saveSheet).not.toHaveBeenCalled();
-    expect(app.toast).toHaveBeenCalledWith('This is your published program. It is already in Programs.');
+    expect(app.toast).toHaveBeenCalledWith('This is your published program. It is already in your Library.');
   });
 });
 

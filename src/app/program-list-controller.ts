@@ -77,7 +77,7 @@ export function createProgramList(ctx: ProgramListContext) {
       // Deleting never reaches relays, so a published program must not read as retracted.
       const message = sheet && ownsPublishedSheet(sheet, state.pubkey)
         ? 'It is removed from this device only. It stays published on public relays and can still appear in Discover.'
-        : 'It is removed from Programs on this device.';
+        : 'It is removed from your Library on this device.';
       if (!state.store || !(await confirmAction({ title: `Delete ${sheet?.name || 'this program'}?`, message, confirmLabel: 'Delete program', icon: 'trash-2' }))) return;
       await state.store.deleteSheet(Number(button.dataset.delSheet) || 0);
       state.sheets = await state.store.listSheets();

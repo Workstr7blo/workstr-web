@@ -255,7 +255,7 @@ async function importProgram(program: RelayProgram, button: HTMLButtonElement | 
     }
     state.sheets = await state.store.listSheets();
     render();
-    toast('This is your published program. It is already in Programs.');
+    toast('This is your published program. It is already in your Library.');
     return;
   }
   const importState = programImportState(program, sheets, state.pubkey);
